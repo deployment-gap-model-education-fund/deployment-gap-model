@@ -8,10 +8,6 @@ dependencies:
 
   - catalystcoop.pudl>=0.5 # implicitly install almost everything needed
   - python-graphviz # For visualizing DAGs from Prefect
-  
-  # database stuff
-  - postgresql~=13.3 # highest version on Google Cloud SQL as of 11/16/2021
-  - postgis~3.1.4
   - psycopg2~=2.9.2
 
   # Jupyter notebook specific packages:

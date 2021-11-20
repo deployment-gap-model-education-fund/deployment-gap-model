@@ -79,8 +79,12 @@ target/
 # exclude data from source control by default
 /data/raw/*
 !/data/raw/.gitkeep
+
 /data/processed/*
 !/data/processed/.gitkeep
+
+/data/postgres/*
+!/data/postgres/.gitkeep
 
 # Mac OS-specific storage files
 .DS_Store
