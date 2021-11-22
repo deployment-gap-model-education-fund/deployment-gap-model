@@ -2,49 +2,57 @@ version: "3.8"
 services:
   postgres:
     image: postgis/postgis:13-3.1-alpine
-    restart: always
+    restart: unless-stopped
     environment:
-      - DATABASE_HOST=127.0.0.1
-      - POSTGRES_DB=dbcp
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
       - PGDATA=/var/lib/postgresql/data # this is the default, but make it explicit
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./sql/docker_init_sql/:/docker-entrypoint-initdb.d # files execute in lex order
+      - ./docker/init_sql/:/docker-entrypoint-initdb.d # files execute in lex order
+      # above scripts won't run if a database already exists
+    networks:
+      - postgres
 
   postgres-test:
     # same as postgres but no persistence and different port
     image: postgis/postgis:13-3.1-alpine
-    restart: always
+    restart: unless-stopped
     environment:
-      - DATABASE_HOST=127.0.0.1
-      - POSTGRES_DB=dbcp
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     ports:
-      - "5430:5432"
+      - "${POSTGRES_TEST_PORT}:5432"
     volumes:
-      - ./sql/docker_init_sql/:/docker-entrypoint-initdb.d # files execute in lex order
-      # no volume because we probalby don't need to persist test data
+      - ./docker/init_sql/:/docker-entrypoint-initdb.d # files execute in lex order
+      # no volume because we probably don't need to persist test data
+    networks:
+      - postgres
 
   pgadmin:
     image: dpage/pgadmin4:6.2
-    restart: always
+    restart: unless-stopped
     depends_on:
       - postgres
     environment:
-      - PGADMIN_DEFAULT_EMAIL=admin@fake.com
-      - PGADMIN_DEFAULT_PASSWORD=pgadmin
-      - PGADMIN_LISTEN_PORT=80
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+      - PGADMIN_LISTEN_PORT=${PGADMIN_LISTEN_PORT}
     ports:
-      - "8080:80"
+      - "${PGADMIN_PORT}:${PGADMIN_LISTEN_PORT}"
     volumes:
       - pgadmin-data:/var/lib/pgadmin
-    links:
-      - "postgres:pgsql-server"
+    networks:
+      - postgres
+
+networks:
+  postgres:
+    driver: bridge
+
 volumes:
-  postgres-data: null
-  pgadmin-data: null
+  postgres-data:
+  pgadmin-data:

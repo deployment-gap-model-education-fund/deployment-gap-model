@@ -7,7 +7,9 @@ dependencies:
   - python>=3.8
 
   - catalystcoop.pudl>=0.5 # implicitly install almost everything needed
-  - python-graphviz # For visualizing DAGs from Prefect
+  - python-graphviz~=0.18 # For visualizing DAGs from Prefect
+  - python-dotenv~=0.19
+  - make~=4.3
   - psycopg2~=2.9.2
 
   # Jupyter notebook specific packages:
