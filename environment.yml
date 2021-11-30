@@ -4,47 +4,9 @@ channels:
   - defaults
 dependencies:
   - pip~=21.0
-  - python>=3.8
+  - python>=3.8,<3.10
 
   - catalystcoop.pudl>=0.5 # implicitly install almost everything needed
-  - python-graphviz~=0.18 # For visualizing DAGs from Prefect
-  - python-dotenv~=0.19
-  - make~=4.3
-  - psycopg2~=2.9.2
-
-  # Jupyter notebook specific packages:
-  - jupyter-resource-usage~=0.5.0
-  - jupyter_contrib_nbextensions~=0.5.1
-  - jupyter_nbextensions_configurator
-  - seaborn~=0.11.0
-  - jupyterlab~=3.1
-  - nbdime~=3.1.0
-
-  # dev tools
-  # linting & formatting
-  - autopep8~=1.5
-  - isort~=5.0
-  - flake8~=4.0
-  - flake8-builtins~=1.5
-  - flake8-colors~=0.1
-  - flake8-docstrings~=1.5
-  - flake8-use-fstring~=1.0
-  - pep8-naming~=0.12
-  - mypy~=0.910
-  # testing
-  - tox~=3.20
-  - pytest~=6.2
-  - pytest-console-scripts~=1.1
-  - pytest-cov>=2.10,<4.0
-  # miscellaneous
-  - jedi~=0.18
-  - ipdb~=0.13.4
-  - bandit~=1.6
-  - coverage>=5.3,<7.0
-  - mccabe~=0.6
-  - nbval~=0.9
-  - pre-commit~=2.9
-  - pydocstyle>=5.1,<7.0
 
   # Use pip to install the main package for development:
 #  - pip:
