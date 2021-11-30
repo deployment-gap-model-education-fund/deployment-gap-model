@@ -5,13 +5,14 @@ import logging
 
 import pandas as pd
 
-from dbcp.extract import excel
+from pudl.extract.excel import GenericExtractor
+from dbcp.extract.excel import DBCPMetadata
 from pudl.helpers import fix_leading_zero_gen_ids
 
 logger = logging.getLogger(__name__)
 
 
-class Extractor(excel.GenericExtractor):
+class Extractor(GenericExtractor):
     """Extractor for the excel dataset EIA860."""
 
     def __init__(self, *args, **kwargs):
@@ -21,7 +22,7 @@ class Extractor(excel.GenericExtractor):
         Args:
             ds (:class:datastore.Datastore): Initialized datastore.
         """
-        self.METADATA = excel.Metadata('eipinfrastructure')
+        self.METADATA = DBCPMetadata('eipinfrastructure')
         self.cols_added = []
         super().__init__(*args, **kwargs)
 

@@ -4,11 +4,11 @@ import dbcp
 import pandas as pd
 from dbcp.constants import WORKING_PARTITIONS
 
-from pudl.workspace.datastore import Datastore
+from dbcp.workspace.datastore import DBCPDatastore
 
 def etl_eipinfrastructure():
     """EIP Infrastructure ETL."""
-    ds = Datastore(sandbox=True)
+    ds = DBCPDatastore(sandbox=True)
     eip_raw_dfs = dbcp.extract.eipinfrastructure.Extractor(ds).extract(update_date=WORKING_PARTITIONS["eipinfrastructure"]["update_date"])
     
     # Transform
