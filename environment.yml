@@ -1,0 +1,11 @@
+name: dbcp-dev
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - pip~=21.0
+  - python>=3.8,<3.10
+  - pre-commit
+  - pip:
+    - --editable .
+    - -r requirements.txt
