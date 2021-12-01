@@ -3,7 +3,7 @@ import dbcp
 
 import pandas as pd
 from dbcp.constants import WORKING_PARTITIONS
-
+from pudl.metadata.classes import Package, Resource
 from dbcp.workspace.datastore import DBCPDatastore
 
 def etl_eipinfrastructure():
@@ -26,3 +26,11 @@ def etl():
         transformed_dfs.update(etl_func())
 
     # TODO: Load!
+    
+
+    from sqlalchemy import create_engine
+    engine = create_engine('postgresql://postgres:postgres@postgres:5432')
+    with engine.connect() as con:
+        for table_name, df in transformed_dfs.items():
+            print(f"writting {table_name} to sql")
+            df.to_sql(name=table_name, con=con, if_exists="replace")
