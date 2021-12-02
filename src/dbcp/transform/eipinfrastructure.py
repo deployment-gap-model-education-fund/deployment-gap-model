@@ -67,7 +67,7 @@ def transform(eip_raw_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     }
 
     for table_name, transform_func in eip_transform_functions.items():
-        logger.info(f"Transforming {table_name} EIP DataFrames.")
+        logger.info(f"EIP Infrastructure: Transforming {table_name} table.")
 
         table_df = eip_raw_dfs[table_name].copy()
         eip_transformed_dfs[table_name] = transform_func(table_df)
