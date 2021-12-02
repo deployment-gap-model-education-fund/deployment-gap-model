@@ -1,16 +1,17 @@
 """DBC ETL logic."""
-import dbcp
+import sqlalchemy as sa
 
-import pandas as pd
+import dbcp
 from dbcp.constants import WORKING_PARTITIONS
-from pudl.metadata.classes import Package, Resource
 from dbcp.workspace.datastore import DBCPDatastore
+
 
 def etl_eipinfrastructure():
     """EIP Infrastructure ETL."""
     ds = DBCPDatastore(sandbox=True)
-    eip_raw_dfs = dbcp.extract.eipinfrastructure.Extractor(ds).extract(update_date=WORKING_PARTITIONS["eipinfrastructure"]["update_date"])
-    
+    eip_raw_dfs = dbcp.extract.eipinfrastructure.Extractor(ds).extract(
+        update_date=WORKING_PARTITIONS["eipinfrastructure"]["update_date"])
+
     # Transform
     eip_transformed_dfs = dbcp.transform.eipinfrastructure.transform(eip_raw_dfs)
 
@@ -26,10 +27,8 @@ def etl():
         transformed_dfs.update(etl_func())
 
     # TODO: Load!
-    
 
-    from sqlalchemy import create_engine
-    engine = create_engine('postgresql://postgres:postgres@postgres:5432')
+    engine = sa.create_engine('postgresql://postgres:postgres@postgres:5432')
     with engine.connect() as con:
         for table_name, df in transformed_dfs.items():
             print(f"writting {table_name} to sql")

@@ -1,8 +1,12 @@
-from typing import Dict
-import pandas as pd
+"""Functions to transform EIP Infrastructure tables."""
+
 import logging
+from typing import Dict
+
+import pandas as pd
 
 logger = logging.getLogger(__name__)
+
 
 def natural_gas_pipelines(ng_pipes: pd.DataFrame) -> pd.DataFrame:
     """
@@ -20,8 +24,9 @@ def natural_gas_pipelines(ng_pipes: pd.DataFrame) -> pd.DataFrame:
     """
     # Convert cost to millions
     ng_pipes["cost"] = ng_pipes["cost"] * 1_000_000
-    
+
     return ng_pipes
+
 
 def emissions_increase(projects: pd.DataFrame) -> pd.DataFrame:
     """
@@ -43,6 +48,7 @@ def emissions_increase(projects: pd.DataFrame) -> pd.DataFrame:
 
     return projects
 
+
 def transform(eip_raw_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     """
     Transform EIP Infrastructure dataframes.
@@ -53,7 +59,6 @@ def transform(eip_raw_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     Returns:
         eip_transformed_dfs: Dictionary of the transformed tables.
     """
-
     eip_transformed_dfs = {}
 
     eip_transform_functions = {
@@ -63,7 +68,7 @@ def transform(eip_raw_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
 
     for table_name, transform_func in eip_transform_functions.items():
         logger.info(f"Transforming {table_name} EIP DataFrames.")
-        
+
         table_df = eip_raw_dfs[table_name].copy()
         eip_transformed_dfs[table_name] = transform_func(table_df)
 

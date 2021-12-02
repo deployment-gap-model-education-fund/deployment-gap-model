@@ -64,14 +64,14 @@ repos:
   - id: bandit
     args: [--configfile, .bandit.yml]
 
-# Unit tests
-- repo: local
-  hooks:
-    - id: unit-tests
-      name: unit-tests
-      stages: [commit]
-      language: system
-      verbose: false
-      pass_filenames: false
-      always_run: true
-      entry: pytest --doctest-modules src/dbcp test/unit
+# # Unit tests
+# - repo: local
+#   hooks:
+#     - id: unit-tests
+#       name: unit-tests
+#       stages: [commit]
+#       language: system
+#       verbose: false
+#       pass_filenames: false
+#       always_run: true
+#       entry: pytest --doctest-modules src/dbcp test/unit

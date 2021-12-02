@@ -1,7 +1,6 @@
 """Load excel metadata CSV files form a python data package."""
 import importlib.resources
 import logging
-import pathlib
 
 import pandas as pd
 
@@ -12,18 +11,18 @@ class Metadata(object):
     """Load Excel metadata from Python package data.
 
     Excel sheet files may contain many different tables. When we load those
-    into dataframes, metadata tells us how to do this. Metadata generally informs
-    us about the position of a given page in the file (which sheet and which row)
-    and it informs us how to translate excel column names into standardized
-    column names.
+    into dataframes, metadata tells us how to do this. Metadata generally
+    informs us about the position of a given page in the file (which sheet
+    and which row) and it informs us how to translate excel column names
+    into standardized column names.
 
     When metadata object is instantiated, it is given ${dataset} name and it
     will attempt to load csv files from pudl.package_data.${dataset} package.
 
     It expects the following kinds of files:
 
-    * skiprows.csv tells us how many initial rows should be skipped when loading
-      data for given (partition, page).
+    * skiprows.csv tells us how many initial rows should be skipped when
+      loading data for given (partition, page).
     * skipfooter.csv tells us how many bottom rows should be skipped when
       loading data for given partition (partition, page).
     * page_map.csv tells us what is the excel sheet name that should be read
@@ -33,16 +32,16 @@ class Metadata(object):
       Relevant page is encoded in the filename.
     """
 
-    # TODO: we could validate whether metadata is valid for all year. We should have
-    # existing records for each (year, page) -> sheet_name, (year, page) -> skiprows
-    # and for all (year, page) -> column map
+    # TODO: we could validate whether metadata is valid for all year. We
+    # should have existing records for each (year, page) -> sheet_name,
+    # (year, page) -> skiprows and for all (year, page) -> column map
 
     def __init__(self, dataset_name: str):
         """Create Metadata object and load metadata from python package.
 
         Args:
-            dataset_name: Name of the package/dataset to load the metadata from.
-            Files will be loaded from pudl.package_data.${dataset_name}
+            dataset_name: Name of the package/dataset to load the metadata
+            from. Files will be loaded from pudl.package_data.${dataset_name}
 
         """
         pkg = f'dbcp.package_data.{dataset_name}'
@@ -62,35 +61,35 @@ class Metadata(object):
             self._column_map[parts[0]] = column_map
 
     def get_dataset_name(self):
-        """Returns the name of the dataset described by this metadata."""
+        """Return the name of the dataset described by this metadata."""
         return self._dataset_name
 
     def get_sheet_name(self, page, **partition):
-        """Returns name of the excel sheet that contains the data for given partition and page."""
+        """Return name of the excel sheet that contains the data for given partition and page."""
         return self._sheet_name.at[page, str(self._get_partition_key(partition))]
 
     def get_skiprows(self, page, **partition):
-        """Returns number of initial rows to skip when loading given partition and page."""
+        """Return number of initial rows to skip when loading given partition and page."""
         return self._skiprows.at[page, str(self._get_partition_key(partition))]
 
     def get_skipfooter(self, page, **partition):
-        """Returns number of bottom rows to skip when loading given partition and page."""
+        """Return number of bottom rows to skip when loading given partition and page."""
         return self._skipfooter.at[page, str(self._get_partition_key(partition))]
 
     def get_file_name(self, page, **partition):
-        """Returns file name of given partition and page."""
+        """Return file name of given partition and page."""
         return self._file_name.at[page, str(self._get_partition_key(partition))]
 
     def get_column_map(self, page, **partition):
-        """Returns the dictionary mapping input columns to pudl columns for given partition and page."""
+        """Return the dictionary mapping input columns to pudl columns for given partition and page."""
         return {v: k for k, v in self._column_map[page].T.loc[str(self._get_partition_key(partition))].to_dict().items() if v != -1}
 
     def get_all_columns(self, page):
-        """Returns list of all pudl (standardized) columns for a given page (across all partition)."""
+        """Return list of all pudl (standardized) columns for a given page (across all partition)."""
         return sorted(self._column_map[page].T.columns)
 
     def get_all_pages(self):
-        """Returns list of all known pages."""
+        """Return list of all known pages."""
         return sorted(self._column_map.keys())
 
     @staticmethod

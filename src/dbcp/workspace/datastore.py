@@ -1,4 +1,7 @@
-from pudl.workspace.datastore import ZenodoFetcher, Datastore
+"""Subclasses of PUDL Datastore and ZenodoFetcher that point to DBCP Zenodo archives."""
+
+from pudl.workspace.datastore import Datastore, ZenodoFetcher
+
 
 class DBCPZenodoFetcher(ZenodoFetcher):
     """API for fetching datapackage descriptors and resource contents from zenodo."""
@@ -25,10 +28,12 @@ class DBCPZenodoFetcher(ZenodoFetcher):
         "production": "https://zenodo.org/api",
     }
 
+
 class DBCPDatastore(Datastore):
     """Datastore that uses DBCPZenodoFetcher's DOIs."""
 
     def __init__(self, sandbox: bool = False, timeout: float = 15, *args, **kwargs):
+        """Inititalize a Datastore with DBCPZenodoFetcher."""
         super().__init__(*args, **kwargs)
         self._zenodo_fetcher = DBCPZenodoFetcher(
             sandbox=sandbox,
