@@ -1,15 +1,21 @@
 """DBC ETL logic."""
 import logging
+from typing import Dict
+
+import pandas as pd
+import sqlalchemy as sa
 
 import dbcp
 from dbcp.constants import WORKING_PARTITIONS
 from dbcp.workspace.datastore import DBCPDatastore
+from pudl.output.pudltabl import PudlTabl
 
 logger = logging.getLogger(__name__)
 
 
-def etl_eipinfrastructure():
+def etl_eipinfrastructure() -> Dict[str, pd.DataFrame]:
     """EIP Infrastructure ETL."""
+    # Extract
     ds = DBCPDatastore(sandbox=True)
     eip_raw_dfs = dbcp.extract.eipinfrastructure.Extractor(ds).extract(
         update_date=WORKING_PARTITIONS["eipinfrastructure"]["update_date"])
@@ -20,19 +26,42 @@ def etl_eipinfrastructure():
     return eip_transformed_dfs
 
 
+def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
+    """Pull tables from pudl sqlite database."""
+    pudl_tables = {}
+
+    pudl_engine = sa.create_engine("sqlite:////app/pudl.sqlite")
+    pudl_out = PudlTabl(
+        pudl_engine,
+        start_date='2020-01-01',
+        end_date='2020-12-31',
+        freq='AS',
+        fill_fuel_cost=True,
+        roll_fuel_cost=True,
+        fill_net_gen=True,
+    )
+
+    mcoe = pudl_out.mcoe(all_gens=True)
+    pudl_tables["mcoe"] = mcoe
+
+    return pudl_tables
+
+
 def etl():
     """Run dbc ETL."""
-    etl_funcs = {"eipinfrastructure": etl_eipinfrastructure}
+    etl_funcs = {"eipinfrastructure": etl_eipinfrastructure, "pudl": etl_pudl_tables}
 
+    # Extract and transform the data sets
     transformed_dfs = {}
     for dataset, etl_func in etl_funcs.items():
         logger.info(f"Processing: {dataset}")
         transformed_dfs.update(etl_func())
 
-    # TODO: Load!
-
+    # Load table into postgres
     engine = dbcp.helpers.get_sql_engine()
     with engine.connect() as con:
         for table_name, df in transformed_dfs.items():
             logger.info(f"Load {table_name} to postgres.")
-            df.to_sql(name=table_name, con=con, if_exists="replace")
+            df.to_sql(name=table_name, con=con, if_exists="replace", index=False)
+
+    logger.info("Sucessfully finished ETL.")

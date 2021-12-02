@@ -9,3 +9,6 @@ run_etl:
 
 sql_shell:
 	docker compose run --rm postgres bash -c 'psql -U $$POSTGRES_USER -h $$POSTGRES_HOST $$POSTGRES_DB'
+
+pudl_db:
+	docker compose run --rm app sqlite3 pudl.sqlite
