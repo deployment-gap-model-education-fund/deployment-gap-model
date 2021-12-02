@@ -15,6 +15,16 @@ make run_etl
 ```
 to run the etl.
 
+```
+make sql_shell
+```
+starts a PostgreSQL interactive terminal.
+
+```
+make shell
+```
+starts a bash interactive terminal.
+
 ## Conda
 There are some packages that are helpful for local development that aren't necessary in the docker image like pre-commit. To manage these packages, create a conda environment using this command:
 

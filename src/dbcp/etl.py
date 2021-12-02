@@ -1,9 +1,11 @@
 """DBC ETL logic."""
-import sqlalchemy as sa
+import logging
 
 import dbcp
 from dbcp.constants import WORKING_PARTITIONS
 from dbcp.workspace.datastore import DBCPDatastore
+
+logger = logging.getLogger(__name__)
 
 
 def etl_eipinfrastructure():
@@ -24,12 +26,13 @@ def etl():
 
     transformed_dfs = {}
     for dataset, etl_func in etl_funcs.items():
+        logger.info(f"Processing: {dataset}")
         transformed_dfs.update(etl_func())
 
     # TODO: Load!
 
-    engine = sa.create_engine('postgresql://postgres:postgres@postgres:5432')
+    engine = dbcp.helpers.get_sql_engine()
     with engine.connect() as con:
         for table_name, df in transformed_dfs.items():
-            print(f"writting {table_name} to sql")
+            logger.info(f"Load {table_name} to postgres.")
             df.to_sql(name=table_name, con=con, if_exists="replace")
