@@ -1,5 +1,6 @@
-from typing import Dict, Tuple
+"""DBCP constants."""
 
+from typing import Dict, Tuple
 
 WORKING_PARTITIONS: Dict[str, Dict] = {
     "eipinfrastructure": {

@@ -1,6 +1,8 @@
+"""A Command line interface for the down ballot project."""
 import sys
 
 import dbcp
+
 
 def main():
     """Parse command line and initialize PUDL DB."""
