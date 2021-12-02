@@ -7,6 +7,7 @@ services:
       - postgres
     volumes:
       - ./src/dbcp:/app/dbcp:ro
+      - ../pudl-work/sqlite/pudl.sqlite:/app/pudl.sqlite:ro
   postgres:
     image: postgis/postgis:13-3.1-alpine
     restart: unless-stopped
