@@ -1,5 +1,6 @@
 """DBC ETL logic."""
 import logging
+from pathlib import Path
 from typing import Dict
 
 import pandas as pd
@@ -50,7 +51,7 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
     return pudl_tables
 
 
-def etl():
+def etl(args):
     """Run dbc ETL."""
     etl_funcs = {
         "eipinfrastructure": etl_eipinfrastructure,
@@ -69,5 +70,13 @@ def etl():
         for table_name, df in transformed_dfs.items():
             logger.info(f"Load {table_name} to postgres.")
             df.to_sql(name=table_name, con=con, if_exists="replace", index=False)
+
+    # TODO: Writing to CSVs is a temporary solution for getting data into Tableau
+    # This should be removed once we have cloudsql setup.
+    if args.csv:
+        logger.info('Writing tables to CSVs.')
+        output_path = Path("/app/output/")
+        for table_name, df in transformed_dfs.items():
+            df.to_csv(output_path / f"{table_name}.csv", index=False)
 
     logger.info("Sucessfully finished ETL.")
