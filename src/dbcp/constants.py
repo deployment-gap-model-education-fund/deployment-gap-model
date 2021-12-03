@@ -14,3 +14,5 @@ PUDL_TABLES: Dict[str, Tuple[str]] = {
         "emissions_increase"
     )
 }
+
+PUDL_VERSION = "pudl-v0.5.0-2021-11-14"
