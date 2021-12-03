@@ -15,3 +15,6 @@ sql_shell:
 
 pudl_db:
 	docker compose run --rm app bash -c 'sqlite3 /app/input/$$PUDL_VERSION/pudl_data/sqlite/pudl.sqlite'
+
+test:
+	docker compose run --rm app pytest --ignore=input/w
