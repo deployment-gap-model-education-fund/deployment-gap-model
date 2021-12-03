@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 def etl_eipinfrastructure() -> Dict[str, pd.DataFrame]:
     """EIP Infrastructure ETL."""
     # Extract
-    ds = DBCPDatastore(sandbox=True)
+    ds = DBCPDatastore(sandbox=True, local_cache_path="/app/input")
     eip_raw_dfs = dbcp.extract.eipinfrastructure.Extractor(ds).extract(
         update_date=WORKING_PARTITIONS["eipinfrastructure"]["update_date"])
 
@@ -28,9 +28,12 @@ def etl_eipinfrastructure() -> Dict[str, pd.DataFrame]:
 
 def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
     """Pull tables from pudl sqlite database."""
+    pudl_data_path = dbcp.helpers.download_pudl_data()
+
     pudl_tables = {}
 
-    pudl_engine = sa.create_engine("sqlite:////app/pudl.sqlite")
+    pudl_engine = sa.create_engine(
+        f"sqlite:////{pudl_data_path}/pudl_data/sqlite/pudl.sqlite")
     pudl_out = PudlTabl(
         pudl_engine,
         start_date='2020-01-01',
@@ -49,7 +52,10 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
 
 def etl():
     """Run dbc ETL."""
-    etl_funcs = {"eipinfrastructure": etl_eipinfrastructure, "pudl": etl_pudl_tables}
+    etl_funcs = {
+        "eipinfrastructure": etl_eipinfrastructure,
+        "pudl": etl_pudl_tables
+    }
 
     # Extract and transform the data sets
     transformed_dfs = {}
