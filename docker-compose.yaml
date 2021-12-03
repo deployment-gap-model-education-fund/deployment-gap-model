@@ -9,6 +9,7 @@ services:
       - ./src/dbcp:/app/dbcp:ro
       - ./input:/app/input:rw
       - ./output:/app/output:rw
+      - ./test:/app/test:r
   postgres:
     image: postgis/postgis:13-3.1-alpine
     restart: unless-stopped
