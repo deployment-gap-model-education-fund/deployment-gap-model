@@ -8,6 +8,7 @@ services:
     volumes:
       - ./src/dbcp:/app/dbcp:ro
       - ./input:/app/input:rw
+      - ./output:/app/output:rw
   postgres:
     image: postgis/postgis:13-3.1-alpine
     restart: unless-stopped
