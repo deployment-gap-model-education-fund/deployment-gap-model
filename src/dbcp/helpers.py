@@ -9,8 +9,6 @@ import requests
 import sqlalchemy as sa
 from tqdm import tqdm
 
-from dbcp.constants import PUDL_VERSION
-
 logger = logging.getLogger(__name__)
 
 
@@ -26,6 +24,8 @@ def download_pudl_data() -> Path:
     """Download pudl data from Zenodo."""
     # TODO(bendnorman): Adjust the datastore and zenodo fetcher so we can pull down PUDL
     # TODO(bendnorman): Ideally this is replaced with Intake.
+    PUDL_VERSION = os.environ["PUDL_VERSION"]
+
     input_path = Path("/app/input")
     pudl_data_path = input_path / PUDL_VERSION
     if not pudl_data_path.exists():
