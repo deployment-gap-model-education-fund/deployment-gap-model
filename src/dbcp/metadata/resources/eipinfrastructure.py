@@ -1,0 +1,56 @@
+"""Definitions of data tables primarily coming from EIA 860/861/923."""
+from typing import Any, Dict
+
+RESOURCE_METADATA: Dict[str, Dict[str, Any]] = {
+    "emissions_increase": {
+        "schema": {
+            "fields": [
+                "latitude",
+                "company",
+                "description",
+                "pm2_5_tpy",
+                "population_within_3_miles",
+                "congressional_representative",
+                "political_party",
+                "longitude",
+                "ejscreen_report_url",
+                "population_people_of_color_pct",
+                "state_enforcement_records_url",
+                "classification",
+                "co2_tpy",
+                "permit_history",
+                "state",
+                "respiratory_hazard_index",
+                "operating_status",
+                "state_permitting_url",
+                "ghg_permit_status",
+                "population_over_64_pct",
+                "permit_status_last_updated",
+                "pm2_5_ugpm3",
+                "population_low_income_pct",
+                "sector",
+                "project_name",
+                "epa_compliance_report_url",
+                "permit_type",
+                "so2_tpy",
+                "operational_status_sources",
+                "operational_status_links",
+                "state_facility_id",
+                "cancer_risk",
+                "population_under_5_pct",
+                "completion_date",
+                "o3_ppb",
+                "pm10_tpy",
+                "wastewater_discharge_indicator",
+                "voc_tpy",
+                "permit_documents_url",
+                "haps_tpy",
+                "nox_tpy",
+                "co_typ",
+                "county",
+                "operating_status_last_updated",
+            ],
+        },
+        "sources": ["eipinfrastructure"]
+    }
+}

@@ -1,20 +1,20 @@
-SHELL := /bin/bash
-create_dotenv:
-	#TODO: very brittle
-	if [[ ! -e ./.env ]]; then tail -n +7 config.env > ./.env; fi
+build:
+	docker compose build
 
-start_database: create_dotenv
-	docker compose up -d
+shell:
+	docker compose run --rm app /bin/bash
 
-stop_database:
-	docker compose down
+run_etl:
+	docker compose run --rm app python -m dbcp.cli
 
-delete_db_data: stop_database
-	docker volume rm down_ballot_climate_postgres-data
+run_etl_csv:
+	docker compose run --rm app python -m dbcp.cli --csv
 
-delete_pgadmin_data: stop_database
-	docker volume rm down_ballot_climate_pgadmin-data
+sql_shell:
+	docker compose run --rm postgres bash -c 'psql -U $$POSTGRES_USER -h $$POSTGRES_HOST $$POSTGRES_DB'
 
-delete_all_data: delete_db_data delete_pgadmin
-	# use docker volume prune to remove build cache.
-	# Careful because it removes ALL unused volumes, even from other projects
+pudl_db:
+	docker compose run --rm app bash -c 'sqlite3 /app/input/$$PUDL_VERSION/pudl_data/sqlite/pudl.sqlite'
+
+test:
+	docker compose run --rm app pytest --ignore=input/w

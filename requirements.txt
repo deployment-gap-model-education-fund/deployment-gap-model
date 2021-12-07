@@ -1,0 +1,4 @@
+catalystcoop.pudl>=0.5
+psycopg2
+pytest
+tqdm
