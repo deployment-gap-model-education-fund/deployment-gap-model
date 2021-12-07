@@ -1,58 +1,18 @@
-version: "3.8"
+version: '3.9'
 services:
-  postgres:
-    image: postgis/postgis:13-3.1-alpine
-    restart: unless-stopped
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - PGDATA=/var/lib/postgresql/data # this is the default, but make it explicit
-    ports:
-      - "${POSTGRES_PORT}:5432"
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - ./docker/init_sql/:/docker-entrypoint-initdb.d # files execute in lex order
-      # above scripts won't run if a database already exists
-    networks:
-      - postgres
-
-  postgres-test:
-    # same as postgres but no persistence and different port
-    image: postgis/postgis:13-3.1-alpine
-    restart: unless-stopped
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-    ports:
-      - "${POSTGRES_TEST_PORT}:5432"
-    volumes:
-      - ./docker/init_sql/:/docker-entrypoint-initdb.d # files execute in lex order
-      # no volume because we probably don't need to persist test data
-    networks:
-      - postgres
-
-  pgadmin:
-    image: dpage/pgadmin4:6.2
-    restart: unless-stopped
+  app:
+    build: .
+    env_file: default.env
     depends_on:
       - postgres
-    environment:
-      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
-      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
-      - PGADMIN_LISTEN_PORT=${PGADMIN_LISTEN_PORT}
-    ports:
-      - "${PGADMIN_PORT}:${PGADMIN_LISTEN_PORT}"
     volumes:
-      - pgadmin-data:/var/lib/pgadmin
-    networks:
-      - postgres
-
-networks:
+      - ./src/dbcp:/app/dbcp:ro
+      - ./input:/app/input:rw
+      - ./output:/app/output:rw
+      - ./test:/app/test:r
   postgres:
-    driver: bridge
-
-volumes:
-  postgres-data:
-  pgadmin-data:
+    image: postgis/postgis:13-3.1-alpine
+    restart: unless-stopped
+    env_file: default.env
+    ports:
+      - ${POSTGRES_PORT}:5432
