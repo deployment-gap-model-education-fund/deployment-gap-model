@@ -7,6 +7,7 @@ import docx
 from pudl.metadata.enums import US_STATES
 
 class ColumbiaDocxParser(object):
+    """Parser for the Columbia Local Opposition .docx file."""
     POSSIBLE_STATES = set(US_STATES.values())
     POSSIBLE_HEADERS = {'Local Laws/Ordinances', 'Contested Projects', 'State Policy'}
     FIRST_STATE = 'Alabama'
@@ -14,7 +15,6 @@ class ColumbiaDocxParser(object):
     NULL_PROJECT = {'No contested projects were found at this time.',}
 
     def __init__(self) -> None:
-        #TODO: refactor to use datastore
         self.current_state = ''
         self.current_header = ''
         self.doc: Optional[docx.Document] = None
@@ -24,9 +24,25 @@ class ColumbiaDocxParser(object):
         self.contested_projects_dict: Dict[str, List[str]] = {'state': [], 'project_name': [], 'description': []}
     
     def load_docx(self, source_path = Path('/app/input/RELDI report updated 9.10.21 (1).docx')) -> None:
+        """Read the .docx file with python-docx.
+
+        Args:
+            source_path (Path, optional): path to .docx file. Defaults to Path('/app/input/RELDI report updated 9.10.21 (1).docx').
+        """
         self.doc = docx.Document(source_path)
 
     def _remove_intro(self, paragraphs: List[docx.text.paragraph.Paragraph]) -> List[docx.text.paragraph.Paragraph]:
+        """Skip over The title page, table of contents, intro, etc that contain no data.
+
+        Args:
+            paragraphs (List[docx.text.paragraph.Paragraph]): the list of paragraphs
+
+        Raises:
+            ValueError: if the marker for the start of the data cannot be found.
+
+        Returns:
+            List[docx.text.paragraph.Paragraph]: subset of paragraphs, from the first data line to the end.
+        """
         for idx, paragraph in enumerate(paragraphs):
             if paragraph.text.strip() == ColumbiaDocxParser.FIRST_STATE:
                 return paragraphs[idx:]
@@ -34,6 +50,11 @@ class ColumbiaDocxParser(object):
 
 
     def _parse_values(self, text: str) -> None:
+        """Parse and assign values to the correct dataset based on the current hierarchical headings.
+
+        Args:
+            text (str): the paragraph text content
+        """
         if self.current_header == 'State Policy':
             # no null check required. This section is simply missing if null.
             self.state_policy_dict['state'].append(self.current_state)
