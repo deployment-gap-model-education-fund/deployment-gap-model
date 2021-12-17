@@ -82,7 +82,8 @@ class ColumbiaDocxParser(object):
             self.contested_projects_dict['project_name'].append(name)
             self.contested_projects_dict['description'].append(description.strip())
             return
-        # else: not required. Set membership test occurs prior to this function
+        else:
+            raise ValueError(f'Unexpected header: {self.current_header}')
         
 
     def extract(self) -> Dict[str, pd.DataFrame]:
@@ -105,13 +106,15 @@ class ColumbiaDocxParser(object):
                 continue
             elif paragraph.style.name == 'Heading 1': # states
                 self.current_state = paragraph.text.strip()
-                assert self.current_state in ColumbiaDocxParser.POSSIBLE_STATES, f'Parsing error. Check state: {self.current_state}'
+                assert self.current_state in ColumbiaDocxParser.POSSIBLE_STATES, f'Unexepected state: {self.current_state}'
                 self.current_header = '' # a new state marks a new hierarchy, so reset cache
             elif paragraph.style.name == 'Heading 2': # value type
                 self.current_header = paragraph.text.strip()
-                assert self.current_header in ColumbiaDocxParser.POSSIBLE_HEADERS, f'Parsing error. Check header: {self.current_header}'
+                assert self.current_header in ColumbiaDocxParser.POSSIBLE_HEADERS, f'Unexpected header: {self.current_header}'
             elif paragraph.style.name == 'Normal': # values
                 self._parse_values(paragraph.text.strip())
+            else:
+                raise ValueError(f'Unexpected paragraph style: {paragraph.style.name}')
         
         return {
             'state_policy': pd.DataFrame(self.state_policy_dict),
