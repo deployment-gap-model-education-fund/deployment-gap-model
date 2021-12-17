@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 from pathlib import Path
 
 import pandas as pd
@@ -13,16 +13,18 @@ class ColumbiaDocxParser(object):
     NULL_ORDINANCE = {'No ordinances were found at this time.', 'No local ordinances were found at this time.'}
     NULL_PROJECT = {'No contested projects were found at this time.',}
 
-    def __init__(self, source_path = Path('/app/input/RELDI report updated 9.10.21 (1).docx')) -> None:
+    def __init__(self) -> None:
         #TODO: refactor to use datastore
         self.current_state = ''
         self.current_header = ''
-        self.doc = docx.Document(source_path)
+        self.doc: Optional[docx.Document] = None
         
         self.state_policy_dict: Dict[str, List[str]] = {'state': [], 'policy': []}
-        self.county_ordinance_dict: Dict[str, List[str]] = {'state': [], 'county': [], 'ordinance': []}
+        self.local_ordinance_dict: Dict[str, List[str]] = {'state': [], 'locality': [], 'ordinance': []}
         self.contested_projects_dict: Dict[str, List[str]] = {'state': [], 'project_name': [], 'description': []}
     
+    def load_docx(self, source_path = Path('/app/input/RELDI report updated 9.10.21 (1).docx')) -> None:
+        self.doc = docx.Document(source_path)
 
     def _remove_intro(self, paragraphs: List[docx.text.paragraph.Paragraph]) -> List[docx.text.paragraph.Paragraph]:
         for idx, paragraph in enumerate(paragraphs):
@@ -41,10 +43,10 @@ class ColumbiaDocxParser(object):
         elif self.current_header == 'Local Laws/Ordinances':
             if text in ColumbiaDocxParser.NULL_ORDINANCE:
                 return
-            county, ordinance = text.split(':', maxsplit=1)
-            self.county_ordinance_dict['state'].append(self.current_state)
-            self.county_ordinance_dict['county'].append(county)
-            self.county_ordinance_dict['ordinance'].append(ordinance.strip())
+            locality, ordinance = text.split(':', maxsplit=1)
+            self.local_ordinance_dict['state'].append(self.current_state)
+            self.local_ordinance_dict['locality'].append(locality)
+            self.local_ordinance_dict['ordinance'].append(ordinance.strip())
             return
 
         elif self.current_header == 'Contested Projects':
@@ -70,10 +72,11 @@ class ColumbiaDocxParser(object):
         and then extracting values into a dictionary (later converted to pd.DataFrame)
 
         Returns:
-            Dict[str, pd.DataFrame]: return dataframes with keys 'state_policy', 'county_ordinance', and 'contested_project'
+            Dict[str, pd.DataFrame]: return dataframes with keys 'state_policy', 'local_ordinance', and 'contested_project'
         """
+        if self.doc is None:
+            raise ValueError('Use the .load_docx() method to load the document.')
 
-        
         paragraphs = self._remove_intro(self.doc.paragraphs)
 
         for paragraph in paragraphs:
@@ -91,6 +94,6 @@ class ColumbiaDocxParser(object):
         
         return {
             'state_policy': pd.DataFrame(self.state_policy_dict),
-            'county_ordinance': pd.DataFrame(self.county_ordinance_dict),
+            'local_ordinance': pd.DataFrame(self.local_ordinance_dict),
             'contested_project': pd.DataFrame(self.contested_projects_dict)
         }
