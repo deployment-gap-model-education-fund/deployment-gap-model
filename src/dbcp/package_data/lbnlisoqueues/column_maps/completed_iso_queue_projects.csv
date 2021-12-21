@@ -16,5 +16,5 @@ days_in_queue,days_in_q
 resource_type,type_clean
 resource_type_1,type1
 resource_type_2,type2
-resource_capacity_1,mw1
-resource_capacity_2,mw2
+capacity_mw_resource_1,mw1
+capacity_mw_resource_2,mw2
