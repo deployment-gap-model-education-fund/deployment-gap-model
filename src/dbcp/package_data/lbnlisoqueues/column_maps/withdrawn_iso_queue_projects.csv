@@ -15,7 +15,7 @@ year_withdrawn,wd_year
 withdrawl_reason,wd_reason
 days_in_queue,days_in_q
 interconnection_status,ia_status
-resource_type,type_clean
+resource_type_lbnl,type_clean
 resource_type_1,type1
 resource_type_2,type2
 capacity_mw_resource_1,mw1
