@@ -13,11 +13,11 @@ county_3,county_3
 state,state
 region,region
 point_of_interconnection,poi_name
-resource_type,type_clean
+resource_type_lbnl,type_clean
 date_proposed,proposed_on_date
 year_proposed,proposed_on_year
 interconnection_status_raw,ia_status_raw
-interconnection_status_clean,ia_status_clean
+interconnection_status_lbnl,ia_status_clean
 resource_type_1,type1
 resource_type_2,type2
 resource_type_3,type3

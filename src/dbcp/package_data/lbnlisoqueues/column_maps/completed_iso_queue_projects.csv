@@ -13,7 +13,7 @@ date_proposed,proposed_on_date
 date_operational,on_date
 year_operational,on_year
 days_in_queue,days_in_q
-resource_type,type_clean
+resource_type_lbnl,type_clean
 resource_type_1,type1
 resource_type_2,type2
 capacity_mw_resource_1,mw1
