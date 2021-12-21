@@ -8,13 +8,13 @@ project_name,project_name
 utility,utility
 county,county
 state,state
-poi_name,poi_name
+point_of_interconnection,poi_name
 date_proposed,proposed_on_date
 date_withdrawn,wd_date
 year_withdrawn,wd_year
 withdrawl_reason,wd_reason
 days_in_queue,days_in_q
-agreement_status,ia_status
+interconnection_status,ia_status
 resource_type,type_clean
 resource_type_1,type1
 resource_type_2,type2
