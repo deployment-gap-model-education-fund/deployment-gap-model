@@ -8,7 +8,7 @@ project_name,project_name
 utility,utility
 county,county
 state,state
-poi_name,poi_name
+point_of_interconnection,poi_name
 date_proposed,proposed_on_date
 date_operational,on_date
 year_operational,on_year
