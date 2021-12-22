@@ -76,7 +76,7 @@ class ColumbiaDocxParser(object):
             try:
                 name, description = text.split(':', maxsplit=1)
             except ValueError: # no split
-                name = 'unknown'
+                name = ''
                 description = text
             self.contested_projects_dict['state'].append(self.current_state)
             self.contested_projects_dict['project_name'].append(name)
@@ -111,7 +111,11 @@ class ColumbiaDocxParser(object):
             elif paragraph.style.name == 'Heading 2': # value type
                 self.current_header = paragraph.text.strip()
                 assert self.current_header in ColumbiaDocxParser.POSSIBLE_HEADERS, f'Unexpected header: {self.current_header}'
-            elif paragraph.style.name == 'Normal': # values
+            elif paragraph.style.name in {'Normal', 'List Paragraph', 'Normal1'}: # values
+                # This hardcoded style checking is slightly less brittle than it seems.
+                # Any mis-styled states or headers would be obvious from the table of contents.
+                # A future improvement could be to ensure that is true, but I think this data is static
+                # so will defer that work.
                 self._parse_values(paragraph.text.strip())
             else:
                 raise ValueError(f'Unexpected paragraph style: {paragraph.style.name}')
