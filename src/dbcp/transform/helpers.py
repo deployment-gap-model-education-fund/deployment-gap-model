@@ -4,6 +4,10 @@ from typing import Optional, List, Dict
 import pandas as pd
 
 
+EXCEL_EPOCH_ORIGIN = pd.Timestamp('01/01/1900')
+UNIX_EPOCH_ORIGIN = pd.Timestamp('01/01/1970')
+
+
 def normalize_multicolumns_to_rows(
     df: pd.DataFrame,
     attribute_columns_dict: Dict[str, List[str]],
@@ -45,7 +49,8 @@ def normalize_multicolumns_to_rows(
         original_df,
         attribute_columns_dict = {
             'fuel': ['fuel_1', 'fuel_2', 'fuel_N'],
-            'capacity': ['capacity_of_fuel_1', 'capacity_of_fuel_2', 'capacity_of_fuel_N']
+            'capacity': ['capacity_of_fuel_1', 'capacity_of_fuel_2', 'capacity_of_fuel_N'],
+            <more attribute:column mappings here if needed>,
         },
         preserve_original_names=False
     )
@@ -75,12 +80,12 @@ def normalize_multicolumns_to_rows(
     return output.reset_index()
 
 
-def multiformat_date_parser(date_strings: pd.Series, parse_excel=True) -> pd.Series:
+def multiformat_string_date_parser(dates: pd.Series, numeric_origin=EXCEL_EPOCH_ORIGIN) -> pd.Series:
     """Iteratively parse a column of date strings with heterogeneous formatting.
 
     The LBNL ISO Queue contains a variety of date formats. I couldn't get
     pd.to_datetime() to convert all of them with a single function call because
-    it assumes that if the first X have the same format, all of them do.
+    it assumes that if the first N rows have the same format, all of them do.
     This solution iteratively calls pd.to_datetime() and inputs the results to .fillna()
 
     Args:
@@ -90,39 +95,81 @@ def multiformat_date_parser(date_strings: pd.Series, parse_excel=True) -> pd.Ser
     Returns:
         pd.Series: dates converted to pd.Timestamp
     """
-    dates = pd.to_datetime(
+    if not pd.api.types.is_string_dtype(dates):
+        raise ValueError(f"Column is not a string dtype. Given {dates.dtype}.")
+
+    # separate numeric encodings from string encodings
+    is_numeric_string = dates.str.isnumeric().fillna(False)
+    date_strings = dates.loc[~is_numeric_string]
+
+    # parse strings
+    parsed_dates = pd.to_datetime(
         date_strings, infer_datetime_format=True, errors='coerce')
-    remaining_nan = dates.isna().sum()
+    remaining_nan = parsed_dates.isna().sum()
     while True:
+        nans = parsed_dates.isna()
         nan_to_dates = pd.to_datetime(
-            date_strings[dates.isna()], infer_datetime_format=True, errors='coerce')
-        dates = dates.fillna(nan_to_dates)
-        new_remaining_nan = dates.isna().sum()
+            date_strings[nans], infer_datetime_format=True, errors='coerce')
+        parsed_dates = parsed_dates.fillna(nan_to_dates)
+        new_remaining_nan = nans.sum()
         if new_remaining_nan == remaining_nan:  # no improvement
             break
         else:
             remaining_nan = new_remaining_nan
 
-    # finally, interpret strings like '45049' as excel date offsets
-    if parse_excel:
-        maybe_excel_ints = date_strings[dates.isna()]
-        parsed_excel_dates = excel_date_parser(maybe_excel_ints)
-        dates = dates.fillna(parsed_excel_dates)
-    return dates
+    # handle numeric encodings
+    numbers = pd.to_numeric(dates.loc[is_numeric_string], errors='coerce')
+    encoded_dates = numeric_offset_date_encoder(numbers, origin=numeric_origin)
+
+    # recombine
+    new_dates = pd.concat([parsed_dates, encoded_dates],
+                          copy=False).loc[dates.index]
+    pd.testing.assert_index_equal(new_dates.index, dates.index)
+
+    return new_dates
 
 
-def excel_date_parser(date_strings: pd.Series) -> pd.Series:
-    """Convert column of excel date offsets (like '45059') to pd.Timestamp.
+def numeric_offset_date_encoder(series: pd.Series, origin=EXCEL_EPOCH_ORIGIN, unit='d', roundoff: Optional[str] = None) -> pd.Series:
+    """Convert column of numeric date offsets (like 45059) to pd.Timestamp.
 
     Warning: validation is left to the user! Check for unexpected dates.
 
     Args:
-        date_strings (pd.Series): column of strings to be converted
+        series (pd.Series): numeric date offsets
+        origin (pd.Timestamp): epoch origin, such as 1/1/1970 for unix
+        unit (str, optional): pandas frequency string. Defaults to 'd'.
+        roundoff (Optional[str], optional): pandas frequency string to round to, such as 'L' for milliseconds. Defaults to None.
+
+    Raises:
+        ValueError: if input column is not numeric
 
     Returns:
-        pd.Series: successful timestamp conversions (NaNs dropped)
+        pd.Series: output timestamps
     """
-    excel_origin = pd.Timestamp('01/01/1900')
-    numbers = pd.to_numeric(date_strings, errors='coerce').dropna()
-    offsets = pd.to_timedelta(numbers, unit='day')
-    return offsets + excel_origin
+    if len(series) == 0:  # accept empty series
+        return series
+    if not pd.api.types.is_numeric_dtype(series):
+        raise ValueError(f'Series is not numeric. Given {series.dtype}')
+    offsets = pd.to_timedelta(series, unit=unit)
+    date = offsets + origin
+    if roundoff:
+        # remove roundoff error
+        date = date.dt.round(freq=roundoff)
+    return date
+
+
+def parse_dates(series: pd.Series, expected_mean_year=2020) -> pd.Series:
+    if pd.api.types.is_numeric_dtype(series):
+        unix_dates = numeric_offset_date_encoder(
+            series, origin=UNIX_EPOCH_ORIGIN)
+        excel_dates = numeric_offset_date_encoder(
+            series, origin=EXCEL_EPOCH_ORIGIN)
+        unix_diff = (expected_mean_year - unix_dates.dt.year.mean())
+        excel_diff = (expected_mean_year - excel_dates.dt.year.mean())
+        if unix_diff < excel_diff:
+            return unix_dates
+        else:
+            return excel_dates
+    else:
+        # assumes excel epoch when mixed with strings
+        return multiformat_string_date_parser(series)
