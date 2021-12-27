@@ -4,7 +4,7 @@ from typing import Optional, List, Dict
 import pandas as pd
 
 
-EXCEL_EPOCH_ORIGIN = pd.Timestamp('01/01/1900')
+EXCEL_EPOCH_ORIGIN = pd.Timestamp('12/31/1899')
 UNIX_EPOCH_ORIGIN = pd.Timestamp('01/01/1970')
 
 
@@ -166,7 +166,7 @@ def parse_dates(series: pd.Series, expected_mean_year=2020) -> pd.Series:
             series, origin=EXCEL_EPOCH_ORIGIN)
         unix_diff = (expected_mean_year - unix_dates.dt.year.mean())
         excel_diff = (expected_mean_year - excel_dates.dt.year.mean())
-        if unix_diff < excel_diff:
+        if abs(unix_diff) < abs(excel_diff):
             return unix_dates
         else:
             return excel_dates
