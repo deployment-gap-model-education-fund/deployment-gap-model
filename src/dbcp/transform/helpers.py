@@ -3,9 +3,10 @@ from typing import Optional, List, Dict
 
 import pandas as pd
 
-
-EXCEL_EPOCH_ORIGIN = pd.Timestamp('12/31/1899')
 UNIX_EPOCH_ORIGIN = pd.Timestamp('01/01/1970')
+# Excel parser is simplified and will be one day off for dates < 1900/03/01
+# see xlrd.xldate.py:xldate_as_datetime for complete implementation
+EXCEL_EPOCH_ORIGIN = pd.Timestamp('12/30/1899')
 
 
 def normalize_multicolumns_to_rows(
@@ -75,9 +76,11 @@ def normalize_multicolumns_to_rows(
 
     output = pd.concat(chunks)
     if dropna:
-        output = output.dropna(how='all')
+        # need to subset columns, so can't use .dropna()
+        to_drop = output.loc[:, list(new_names)].isna().all(axis=1)
+        output = output.loc[~to_drop, :].copy()
 
-    return output.reset_index()
+    return output.sort_index().reset_index()
 
 
 def multiformat_string_date_parser(dates: pd.Series, numeric_origin=EXCEL_EPOCH_ORIGIN) -> pd.Series:
@@ -153,7 +156,7 @@ def numeric_offset_date_encoder(series: pd.Series, origin=EXCEL_EPOCH_ORIGIN, un
     offsets = pd.to_timedelta(series, unit=unit)
     date = offsets + origin
     if roundoff:
-        # remove roundoff error
+        # remove roundoff error to desired precision
         date = date.dt.round(freq=roundoff)
     return date
 
