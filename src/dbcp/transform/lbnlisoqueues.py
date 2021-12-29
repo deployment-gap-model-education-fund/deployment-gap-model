@@ -1,7 +1,7 @@
 """Functions to transform EIP Infrastructure tables."""
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 import pandas as pd
 
@@ -25,6 +25,8 @@ def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
 def completed_iso_queue_projects(completed_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform completed iso queue data."""
     parse_date_columns(completed_projects)
+    # standardize columns between queues
+    completed_projects.loc[:, 'interconnection_status_lbnl'] = 'IA Executed'
     return completed_projects
 
 
@@ -37,10 +39,14 @@ def withdrawn_iso_queue_projects(withdrawn_projects: pd.DataFrame) -> pd.DataFra
                                         replacement='CA',
                                         expected_count=5,
                                         )
+    # standardize values between queues
+    withdrawn_projects.loc[:, 'interconnection_status'].replace(
+        'Executed', 'IA Executed', inplace=True)
+
     return withdrawn_projects
 
 
-def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     """
     Transform LBNL ISO Queues dataframes.
 
@@ -53,7 +59,7 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
 
     lbnl_transformed_dfs = {name: df.copy()
                             for name, df in lbnl_raw_dfs.items()}
-    set_global_project_ids(lbnl_transformed_dfs)
+    _set_global_project_ids(lbnl_transformed_dfs)
 
     lbnl_transform_functions = {
         "active_iso_queue_projects": active_iso_queue_projects,
@@ -63,14 +69,13 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
 
     for table_name, transform_func in lbnl_transform_functions.items():
         logger.info(f"LBNL ISO Queues: Transforming {table_name} table.")
+        lbnl_transformed_dfs[table_name] = transform_func(
+            lbnl_transformed_dfs[table_name])
+    lbnl_normalized_dfs: Dict[str, pd.DataFrame] = {}
+    return lbnl_normalized_dfs
 
-        table_df = lbnl_raw_dfs[table_name].copy()
-        lbnl_transformed_dfs[table_name] = transform_func(table_df)
 
-    return lbnl_transformed_dfs
-
-
-def set_global_project_ids(lbnl_dfs: Dict[str, pd.DataFrame]) -> None:
+def _set_global_project_ids(lbnl_dfs: Dict[str, pd.DataFrame]) -> None:
     previous_idx_max = 0
     for df in lbnl_dfs.values():
         new_idx = pd.RangeIndex(previous_idx_max, len(
@@ -105,7 +110,8 @@ def replace_value_with_count_validation(df: pd.DataFrame, col: str, val_to_repla
     """Manually replace values, but with a minimal form of validation to guard against future changes.
 
     Args:
-        ser (pd.Series): the series in question
+        df (pd.DataFrame): the source dataframe
+        col (str): the name of the column containing values to replace
         val_to_replace (Any): value to replace
         replacement (Any): replacement value
         expected_count (int): known number of replacements to make
@@ -123,3 +129,44 @@ def replace_value_with_count_validation(df: pd.DataFrame, col: str, val_to_repla
 
     df.loc[matches, col] = replacement
     return
+
+
+def _normalize_resource_capacity(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+    if 'capacity_mw_resource_3' in lbnl_df.columns:  # only active projects
+        n_multicolumns = 3
+    else:
+        n_multicolumns = 2
+    attr_columns = {
+        'resource': ['resource_type_' + str(n) for n in range(1, n_multicolumns + 1)],
+        'capacity_mw': ['capacity_mw_resource_' + str(n) for n in range(1, n_multicolumns + 1)]
+    }
+    resource_capacity_df = normalize_multicolumns_to_rows(lbnl_df,
+                                                          attribute_columns_dict=attr_columns,
+                                                          preserve_original_names=False,
+                                                          dropna=True)
+    combined_cols: List[str] = sum(attr_columns.values(), start=[])
+    project_df = lbnl_df.drop(columns=combined_cols)
+
+    return {'resource_capacity_df': resource_capacity_df, 'project_df': project_df}
+
+
+def _normalize_location(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+    if 'county_3' in lbnl_df.columns:  # only active projects are multivalued
+        county_cols = ['county_' + str(n) for n in range(1, 4)]
+        location_df = normalize_multicolumns_to_rows(lbnl_df,
+                                                     attribute_columns_dict={
+                                                         'county': county_cols},
+                                                     preserve_original_names=False,
+                                                     dropna=True)
+        location_df = location_df.join(
+            lbnl_df.loc[:, 'state'], on='project_id')
+        project_df = lbnl_df.drop(columns=county_cols+['state'])
+    else:
+        location_df = lbnl_df.loc[:, ['state', 'county']].copy()
+        project_df = lbnl_df.drop(columns=['state', 'county'])
+
+    return {'location_df': location_df, 'project_df': project_df}
+
+
+def normalize_lbnl_dfs(lbnl_transformed_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
+    raise NotImplementedError
