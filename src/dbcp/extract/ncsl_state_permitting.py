@@ -46,18 +46,21 @@ class NCSLScraper(object):
             if tag.contents[0].text == '':
                 continue
             # Statute link
-            if tag.contents[0].text == 'Statute':
+            elif tag.contents[0].text == 'Statute':
                 try:
                     statute_link = tag.select('a')[0].attrs['href']
                 except IndexError:  # N/A values have no links
                     statute_link = ''
             # statute summary
-            if tag.contents[0].text == 'Summary':
+            elif tag.contents[0].text == 'Summary':
                 description = tag.contents[2].strip()
 
             # statute type
-            if tag.contents[0].text == 'Authority':
+            elif tag.contents[0].text == 'Authority':
                 permitting_type = tag.contents[2].strip()
+            else:
+                raise ValueError(
+                    f"Unexpected content title: {tag.contents[0].text}")
 
         output = {
             'state': state_name,
