@@ -6,6 +6,7 @@ from typing import Dict, Any, List
 import pandas as pd
 
 from dbcp.transform.helpers import EXCEL_EPOCH_ORIGIN, parse_dates, normalize_multicolumns_to_rows
+from pudl.helpers import add_fips_ids
 
 logger = logging.getLogger(__name__)
 
@@ -188,13 +189,15 @@ def _normalize_location(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
                                                          'county': county_cols},
                                                      preserve_original_names=False,
                                                      dropna=True)
-        location_df = location_df.join(
-            lbnl_df.loc[:, 'state'], on='project_id')
+        location_df = location_df.merge(
+            lbnl_df.loc[:, 'state'], on='project_id', validate='m:1')
+
         project_df = lbnl_df.drop(columns=county_cols+['state'])
     else:
         location_df = lbnl_df.loc[:, ['state', 'county']].reset_index()
         project_df = lbnl_df.drop(columns=['state', 'county'])
 
+    location_df.dropna(subset=['state', 'county'], how='all', inplace=True)
     return {'location_df': location_df, 'project_df': project_df}
 
 
@@ -225,3 +228,8 @@ def normalize_lbnl_dfs(lbnl_transformed_dfs: Dict[str, pd.DataFrame]) -> Dict[st
         'iso_locations': location_df,
         'iso_resource_capacity': resource_capacity_df,
     }
+
+
+def add_fips_codes(location_df: pd.DataFrame) -> pd.DataFrame:
+    with_fips = add_fips_ids(
+        location_df, state_col='state', county_col='county')
