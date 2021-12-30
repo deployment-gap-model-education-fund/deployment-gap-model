@@ -6,7 +6,7 @@ from typing import Dict, Any, List
 import pandas as pd
 
 from dbcp.transform.helpers import EXCEL_EPOCH_ORIGIN, parse_dates, normalize_multicolumns_to_rows
-from pudl.helpers import add_fips_ids
+from pudl.helpers import add_fips_ids as _add_fips_ids
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +73,10 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         lbnl_transformed_dfs[table_name] = transform_func(
             lbnl_transformed_dfs[table_name])
     lbnl_normalized_dfs = normalize_lbnl_dfs(lbnl_transformed_dfs)
+    # data enrichment
+    lbnl_normalized_dfs['iso_locations'] = add_fips_codes(
+        lbnl_normalized_dfs['iso_locations'])
+
     return lbnl_normalized_dfs
 
 
@@ -231,5 +235,27 @@ def normalize_lbnl_dfs(lbnl_transformed_dfs: Dict[str, pd.DataFrame]) -> Dict[st
 
 
 def add_fips_codes(location_df: pd.DataFrame) -> pd.DataFrame:
-    with_fips = add_fips_ids(
-        location_df, state_col='state', county_col='county')
+    """Add columns with state and county Federal Information Processing System (FIPS) ID codes.
+
+    Args:
+        location_df (pd.DataFrame): normalized lbnl ISO queue location df
+
+    Returns:
+        pd.DataFrame: copy of location_df with two new columns containing FIPS codes
+    """
+    with_fips = _add_fips_ids(
+        location_df.fillna({'state': ''}),
+        state_col='state',
+        county_col='county',
+    )
+    # fix about 50 independent cities with wrong name order
+    nan_fips = with_fips.loc[with_fips['county_id_fips'].isna(), :].copy()
+    nan_fips.loc[:, 'county'] = nan_fips.loc[:, 'county'].str.replace(
+        '^City of (.+)',
+        lambda x: x.group(1) + ' City',
+        regex=True
+    )
+    nan_fips = _add_fips_ids(nan_fips)
+    with_fips.loc[:, 'county_id_fips'].fillna(
+        nan_fips['county_id_fips'], inplace=True)
+    return with_fips
