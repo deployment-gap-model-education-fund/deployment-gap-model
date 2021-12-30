@@ -76,11 +76,9 @@ def normalize_multicolumns_to_rows(
             chunk['original_group'] = linked_columns[0]
         chunks.append(chunk)
 
-    output = pd.concat(chunks)
+    output: pd.DataFrame = pd.concat(chunks)
     if dropna:
-        # need to subset columns, so can't use .dropna()
-        to_drop = output.loc[:, list(new_names)].isna().all(axis=1)
-        output = output.loc[~to_drop, :].copy()
+        output.dropna(subset=list(new_names), how='all', inplace=True)
 
     return output.sort_index().reset_index()
 
