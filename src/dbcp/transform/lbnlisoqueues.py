@@ -76,7 +76,7 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     # data enrichment
     lbnl_normalized_dfs['iso_locations'] = add_fips_codes(
         lbnl_normalized_dfs['iso_locations'])
-
+    lbnl_normalized_dfs['iso_for_tableau'] = denormalize(lbnl_normalized_dfs)
     return lbnl_normalized_dfs
 
 
@@ -259,3 +259,12 @@ def add_fips_codes(location_df: pd.DataFrame) -> pd.DataFrame:
     with_fips.loc[:, 'county_id_fips'].fillna(
         nan_fips['county_id_fips'], inplace=True)
     return with_fips
+
+
+def denormalize(lbnl_normalized_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+    # TODO: this should be a view in SQL
+    loc_proj = lbnl_normalized_dfs['iso_locations'].merge(
+        lbnl_normalized_dfs['iso_projects'], on='project_id', how='outer', validate='m:1')
+    all_proj = loc_proj.merge(
+        lbnl_normalized_dfs['iso_resource_capacity'], on='project_id', how='outer', validate="m:m")
+    return all_proj
