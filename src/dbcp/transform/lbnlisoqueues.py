@@ -71,11 +71,16 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         logger.info(f"LBNL ISO Queues: Transforming {table_name} table.")
         lbnl_transformed_dfs[table_name] = transform_func(
             lbnl_transformed_dfs[table_name])
-    lbnl_normalized_dfs: Dict[str, pd.DataFrame] = {}
+    lbnl_normalized_dfs = normalize_lbnl_dfs(lbnl_transformed_dfs)
     return lbnl_normalized_dfs
 
 
 def _set_global_project_ids(lbnl_dfs: Dict[str, pd.DataFrame]) -> None:
+    """Reindex (in place) the three LBNL queues with IDs unique between all three dataframes.
+
+    Args:
+        lbnl_dfs (Dict[str, pd.DataFrame]): dict with the three LBNL queue dataframes
+    """
     previous_idx_max = 0
     for df in lbnl_dfs.values():
         new_idx = pd.RangeIndex(previous_idx_max, len(
@@ -86,6 +91,13 @@ def _set_global_project_ids(lbnl_dfs: Dict[str, pd.DataFrame]) -> None:
 
 
 def parse_date_columns(queue: pd.DataFrame) -> None:
+    """Identify date columns and parse them to pd.Timestamp.
+
+    Original (unparsed) date columns are preserved but with the suffix '_raw'.
+
+    Args:
+        queue (pd.DataFrame): an LBNL ISO queue dataframe
+    """
     date_cols = [col for col in queue.columns if (
         (col.startswith('date_') or col.endswith('_date'))
         # datetime columns don't need parsing
@@ -99,8 +111,8 @@ def parse_date_columns(queue: pd.DataFrame) -> None:
     for date_col, raw_col in rename_dict.items():
         new_dates = parse_dates(queue.loc[:, raw_col])
         # set obviously bad values to null
-        # This is designed to catch values improperly encoded by Excel to 1899 or 1900
-        bad = new_dates.dt.year <= (EXCEL_EPOCH_ORIGIN.year + 1)
+        # This is designed to catch NaN values improperly encoded by Excel to 1899 or 1900
+        bad = new_dates.dt.year.isin({1899, 1900})
         new_dates.loc[bad] = pd.NaT
         queue.loc[:, date_col] = new_dates
     return
@@ -132,6 +144,15 @@ def replace_value_with_count_validation(df: pd.DataFrame, col: str, val_to_repla
 
 
 def _normalize_resource_capacity(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+    """Pull out the awkward one-to-many columns (type_1, capacity_1, type_2, capacity_2)
+    to a separate dataframe.
+
+    Args:
+        lbnl_df (pd.DataFrame): LBNL ISO queue dataframe
+
+    Returns:
+        Dict[str, pd.DataFrame]: dict with the projects and multivalues split into two dataframes
+    """
     if 'capacity_mw_resource_3' in lbnl_df.columns:  # only active projects
         n_multicolumns = 3
     else:
@@ -151,6 +172,15 @@ def _normalize_resource_capacity(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFram
 
 
 def _normalize_location(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+    """Pull out the awkward one-to-many columns (county_1, county_2, etc)
+    to a separate dataframe.
+
+    Args:
+        lbnl_df (pd.DataFrame): LBNL ISO queue dataframe
+
+    Returns:
+        Dict[str, pd.DataFrame]: dict with the projects and locations split into two dataframes
+    """
     if 'county_3' in lbnl_df.columns:  # only active projects are multivalued
         county_cols = ['county_' + str(n) for n in range(1, 4)]
         location_df = normalize_multicolumns_to_rows(lbnl_df,
@@ -162,11 +192,33 @@ def _normalize_location(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
             lbnl_df.loc[:, 'state'], on='project_id')
         project_df = lbnl_df.drop(columns=county_cols+['state'])
     else:
-        location_df = lbnl_df.loc[:, ['state', 'county']].copy()
+        location_df = lbnl_df.loc[:, ['state', 'county']].reset_index()
         project_df = lbnl_df.drop(columns=['state', 'county'])
 
     return {'location_df': location_df, 'project_df': project_df}
 
 
 def normalize_lbnl_dfs(lbnl_transformed_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
-    raise NotImplementedError
+    """Normalize one-to-many columns and combine the three queues.
+
+    Args:
+        lbnl_transformed_dfs (Dict[str, pd.DataFrame]): the LBNL ISO queue dataframes
+
+    Returns:
+        Dict[str, pd.DataFrame]: the combined queues, normalized into projects, locations, and resource_capacity
+    """
+    resource_capacity_dfs = [_normalize_resource_capacity(df)
+                             for df in lbnl_transformed_dfs.values()
+                             ]
+    resource_capacity_df = pd.concat(
+        [df_dict['resource_capacity_df'] for df_dict in resource_capacity_dfs])
+    location_dfs = [_normalize_location(df_dict['project_df'])
+                    for df_dict in resource_capacity_dfs]
+    location_df = pd.concat([df_dict['location_df']
+                            for df_dict in location_dfs])
+    project_df = pd.concat([df_dict['project_df'] for df_dict in location_dfs])
+    return {
+        'iso_projects': project_df,
+        'iso_locations': location_df,
+        'iso_resource_capacity': resource_capacity_df,
+    }
