@@ -86,7 +86,7 @@ def _set_global_project_ids(lbnl_dfs: Dict[str, pd.DataFrame]) -> None:
         new_idx = pd.RangeIndex(previous_idx_max, len(
             df) + previous_idx_max, name='project_id')
         df.set_index(new_idx, inplace=True)
-        previous_idx_max = new_idx.max()
+        previous_idx_max = new_idx.max() + 1
     return
 
 
@@ -211,12 +211,15 @@ def normalize_lbnl_dfs(lbnl_transformed_dfs: Dict[str, pd.DataFrame]) -> Dict[st
                              for df in lbnl_transformed_dfs.values()
                              ]
     resource_capacity_df = pd.concat(
-        [df_dict['resource_capacity_df'] for df_dict in resource_capacity_dfs])
+        [df_dict['resource_capacity_df'] for df_dict in resource_capacity_dfs],
+        ignore_index=True)
     location_dfs = [_normalize_location(df_dict['project_df'])
                     for df_dict in resource_capacity_dfs]
     location_df = pd.concat([df_dict['location_df']
-                            for df_dict in location_dfs])
-    project_df = pd.concat([df_dict['project_df'] for df_dict in location_dfs])
+                            for df_dict in location_dfs],
+                            ignore_index=True)
+    project_df = pd.concat([df_dict['project_df']
+                           for df_dict in location_dfs])  # keep project_id index
     return {
         'iso_projects': project_df,
         'iso_locations': location_df,
