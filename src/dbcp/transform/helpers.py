@@ -5,7 +5,9 @@ import pandas as pd
 
 UNIX_EPOCH_ORIGIN = pd.Timestamp('01/01/1970')
 # Excel parser is simplified and will be one day off for dates < 1900/03/01
-# see xlrd.xldate.py:xldate_as_datetime for complete implementation
+# The origin is actually 12/31/1899, but because Excel mistakenly thinks
+# 1900 was a leap year, I cancel out that error by setting the origin to 12/30/1899.
+# See xlrd.xldate.py:xldate_as_datetime for complete implementation.
 EXCEL_EPOCH_ORIGIN = pd.Timestamp('12/30/1899')
 
 
