@@ -41,7 +41,7 @@ def withdrawn_iso_queue_projects(withdrawn_projects: pd.DataFrame) -> pd.DataFra
                                         expected_count=5,
                                         )
     # standardize values between queues
-    withdrawn_projects.loc[:, 'interconnection_status'].replace(
+    withdrawn_projects.loc[:, 'interconnection_status_lbnl'].replace(
         'Executed', 'IA Executed', inplace=True)
 
     return withdrawn_projects
