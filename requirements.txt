@@ -3,3 +3,4 @@ psycopg2
 pytest
 tqdm
 python-docx
+googlemaps
