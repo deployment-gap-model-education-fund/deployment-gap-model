@@ -10,6 +10,99 @@ from pudl.helpers import add_fips_ids as _add_fips_ids
 
 logger = logging.getLogger(__name__)
 
+RESOURCE_DICT = {
+    "Battery Storage": {
+        "codes": ["Battery", "Batteries", "BAT", "ES"],
+        "type": "Renewable"},
+    "Biofuel": {
+        "codes": [],
+        "type": "Renewable"},
+    "Biomass": {
+        "codes": ["Wood", "W", "BLQ WDS", "WDS"],
+        "type": "Renewable"},
+    "Coal": {
+        "codes": ["BIT", "C"],
+        "type": "Fossil"},
+    "Combined Cycle": {
+        "codes": ["CC", "Co-Gen"],
+        "type": "Fossil"},
+    "Combustion Turbine": {
+        "codes": ["CT"],
+        "type": "Fossil"},
+    "Fuel Cell": {
+        "codes": ["Fuel Cell", "FC"],
+        "type": "Fossil"},
+    "Geothermal": {
+        "codes": [],
+        "type": "Renewable"},
+    "Hydro": {
+        "codes": ["WAT", "H", "Water"],
+        "type": "Renewable"},
+    "Landfill Gas": {
+        "codes": ["LFG", "L"],
+        "type": "Fossil"},
+    "Methane; Solar": {
+        "codes": [],
+        "type": "Hybrid"},
+    "Municipal Solid Waste": {
+        "codes": ["MSW"],
+        "type": "Fossil"},
+    "Natural Gas": {
+        "codes": ["NG", "CC-NG", "Methane", "CT-NG", "ST-NG", "CS-NG", "Gas", "Natural Gas; Other"],
+        "type": "Fossil"},
+    "Natural Gas; Oil": {
+        "codes": ["DFO KER NG", "DFO NG", "Diesel; Methane", "JF KER NG", "NG WO", "KER NG", "Natural Gas; Diesel; Other; Storage"],
+        "type": "Fossil"},
+    "Natural Gas; Other; Storage; Solar": {
+        "codes": [],
+        "type": "Hybrid"},
+    "Natural Gas; Storage": {
+        "codes": [],
+        "type": "Fossil"},
+    "Nuclear": {
+        "codes": ["NU", "NUC"],
+        "type": "Renewable"},
+    "Offshore Wind": {
+        "codes": [],
+        "type": "Renewable"},
+    "Oil": {
+        "codes": ["DFO", "Diesel", "CT-D", "CC-D", "JF", "KER", "DFO KER", "D"],
+        "type": "Fossil"},
+    "Oil; Biomass": {
+        "codes": ["BLQ DFO KER WDS"],
+        "type": "Hybrid"},
+    "Onshore Wind": {
+        "codes": ["Wind", "WND", "Wind Turbine"],
+        "type": "Renewable"},
+    "Other": {
+        "codes": ["Wo", "F", "Hybrid", "M", "Unknown"],
+        "type": "Unknown Resource"},
+    "Other Storage": {
+        "codes": ["Flywheel", "Storage"],
+        "type": "Renewable"},
+    "Pumped Storage": {
+        "codes": ["Pump Storage", "Pumped-Storage hydro", "PS"],
+        "type": "Renewable"},
+    "Solar": {
+        "codes": ["SUN", "S"],
+        "type": "Renewable"},
+    "Solar; Biomass": {
+        "codes": [],
+        "type": "Renewable"},
+    "Solar; Storage": {
+        "codes": ["Solar; Battery", "SUN BAT", "Storage; Solar"],
+        "type": "Renewable"},
+    "Steam": {
+        "codes": ["ST"],
+        "type": "Fossil"},
+    "Waste Heat": {
+        "codes": ["Waste Heat Recovery", "Heat Recovery"],
+        "type": "Fossil"},
+    "Wind; Storage": {
+        "codes": ["WND BAT"],
+        "type": "Renewable"},
+}
+
 
 def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform active iso queue data."""
@@ -57,7 +150,6 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     Returns:
         lbnl_transformed_dfs: Dictionary of the transformed tables.
     """
-
     lbnl_transformed_dfs = {name: df.copy()
                             for name, df in lbnl_raw_dfs.items()}
     _set_global_project_ids(lbnl_transformed_dfs)
@@ -72,11 +164,33 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         logger.info(f"LBNL ISO Queues: Transforming {table_name} table.")
         lbnl_transformed_dfs[table_name] = transform_func(
             lbnl_transformed_dfs[table_name])
+    # Combine and normalize iso queue tables
     lbnl_normalized_dfs = normalize_lbnl_dfs(lbnl_transformed_dfs)
-    # data enrichment
+
+    # Add Fips Codes
     lbnl_normalized_dfs['iso_locations'] = add_fips_codes(
         lbnl_normalized_dfs['iso_locations'])
+
+    # Clean up and categorize resources
+    lbnl_normalized_dfs['iso_resource_capacity'] = (
+        lbnl_normalized_dfs['iso_resource_capacity']
+        .pipe(clean_resource_type)
+        .pipe(add_resource_classification)
+        .pipe(add_project_classification))
+    if lbnl_normalized_dfs['iso_resource_capacity'].resource_clean.isna().any():
+        raise AssertionError("Missing Resources!")
+
     lbnl_normalized_dfs['iso_for_tableau'] = denormalize(lbnl_normalized_dfs)
+    # not my fav, but gonna run this resource cleaning again for the denormalized tableau
+    # version because there are some new rows added during the merge that need to be
+    # categorized as Unknown. I'm putting it in BOTH places instead of just here so
+    # that the output CSV for iso resource capacity is also cleaned.
+    lbnl_normalized_dfs['iso_for_tableau'] = (
+        lbnl_normalized_dfs['iso_for_tableau']
+        .pipe(clean_resource_type)
+        .pipe(add_resource_classification)
+        .pipe(add_project_classification))
+
     return lbnl_normalized_dfs
 
 
@@ -196,7 +310,7 @@ def _normalize_location(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         location_df = location_df.merge(
             lbnl_df.loc[:, 'state'], on='project_id', validate='m:1')
 
-        project_df = lbnl_df.drop(columns=county_cols+['state'])
+        project_df = lbnl_df.drop(columns=county_cols + ['state'])
     else:
         location_df = lbnl_df.loc[:, ['state', 'county']].reset_index()
         project_df = lbnl_df.drop(columns=['state', 'county'])
@@ -259,6 +373,108 @@ def add_fips_codes(location_df: pd.DataFrame) -> pd.DataFrame:
     with_fips.loc[:, 'county_id_fips'].fillna(
         nan_fips['county_id_fips'], inplace=True)
     return with_fips
+
+
+def clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
+    """Standardize resource types used throughout iso queue tables.
+
+    Args:
+        resource_df (pd.DataFrame): normalized lbnl ISO queue resource df.
+
+    Returns:
+        pd.DataFrame: A copy of the resource df with a new columns for cleaned resource
+            types.
+
+    """
+    resource_df = resource_df.copy()
+    # Modify RESOURCE DICT for mapping
+    long_dict = {}
+    for clean_name, code_type_dict in RESOURCE_DICT.items():
+        for code in code_type_dict["codes"]:
+            long_dict[code] = clean_name
+    # Map clean resource values into new column
+    resource_df['resource_clean'] = resource_df.resource.fillna("Other")
+    resource_df = resource_df.replace({"resource_clean": long_dict})
+    return resource_df
+
+
+def add_resource_classification(resource_df: pd.DataFrame) -> pd.DataFrame:
+    """Classify resources as either Fossil, Renewable, or Hybrid.
+
+    The classification depends on a the resource_clean column, so you must first run
+    the clean_resource_type() function.
+
+    Args:
+        resource_df (pd.DataFrame): normalized lbnl ISO queue resource df.
+
+    Returns:
+        pd.DataFrame: A copy of the ISO queue resource_df with a column indicating
+            whether a given resource is Renewable, Fossil, or Hybrid.
+    """
+    # Modify RESOURCE DICT for mapping
+    long_dict = {}
+    for clean_name, code_type_dict in RESOURCE_DICT.items():
+        long_dict[clean_name] = code_type_dict['type']
+    # Map resources class values into new column
+    resource_df['resource_class'] = resource_df.resource_clean.map(long_dict)
+    return resource_df
+
+
+def _check_project_class(resource_class: pd.Series) -> str:
+    """Classify a single iso queue project as Renewable, Fossil, or Hybrid.
+
+    Args:
+        resource_class (pd.Series): The resource_class column of the resource_df grouped
+            by project_id
+
+    Returns:
+        str: A String value representing the project's resource class: Renewable,
+            Fossil, or Hybrid.
+
+    """
+    if resource_class.str.contains("Hybrid").any():
+        out = "Hybrid"
+    elif resource_class.str.contains("Fossil").any():
+        if resource_class.str.contains("Unknown Resource").any():
+            out = "Contains Unknown Resource"
+        if resource_class.str.contains("Renewable").any():
+            out = "Hybrid"
+        else:
+            out = "Fossil"
+    elif resource_class.str.contains("Renewable").any():
+        if resource_class.str.contains("Unknown Resource").any():
+            out = "Contains Unknown Resource"
+        else:
+            out = "Renewable"
+    else:
+        out = "Contains Unknown Resource"
+    return out
+
+
+def add_project_classification(resource_df: pd.DataFrame) -> pd.DataFrame:
+    """Classify all iso queue projects as either Renewable, Fossil, or Hybrid.
+
+    This function relies on the resource_class column which is created while running the
+    add_resource_classification() function. That function must be run before this
+    function.
+
+    Args:
+        resource_df (pandas.DataFrame): normalized lbnl ISO queue resource df.
+
+    Returns:
+        pd.DataFrame: A copy of the resource_df with a new column identifying whether
+            projects consist of renewables, fossil fuels, or a hybrid of the two.
+
+    """
+    resource_df_out = resource_df.copy()
+    project_groups = resource_df_out.groupby('project_id')
+    resource_df_out['project_class'] = (
+        project_groups.resource_class
+        .transform(lambda x: _check_project_class(x))
+    )
+    assert resource_df_out.project_class.isin([
+        "Fossil", "Renewable", "Hybrid", "Contains Unknown Resource"]).all()
+    return resource_df_out
 
 
 def denormalize(lbnl_normalized_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
