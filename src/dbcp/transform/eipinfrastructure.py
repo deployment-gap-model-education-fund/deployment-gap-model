@@ -26,8 +26,10 @@ def natural_gas_pipelines(ng_pipes: pd.DataFrame) -> pd.DataFrame:
         transformed natural_gas_pipelines table.
     """
     # Clean date fields
-    date_fields = ng_pipes.filter(regex=(".+_date")).columns
+    date_fields = ng_pipes.filter(regex=(".+_date")).select_dtypes("object").columns
     for field in date_fields:
+        ng_pipes[field] = ng_pipes[field].astype("string")
+        ng_pipes[field] = ng_pipes[field].str.replace(r'(Q\d) (\d+)', r'\2-\1')
         ng_pipes[field] = pd.to_datetime(ng_pipes[field], errors="coerce")
 
     # Remove 'TBD'

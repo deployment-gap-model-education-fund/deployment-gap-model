@@ -10,6 +10,9 @@ run_etl:
 run_etl_csv:
 	docker compose run --rm app python -m dbcp.cli --csv
 
+run_etl_bq:
+	docker compose run --rm app python -m dbcp.cli --upload-to-bigquery
+
 sql_shell:
 	docker compose run --rm postgres bash -c 'psql -U $$POSTGRES_USER -h $$POSTGRES_HOST $$POSTGRES_DB'
 
