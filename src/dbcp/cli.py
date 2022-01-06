@@ -25,6 +25,13 @@ def parse_command_line():
         default=False,
         help="Write tables to csvs. This will overwrite existing csvs.",
     )
+    parser.add_argument(
+        '-bq',
+        '--upload-to-bigquery',
+        action='store_true',
+        default=False,
+        help="Loads tables to BigQuery.",
+    )
     arguments = parser.parse_args()
     return arguments
 
