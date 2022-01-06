@@ -5,6 +5,9 @@ from typing import Dict
 
 import pandas as pd
 
+from dbcp.schemas import (EMISSIONS_INCREASE_SCHEMA,
+                          NATURAL_GAS_PIPELINES_SCHEMA)
+
 logger = logging.getLogger(__name__)
 
 
@@ -22,6 +25,22 @@ def natural_gas_pipelines(ng_pipes: pd.DataFrame) -> pd.DataFrame:
     Returns:
         transformed natural_gas_pipelines table.
     """
+    # Clean date fields
+    date_fields = ng_pipes.filter(regex=(".+_date")).columns
+    for field in date_fields:
+        ng_pipes[field] = pd.to_datetime(ng_pipes[field], errors="coerce")
+
+    # Remove 'TBD'
+    ng_pipes = ng_pipes.replace("TBD", None)
+
+    # Clean num_new_compressor_stations
+    ng_pipes['num_new_compressor_stations'] = pd.to_numeric(
+        ng_pipes['num_new_compressor_stations'], downcast="integer", errors="coerce")
+
+    # Validate schema
+    ng_pipes = NATURAL_GAS_PIPELINES_SCHEMA.validate(ng_pipes)
+    assert "object" not in ng_pipes.dtypes
+
     # Convert cost to millions
     ng_pipes["cost"] = ng_pipes["cost"] * 1_000_000
 
@@ -45,6 +64,23 @@ def emissions_increase(projects: pd.DataFrame) -> pd.DataFrame:
     cong_split = projects.congressional_rep_party.str.split(",", expand=True)
     projects["congressional_representative"] = cong_split[0]
     projects["political_party"] = cong_split[1]
+    projects = projects.drop(columns=["congressional_rep_party"])
+
+    # Clean pct fields
+    pct_fields = projects.filter(regex=(".+_pct")).columns
+    for field in pct_fields:
+        projects[field] = projects[field].str.replace("%", "")
+    projects[pct_fields] = projects[pct_fields].astype(float) / 100
+
+    # Clean tpy fields
+    tpy_fields = projects.filter(regex=(".+_tpy")).columns
+    for field in tpy_fields:
+        projects[field] = pd.to_numeric(
+            projects[field], errors="coerce", downcast="float")
+
+    # Validate schema
+    projects = EMISSIONS_INCREASE_SCHEMA.validate(projects)
+    assert "object" not in projects.dtypes
 
     return projects
 

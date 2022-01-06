@@ -18,3 +18,9 @@ pudl_db:
 
 test:
 	docker compose run --rm app pytest --ignore=input/w
+
+clean:
+	docker compose down -v
+
+update_conda:
+	conda env update --file environment.yml --name dbcp-dev --prune
