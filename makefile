@@ -18,3 +18,12 @@ pudl_db:
 
 test:
 	docker compose run --rm app pytest --ignore=input/w
+
+clean:
+	docker compose down -v
+
+update_conda:
+	conda env update --file environment.yml --name dbcp-dev --prune
+
+jupyter_lab:
+	docker compose run -p 8888:8888 --rm app jupyter lab --port 8888 --ip 0.0.0.0 --no-browser
