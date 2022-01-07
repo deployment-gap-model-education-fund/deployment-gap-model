@@ -8,7 +8,8 @@ logger = getLogger('__name__')
 
 class GoogleGeocoder(object):
     COUNTY_LABEL = 'administrative_area_level_2'
-    LOCALITY_LABEL = 'locality'
+    CITY_LABEL = 'locality'
+    TOWN_LABEL = 'administrative_area_level_3'
 
     def __init__(self, key=None) -> None:
         if key is None:
@@ -46,26 +47,31 @@ class GoogleGeocoder(object):
             if GoogleGeocoder.COUNTY_LABEL in component['types']:
                 county_name = component['long_name']
                 return county_name
-        if self.is_locality():
+        if self.is_city():
             # "independent cities" do not belong to a county
             # only 41 in existence, 38 in VA
             return self._name
         return ''
 
-    def is_locality(self) -> bool:
-        return GoogleGeocoder.LOCALITY_LABEL in self._response['types']
+    def is_city(self) -> bool:
+        return GoogleGeocoder.CITY_LABEL in self._response['types']
 
     def is_county(self) -> bool:
         return GoogleGeocoder.COUNTY_LABEL in self._response['types']
+
+    def is_town(self) -> bool:
+        return GoogleGeocoder.TOWN_LABEL in self._response['types']
 
     def describe(self) -> List[str]:
         if not self._response:  # empty
             return ['', '', '', ]
 
-        if self.is_locality():
-            object_type = 'locality'
+        if self.is_city():
+            object_type = 'city'
         elif self.is_county():
             object_type = 'county'
+        elif self.is_town():
+            object_type = 'town'
         else:
             object_type = ''
 
