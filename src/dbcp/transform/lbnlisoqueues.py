@@ -77,6 +77,7 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     lbnl_normalized_dfs['iso_locations'] = add_fips_codes(
         lbnl_normalized_dfs['iso_locations'])
     lbnl_normalized_dfs['iso_for_tableau'] = denormalize(lbnl_normalized_dfs)
+    lbnl_normalized_dfs['iso_projects'].reset_index(inplace=True)
     return lbnl_normalized_dfs
 
 
