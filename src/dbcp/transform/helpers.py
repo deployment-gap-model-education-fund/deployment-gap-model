@@ -162,6 +162,24 @@ def numeric_offset_date_encoder(series: pd.Series, origin=EXCEL_EPOCH_ORIGIN, un
 
 
 def parse_dates(series: pd.Series, expected_mean_year=2020) -> pd.Series:
+    """convert a column to pd.Datetime using one of several parsing strategies.
+
+    Numeric columns are interpreted as either Unix or Excel datetime encoding.
+    The choice of epoch is determined by which encoding produces dates closer
+    to the expected_mean_year. 70 years separate Unix from Excel epochs, so
+    this choice is usually clear.
+
+    String columns are passed to the multiformat_string_date_parser.
+
+    Args:
+        series (pd.Series): encoded dates
+        expected_mean_year (int, optional): year to compare outputs to when
+            choosing between Unix and Excel epochs. For numeric columns only.
+            Defaults to 2020.
+
+    Returns:
+        pd.Series: new column of pd.Datetime
+    """
     if pd.api.types.is_numeric_dtype(series):
         unix_dates = numeric_offset_date_encoder(
             series, origin=UNIX_EPOCH_ORIGIN)
