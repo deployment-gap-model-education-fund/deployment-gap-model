@@ -15,3 +15,6 @@ RUN rm requirements.txt
 
 # Add the python packages to PATH
 ENV PATH="/app/.local/bin:${PATH}"
+
+# Add dbcp to PYTHONPATH
+ENV PYTHONPATH="/app:${PYTHONPATH}"
