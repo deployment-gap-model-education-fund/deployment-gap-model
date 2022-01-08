@@ -1,4 +1,4 @@
-"""Retrieve data from EIP Infrastructure spreadsheets for analysis."""
+"""Retrieve data from LBNL ISO Queues spreadsheets for analysis."""
 import logging
 
 from dbcp.extract.excel import Metadata
@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class Extractor(GenericExtractor):
-    """Extractor for the excel dataset EIP Infrastructure."""
+    """Extractor for the excel dataset LBNL ISO Queues."""
 
     def __init__(self, *args, **kwargs):
         """
@@ -17,7 +17,7 @@ class Extractor(GenericExtractor):
         Args:
             ds (:class:datastore.Datastore): Initialized datastore.
         """
-        self.METADATA = Metadata('eipinfrastructure')
+        self.METADATA = Metadata('lbnlisoqueues')
         self.cols_added = []
         super().__init__(*args, **kwargs)
 

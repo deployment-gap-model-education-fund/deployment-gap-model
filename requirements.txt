@@ -4,3 +4,7 @@ pytest
 tqdm
 python-docx
 googlemaps
+pandas-gbq
+pandera
+pandera[io]
+jupyterlab
