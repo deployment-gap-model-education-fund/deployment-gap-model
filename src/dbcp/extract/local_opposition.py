@@ -146,6 +146,9 @@ class ColumbiaDocxParser(object):
         # that produces an extra empty row
         query_str = "state == 'Texas' and (locality == 'Brownsville' or locality == 'Benbrook')"
         subset = output['local_ordinance'].query(query_str).reset_index()
+        if subset['ordinance'].iat[0] != "Enacted July 9, 2020:":
+            raise ValueError(
+                'Data has changed and Brownsville correction is no longer valid')
         indices_to_delete = pd.Index(subset.groupby(
             ['state', 'locality'], as_index=False).first()['index'])
         output['local_ordinance'].drop(index=indices_to_delete, inplace=True)
