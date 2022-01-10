@@ -5,6 +5,9 @@ from typing import Dict, Tuple
 WORKING_PARTITIONS: Dict[str, Dict] = {
     "eipinfrastructure": {
         "update_date": "2021-05-03"
+    },
+    "lbnlisoqueues": {
+        "update_date": "2020"
     }
 }
 
@@ -12,5 +15,10 @@ PUDL_TABLES: Dict[str, Tuple[str]] = {
     "eipinfrastructure": (
         "natural_gas_pipelines",
         "emissions_increase"
+    ),
+    "lbnlisoqueues": (
+        "active_iso_queue_projects",
+        "withdrawn_iso_queue_projects",
+        "completed_iso_queue_projects",
     )
 }
