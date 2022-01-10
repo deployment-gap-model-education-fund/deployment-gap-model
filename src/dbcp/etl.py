@@ -10,6 +10,7 @@ import sqlalchemy as sa
 
 import dbcp
 from dbcp.constants import WORKING_PARTITIONS
+from dbcp.schemas import MCOE_SCHEMA
 from dbcp.workspace.datastore import DBCPDatastore
 from pudl.output.pudltabl import PudlTabl
 
@@ -48,6 +49,7 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
     )
 
     mcoe = pudl_out.mcoe(all_gens=True)
+    mcoe = MCOE_SCHEMA.validate(mcoe)
     pudl_tables["mcoe"] = mcoe
 
     return pudl_tables
@@ -62,7 +64,7 @@ def etl(args):
 
     etl_funcs = {
         "eipinfrastructure": etl_eipinfrastructure,
-        # "pudl": etl_pudl_tables
+        "pudl": etl_pudl_tables
     }
 
     # Extract and transform the data sets
@@ -91,7 +93,6 @@ def etl(args):
 
         SCOPES = [
             'https://www.googleapis.com/auth/cloud-platform',
-            'https://www.googleapis.com/auth/drive',
         ]
 
         credentials = pydata_google_auth.get_user_credentials(
