@@ -32,18 +32,23 @@ def parse_command_line():
         default=False,
         help="Loads tables to BigQuery.",
     )
+    parser.add_argument(
+        "--loglevel",
+        help="Set logging level (DEBUG, INFO, WARNING, ERROR, or CRITICAL).",
+        default="INFO",
+    )
     arguments = parser.parse_args()
     return arguments
 
 
 def main():
     """Parse command line and initialize PUDL DB."""
+    args = parse_command_line()
+
     # Display logged output from the PUDL package:
     dbcp_logger = logging.getLogger()
     log_format = '%(asctime)s [%(levelname)8s] %(name)s:%(lineno)s %(message)s'
-    coloredlogs.install(fmt=log_format, level='INFO', logger=dbcp_logger)
-
-    args = parse_command_line()
+    coloredlogs.install(fmt=log_format, level=args.loglevel, logger=dbcp_logger)
 
     dbcp.etl.etl(args)
 
