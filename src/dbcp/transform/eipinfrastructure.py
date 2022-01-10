@@ -35,10 +35,6 @@ def natural_gas_pipelines(ng_pipes: pd.DataFrame) -> pd.DataFrame:
     # Remove 'TBD'
     ng_pipes = ng_pipes.replace("TBD", None)
 
-    # Clean num_new_compressor_stations
-    ng_pipes['num_new_compressor_stations'] = pd.to_numeric(
-        ng_pipes['num_new_compressor_stations'], downcast="integer", errors="coerce")
-
     # Validate schema
     ng_pipes = NATURAL_GAS_PIPELINES_SCHEMA.validate(ng_pipes)
     assert "object" not in ng_pipes.dtypes

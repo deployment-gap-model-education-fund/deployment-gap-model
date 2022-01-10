@@ -87,7 +87,7 @@ NATURAL_GAS_PIPELINES_SCHEMA = pa.DataFrameSchema({
     "nox_tons": pa.Column(float, nullable=True),
     "nox_tpy": pa.Column(float, nullable=True),
     "num_modified_compressor_stations": pa.Column(pd.Int64Dtype),
-    "num_new_compressor_stations": pa.Column(pd.Int64Dtype),
+    "num_new_compressor_stations": pa.Column(CoercedInt64()),
     "num_waterbody_crossings": pa.Column(pd.Int64Dtype, nullable=True),
     "permanent_construction_workforce": pa.Column(pd.StringDtype, nullable=True),
     "pipeline_diameter_in": pa.Column(pd.StringDtype, nullable=True),
