@@ -27,6 +27,19 @@ def etl_eipinfrastructure() -> Dict[str, pd.DataFrame]:
     return eip_transformed_dfs
 
 
+def etl_lbnlisoqueues() -> Dict[str, pd.DataFrame]:
+    """LBNL ISO Queues ETL."""
+    # Extract
+    ds = DBCPDatastore(sandbox=True, local_cache_path="/app/input")
+    lbnl_raw_dfs = dbcp.extract.lbnlisoqueues.Extractor(ds).extract(
+        update_date=WORKING_PARTITIONS["lbnlisoqueues"]["update_date"])
+
+    # Transform
+    lbnl_transformed_dfs = dbcp.transform.lbnlisoqueues.transform(lbnl_raw_dfs)
+
+    return lbnl_transformed_dfs
+
+
 def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
     """Pull tables from pudl sqlite database."""
     pudl_data_path = dbcp.helpers.download_pudl_data()
@@ -55,6 +68,7 @@ def etl(args):
     """Run dbc ETL."""
     etl_funcs = {
         "eipinfrastructure": etl_eipinfrastructure,
+        "lbnlisoqueues": etl_lbnlisoqueues,
         "pudl": etl_pudl_tables
     }
 
