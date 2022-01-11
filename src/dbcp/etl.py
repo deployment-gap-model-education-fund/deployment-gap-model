@@ -22,7 +22,8 @@ def etl_eipinfrastructure() -> Dict[str, pd.DataFrame]:
         update_date=WORKING_PARTITIONS["eipinfrastructure"]["update_date"])
 
     # Transform
-    eip_transformed_dfs = dbcp.transform.eipinfrastructure.transform(eip_raw_dfs)
+    eip_transformed_dfs = dbcp.transform.eipinfrastructure.transform(
+        eip_raw_dfs)
 
     return eip_transformed_dfs
 
@@ -64,11 +65,23 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
     return pudl_tables
 
 
+def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
+    """NCSL State Permitting for Wind ETL."""
+    # Extract
+    source_path = Path('/app/data/raw/ncsl_state_permitting_wind.csv')
+    raw_df = dbcp.extract.ncsl_state_permitting.extract(source_path)
+
+    out = dbcp.transform.ncsl_state_permitting.transform(raw_df)
+
+    return out
+
+
 def etl(args):
     """Run dbc ETL."""
     etl_funcs = {
         "eipinfrastructure": etl_eipinfrastructure,
         "lbnlisoqueues": etl_lbnlisoqueues,
+        "ncsl_state_permitting": etl_ncsl_state_permitting,
         "pudl": etl_pudl_tables
     }
 
@@ -83,7 +96,8 @@ def etl(args):
     with engine.connect() as con:
         for table_name, df in transformed_dfs.items():
             logger.info(f"Load {table_name} to postgres.")
-            df.to_sql(name=table_name, con=con, if_exists="replace", index=False)
+            df.to_sql(name=table_name, con=con,
+                      if_exists="replace", index=False)
 
     # TODO: Writing to CSVs is a temporary solution for getting data into Tableau
     # This should be removed once we have cloudsql setup.
