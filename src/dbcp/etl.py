@@ -22,7 +22,8 @@ def etl_eipinfrastructure() -> Dict[str, pd.DataFrame]:
         update_date=WORKING_PARTITIONS["eipinfrastructure"]["update_date"])
 
     # Transform
-    eip_transformed_dfs = dbcp.transform.eipinfrastructure.transform(eip_raw_dfs)
+    eip_transformed_dfs = dbcp.transform.eipinfrastructure.transform(
+        eip_raw_dfs)
 
     return eip_transformed_dfs
 
@@ -38,6 +39,20 @@ def etl_lbnlisoqueues() -> Dict[str, pd.DataFrame]:
     lbnl_transformed_dfs = dbcp.transform.lbnlisoqueues.transform(lbnl_raw_dfs)
 
     return lbnl_transformed_dfs
+
+
+def etl_columbia_local_opp() -> Dict[str, pd.DataFrame]:
+    """Columbia Local Opposition ETL."""
+    # Extract
+    source_path = Path('/app/data/raw/RELDI report updated 9.10.21 (1).docx')
+    extractor = dbcp.extract.local_opposition.ColumbiaDocxParser()
+    extractor.load_docx(source_path)
+    raw_dfs = extractor.extract()
+
+    # Transform
+    transformed_dfs = dbcp.transform.local_opposition.transform(raw_dfs)
+
+    return transformed_dfs
 
 
 def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
@@ -69,7 +84,8 @@ def etl(args):
     etl_funcs = {
         "eipinfrastructure": etl_eipinfrastructure,
         "lbnlisoqueues": etl_lbnlisoqueues,
-        "pudl": etl_pudl_tables
+        "pudl": etl_pudl_tables,
+        "columbia_local_opp": etl_columbia_local_opp,
     }
 
     # Extract and transform the data sets
@@ -83,7 +99,8 @@ def etl(args):
     with engine.connect() as con:
         for table_name, df in transformed_dfs.items():
             logger.info(f"Load {table_name} to postgres.")
-            df.to_sql(name=table_name, con=con, if_exists="replace", index=False)
+            df.to_sql(name=table_name, con=con,
+                      if_exists="replace", index=False)
 
     # TODO: Writing to CSVs is a temporary solution for getting data into Tableau
     # This should be removed once we have cloudsql setup.
