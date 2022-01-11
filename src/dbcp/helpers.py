@@ -26,10 +26,11 @@ def download_pudl_data() -> Path:
     # TODO(bendnorman): Ideally this is replaced with Intake.
     PUDL_VERSION = os.environ["PUDL_VERSION"]
 
-    input_path = Path("/app/input")
+    input_path = Path("/app/data/data_cache")
     pudl_data_path = input_path / PUDL_VERSION
     if not pudl_data_path.exists():
-        logger.info("PUDL data directory does not exist, downloading from Zenodo.")
+        logger.info(
+            "PUDL data directory does not exist, downloading from Zenodo.")
         response = requests.get(
             f"https://zenodo.org/record/5701406/files/{PUDL_VERSION}.tgz", stream=True)
         tgz_file_path = input_path / f"{PUDL_VERSION}.tgz"

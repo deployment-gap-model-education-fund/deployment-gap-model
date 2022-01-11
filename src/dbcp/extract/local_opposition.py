@@ -31,11 +31,11 @@ class ColumbiaDocxParser(object):
         self.contested_projects_dict: Dict[str, List[str]] = {
             'state': [], 'project_name': [], 'description': []}
 
-    def load_docx(self, source_path=Path('/app/input/RELDI report updated 9.10.21 (1).docx')) -> None:
+    def load_docx(self, source_path=Path('/app/data/raw/RELDI report updated 9.10.21 (1).docx')) -> None:
         """Read the .docx file with python-docx.
 
         Args:
-            source_path (Path, optional): path to .docx file. Defaults to Path('/app/input/RELDI report updated 9.10.21 (1).docx').
+            source_path (Path, optional): path to .docx file. Defaults to Path('/app/data/raw/RELDI report updated 9.10.21 (1).docx').
         """
         self.doc = docx.Document(source_path)
 
