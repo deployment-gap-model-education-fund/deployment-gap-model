@@ -3,6 +3,11 @@ from typing import Optional, List, Dict
 
 import pandas as pd
 
+from pudl.helpers import add_fips_ids as _add_fips_ids
+
+from dbcp.transform.geocoding import GoogleGeocoder
+from dbcp.constants import FIPS_CODE_VINTAGE
+
 UNIX_EPOCH_ORIGIN = pd.Timestamp('01/01/1970')
 # Excel parser is simplified and will be one day off for dates < 1900/03/01
 # The origin is actually 12/31/1899, but because Excel mistakenly thinks
@@ -194,3 +199,85 @@ def parse_dates(series: pd.Series, expected_mean_year=2020) -> pd.Series:
     else:
         # assumes excel epoch when mixed with strings
         return multiformat_string_date_parser(series)
+
+
+def _geocode_row(ser: pd.Series, client: GoogleGeocoder, state_col='state', locality_col='county') -> List[str]:
+    """function to pass into pandas df.apply() to geocode state/locality pairs
+
+    Args:
+        ser (pd.Series): a row of a larger dataframe to geocode
+        client (GoogleGeocoder): client for Google Maps Platform API
+        state_col (str, optional): name of the column of state names. Defaults to 'state'.
+        locality_col (str, optional): name of the column of locality names. Defaults to 'county'.
+
+    Returns:
+        List[str]: geocoded locality_name, locality_type, and containing_county
+    """
+    client.geocode_request(name=ser[locality_col], state=ser[state_col])
+    return client.describe()
+
+
+def _geocode_locality(state_locality_df: pd.DataFrame, state_col='state', locality_col='county') -> pd.DataFrame:
+    """Use Google Maps Platform API to look up information about state/locality pairs in a dataframe.
+
+    Args:
+        state_locality_df (pd.DataFrame): dataframe with state and locality columns
+        state_col (str, optional): name of the column of state names. Defaults to 'state'.
+        locality_col (str, optional): name of the column of locality names. Defaults to 'county'.
+
+    Returns:
+        pd.DataFrame: new columns 'locality_name', 'locality_type', 'containing_county'
+    """
+    geocoder = GoogleGeocoder()
+    new_cols = state_locality_df.apply(
+        _geocode_row, axis=1, result_type='expand', client=geocoder, state_col=state_col, locality_col=locality_col)
+    new_cols.columns = ['locality_name', 'locality_type', 'containing_county']
+    return new_cols
+
+
+def add_county_fips_with_backup_geocoding(state_locality_df: pd.DataFrame, state_col='state', locality_col='county') -> pd.DataFrame:
+    """Add state and county FIPS codes to a DataFrame with state and locality columns.
+
+    This function is tolerant of mis-spellings and heterogeneous town/city/county types
+    because it uses the Google Maps Platform API to re-process initial matching failures.
+
+    Args:
+        state_locality_df (pd.DataFrame): dataframe with state and locality columns
+        state_col (str, optional): name of the column of state names. Defaults to 'state'.
+        locality_col (str, optional): name of the column of locality names. Defaults to 'county'.
+
+    Returns:
+        pd.DataFrame: copy of state_locality_df with new columns 'locality_name', 'locality_type', 'containing_county' 
+    """
+    # first try a simple FIPS lookup and split by valid/invalid fips codes
+    # The only purpose of this step is to save API calls on the easy ones (most of them)
+    with_fips = _add_fips_ids(
+        state_locality_df, state_col=state_col, county_col=locality_col, vintage=FIPS_CODE_VINTAGE)
+    fips_is_nan = with_fips.loc[:, 'county_id_fips'].isna()
+    if not fips_is_nan.any():
+        # standardize output columns
+        with_fips['locality_name'] = with_fips[locality_col]
+        with_fips['locality_type'] = 'county'
+        with_fips['containing_county'] = with_fips[locality_col]
+        return with_fips
+
+    nan_fips = with_fips.loc[fips_is_nan, :].copy()
+    good_fips = with_fips.loc[~fips_is_nan, :].copy()
+
+    # geocode the lookup failures - they are often city/town names (instead of counties) or simply mis-spelled
+    geocoded = _geocode_locality(
+        nan_fips, state_col=state_col, locality_col=locality_col)
+    nan_fips = pd.concat([nan_fips, geocoded], axis=1)
+    # add fips using geocoded names
+    filled_fips = _add_fips_ids(nan_fips, state_col=state_col,
+                                county_col='containing_county', vintage=FIPS_CODE_VINTAGE)
+
+    # recombine
+    # _add_fips_ids only works on counties
+    good_fips['locality_name'] = good_fips[locality_col]
+    good_fips['locality_type'] = 'county'
+    good_fips['containing_county'] = good_fips[locality_col]
+
+    recombined = pd.concat([good_fips, filled_fips], axis=0)
+
+    return recombined
