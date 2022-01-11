@@ -6,8 +6,9 @@ from pudl.metadata.enums import US_STATES_TERRITORIES
 from pudl.helpers import add_fips_ids as _add_fips_ids
 
 
-def transform(raw_df: pd.DataFrame) -> pd.DataFrame:
-    transform_df = raw_df.copy()
+def transform(raw_df: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
+    # only one df in dict
+    transform_df = raw_df['ncsl_state_permitting'].copy()
     transform_df.loc[:, 'permitting_type'].replace('n/a', pd.NA, inplace=True)
     transform_df.loc[:, 'state'].replace(
         'Washington D.C.', 'District of Columbia', inplace=True)
@@ -29,7 +30,7 @@ def transform(raw_df: pd.DataFrame) -> pd.DataFrame:
     transform_df = _add_fips_ids(
         transform_df, county_col='description').drop(columns='county_id_fips')
     validate(transform_df)
-    return transform_df
+    return {'ncsl_state_permitting': transform_df}
 
 
 def validate(ncsl_df: pd.DataFrame) -> None:
