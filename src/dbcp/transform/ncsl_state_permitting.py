@@ -3,6 +3,7 @@ from typing import Dict, Any, List
 import pandas as pd
 import numpy as np
 from pudl.metadata.enums import US_STATES_TERRITORIES
+from pudl.helpers import add_fips_ids as _add_fips_ids
 
 
 def transform(raw_df: pd.DataFrame) -> pd.DataFrame:
@@ -25,6 +26,8 @@ def transform(raw_df: pd.DataFrame) -> pd.DataFrame:
         'link': pd.StringDtype(),
     }
     transform_df = transform_df.astype(dtypes, copy=False)
+    transform_df = _add_fips_ids(
+        transform_df, county_col='description').drop(columns='county_id_fips')
     validate(transform_df)
     return transform_df
 
