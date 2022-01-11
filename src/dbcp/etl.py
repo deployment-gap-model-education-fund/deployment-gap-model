@@ -91,7 +91,7 @@ def etl(args):
     # This should be removed once we have cloudsql setup.
     if args.csv:
         logger.info('Writing tables to CSVs.')
-        output_path = Path("/app/output/")
+        output_path = Path("/app/data/output/")
         for table_name, df in transformed_dfs.items():
             df.to_csv(output_path / f"{table_name}.csv", index=False)
 
