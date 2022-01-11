@@ -76,6 +76,9 @@ target/
 # Jupyter NB Checkpoints
 .ipynb_checkpoints/
 
+# geocoder disk cache
+data/geocoder_cache/*
+
 # Mac OS-specific storage files
 .DS_Store
 
