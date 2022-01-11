@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 import dbcp
 from dbcp.constants import WORKING_PARTITIONS
-from dbcp.schemas import MCOE_SCHEMA
+from dbcp.schemas import TABLE_SCHEMAS
 from dbcp.workspace.datastore import DBCPDatastore
 from pudl.output.pudltabl import PudlTabl
 
@@ -62,7 +62,7 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
     )
 
     mcoe = pudl_out.mcoe(all_gens=True)
-    mcoe = MCOE_SCHEMA.validate(mcoe)
+    mcoe = TABLE_SCHEMAS["mcoe"].validate(mcoe)
     pudl_tables["mcoe"] = mcoe
 
     return pudl_tables
