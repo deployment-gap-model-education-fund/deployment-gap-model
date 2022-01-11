@@ -3,15 +3,15 @@ import pandas as pd
 
 from pudl.helpers import add_fips_ids as _add_fips_ids
 
-from dbcp.transform.geocoding import GoogleGeocoder
+from dbcp.transform.helpers import add_county_fips_with_backup_geocoding
 
 
 def _extract_years(ser: pd.Series) -> pd.Series:
     """Extract year-like strings from text and summarize with min, max, count.
 
-    There are two key assumptions behind this, so interpret with caution:
-    * all numbers 1990 - 2029 are interpreted as years
-    * the lowest year is assumed to be year_enacted
+    The key assumption behind this is that all numbers 1990 - 2029 are interpreted as years
+    Also, the purpose of these summaries is really to help users to assume 
+    earliest_year_mentioned means 'year enacted', which is not always true.
 
     Args:
         ser (pd.Series): string column with policy descriptions
@@ -25,55 +25,84 @@ def _extract_years(ser: pd.Series) -> pd.Series:
     summarized = years.groupby(level=0).agg(['min', 'max', 'count'])
     summarized = summarized.astype(pd.Int16Dtype())
     summarized.rename(columns={
-                      'min': 'year_enacted',
-                      'max': 'year_last_updated',
+                      'min': 'earliest_year_mentioned',
+                      'max': 'latest_year_mentioned',
                       'count': 'n_years_mentioned',
                       },
                       inplace=True,
                       )
 
     only_one_year = summarized.loc[:, 'n_years_mentioned'] == 1
-    summarized.loc[only_one_year, 'year_last_updated'] = pd.NA
+    summarized.loc[only_one_year, 'latest_year_mentioned'] = pd.NA
     summarized = summarized.reindex(index=ser.index, fill_value=pd.NA)
     summarized.loc[:, 'n_years_mentioned'].fillna(0, inplace=True)
     return summarized
 
 
 def _transform_state_policy(state_policy_df: pd.DataFrame) -> pd.DataFrame:
-    year_summaries = _extract_years(state_policy_df['policy'])
-    return pd.concat([state_policy_df, year_summaries], axis=1)
+    """Add FIPS codes and summarize years for state policies
+
+    Args:
+        state_policy_df (pd.DataFrame): dataframe of state policies
+
+    Returns:
+        pd.DataFrame: dataframe of state policies with additional columns
+    """
+    state = _add_fips_ids(state_policy_df, county_col='policy').drop(
+        columns='county_id_fips')
+    year_summaries = _extract_years(state.loc[:, 'policy'])
+    state = pd.concat([state, year_summaries], axis=1)
+    return state
 
 
 def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
+    """Standardize locality names, add FIPS codes, and summarize years for local ordinances.
+
+    Args:
+        project_df (pd.DataFrame): dataframe of local ordinances
+
+    Returns:
+        pd.DataFrame: dataframe of local ordinances with additional columns
+    """
     local = local_ord_df.copy()
     for col in local.columns:
         local.loc[:, col] = local.loc[:, col].str.strip()
-    year_summaries = _extract_years(local['ordinance'])
-    transformed = pd.concat([local, year_summaries], axis=1)
-
     # remove straggling words in county names
-    transformed.loc[:, 'locality'] = transformed.loc[:, 'locality'].str.replace(
+    local.loc[:, 'locality'] = local.loc[:, 'locality'].str.replace(
         ' Solar$| Wind$| Zoning Ordinance$', '', regex=True)
     # add fips codes to counties (but many names are cities)
-    transformed = _add_fips_ids(
-        transformed, county_col='locality', vintage=2020)
-    no_fips = transformed.loc[transformed.loc[:, 'county_id_fips'].isna(), :]
+    with_fips = add_county_fips_with_backup_geocoding(
+        local, locality_col='locality')
 
-    return transformed
+    year_summaries = _extract_years(local['ordinance'])
+    local = pd.concat([with_fips, year_summaries], axis=1)
+    local.rename(columns={'locality': 'raw_locality_name'}, inplace=True)
 
-
-def _geocode_row(ser: pd.Series, client: GoogleGeocoder) -> List[str]:
-    client.geocode_request(name=ser['locality'], state=ser['state'])
-    return client.describe()
+    return local
 
 
-def geocode_locality(local_ord_subset: pd.DataFrame) -> pd.DataFrame:
-    geocoder = GoogleGeocoder()
-    new_cols = local_ord_subset.apply(
-        _geocode_row, axis=1, result_type='expand', client=geocoder)
-    new_cols.columns = ['object_name', 'object_type', 'containing_county']
-    return new_cols
+def _transform_contested_projects(project_df: pd.DataFrame) -> pd.DataFrame:
+    """Add FIPS codes and summarize years for contested projects
+
+    Args:
+        project_df (pd.DataFrame): dataframe of contested projects
+
+    Returns:
+        pd.DataFrame: dataframe of contested projects with additional columns
+    """
+    proj = _add_fips_ids(project_df, county_col='description').drop(
+        columns='county_id_fips')
+    year_summaries = _extract_years(proj.loc[:, 'description'])
+    proj = pd.concat([proj, year_summaries], axis=1)
+    return proj
 
 
 def transform(raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
-    raise NotImplementedError
+    transform_funcs = {
+        'state_policy': _transform_state_policy,
+        'local_ordinance': _transform_local_ordinances,
+        'contested_project': _transform_contested_projects,
+    }
+    transformed = {key: transform_funcs[key](
+        raw_dfs[key]) for key in raw_dfs.keys()}
+    return transformed
