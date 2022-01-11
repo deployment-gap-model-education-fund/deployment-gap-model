@@ -4,6 +4,7 @@ pytest
 tqdm
 python-docx
 googlemaps
+joblib
 pandas-gbq
 pandera
 pandera[io]
