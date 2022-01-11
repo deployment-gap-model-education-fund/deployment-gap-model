@@ -3,3 +3,7 @@ psycopg2
 pytest
 tqdm
 beautifulsoup4
+pandas-gbq
+pandera
+pandera[io]
+jupyterlab
