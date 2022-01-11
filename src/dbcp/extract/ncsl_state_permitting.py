@@ -1,5 +1,4 @@
 from typing import Dict, List, Optional
-from pathlib import Path
 
 import requests
 import bs4
@@ -96,8 +95,8 @@ class NCSLScraper(object):
         return output
 
 
-def extract(csv) -> pd.DataFrame:
+def extract(csv) -> Dict[str, pd.DataFrame]:
     # TODO: use datastore
     out = pd.read_csv(csv)
     # set categorical dtypes after cleaning up categories in transform stage.
-    return out
+    return {'ncsl_state_permitting': out}
