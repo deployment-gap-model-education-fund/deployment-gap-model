@@ -5,8 +5,7 @@ from typing import Dict
 
 import pandas as pd
 
-from dbcp.schemas import (EMISSIONS_INCREASE_SCHEMA,
-                          NATURAL_GAS_PIPELINES_SCHEMA)
+from dbcp.schemas import TABLE_SCHEMAS
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +35,7 @@ def natural_gas_pipelines(ng_pipes: pd.DataFrame) -> pd.DataFrame:
     ng_pipes = ng_pipes.replace("TBD", None)
 
     # Validate schema
-    ng_pipes = NATURAL_GAS_PIPELINES_SCHEMA.validate(ng_pipes)
+    ng_pipes = TABLE_SCHEMAS["natural_gas_pipelines"].validate(ng_pipes)
     assert "object" not in ng_pipes.dtypes
 
     # Convert cost to millions
@@ -77,7 +76,7 @@ def emissions_increase(projects: pd.DataFrame) -> pd.DataFrame:
             projects[field], errors="coerce", downcast="float")
 
     # Validate schema
-    projects = EMISSIONS_INCREASE_SCHEMA.validate(projects)
+    projects = TABLE_SCHEMAS["emissions_increase"].validate(projects)
     assert "object" not in projects.dtypes
 
     return projects
