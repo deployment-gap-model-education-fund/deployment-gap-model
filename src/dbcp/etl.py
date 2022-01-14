@@ -105,6 +105,18 @@ def etl(args):
     if args.upload_to_bigquery:
         logger.info('Loading tables to BigQuery.')
 
+        # read tables from dbcp schema in a dictionary of dfs
+        loaded_tables = {}
+        with engine.connect() as con:
+            query = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'dbcp';"
+            table_names = list(pd.read_sql(query, con)["table_name"])
+
+            for table_name in table_names:
+                table = pd.read_sql_table(table_name, con, schema="dbcp")
+                # Validate the schemas again
+                loaded_tables[table_name] = TABLE_SCHEMAS[table_name].validate(table)
+
+        # load to big query
         SCOPES = [
             'https://www.googleapis.com/auth/cloud-platform',
         ]
@@ -112,7 +124,7 @@ def etl(args):
         credentials = pydata_google_auth.get_user_credentials(
             SCOPES)
 
-        for table_name, df in transformed_dfs.items():
+        for table_name, df in loaded_tables.items():
             logger.info(f"Loading: {table_name}")
             pandas_gbq.to_gbq(
                 df, f"dbcp_data.{table_name}", project_id="dbcp-dev", if_exists="replace", credentials=credentials)
