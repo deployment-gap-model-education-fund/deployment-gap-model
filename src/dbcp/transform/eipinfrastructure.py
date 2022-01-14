@@ -67,7 +67,8 @@ def emissions_increase(projects: pd.DataFrame) -> pd.DataFrame:
     pct_fields = projects.filter(regex=(".+_pct")).columns
     for field in pct_fields:
         projects[field] = projects[field].str.replace("%", "")
-    projects[pct_fields] = projects[pct_fields].astype(float) / 100
+        projects[field] = pd.to_numeric(
+            projects[field], downcast="float", errors="coerce") / 100
 
     # Clean tpy fields
     tpy_fields = projects.filter(regex=(".+_tpy")).columns
