@@ -12,7 +12,6 @@ services:
       - ./test:/app/test:r
   postgres:
     image: postgis/postgis:13-3.1-alpine
-    restart: unless-stopped
     env_file: default.env
     ports:
       - ${POSTGRES_PORT}:5432
