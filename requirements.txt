@@ -5,6 +5,7 @@ tqdm
 python-docx
 googlemaps
 pandas-gbq
+pydata-google-auth
 pandera
 pandera[io]
 jupyterlab
