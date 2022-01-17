@@ -1,11 +1,12 @@
 """Functions to transform EIP Infrastructure tables."""
 
 import logging
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 import pandas as pd
 
-from dbcp.transform.helpers import EXCEL_EPOCH_ORIGIN, parse_dates, normalize_multicolumns_to_rows
+from dbcp.schemas import TABLE_SCHEMAS
+from dbcp.transform.helpers import normalize_multicolumns_to_rows, parse_dates
 from pudl.helpers import add_fips_ids as _add_fips_ids
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,6 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     Returns:
         lbnl_transformed_dfs: Dictionary of the transformed tables.
     """
-
     lbnl_transformed_dfs = {name: df.copy()
                             for name, df in lbnl_raw_dfs.items()}
     _set_global_project_ids(lbnl_transformed_dfs)
@@ -78,6 +78,11 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         lbnl_normalized_dfs['iso_locations'])
     lbnl_normalized_dfs['iso_for_tableau'] = denormalize(lbnl_normalized_dfs)
     lbnl_normalized_dfs['iso_projects'].reset_index(inplace=True)
+
+    # Validate schema
+    for name, df in lbnl_normalized_dfs.items():
+        lbnl_normalized_dfs[name] = TABLE_SCHEMAS[name].validate(df)
+
     return lbnl_normalized_dfs
 
 
@@ -150,8 +155,7 @@ def replace_value_with_count_validation(df: pd.DataFrame, col: str, val_to_repla
 
 
 def _normalize_resource_capacity(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
-    """Pull out the awkward one-to-many columns (type_1, capacity_1, type_2, capacity_2)
-    to a separate dataframe.
+    """Pull out the awkward one-to-many columns (type_1, capacity_1, type_2, capacity_2) to a separate dataframe.
 
     Args:
         lbnl_df (pd.DataFrame): LBNL ISO queue dataframe
@@ -178,8 +182,7 @@ def _normalize_resource_capacity(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFram
 
 
 def _normalize_location(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
-    """Pull out the awkward one-to-many columns (county_1, county_2, etc)
-    to a separate dataframe.
+    """Pull out the awkward one-to-many columns (county_1, county_2, etc) to a separate dataframe.
 
     Args:
         lbnl_df (pd.DataFrame): LBNL ISO queue dataframe
@@ -197,7 +200,7 @@ def _normalize_location(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         location_df = location_df.merge(
             lbnl_df.loc[:, 'state'], on='project_id', validate='m:1')
 
-        project_df = lbnl_df.drop(columns=county_cols+['state'])
+        project_df = lbnl_df.drop(columns=county_cols + ['state'])
     else:
         location_df = lbnl_df.loc[:, ['state', 'county']].reset_index()
         project_df = lbnl_df.drop(columns=['state', 'county'])
@@ -263,6 +266,7 @@ def add_fips_codes(location_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def denormalize(lbnl_normalized_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Denormalize lbnl dataframes."""
     # TODO: this should be a view in SQL
     loc_proj = lbnl_normalized_dfs['iso_locations'].merge(
         lbnl_normalized_dfs['iso_projects'], on='project_id', how='outer', validate='m:1')
