@@ -39,6 +39,6 @@ voc_tpy,voc
 permit_documents_url,link_to_permit_documents
 haps_tpy,haps
 nox_tpy,nox
-co_typ,co
+co_tpy,co
 county,county_parish
 operating_status_last_updated,operating_status_last_updated_by_eip_staff
