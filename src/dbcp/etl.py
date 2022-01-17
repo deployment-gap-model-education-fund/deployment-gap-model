@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 def etl_eipinfrastructure() -> Dict[str, pd.DataFrame]:
     """EIP Infrastructure ETL."""
     # Extract
-    ds = DBCPDatastore(sandbox=True, local_cache_path="/app/input")
+    ds = DBCPDatastore(sandbox=True, local_cache_path="/app/data/data_cache")
     eip_raw_dfs = dbcp.extract.eipinfrastructure.Extractor(ds).extract(
         update_date=WORKING_PARTITIONS["eipinfrastructure"]["update_date"])
 
@@ -31,7 +31,7 @@ def etl_eipinfrastructure() -> Dict[str, pd.DataFrame]:
 def etl_lbnlisoqueues() -> Dict[str, pd.DataFrame]:
     """LBNL ISO Queues ETL."""
     # Extract
-    ds = DBCPDatastore(sandbox=True, local_cache_path="/app/input")
+    ds = DBCPDatastore(sandbox=True, local_cache_path="/app/data/data_cache")
     lbnl_raw_dfs = dbcp.extract.lbnlisoqueues.Extractor(ds).extract(
         update_date=WORKING_PARTITIONS["lbnlisoqueues"]["update_date"])
 
@@ -106,7 +106,7 @@ def etl(args):
     # This should be removed once we have cloudsql setup.
     if args.csv:
         logger.info('Writing tables to CSVs.')
-        output_path = Path("/app/output/")
+        output_path = Path("/app/data/output/")
         for table_name, df in transformed_dfs.items():
             df.to_csv(output_path / f"{table_name}.csv", index=False)
 
