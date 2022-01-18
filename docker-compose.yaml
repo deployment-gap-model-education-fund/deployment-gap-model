@@ -11,6 +11,9 @@ services:
       - ./input:/app/input:rw
       - ./output:/app/output:rw
       - ./test:/app/test:r
+    ports:
+      - ${JUPYTER_PORT}:${JUPYTER_PORT}
+    command: jupyter lab --port ${JUPYTER_PORT} --ip 0.0.0.0 --no-browser
   postgres:
     image: postgis/postgis:13-3.1-alpine
     env_file: default.env
