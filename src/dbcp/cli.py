@@ -26,6 +26,13 @@ def parse_command_line():
         help="Write tables to csvs. This will overwrite existing csvs.",
     )
     parser.add_argument(
+        '-bq',
+        '--upload-to-bigquery',
+        action='store_true',
+        default=False,
+        help="Loads tables to BigQuery.",
+    )
+    parser.add_argument(
         "--loglevel",
         help="Set logging level (DEBUG, INFO, WARNING, ERROR, or CRITICAL).",
         default="INFO",
