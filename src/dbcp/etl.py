@@ -12,6 +12,7 @@ import dbcp
 from dbcp.constants import WORKING_PARTITIONS
 from dbcp.schemas import TABLE_SCHEMAS
 from dbcp.workspace.datastore import DBCPDatastore
+from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from pudl.output.pudltabl import PudlTabl
 
 logger = logging.getLogger(__name__)
@@ -71,8 +72,9 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
 
 def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
     """NCSL State Permitting for Wind ETL."""
-    # Extract
     source_path = Path('/app/data/raw/ncsl_state_permitting_wind.csv')
+    if not source_path.exists():
+        NCSLScraper().scrape_and_save_to_disk(source_path)
     raw_df = dbcp.extract.ncsl_state_permitting.extract(source_path)
 
     out = dbcp.transform.ncsl_state_permitting.transform(raw_df)
