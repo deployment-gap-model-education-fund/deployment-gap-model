@@ -1,4 +1,5 @@
 from typing import Dict, List, Optional
+from pathlib import Path
 
 import requests
 import bs4
@@ -94,9 +95,19 @@ class NCSLScraper(object):
             'state').reset_index(drop=True)
         return output
 
+    def scrape_and_save_to_disk(self, destination_path: Path) -> None:
+        """Get NCSL winder energy permitting data, parse it, and save results to disk.
+
+        Args:
+            destination_path (Path): filepath to write csv to
+        """
+        scraped = self.parse_page()
+        scraped.to_csv(destination_path, index=False)
+        return
+
 
 def extract(csv) -> Dict[str, pd.DataFrame]:
     # TODO: use datastore
     out = pd.read_csv(csv)
-    # set categorical dtypes after cleaning up categories in transform stage.
+    # set categorical dtypes in transform stage, after cleaning up categories.
     return {'ncsl_state_permitting': out}
