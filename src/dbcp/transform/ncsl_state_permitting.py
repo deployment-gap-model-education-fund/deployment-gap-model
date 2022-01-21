@@ -7,6 +7,14 @@ from pudl.helpers import add_fips_ids as _add_fips_ids
 
 
 def transform(raw_df: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
+    """Standardize null values, state names, and dtypes. Add state FIPS codes.
+
+    Args:
+        raw_df (Dict[str, pd.DataFrame]): dataframe from .docx parser
+
+    Returns:
+        Dict[str, pd.DataFrame]: cleaned and transformed state permitting dataset
+    """
     # only one df in dict
     transform_df = raw_df['ncsl_state_permitting'].copy()
     transform_df.loc[:, 'permitting_type'].replace('n/a', pd.NA, inplace=True)
@@ -34,6 +42,15 @@ def transform(raw_df: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
 
 
 def validate(ncsl_df: pd.DataFrame) -> None:
+    """Set membership validation of state names and permitting types.
+
+    Args:
+        ncsl_df (pd.DataFrame): cleaned and transformed state permitting dataset
+
+    Raises:
+        AssertionError: if unexpected state name is found
+        AssertionError: if unexpected permitting type is found
+    """
     expected_states = set(US_STATES_TERRITORIES.values())
     df_states = set(ncsl_df.loc[:, 'state'].unique())
     # don't want symmetric diff due to territories
