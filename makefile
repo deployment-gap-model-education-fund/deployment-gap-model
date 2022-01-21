@@ -17,7 +17,7 @@ sql_shell:
 	docker compose run --rm postgres bash -c 'psql -U $$POSTGRES_USER -h $$POSTGRES_HOST $$POSTGRES_DB'
 
 pudl_db:
-	docker compose run --rm app bash -c 'sqlite3 /app/input/$$PUDL_VERSION/pudl_data/sqlite/pudl.sqlite'
+	docker compose run --rm app bash -c 'sqlite3 /app/data/data_cache/$$PUDL_VERSION/pudl_data/sqlite/pudl.sqlite'
 
 test:
 	docker compose run --rm app pytest --ignore=input/w
@@ -29,4 +29,4 @@ update_conda:
 	conda env update --file environment.yml --name dbcp-dev --prune
 
 jupyter_lab:
-	docker compose run -p 8888:8888 --rm app jupyter lab --port 8888 --ip 0.0.0.0 --no-browser
+	docker compose up
