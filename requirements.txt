@@ -2,7 +2,10 @@ catalystcoop.pudl>=0.5
 psycopg2
 pytest
 tqdm
+python-docx
+googlemaps
 pandas-gbq
+pydata-google-auth
 pandera
 pandera[io]
 jupyterlab
