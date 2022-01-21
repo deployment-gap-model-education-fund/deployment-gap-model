@@ -2,6 +2,7 @@ catalystcoop.pudl>=0.5
 psycopg2
 pytest
 tqdm
+beautifulsoup4
 python-docx
 googlemaps
 pandas-gbq
