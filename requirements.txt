@@ -3,7 +3,10 @@ psycopg2
 pytest
 tqdm
 beautifulsoup4
+python-docx
+googlemaps
 pandas-gbq
+pydata-google-auth
 pandera
 pandera[io]
 jupyterlab
