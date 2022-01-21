@@ -8,8 +8,7 @@ services:
     volumes:
       - ./src/dbcp:/app/dbcp:ro
       - ./notebooks:/app/notebooks:rw
-      - ./input:/app/input:rw
-      - ./output:/app/output:rw
+      - ./data:/app/data:rw
       - ./test:/app/test:r
     ports:
       - ${JUPYTER_PORT}:${JUPYTER_PORT}
