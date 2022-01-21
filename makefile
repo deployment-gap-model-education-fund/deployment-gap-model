@@ -29,4 +29,4 @@ update_conda:
 	conda env update --file environment.yml --name dbcp-dev --prune
 
 jupyter_lab:
-	docker compose run -p 8888:8888 --rm app jupyter lab --port 8888 --ip 0.0.0.0 --no-browser
+	docker compose up
