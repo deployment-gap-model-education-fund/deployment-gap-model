@@ -13,7 +13,14 @@ class GoogleGeocoder(object):
 
     def __init__(self, key=None) -> None:
         if key is None:
-            key = os.environ["API_KEY_GOOGLE_MAPS"]
+            try:
+                key = os.environ["API_KEY_GOOGLE_MAPS"]
+            except KeyError:
+                raise KeyError(
+                    "API_KEY_GOOGLE_MAPS must be defined in your local .env file."
+                    " The API key is available in our account: "
+                    "https://console.cloud.google.com/google/maps-apis/credentials?project=dbcp-dev&supportedpurview=project"
+                )
         self.client = googlemaps.Client(key=key)
         self._name = ''
         self._state = ''
