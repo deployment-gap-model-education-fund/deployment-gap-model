@@ -2,7 +2,9 @@ version: '3.9'
 services:
   app:
     build: .
-    env_file: default.env
+    env_file:
+      - default.env
+      - .env # for API_KEY_GOOGLE_MAPS
     depends_on:
       - postgres
     volumes:
