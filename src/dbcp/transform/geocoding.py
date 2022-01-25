@@ -15,12 +15,16 @@ class GoogleGeocoder(object):
         if key is None:
             try:
                 key = os.environ["API_KEY_GOOGLE_MAPS"]
-            except KeyError:
-                raise KeyError(
-                    "API_KEY_GOOGLE_MAPS must be defined in your local .env file."
-                    " The API key is available in our account: "
-                    "https://console.cloud.google.com/google/maps-apis/credentials?project=dbcp-dev&supportedpurview=project"
-                )
+            except ValueError as e:
+                if 'google.com' in e.args[0]:
+                    # local.env wasn't updated properly
+                    raise ValueError(
+                        "API_KEY_GOOGLE_MAPS must be defined in your local.env file."
+                        " See README.md for instructions."
+                    )
+                else:
+                    raise e
+
         self.client = googlemaps.Client(key=key)
         self._name = ''
         self._state = ''
