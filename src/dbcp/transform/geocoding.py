@@ -13,7 +13,18 @@ class GoogleGeocoder(object):
 
     def __init__(self, key=None) -> None:
         if key is None:
-            key = os.environ["API_KEY_GOOGLE_MAPS"]
+            try:
+                key = os.environ["API_KEY_GOOGLE_MAPS"]
+            except ValueError as e:
+                if 'google.com' in e.args[0]:
+                    # local.env wasn't updated properly
+                    raise ValueError(
+                        "API_KEY_GOOGLE_MAPS must be defined in your local.env file."
+                        " See README.md for instructions."
+                    )
+                else:
+                    raise e
+
         self.client = googlemaps.Client(key=key)
         self._name = ''
         self._state = ''
