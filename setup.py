@@ -1,6 +1,4 @@
-"""Setup script to make DBCP directly installable with pip."""
-
-from setuptools import find_packages, setup
+from setuptools import setup, find_packages
 
 setup(
     name='dbcp',
@@ -11,5 +9,14 @@ setup(
     description='Data engineering for the Down Ballot Climate Project (DBCP)',
     packages=find_packages("src"),
     package_dir={"": "src"},
-    install_requires=['catalystcoop.pudl>=0.5', 'psycopg2', 'tqdm', 'python-docx', ],
+    install_requires=['catalystcoop.pudl>=0.5',
+                      'psycopg2',
+                      'tqdm',
+                      'python-docx',
+                      'googlemaps',
+                      'pandas-gbq',
+                      'pydata-google-auth',
+                      'pandera',
+                      'pandera[io]',
+                      ],
 )

@@ -1,11 +1,12 @@
 """Functions to transform EIP Infrastructure tables."""
 
 import logging
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 import pandas as pd
 
-from dbcp.transform.helpers import EXCEL_EPOCH_ORIGIN, parse_dates, normalize_multicolumns_to_rows
+from dbcp.schemas import TABLE_SCHEMAS
+from dbcp.transform.helpers import normalize_multicolumns_to_rows, parse_dates
 from pudl.helpers import add_fips_ids as _add_fips_ids
 
 logger = logging.getLogger(__name__)
@@ -181,6 +182,7 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         raise AssertionError("Missing Resources!")
 
     lbnl_normalized_dfs['iso_for_tableau'] = denormalize(lbnl_normalized_dfs)
+
     # not my fav, but gonna run this resource cleaning again for the denormalized tableau
     # version because there are some new rows added during the merge that need to be
     # categorized as Unknown. I'm putting it in BOTH places instead of just here so
@@ -190,6 +192,12 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         .pipe(clean_resource_type)
         .pipe(add_resource_classification)
         .pipe(add_project_classification))
+
+    lbnl_normalized_dfs['iso_projects'].reset_index(inplace=True)
+
+    # Validate schema
+    for name, df in lbnl_normalized_dfs.items():
+        lbnl_normalized_dfs[name] = TABLE_SCHEMAS[name].validate(df)
 
     return lbnl_normalized_dfs
 
@@ -263,8 +271,7 @@ def replace_value_with_count_validation(df: pd.DataFrame, col: str, val_to_repla
 
 
 def _normalize_resource_capacity(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
-    """Pull out the awkward one-to-many columns (type_1, capacity_1, type_2, capacity_2)
-    to a separate dataframe.
+    """Pull out the awkward one-to-many columns (type_1, capacity_1, type_2, capacity_2) to a separate dataframe.
 
     Args:
         lbnl_df (pd.DataFrame): LBNL ISO queue dataframe
@@ -291,8 +298,7 @@ def _normalize_resource_capacity(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFram
 
 
 def _normalize_location(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
-    """Pull out the awkward one-to-many columns (county_1, county_2, etc)
-    to a separate dataframe.
+    """Pull out the awkward one-to-many columns (county_1, county_2, etc) to a separate dataframe.
 
     Args:
         lbnl_df (pd.DataFrame): LBNL ISO queue dataframe
@@ -337,10 +343,10 @@ def normalize_lbnl_dfs(lbnl_transformed_dfs: Dict[str, pd.DataFrame]) -> Dict[st
     location_dfs = [_normalize_location(df_dict['project_df'])
                     for df_dict in resource_capacity_dfs]
     location_df = pd.concat([df_dict['location_df']
-                            for df_dict in location_dfs],
+                             for df_dict in location_dfs],
                             ignore_index=True)
     project_df = pd.concat([df_dict['project_df']
-                           for df_dict in location_dfs])  # keep project_id index
+                            for df_dict in location_dfs])  # keep project_id index
     return {
         'iso_projects': project_df,
         'iso_locations': location_df,
@@ -478,6 +484,7 @@ def add_project_classification(resource_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def denormalize(lbnl_normalized_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Denormalize lbnl dataframes."""
     # TODO: this should be a view in SQL
     loc_proj = lbnl_normalized_dfs['iso_locations'].merge(
         lbnl_normalized_dfs['iso_projects'], on='project_id', how='outer', validate='m:1')
