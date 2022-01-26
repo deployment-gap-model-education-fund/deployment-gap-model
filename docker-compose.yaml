@@ -2,17 +2,20 @@ version: '3.9'
 services:
   app:
     build: .
-    env_file: default.env
+    env_file: local.env
     depends_on:
       - postgres
     volumes:
       - ./src/dbcp:/app/dbcp:ro
-      - ./input:/app/input:rw
-      - ./output:/app/output:rw
+      - ./notebooks:/app/notebooks:rw
+      - ./data:/app/data:rw
       - ./test:/app/test:r
+    ports:
+      - ${JUPYTER_PORT}:${JUPYTER_PORT}
+    command: jupyter lab --port ${JUPYTER_PORT} --ip 0.0.0.0 --no-browser
+
   postgres:
     image: postgis/postgis:13-3.1-alpine
-    restart: unless-stopped
-    env_file: default.env
+    env_file: local.env
     ports:
       - ${POSTGRES_PORT}:5432
