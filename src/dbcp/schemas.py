@@ -284,6 +284,9 @@ TABLE_SCHEMAS = {
         pa.DataFrameSchema({
             "project_id": pa.Column(pd.Int64Dtype),
             "resource": pa.Column(pd.StringDtype, nullable=True),
+            "resource_clean": pa.Column(pd.StringDtype, nullable=True),
+            "resource_class": pa.Column(pd.StringDtype, nullable=True),
+            "project_class": pa.Column(pd.StringDtype, nullable=True),
             "capacity_mw": pa.Column(float, nullable=True),
         },
             strict=True,
