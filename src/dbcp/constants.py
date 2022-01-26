@@ -11,7 +11,7 @@ WORKING_PARTITIONS: Dict[str, Dict] = {
     }
 }
 
-PUDL_TABLES: Dict[str, Tuple[str]] = {
+PUDL_TABLES: Dict[str, Tuple[str, ...]] = {
     "eipinfrastructure": (
         "natural_gas_pipelines",
         "emissions_increase"
@@ -22,3 +22,5 @@ PUDL_TABLES: Dict[str, Tuple[str]] = {
         "completed_iso_queue_projects",
     )
 }
+
+FIPS_CODE_VINTAGE = 2020
