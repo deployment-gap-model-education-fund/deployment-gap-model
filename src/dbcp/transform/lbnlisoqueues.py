@@ -182,17 +182,6 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         raise AssertionError("Missing Resources!")
 
     lbnl_normalized_dfs['iso_for_tableau'] = denormalize(lbnl_normalized_dfs)
-
-    # not my fav, but gonna run this resource cleaning again for the denormalized tableau
-    # version because there are some new rows added during the merge that need to be
-    # categorized as Unknown. I'm putting it in BOTH places instead of just here so
-    # that the output CSV for iso resource capacity is also cleaned.
-    lbnl_normalized_dfs['iso_for_tableau'] = (
-        lbnl_normalized_dfs['iso_for_tableau']
-        .pipe(clean_resource_type)
-        .pipe(add_resource_classification)
-        .pipe(add_project_classification))
-
     lbnl_normalized_dfs['iso_projects'].reset_index(inplace=True)
 
     # Validate schema
