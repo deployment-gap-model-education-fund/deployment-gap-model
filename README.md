@@ -1,26 +1,56 @@
 # down_ballot_climate
 Repository for work with the Down Ballot Climate Project
 
-# Usage
-## Configure Environment Variables
+# Setup
+## Conda Environment
+Make sure you have [conda installed](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html). Once conda is installed, run:
+```
+conda env create --name dbcp-dev --file environment.yml
+```
+then activate the environment:
+```
+conda activate dbcp-dev
+```
+This conda environment has python, pip and pre-commit installed in it. This env is just for running pre-commits, the actual ETL development happens in docker.
 
-There are two config steps that must be completed before this repo will function.
-First, after cloning this repo, make a new file in the repo root directory called `.env` and enter these two lines to configure local ports:
+## Docker
+[Install docker](https://docs.docker.com/get-docker/). Once you have docker installed, make sure it is running.
+
+Now we can build the docker images by running:
+```
+make build
+```
+This command create a docker image and installs all the packages in `requirements.txt` so it will take a couple minutes to complete.
+
+If you get this error:
+```
+Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?
+```
+during this step it means docker is not running.
+
+## Environment Variables
+Once the image is created we need to set some environment variables. First, make a new file in the repo root directory called `.env` and enter these two lines to configure local ports:
 ```
 POSTGRES_PORT=5432
 JUPYTER_PORT=8890
 ```
-These ports can be changed to fit your local needs.
+If you have other services running on these ports, you can change them in `.env`.
 
-Second, make a copy of `default.env` and call it `local.env`. Follow the instructions inside to set up API key access.
+Second, make a copy of `default.env` and call it `local.env`. Follow the instructions inside to set up API key access. `local.env` contains environment variables that can be accessed within the docker container. You can read more about docker environment variables [here](https://docs.docker.com/compose/environment-variables/).
 
-## Docker
-The Down Ballot Climate Project uses [Docker](https://www.docker.com/) for development and deployment. To start working with DBCP, [install docker](https://docs.docker.com/get-docker/) and refer to the following make commands:
+## Run the ETL
+Now that we’ve built the image and set the environment variables run:
+```
+make run_etl
+```
+to run the ETL and load the data to postgres.
 
+# Makefile
+Here are additional make commands you can run.
 ```
 make build
 ```
-to build the dbcp docker imagess.
+to build the dbcp docker images.
 
 ```
 make run_etl
@@ -49,11 +79,4 @@ starts a jupyter lab instance at http://127.0.0.1:8888/. If you have another jup
 
 ```
 export JUPYTER_PORT=8890
-```
-
-## Conda
-There are some packages that are helpful for local development that aren't necessary in the docker image like pre-commit. To manage these packages, create a conda environment using this command:
-
-```
-conda env create -f environment.yml
 ```
