@@ -74,4 +74,4 @@ repos:
       verbose: false
       pass_filenames: false
       always_run: true
-      entry: pytest --doctest-modules src/dbcp test/unit --ignore input/
+      entry: docker compose run --rm app pytest --doctest-modules dbcp test/unit --ignore input/
