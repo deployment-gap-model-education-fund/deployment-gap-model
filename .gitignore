@@ -59,6 +59,7 @@ target/
 
 # DotEnv configuration
 .env
+local.env
 
 # Database
 *.db
@@ -76,15 +77,8 @@ target/
 # Jupyter NB Checkpoints
 .ipynb_checkpoints/
 
-# exclude data from source control by default
-/data/raw/*
-!/data/raw/.gitkeep
-
-/data/processed/*
-!/data/processed/.gitkeep
-
-/data/postgres/*
-!/data/postgres/.gitkeep
+# geocoder disk cache
+data/geocoder_cache/*
 
 # Mac OS-specific storage files
 .DS_Store
