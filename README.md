@@ -7,7 +7,7 @@ Make sure you have [conda installed](https://docs.conda.io/projects/conda/en/lat
 ```
 conda env create --name dbcp-dev --file environment.yml
 ```
-then activate the environment:
+Then activate the environment:
 ```
 conda activate dbcp-dev
 ```
@@ -60,22 +60,22 @@ to run the etl.
 ```
 make sql_shell
 ```
-starts a PostgreSQL interactive terminal.
+starts a PostgreSQL interactive terminal. This is helpful for inspecting the loaded data.
 
 ```
 make shell
 ```
-starts a bash interactive terminal.
+starts a bash interactive terminal. This is helpful for debugging. 
 
 ```
 make run_etl_bq
 ```
-runs the etl and loads the data to our BigQuery instance.
+runs the etl and loads the data to our BigQuery instance. Currently only @bendnorman has the permissions to load to BigQuery.
 
 ```
 make jupyter_lab
 ```
-starts a jupyter lab instance at http://127.0.0.1:8888/. If you have another jupyter service running at 8888 you can change the port by setting an environment variable in your shell before running this command:
+starts a jupyter lab instance at `http://127.0.0.1:8888/`. If you have another jupyter service running at `8888` you can change the port by setting an environment variable in your shell before running this command:
 
 ```
 export JUPYTER_PORT=8890
