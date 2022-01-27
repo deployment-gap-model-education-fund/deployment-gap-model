@@ -168,9 +168,11 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     # Combine and normalize iso queue tables
     lbnl_normalized_dfs = normalize_lbnl_dfs(lbnl_transformed_dfs)
 
-    # Add Fips Codes
-    lbnl_normalized_dfs['iso_locations'] = add_fips_codes(
-        lbnl_normalized_dfs['iso_locations'])
+    # Add Fips Codes and Clean Counties
+    lbnl_normalized_dfs['iso_locations'] = (
+        add_fips_codes(lbnl_normalized_dfs['iso_locations'])
+        .pipe(clean_counties)
+    )
 
     # Clean up and categorize resources
     lbnl_normalized_dfs['iso_resource_capacity'] = (
@@ -368,6 +370,14 @@ def add_fips_codes(location_df: pd.DataFrame) -> pd.DataFrame:
     with_fips.loc[:, 'county_id_fips'].fillna(
         nan_fips['county_id_fips'], inplace=True)
     return with_fips
+
+
+def clean_counties(location_df: pd.DataFrame) -> pd.DataFrame:
+    """Remove the words county and parish from county name."""
+    location_df['county'] = location_df.county.replace(' county', '')
+    location_df['county'] = location_df.county.replace(' parish', '')
+
+    return location_df
 
 
 def clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
