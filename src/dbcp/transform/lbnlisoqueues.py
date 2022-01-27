@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform active iso queue data."""
+    active_projects = remove_duplicates(active_projects)
     parse_date_columns(active_projects)
     replace_value_with_count_validation(active_projects,
                                         col='state',
@@ -26,6 +27,7 @@ def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
 
 def completed_iso_queue_projects(completed_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform completed iso queue data."""
+    completed_projects = remove_duplicates(completed_projects)
     parse_date_columns(completed_projects)
     # standardize columns between queues
     completed_projects.loc[:, 'interconnection_status_lbnl'] = 'IA Executed'
@@ -34,6 +36,7 @@ def completed_iso_queue_projects(completed_projects: pd.DataFrame) -> pd.DataFra
 
 def withdrawn_iso_queue_projects(withdrawn_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform withdrawn iso queue data."""
+    withdrawn_projects = remove_duplicates(withdrawn_projects)
     parse_date_columns(withdrawn_projects)
     replace_value_with_count_validation(withdrawn_projects,
                                         col='state',
@@ -76,7 +79,9 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     # data enrichment
     lbnl_normalized_dfs['iso_locations'] = add_fips_codes(
         lbnl_normalized_dfs['iso_locations'])
-    lbnl_normalized_dfs['iso_for_tableau'] = denormalize(lbnl_normalized_dfs)
+    iso_for_tableau = denormalize(lbnl_normalized_dfs)
+    iso_for_tableau = add_co2e_estimate(iso_for_tableau)
+    lbnl_normalized_dfs['iso_for_tableau'] = iso_for_tableau
     lbnl_normalized_dfs['iso_projects'].reset_index(inplace=True)
 
     # Validate schema
@@ -268,8 +273,133 @@ def add_fips_codes(location_df: pd.DataFrame) -> pd.DataFrame:
 def denormalize(lbnl_normalized_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     """Denormalize lbnl dataframes."""
     # TODO: this should be a view in SQL
-    loc_proj = lbnl_normalized_dfs['iso_locations'].merge(
+    # If multiple counties, just pick the first one. This is simplistic but there are only 26/13259 (0.1%)
+    single_location = lbnl_normalized_dfs['iso_locations'].groupby('project_id', as_index=False).nth(0)
+
+    loc_proj = single_location.merge(
         lbnl_normalized_dfs['iso_projects'], on='project_id', how='outer', validate='m:1')
     all_proj = loc_proj.merge(
         lbnl_normalized_dfs['iso_resource_capacity'], on='project_id', how='outer', validate="m:m")
     return all_proj
+
+
+def remove_duplicates(df: pd.DataFrame) -> pd.DataFrame:
+    """First draft deduplication of ISO queues.
+
+    Args:
+        df (pd.DataFrame): a queue dataframe
+
+    Returns:
+        pd.DataFrame: queue dataframe with duplicates removed
+    """
+    df = df.copy()
+    # do some string cleaning on point_of_interconnection
+    # for now "tbd" is mapped to "nan"
+    df["point_of_interconnection_clean"] = (
+        df["point_of_interconnection"]
+        .astype(str)
+        .str.lower()
+        .str.replace("substation", "")
+        .str.replace("kv", "")
+        .str.replace("-", " ")
+        .str.replace("station", "")
+        .str.replace(",", "")
+        .str.replace("at", "")
+        .str.replace("tbd", "nan")
+    )
+
+    df["point_of_interconnection_clean"] = [
+        " ".join(sorted(x)) for x in df["point_of_interconnection_clean"].str.split()
+    ]
+    df["point_of_interconnection_clean"] = df["point_of_interconnection_clean"].str.strip()
+
+    # groupby this set of keys and keep the duplicate with the most listed resources
+    # Note: "active" projects have county_1 and region, "completed" and "withdrawn" only have county and entity
+    if "county_1" in df.columns: # active projects
+        key = [
+            "point_of_interconnection_clean",
+            "capacity_mw_resource_1",
+            "county_1",
+            "state",
+            "region",
+            "resource_type_1",
+        ]
+    else: # completed and withdrawn projects
+        key = [
+            "point_of_interconnection_clean",
+            "capacity_mw_resource_1",
+            "county",
+            "state",
+            "entity",
+            "resource_type_1",
+        ]
+    df["len_resource_type"] = df.resource_type_lbnl.str.len()
+    df = df.reset_index()
+    dups = df.copy()
+    dups = dups.groupby(key, as_index=False, dropna=False).len_resource_type.max()
+    df = dups.merge(df, on=(key + ["len_resource_type"]))
+    # merge added duplicates with same len_resource_type, drop these
+    df = df[~(df.duplicated(key, keep="first"))]
+
+    # some final cleanup
+    df = (
+        df.drop(["len_resource_type", "point_of_interconnection_clean"], axis=1)
+        .set_index("project_id")
+        .sort_index()
+    )
+    return df
+
+
+def add_co2e_estimate(df: pd.DataFrame,
+                      gt_upper_capacity_threshold=110,
+                      gt_mid_capacity_threshold=40,
+                      gas_turbine_btu_per_kwh=11069, 
+                      combined_cycle_btu_per_kwh=7604,
+                      gas_emission_factor=53.08,
+                      small_gt_cf=0.4425,
+                      big_gt_cf=0.0983,
+                      cc_cf=0.5244) -> pd.DataFrame:
+    """For gas plants, estimate CO2e tons per year from capacity.
+
+    heat rate source: https://www.eia.gov/electricity/annual/html/epa_08_02.html
+    emissions factor source: https://github.com/grgmiller/emission-factors (EPA Mandatory Reporting of Greenhouse Gases Rule)
+    
+    Capacity factors were simple mean values derived from recent gas plants. See notebooks/05-kl-iso_co2_emissions.ipynb
+
+    Args:
+        df (pd.DataFrame): denormalized iso queue
+        gt_upper_capacity_threshold (int, optional): the highest capacity in MW that is still labeled as a gas turbine and not combined cycle. Defaults to 110.
+        gt_mid_capacity_threshold (int, optional): capacity at which to use a different average capacity factor for gas turbines. Defaults to 40.
+        gas_turbine_btu_per_kwh (int, optional): gas turbine heat rate. Defaults to 11069.
+        combined_cycle_btu_per_kwh (int, optional): combined cycle heat rate. Defaults to 7604.
+        gas_emission_factor (float, optional): natural gas emissions factor in kg CO2e/mmbtu of fuel. Defaults to 53.08.
+        small_gt_cf (float, optional): capacity factor of gas turbines below gt_mid_capacity_threshold. Defaults to 0.4425.
+        big_gt_cf (float, optional): capacity factor of gas turbines above gt_mid_capacity_threshold. Defaults to 0.0983.
+        cc_cf (float, optional): capacity factor of combined cycle plants. Defaults to 0.5244.
+
+    Returns:
+        pd.DataFrame: copy of input dataframe with new column 'co2e_tpy'
+    """
+
+    gas_df = df.loc[(df.resource == 'Gas') & df['queue_status'].eq('active'), :].copy()
+    gas_df['prime_mover_inferred'] = 'GT'
+    gas_df['prime_mover_inferred'] = gas_df['prime_mover_inferred'].where(gas_df['capacity_mw'] <= gt_upper_capacity_threshold, 'CC')
+    gas_df['heat_rate_btu_per_kwh'] = gas_turbine_btu_per_kwh
+    gas_df['heat_rate_btu_per_kwh'] = gas_df['heat_rate_btu_per_kwh'].where(gas_df['prime_mover_inferred'] == 'GT', combined_cycle_btu_per_kwh)
+    mmbtu_per_btu = 1/1000000
+    gas_df['kg_co2e_emission_per_kwh'] = gas_df['heat_rate_btu_per_kwh'] * mmbtu_per_btu * gas_emission_factor
+    
+    # Estimate capacity factor
+    gas_df['capacity_factor_estimated'] = small_gt_cf
+    gas_df['capacity_factor_estimated'] = gas_df['capacity_factor_estimated'].where(gas_df['capacity_mw'] < gt_mid_capacity_threshold, big_gt_cf)
+    gas_df['capacity_factor_estimated'] = gas_df['capacity_factor_estimated'].where(gas_df['prime_mover_inferred'] == 'GT', cc_cf)
+    
+    # Put it all together
+    gas_df['MWh'] = gas_df['capacity_mw'] * gas_df['capacity_factor_estimated']
+    kwh_per_mwh = 1000
+    tons_per_kg = 1/1000
+    # put in units of tons per year to match EIP data
+    gas_df['co2e_tpy'] = gas_df['kg_co2e_emission_per_kwh'] * kwh_per_mwh * tons_per_kg * gas_df['MWh']
+    # rejoin
+    out = df.join(gas_df['co2e_tpy'], how='left')
+    return out
