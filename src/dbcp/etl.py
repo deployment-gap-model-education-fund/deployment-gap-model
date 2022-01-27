@@ -9,11 +9,12 @@ import pydata_google_auth
 import sqlalchemy as sa
 
 import dbcp
-from dbcp.constants import WORKING_PARTITIONS
+from dbcp.constants import WORKING_PARTITIONS, FIPS_CODE_VINTAGE
 from dbcp.schemas import TABLE_SCHEMAS
 from dbcp.workspace.datastore import DBCPDatastore
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from pudl.output.pudltabl import PudlTabl
+from pudl.helpers import add_fips_ids as _add_fips_ids
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,16 @@ def etl_columbia_local_opp() -> Dict[str, pd.DataFrame]:
     return transformed_dfs
 
 
+
+def add_fips_nan_workaround(df, **kwargs):
+    rows_with_na = df.loc[df[['state', 'county']].isna().any(axis=1)].copy()
+    no_na = df.dropna(subset=['state', 'county'])
+    part_with_fips = _add_fips_ids(no_na, **kwargs)
+    rows_with_na['county_id_fips'] = ''
+    rows_with_na['state_id_fips'] = ''
+    return pd.concat([part_with_fips, rows_with_na], axis=0).sort_index()
+
+
 def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
     """Pull tables from pudl sqlite database."""
     pudl_data_path = dbcp.helpers.download_pudl_data()
@@ -79,6 +90,8 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
 
     mcoe = pudl_out.mcoe(all_gens=True)
     mcoe = TABLE_SCHEMAS["mcoe"].validate(mcoe)
+    # TODO: update schema and re-order these lines!
+    mcoe = add_fips_nan_workaround(mcoe, vintage=FIPS_CODE_VINTAGE)
     pudl_tables["mcoe"] = mcoe
 
     return pudl_tables
