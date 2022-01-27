@@ -374,8 +374,9 @@ def add_fips_codes(location_df: pd.DataFrame) -> pd.DataFrame:
 
 def clean_counties(location_df: pd.DataFrame) -> pd.DataFrame:
     """Remove the words county and parish from county name."""
-    location_df['county'] = location_df.county.replace(' county', '')
-    location_df['county'] = location_df.county.replace(' parish', '')
+    location_df['county'] = location_df.county.str.replace(' county', '')
+    location_df['county'] = location_df.county.str.replace(' parish', '')
+    location_df['county'] = location_df.county.str.replace('st.', 'saint')
 
     return location_df
 
