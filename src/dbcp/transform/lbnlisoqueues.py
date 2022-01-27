@@ -377,6 +377,7 @@ def clean_counties(location_df: pd.DataFrame) -> pd.DataFrame:
     location_df['county'] = location_df.county.str.replace(' county', '')
     location_df['county'] = location_df.county.str.replace(' parish', '')
     location_df['county'] = location_df.county.str.replace('st.', 'saint')
+    location_df['county'] = location_df.county.str.replace('ñ', 'n')
 
     return location_df
 
