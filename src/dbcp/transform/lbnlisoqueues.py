@@ -359,7 +359,10 @@ def add_co2e_estimate(df: pd.DataFrame,
                       small_gt_cf=0.4425,
                       big_gt_cf=0.0983,
                       cc_cf=0.5244) -> pd.DataFrame:
-    """For gas plants, estimate CO2e tons per year from capacity.
+    """NOTE: most the arguments to this function shouldn't exist, because they are interdependent model parameters.
+    Changing any of them simply produces an incoherent output. Issue # 83 raises this issue.
+    
+    For gas plants, estimate CO2e tons per year from capacity.
 
     heat rate source: https://www.eia.gov/electricity/annual/html/epa_08_02.html
     emissions factor source: https://github.com/grgmiller/emission-factors (EPA Mandatory Reporting of Greenhouse Gases Rule)
