@@ -273,7 +273,10 @@ def add_fips_codes(location_df: pd.DataFrame) -> pd.DataFrame:
 def denormalize(lbnl_normalized_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     """Denormalize lbnl dataframes."""
     # TODO: this should be a view in SQL
-    loc_proj = lbnl_normalized_dfs['iso_locations'].merge(
+    # If multiple counties, just pick the first one. This is simplistic but there are only 26/13259 (0.1%)
+    single_location = lbnl_normalized_dfs['iso_locations'].groupby('project_id', as_index=False).nth(0)
+    
+    loc_proj = single_location.merge(
         lbnl_normalized_dfs['iso_projects'], on='project_id', how='outer', validate='m:1')
     all_proj = loc_proj.merge(
         lbnl_normalized_dfs['iso_resource_capacity'], on='project_id', how='outer', validate="m:m")
