@@ -275,7 +275,7 @@ def denormalize(lbnl_normalized_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     # TODO: this should be a view in SQL
     # If multiple counties, just pick the first one. This is simplistic but there are only 26/13259 (0.1%)
     single_location = lbnl_normalized_dfs['iso_locations'].groupby('project_id', as_index=False).nth(0)
-    
+
     loc_proj = single_location.merge(
         lbnl_normalized_dfs['iso_projects'], on='project_id', how='outer', validate='m:1')
     all_proj = loc_proj.merge(
@@ -361,6 +361,11 @@ def add_co2e_estimate(df: pd.DataFrame,
                       cc_cf=0.5244) -> pd.DataFrame:
     """For gas plants, estimate CO2e tons per year from capacity.
 
+    heat rate source: https://www.eia.gov/electricity/annual/html/epa_08_02.html
+    emissions factor source: https://github.com/grgmiller/emission-factors (EPA Mandatory Reporting of Greenhouse Gases Rule)
+    
+    Capacity factors were simple mean values derived from recent gas plants. See notebooks/05-kl-iso_co2_emissions.ipynb
+
     Args:
         df (pd.DataFrame): denormalized iso queue
         gt_upper_capacity_threshold (int, optional): the highest capacity in MW that is still labeled as a gas turbine and not combined cycle. Defaults to 110.
@@ -375,8 +380,7 @@ def add_co2e_estimate(df: pd.DataFrame,
     Returns:
         pd.DataFrame: copy of input dataframe with new column 'co2e_tpy'
     """
-    # heat rate source: https://www.eia.gov/electricity/annual/html/epa_08_02.html
-    # emissions factor source: https://github.com/grgmiller/emission-factors
+
     gas_df = df.loc[(df.resource == 'Gas') & df['queue_status'].eq('active'), :].copy()
     gas_df['prime_mover_inferred'] = 'GT'
     gas_df['prime_mover_inferred'] = gas_df['prime_mover_inferred'].where(gas_df['capacity_mw'] <= gt_upper_capacity_threshold, 'CC')
