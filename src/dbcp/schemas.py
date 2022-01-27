@@ -296,8 +296,11 @@ TABLE_SCHEMAS = {
 }
 
 
-ISO_FOR_TABLEAU = TABLE_SCHEMAS["iso_projects"].add_columns(
-    TABLE_SCHEMAS["iso_locations"].columns).add_columns(TABLE_SCHEMAS["iso_resource_capacity"].columns)
+ISO_FOR_TABLEAU = (TABLE_SCHEMAS["iso_projects"]
+    .add_columns(TABLE_SCHEMAS["iso_locations"].columns)
+    .add_columns(TABLE_SCHEMAS["iso_resource_capacity"].columns)
+    .add_columns(pa.DataFrameSchema({'co2e_tpy': pa.Column(float, nullable=True)}).columns)
+    )
 ISO_FOR_TABLEAU = ISO_FOR_TABLEAU.update_column("state", nullable=True)
 
 TABLE_SCHEMAS["iso_for_tableau"] = ISO_FOR_TABLEAU
