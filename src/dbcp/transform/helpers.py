@@ -251,6 +251,7 @@ def add_county_fips_with_backup_geocoding(state_locality_df: pd.DataFrame, state
     """
     # first try a simple FIPS lookup and split by valid/invalid fips codes
     # The only purpose of this step is to save API calls on the easy ones (most of them)
+    state_locality_df = state_locality_df.fillna({state_col: ''})
     with_fips = _add_fips_ids(
         state_locality_df, state_col=state_col, county_col=locality_col, vintage=FIPS_CODE_VINTAGE)
     fips_is_nan = with_fips.loc[:, 'county_id_fips'].isna()
