@@ -273,10 +273,12 @@ TABLE_SCHEMAS = {
         pa.DataFrameSchema({
             "project_id": pa.Column(pd.Int64Dtype),
             "county": pa.Column(pd.StringDtype, nullable=True),
-            "state": pa.Column(pd.StringDtype),
+            "state": pa.Column(pd.StringDtype, nullable=True),
             "state_id_fips": pa.Column(pd.StringDtype, nullable=True),
             "county_id_fips": pa.Column(pd.StringDtype, nullable=True),
-
+            'locality_name': pa.Column(pd.StringDtype, nullable=True),
+            'locality_type': pa.Column(pd.StringDtype, nullable=True),
+            'containing_county': pa.Column(pd.StringDtype, nullable=True),
         },
             strict=True,
             coerce=True),
@@ -295,7 +297,7 @@ ISO_FOR_TABLEAU = (TABLE_SCHEMAS["iso_projects"]
     .add_columns(TABLE_SCHEMAS["iso_locations"].columns)
     .add_columns(TABLE_SCHEMAS["iso_resource_capacity"].columns)
     .add_columns(pa.DataFrameSchema({'co2e_tpy': pa.Column(float, nullable=True)}).columns)
+    .remove_columns(['locality_name', 'locality_type', 'containing_county',])
     )
-ISO_FOR_TABLEAU = ISO_FOR_TABLEAU.update_column("state", nullable=True)
 
 TABLE_SCHEMAS["iso_for_tableau"] = ISO_FOR_TABLEAU
