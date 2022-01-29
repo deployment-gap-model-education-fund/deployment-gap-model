@@ -406,12 +406,12 @@ def add_co2e_estimate(df: pd.DataFrame,
     return out
 
 def clean_county_names(df: pd.DataFrame):
-    # for now dropping Nans where geocoder didn't fill in a county fips
 
+    # for now dropping Nans where geocoder didn't fill in a county fips
     df = df[df.county_id_fips.notnull()]
     df = (df
-        .drop(['locality_name', 'locality_type', 'county'], axis=1)
-        .rename(columns={'containing_county': 'county'}))
+          .drop(['locality_name', 'locality_type', 'county'], axis=1)
+          .rename(columns={'containing_county': 'county'}))
     df['county'] = df['county'].str.lower()
-    df = df['project_id', 'county', 'state', 'state_id_fips', 'county_id_fips']
+    df = df[['project_id', 'county', 'state', 'state_id_fips', 'county_id_fips']]
     return df
