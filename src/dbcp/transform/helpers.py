@@ -249,10 +249,11 @@ def add_county_fips_with_backup_geocoding(state_locality_df: pd.DataFrame, state
     Returns:
         pd.DataFrame: copy of state_locality_df with new columns 'locality_name', 'locality_type', 'containing_county' 
     """
+    filled_state_locality = state_locality_df.loc[:, [state_col, locality_col]].fillna('') # copy
     # first try a simple FIPS lookup and split by valid/invalid fips codes
     # The only purpose of this step is to save API calls on the easy ones (most of them)
     with_fips = _add_fips_ids(
-        state_locality_df, state_col=state_col, county_col=locality_col, vintage=FIPS_CODE_VINTAGE)
+        filled_state_locality, state_col=state_col, county_col=locality_col, vintage=FIPS_CODE_VINTAGE)
     fips_is_nan = with_fips.loc[:, 'county_id_fips'].isna()
     if not fips_is_nan.any():
         # standardize output columns
@@ -261,23 +262,26 @@ def add_county_fips_with_backup_geocoding(state_locality_df: pd.DataFrame, state
         with_fips['containing_county'] = with_fips[locality_col]
         return with_fips
 
-    nan_fips = with_fips.loc[fips_is_nan, :].copy()
     good_fips = with_fips.loc[~fips_is_nan, :].copy()
+    # standardize output columns
+    good_fips['locality_name'] = good_fips[locality_col]
+    good_fips['locality_type'] = 'county'
+    good_fips['containing_county'] = good_fips[locality_col]
 
     # geocode the lookup failures - they are often city/town names (instead of counties) or simply mis-spelled
+    nan_fips = with_fips.loc[fips_is_nan, :].copy()
     geocoded = _geocode_locality(
         nan_fips, state_col=state_col, locality_col=locality_col)
     nan_fips = pd.concat([nan_fips, geocoded], axis=1)
     # add fips using geocoded names
     filled_fips = _add_fips_ids(nan_fips, state_col=state_col,
                                 county_col='containing_county', vintage=FIPS_CODE_VINTAGE)
+    
+    # recombine and restore row order
+    cols_to_keep = ['state_id_fips', 'county_id_fips', 'locality_name', 'locality_type', 'containing_county',]
+    recombined = pd.concat([good_fips, filled_fips], axis=0).loc[state_locality_df.index, cols_to_keep]
 
-    # recombine
-    # _add_fips_ids only works on counties
-    good_fips['locality_name'] = good_fips[locality_col]
-    good_fips['locality_type'] = 'county'
-    good_fips['containing_county'] = good_fips[locality_col]
+    # attach to original df
+    out = pd.concat([state_locality_df, recombined], axis=1)
 
-    recombined = pd.concat([good_fips, filled_fips], axis=0)
-
-    return recombined
+    return out
