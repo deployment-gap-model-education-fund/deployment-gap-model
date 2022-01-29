@@ -2,6 +2,7 @@ from typing import Optional, List, Dict
 import googlemaps
 import os
 from logging import getLogger
+from functools import lru_cache
 
 logger = getLogger('__name__')
 
@@ -13,7 +14,18 @@ class GoogleGeocoder(object):
 
     def __init__(self, key=None) -> None:
         if key is None:
-            key = os.environ["API_KEY_GOOGLE_MAPS"]
+            try:
+                key = os.environ["API_KEY_GOOGLE_MAPS"]
+            except ValueError as e:
+                if 'google.com' in e.args[0]:
+                    # local.env wasn't updated properly
+                    raise ValueError(
+                        "API_KEY_GOOGLE_MAPS must be defined in your local.env file."
+                        " See README.md for instructions."
+                    )
+                else:
+                    raise e
+
         self.client = googlemaps.Client(key=key)
         self._name = ''
         self._state = ''
@@ -22,22 +34,16 @@ class GoogleGeocoder(object):
         return
 
     def geocode_request(self, name: str, state: str, country: Optional[str] = None) -> None:
-        address = f"{name}, {state}"
         if country is None:
             country = 'US'
         self._name = name
         self._state = state
         self._country = country
-        components = {'administrative_area': state, 'country': country}
-        # Google's API library has built-in rate-limiting (50 per second)
-        # and retries with exponential backoff
-        response = self.client.geocode(address, components=components)
-        try:
-            self._response = response[0]
-        except IndexError:  # empty list = not found
+        response = _get_geocode_response(client=self.client, name=name, state=state, country=country)
+        if not response: # empty dict
             logger.info(
-                f"Address not found: {self._name}, {self._state}, {self._country}")
-            self._response = {}
+            f"Address not found: {self._name}, {self._state}, {self._country}")
+        
         return
 
     def get_county(self) -> str:
@@ -78,3 +84,29 @@ class GoogleGeocoder(object):
         object_name = self._response['address_components'][0]['short_name']
         containing_county = self.get_county()
         return [object_name, object_type, containing_county]
+
+@lru_cache(maxsize=512)
+def _get_geocode_response(*, client: googlemaps.Client, name: str, state: str, country: str) -> Dict:
+    """Get Google Maps Platform's interpretation of which place a name belongs to.
+    
+    This pure function with hashable inputs is factored out of the GoogleGeocoder class 
+    to enable memoization of API calls.
+
+    Args:
+        client (googlemaps.Client): the Google Maps Platform client
+        name (str): place name
+        state (str): state name or abbreviation
+        country (str): country name or abbreviation
+
+    Returns:
+        Dict: JSON response as a nested python dictionary
+    """
+    address = f"{name}, {state}"
+    components = {'administrative_area': state, 'country': country}
+    # Google's API library has built-in rate-limiting (50 per second)
+    # and retries with exponential backoff
+    response = client.geocode(address, components=components)
+    try:
+        return response[0]
+    except IndexError:  # empty list = not found
+        return {}
