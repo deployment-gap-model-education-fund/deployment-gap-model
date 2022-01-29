@@ -17,14 +17,16 @@ UNIX_EPOCH_ORIGIN = pd.Timestamp('01/01/1970')
 # See xlrd.xldate.py:xldate_as_datetime for complete implementation.
 EXCEL_EPOCH_ORIGIN = pd.Timestamp('12/30/1899')
 
-# cache is global because it needs to be accessed outside this module to call .clear()
 try:  # docker path
+    # 3 directories above current module
     geocoder_local_cache = Path("/app/data/geocoder_cache")
     assert geocoder_local_cache.exists()
 except AssertionError:  # local path
     # 4 directories above current module
     geocoder_local_cache = Path(
         __file__).resolve().parents[3] / "data/geocoder_cache"
+    assert geocoder_local_cache.exists()
+# cache needs to be accessed outside this module to call .clear()
 GEOCODER_CACHE = Memory(location=geocoder_local_cache)
 
 
