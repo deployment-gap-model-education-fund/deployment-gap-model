@@ -60,16 +60,6 @@ def etl_columbia_local_opp() -> Dict[str, pd.DataFrame]:
     return transformed_dfs
 
 
-def add_fips_nan_workaround(df, **kwargs):
-    """Add State and County FIPS IDs to a dataframe with nans."""
-    rows_with_na = df.loc[df[['state', 'county']].isna().any(axis=1)].copy()
-    no_na = df.dropna(subset=['state', 'county'])
-    part_with_fips = _add_fips_ids(no_na, **kwargs)
-    rows_with_na['county_id_fips'] = ''
-    rows_with_na['state_id_fips'] = ''
-    return pd.concat([part_with_fips, rows_with_na], axis=0).sort_index()
-
-
 def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
     """Pull tables from pudl sqlite database."""
     pudl_data_path = dbcp.helpers.download_pudl_data()
@@ -89,7 +79,10 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
     )
 
     mcoe = pudl_out.mcoe(all_gens=True)
-    mcoe = add_fips_nan_workaround(mcoe, vintage=FIPS_CODE_VINTAGE)
+    # add FIPS
+    filled_location = mcoe.loc[:,['state', 'county']].fillna('')
+    fips = _add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
+    mcoe = pd.concat([mcoe, fips[['state_id_fips', 'county_id_fips']]], axis=1, copy=False)
     mcoe = TABLE_SCHEMAS["mcoe"].validate(mcoe)
     pudl_tables["mcoe"] = mcoe
 
