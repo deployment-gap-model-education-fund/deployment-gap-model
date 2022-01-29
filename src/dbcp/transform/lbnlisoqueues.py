@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 import pandas as pd
 
 from dbcp.schemas import TABLE_SCHEMAS
-from dbcp.transform.helpers import normalize_multicolumns_to_rows, parse_dates
+from dbcp.transform.helpers import add_county_fips_with_backup_geocoding, normalize_multicolumns_to_rows, parse_dates
 from pudl.helpers import add_fips_ids as _add_fips_ids
 
 logger = logging.getLogger(__name__)
@@ -77,8 +77,9 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
             lbnl_transformed_dfs[table_name])
     lbnl_normalized_dfs = normalize_lbnl_dfs(lbnl_transformed_dfs)
     # data enrichment
-    lbnl_normalized_dfs['iso_locations'] = add_fips_codes(
+    lbnl_normalized_dfs['iso_locations'] = add_county_fips_with_backup_geocoding(
         lbnl_normalized_dfs['iso_locations'])
+    lbnl_normalized_dfs['iso_locations'] = clean_county_names(lbnl_normalized_dfs['iso_locations'])
     iso_for_tableau = denormalize(lbnl_normalized_dfs)
     iso_for_tableau = add_co2e_estimate(iso_for_tableau)
     lbnl_normalized_dfs['iso_for_tableau'] = iso_for_tableau
@@ -403,3 +404,14 @@ def add_co2e_estimate(df: pd.DataFrame,
     # rejoin
     out = df.join(gas_df['co2e_tpy'], how='left')
     return out
+
+def clean_county_names(df: pd.DataFrame):
+    # for now dropping Nans where geocoder didn't fill in a county fips
+
+    df = df[df.county_id_fips.notnull()]
+    df = (df
+        .drop(['locality_name', 'locality_type', 'county'], axis=1)
+        .rename(columns={'containing_county': 'county'}))
+    df['county'] = df['county'].str.lower()
+    df = df['project_id', 'county', 'state', 'state_id_fips', 'county_id_fips']
+    return df
