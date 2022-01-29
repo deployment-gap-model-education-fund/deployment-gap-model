@@ -9,10 +9,11 @@ import pydata_google_auth
 import sqlalchemy as sa
 
 import dbcp
-from dbcp.constants import WORKING_PARTITIONS
+from dbcp.constants import FIPS_CODE_VINTAGE, WORKING_PARTITIONS
+from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.schemas import TABLE_SCHEMAS
 from dbcp.workspace.datastore import DBCPDatastore
-from dbcp.extract.ncsl_state_permitting import NCSLScraper
+from pudl.helpers import add_fips_ids as _add_fips_ids
 from pudl.output.pudltabl import PudlTabl
 
 logger = logging.getLogger(__name__)
@@ -78,6 +79,10 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
     )
 
     mcoe = pudl_out.mcoe(all_gens=True)
+    # add FIPS
+    filled_location = mcoe.loc[:,['state', 'county']].fillna('')
+    fips = _add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
+    mcoe = pd.concat([mcoe, fips[['state_id_fips', 'county_id_fips']]], axis=1, copy=False)
     mcoe = TABLE_SCHEMAS["mcoe"].validate(mcoe)
     pudl_tables["mcoe"] = mcoe
 
@@ -144,8 +149,11 @@ def etl(args):
             for table_name in table_names:
                 table = pd.read_sql_table(table_name, con, schema="dbcp")
                 # Validate the schemas again
-                loaded_tables[table_name] = TABLE_SCHEMAS[table_name].validate(
-                    table)
+                if TABLE_SCHEMAS.get(table_name):
+                    loaded_tables[table_name] = TABLE_SCHEMAS[table_name].validate(
+                        table)
+                else:
+                    loaded_tables[table_name] = table
 
         # load to big query
         SCOPES = [
