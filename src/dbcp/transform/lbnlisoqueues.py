@@ -11,6 +11,96 @@ from pudl.helpers import add_fips_ids as _add_fips_ids
 
 logger = logging.getLogger(__name__)
 
+RESOURCE_DICT = {
+    "Battery Storage": {
+        "codes": ["Battery", "Batteries", "BAT", "ES"],
+        "type": "Renewable"},
+    "Biofuel": {
+        "codes": [],
+        "type": "Renewable"},
+    "Biomass": {
+        "codes": ["Wood", "W", "BLQ WDS", "WDS"],
+        "type": "Renewable"},
+    "Coal": {
+        "codes": ["BIT", "C"],
+        "type": "Fossil"},
+    "Combustion Turbine": {
+        "codes": ["CT"],
+        "type": "Fossil"},
+    "Fuel Cell": {
+        "codes": ["Fuel Cell", "FC"],
+        "type": "Fossil"},
+    "Geothermal": {
+        "codes": [],
+        "type": "Renewable"},
+    "Hydro": {
+        "codes": ["WAT", "H", "Water"],
+        "type": "Renewable"},
+    "Landfill Gas": {
+        "codes": ["LFG", "L"],
+        "type": "Fossil"},
+    "Methane; Solar": {
+        "codes": [],
+        "type": "Hybrid"},
+    "Municipal Solid Waste": {
+        "codes": ["MSW"],
+        "type": "Fossil"},
+    "Natural Gas": {
+        "codes": ["NG", "Methane", "CT-NG", "CC", "CC-NG", "ST-NG", "CS-NG", "Combined Cycle", "Gas", "Natural Gas; Other", "DFO KER NG", "DFO NG", "Diesel; Methane", "JF KER NG", "NG WO", "KER NG", "Natural Gas; Diesel; Other; Storage", "Natural Gas; Oil"],
+        "type": "Fossil"},
+    "Natural Gas; Other; Storage; Solar": {
+        "codes": [],
+        "type": "Hybrid"},
+    "Natural Gas; Storage": {
+        "codes": [],
+        "type": "Fossil"},
+    "Nuclear": {
+        "codes": ["NU", "NUC"],
+        "type": "Renewable"},
+    "Offshore Wind": {
+        "codes": [],
+        "type": "Renewable"},
+    "Oil": {
+        "codes": ["DFO", "Diesel", "CT-D", "CC-D", "JF", "KER", "DFO KER", "D"],
+        "type": "Fossil"},
+    "Oil; Biomass": {
+        "codes": ["BLQ DFO KER WDS"],
+        "type": "Hybrid"},
+    "Onshore Wind": {
+        "codes": ["Wind", "WND", "Wind Turbine"],
+        "type": "Renewable"},
+    "Other": {
+        "codes": [], # 
+        "type": "Unknown Resource"},
+    "Unknown": {
+        "codes": ["Wo", "F", "Hybrid", "M",],
+        "type": "Unknown Resource"},
+    "Other Storage": {
+        "codes": ["Flywheel", "Storage"],
+        "type": "Renewable"},
+    "Pumped Storage": {
+        "codes": ["Pump Storage", "Pumped-Storage hydro", "PS"],
+        "type": "Renewable"},
+    "Solar": {
+        "codes": ["SUN", "S"],
+        "type": "Renewable"},
+    "Solar; Biomass": {
+        "codes": [],
+        "type": "Renewable"},
+    "Solar; Storage": {
+        "codes": ["Solar; Battery", "SUN BAT", "Storage; Solar"],
+        "type": "Renewable"},
+    "Steam": {
+        "codes": ["ST"],
+        "type": "Fossil"},
+    "Waste Heat": {
+        "codes": ["Waste Heat Recovery", "Heat Recovery", "Co-Gen",],
+        "type": "Fossil"},
+    "Wind; Storage": {
+        "codes": ["WND BAT"],
+        "type": "Renewable"},
+}
+
 
 def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform active iso queue data."""
@@ -75,14 +165,29 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         logger.info(f"LBNL ISO Queues: Transforming {table_name} table.")
         lbnl_transformed_dfs[table_name] = transform_func(
             lbnl_transformed_dfs[table_name])
+    # Combine and normalize iso queue tables
     lbnl_normalized_dfs = normalize_lbnl_dfs(lbnl_transformed_dfs)
-    # data enrichment
-    lbnl_normalized_dfs['iso_locations'] = add_fips_codes(
-        lbnl_normalized_dfs['iso_locations'])
+
+    # Add Fips Codes and Clean Counties
+    lbnl_normalized_dfs['iso_locations'] = (
+        add_fips_codes(lbnl_normalized_dfs['iso_locations'])
+        .pipe(clean_counties)
+    )
+
+    # Clean up and categorize resources
+    lbnl_normalized_dfs['iso_resource_capacity'] = (
+        lbnl_normalized_dfs['iso_resource_capacity']
+        .pipe(clean_resource_type)
+        .pipe(add_resource_classification)
+        .pipe(add_project_classification))
+    if lbnl_normalized_dfs['iso_resource_capacity'].resource_clean.isna().any():
+        raise AssertionError("Missing Resources!")
+
+    lbnl_normalized_dfs['iso_projects'].reset_index(inplace=True)
+
     iso_for_tableau = denormalize(lbnl_normalized_dfs)
     iso_for_tableau = add_co2e_estimate(iso_for_tableau)
     lbnl_normalized_dfs['iso_for_tableau'] = iso_for_tableau
-    lbnl_normalized_dfs['iso_projects'].reset_index(inplace=True)
 
     # Validate schema
     for name, df in lbnl_normalized_dfs.items():
@@ -232,10 +337,10 @@ def normalize_lbnl_dfs(lbnl_transformed_dfs: Dict[str, pd.DataFrame]) -> Dict[st
     location_dfs = [_normalize_location(df_dict['project_df'])
                     for df_dict in resource_capacity_dfs]
     location_df = pd.concat([df_dict['location_df']
-                            for df_dict in location_dfs],
+                             for df_dict in location_dfs],
                             ignore_index=True)
     project_df = pd.concat([df_dict['project_df']
-                           for df_dict in location_dfs])  # keep project_id index
+                            for df_dict in location_dfs])  # keep project_id index
     return {
         'iso_projects': project_df,
         'iso_locations': location_df,
@@ -270,11 +375,124 @@ def add_fips_codes(location_df: pd.DataFrame) -> pd.DataFrame:
     return with_fips
 
 
+def clean_counties(location_df: pd.DataFrame) -> pd.DataFrame:
+    """Remove the words county and parish from county name."""
+    location_df['county'] = location_df.county.str.replace(' county', '')
+    location_df['county'] = location_df.county.str.replace(' parish', '')
+    location_df['county'] = location_df.county.str.replace('st.', 'saint')
+    location_df['county'] = location_df.county.str.replace('ñ', 'n')
+
+    return location_df
+
+
+def clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
+    """Standardize resource types used throughout iso queue tables.
+
+    Args:
+        resource_df (pd.DataFrame): normalized lbnl ISO queue resource df.
+
+    Returns:
+        pd.DataFrame: A copy of the resource df with a new columns for cleaned resource
+            types.
+
+    """
+    resource_df = resource_df.copy()
+    # Modify RESOURCE DICT for mapping
+    long_dict = {}
+    for clean_name, code_type_dict in RESOURCE_DICT.items():
+        for code in code_type_dict["codes"]:
+            long_dict[code] = clean_name
+    # Map clean resource values into new column
+    resource_df['resource_clean'] = resource_df.resource.fillna("Unknown")
+    resource_df = resource_df.replace({"resource_clean": long_dict})
+    return resource_df
+
+
+def add_resource_classification(resource_df: pd.DataFrame) -> pd.DataFrame:
+    """Classify resources as either Fossil, Renewable, or Hybrid.
+
+    The classification depends on a the resource_clean column, so you must first run
+    the clean_resource_type() function.
+
+    Args:
+        resource_df (pd.DataFrame): normalized lbnl ISO queue resource df.
+
+    Returns:
+        pd.DataFrame: A copy of the ISO queue resource_df with a column indicating
+            whether a given resource is Renewable, Fossil, or Hybrid.
+    """
+    # Modify RESOURCE DICT for mapping
+    long_dict = {}
+    for clean_name, code_type_dict in RESOURCE_DICT.items():
+        long_dict[clean_name] = code_type_dict['type']
+    # Map resources class values into new column
+    resource_df['resource_class'] = resource_df.resource_clean.map(long_dict)
+    return resource_df
+
+
+def _check_project_class(resource_class: pd.Series) -> str:
+    """Classify a single iso queue project as Renewable, Fossil, or Hybrid.
+
+    Args:
+        resource_class (pd.Series): The resource_class column of the resource_df grouped
+            by project_id
+
+    Returns:
+        str: A String value representing the project's resource class: Renewable,
+            Fossil, or Hybrid.
+
+    """
+    if resource_class.str.contains("Hybrid").any():
+        out = "Hybrid"
+    elif resource_class.str.contains("Fossil").any():
+        if resource_class.str.contains("Unknown Resource").any():
+            out = "Contains Unknown Resource"
+        if resource_class.str.contains("Renewable").any():
+            out = "Hybrid"
+        else:
+            out = "Fossil"
+    elif resource_class.str.contains("Renewable").any():
+        if resource_class.str.contains("Unknown Resource").any():
+            out = "Contains Unknown Resource"
+        else:
+            out = "Renewable"
+    else:
+        out = "Contains Unknown Resource"
+    return out
+
+
+def add_project_classification(resource_df: pd.DataFrame) -> pd.DataFrame:
+    """Classify all iso queue projects as either Renewable, Fossil, or Hybrid.
+
+    This function relies on the resource_class column which is created while running the
+    add_resource_classification() function. That function must be run before this
+    function.
+
+    Args:
+        resource_df (pandas.DataFrame): normalized lbnl ISO queue resource df.
+
+    Returns:
+        pd.DataFrame: A copy of the resource_df with a new column identifying whether
+            projects consist of renewables, fossil fuels, or a hybrid of the two.
+
+    """
+    resource_df_out = resource_df.copy()
+    project_groups = resource_df_out.groupby('project_id')
+    resource_df_out['project_class'] = (
+        project_groups.resource_class
+        .transform(lambda x: _check_project_class(x))
+    )
+    assert resource_df_out.project_class.isin([
+        "Fossil", "Renewable", "Hybrid", "Contains Unknown Resource"]).all()
+    return resource_df_out
+
+
 def denormalize(lbnl_normalized_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     """Denormalize lbnl dataframes."""
     # TODO: this should be a view in SQL
     # If multiple counties, just pick the first one. This is simplistic but there are only 26/13259 (0.1%)
-    single_location = lbnl_normalized_dfs['iso_locations'].groupby('project_id', as_index=False).nth(0)
+    single_location = lbnl_normalized_dfs['iso_locations'].groupby(
+        'project_id', as_index=False).nth(0)
 
     loc_proj = single_location.merge(
         lbnl_normalized_dfs['iso_projects'], on='project_id', how='outer', validate='m:1')
@@ -315,7 +533,7 @@ def remove_duplicates(df: pd.DataFrame) -> pd.DataFrame:
 
     # groupby this set of keys and keep the duplicate with the most listed resources
     # Note: "active" projects have county_1 and region, "completed" and "withdrawn" only have county and entity
-    if "county_1" in df.columns: # active projects
+    if "county_1" in df.columns:  # active projects
         key = [
             "point_of_interconnection_clean",
             "capacity_mw_resource_1",
@@ -324,7 +542,7 @@ def remove_duplicates(df: pd.DataFrame) -> pd.DataFrame:
             "region",
             "resource_type_1",
         ]
-    else: # completed and withdrawn projects
+    else:  # completed and withdrawn projects
         key = [
             "point_of_interconnection_clean",
             "capacity_mw_resource_1",
@@ -353,7 +571,7 @@ def remove_duplicates(df: pd.DataFrame) -> pd.DataFrame:
 def add_co2e_estimate(df: pd.DataFrame,
                       gt_upper_capacity_threshold=110,
                       gt_mid_capacity_threshold=40,
-                      gas_turbine_btu_per_kwh=11069, 
+                      gas_turbine_btu_per_kwh=11069,
                       combined_cycle_btu_per_kwh=7604,
                       gas_emission_factor=53.08,
                       small_gt_cf=0.4425,
@@ -366,7 +584,7 @@ def add_co2e_estimate(df: pd.DataFrame,
 
     heat rate source: https://www.eia.gov/electricity/annual/html/epa_08_02.html
     emissions factor source: https://github.com/grgmiller/emission-factors (EPA Mandatory Reporting of Greenhouse Gases Rule)
-    
+
     Capacity factors were simple mean values derived from recent gas plants. See notebooks/05-kl-iso_co2_emissions.ipynb
 
     Args:
@@ -386,23 +604,29 @@ def add_co2e_estimate(df: pd.DataFrame,
 
     gas_df = df.loc[(df.resource == 'Gas') & df['queue_status'].eq('active'), :].copy()
     gas_df['prime_mover_inferred'] = 'GT'
-    gas_df['prime_mover_inferred'] = gas_df['prime_mover_inferred'].where(gas_df['capacity_mw'] <= gt_upper_capacity_threshold, 'CC')
+    gas_df['prime_mover_inferred'] = gas_df['prime_mover_inferred'].where(
+        gas_df['capacity_mw'] <= gt_upper_capacity_threshold, 'CC')
     gas_df['heat_rate_btu_per_kwh'] = gas_turbine_btu_per_kwh
-    gas_df['heat_rate_btu_per_kwh'] = gas_df['heat_rate_btu_per_kwh'].where(gas_df['prime_mover_inferred'] == 'GT', combined_cycle_btu_per_kwh)
-    mmbtu_per_btu = 1/1000000
-    gas_df['kg_co2e_emission_per_kwh'] = gas_df['heat_rate_btu_per_kwh'] * mmbtu_per_btu * gas_emission_factor
-    
+    gas_df['heat_rate_btu_per_kwh'] = gas_df['heat_rate_btu_per_kwh'].where(
+        gas_df['prime_mover_inferred'] == 'GT', combined_cycle_btu_per_kwh)
+    mmbtu_per_btu = 1 / 1000000
+    gas_df['kg_co2e_emission_per_kwh'] = gas_df['heat_rate_btu_per_kwh'] * \
+        mmbtu_per_btu * gas_emission_factor
+
     # Estimate capacity factor
     gas_df['capacity_factor_estimated'] = small_gt_cf
-    gas_df['capacity_factor_estimated'] = gas_df['capacity_factor_estimated'].where(gas_df['capacity_mw'] < gt_mid_capacity_threshold, big_gt_cf)
-    gas_df['capacity_factor_estimated'] = gas_df['capacity_factor_estimated'].where(gas_df['prime_mover_inferred'] == 'GT', cc_cf)
-    
+    gas_df['capacity_factor_estimated'] = gas_df['capacity_factor_estimated'].where(
+        gas_df['capacity_mw'] < gt_mid_capacity_threshold, big_gt_cf)
+    gas_df['capacity_factor_estimated'] = gas_df['capacity_factor_estimated'].where(
+        gas_df['prime_mover_inferred'] == 'GT', cc_cf)
+
     # Put it all together
     gas_df['MWh'] = gas_df['capacity_mw'] * gas_df['capacity_factor_estimated']
     kwh_per_mwh = 1000
-    tons_per_kg = 1/1000
+    tons_per_kg = 1 / 1000
     # put in units of tons per year to match EIP data
-    gas_df['co2e_tpy'] = gas_df['kg_co2e_emission_per_kwh'] * kwh_per_mwh * tons_per_kg * gas_df['MWh']
+    gas_df['co2e_tpy'] = gas_df['kg_co2e_emission_per_kwh'] * \
+        kwh_per_mwh * tons_per_kg * gas_df['MWh']
     # rejoin
     out = df.join(gas_df['co2e_tpy'], how='left')
     return out
