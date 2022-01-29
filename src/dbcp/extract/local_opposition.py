@@ -1,14 +1,16 @@
-from typing import Dict, List, Optional
+"""Extraction logic for Columbia Local Opposition dataset."""
 from pathlib import Path
+from typing import Dict, List, Optional
 
-import pandas as pd
 import docx
+import pandas as pd
 
 from pudl.metadata.enums import US_STATES
 
 
 class ColumbiaDocxParser(object):
     """Parser for the Columbia Local Opposition .docx file."""
+
     POSSIBLE_STATES = set(US_STATES.values())
     POSSIBLE_HEADERS = {'Local Laws/Ordinances',
                         'Contested Projects', 'State Policy'}
@@ -18,6 +20,7 @@ class ColumbiaDocxParser(object):
     NULL_PROJECT = {'No contested projects were found at this time.', }
 
     def __init__(self) -> None:
+        """Create ColumbiaDocxParser object to parse docx data."""
         self.current_state = ''
         self.current_header = ''
         self.doc: Optional[docx.Document] = None
@@ -31,11 +34,11 @@ class ColumbiaDocxParser(object):
         self.contested_projects_dict: Dict[str, List[str]] = {
             'state': [], 'project_name': [], 'description': []}
 
-    def load_docx(self, source_path=Path('/app/input/RELDI report updated 9.10.21 (1).docx')) -> None:
+    def load_docx(self, source_path=Path('/app/data/raw/RELDI report updated 9.10.21 (1).docx')) -> None:
         """Read the .docx file with python-docx.
 
         Args:
-            source_path (Path, optional): path to .docx file. Defaults to Path('/app/input/RELDI report updated 9.10.21 (1).docx').
+            source_path (Path, optional): path to .docx file. Defaults to Path('/app/data/raw/RELDI report updated 9.10.21 (1).docx').
         """
         self.doc = docx.Document(source_path)
 
@@ -146,9 +149,10 @@ class ColumbiaDocxParser(object):
         # that produces an extra empty row
         query_str = "state == 'Texas' and (locality == 'Brownsville' or locality == 'Benbrook')"
         subset = output['local_ordinance'].query(query_str).reset_index()
-        if subset['ordinance'].iat[0] != "Enacted July 9, 2020:":
-            raise ValueError(
-                'Data has changed and Brownsville correction is no longer valid')
+        if not subset.empty:
+            if subset['ordinance'].iat[0] != "Enacted July 9, 2020:":
+                raise ValueError(
+                    'Data has changed and Brownsville correction is no longer valid')
         indices_to_delete = pd.Index(subset.groupby(
             ['state', 'locality'], as_index=False).first()['index'])
         output['local_ordinance'].drop(index=indices_to_delete, inplace=True)
