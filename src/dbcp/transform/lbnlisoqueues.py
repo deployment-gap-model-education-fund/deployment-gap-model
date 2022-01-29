@@ -24,9 +24,6 @@ RESOURCE_DICT = {
     "Coal": {
         "codes": ["BIT", "C"],
         "type": "Fossil"},
-    "Combined Cycle": {
-        "codes": ["CC", "Co-Gen"],
-        "type": "Fossil"},
     "Combustion Turbine": {
         "codes": ["CT"],
         "type": "Fossil"},
@@ -49,10 +46,7 @@ RESOURCE_DICT = {
         "codes": ["MSW"],
         "type": "Fossil"},
     "Natural Gas": {
-        "codes": ["NG", "CC-NG", "Methane", "CT-NG", "ST-NG", "CS-NG", "Gas", "Natural Gas; Other"],
-        "type": "Fossil"},
-    "Natural Gas; Oil": {
-        "codes": ["DFO KER NG", "DFO NG", "Diesel; Methane", "JF KER NG", "NG WO", "KER NG", "Natural Gas; Diesel; Other; Storage"],
+        "codes": ["NG", "Methane", "CT-NG", "CC", "CC-NG", "ST-NG", "CS-NG", "Combined Cycle", "Gas", "Natural Gas; Other", "DFO KER NG", "DFO NG", "Diesel; Methane", "JF KER NG", "NG WO", "KER NG", "Natural Gas; Diesel; Other; Storage", "Natural Gas; Oil"],
         "type": "Fossil"},
     "Natural Gas; Other; Storage; Solar": {
         "codes": [],
@@ -76,7 +70,10 @@ RESOURCE_DICT = {
         "codes": ["Wind", "WND", "Wind Turbine"],
         "type": "Renewable"},
     "Other": {
-        "codes": ["Wo", "F", "Hybrid", "M", "Unknown"],
+        "codes": [], # 
+        "type": "Unknown Resource"},
+    "Unknown": {
+        "codes": ["Wo", "F", "Hybrid", "M",],
         "type": "Unknown Resource"},
     "Other Storage": {
         "codes": ["Flywheel", "Storage"],
@@ -97,7 +94,7 @@ RESOURCE_DICT = {
         "codes": ["ST"],
         "type": "Fossil"},
     "Waste Heat": {
-        "codes": ["Waste Heat Recovery", "Heat Recovery"],
+        "codes": ["Waste Heat Recovery", "Heat Recovery", "Co-Gen",],
         "type": "Fossil"},
     "Wind; Storage": {
         "codes": ["WND BAT"],
@@ -406,7 +403,7 @@ def clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
         for code in code_type_dict["codes"]:
             long_dict[code] = clean_name
     # Map clean resource values into new column
-    resource_df['resource_clean'] = resource_df.resource.fillna("Other")
+    resource_df['resource_clean'] = resource_df.resource.fillna("Unknown")
     resource_df = resource_df.replace({"resource_clean": long_dict})
     return resource_df
 
