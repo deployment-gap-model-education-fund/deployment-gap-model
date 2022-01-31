@@ -645,8 +645,6 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     lbnl_normalized_dfs['iso_projects'].reset_index(inplace=True)
 
     iso_for_tableau = denormalize(lbnl_normalized_dfs)
-    from pdb import set_trace as bp
-    bp()
     # remove duplicates again now table is denormalized and cleaned
     iso_for_tableau = remove_duplicates(iso_for_tableau, uncombined=False)
     iso_for_tableau = add_co2e_estimate(iso_for_tableau)
