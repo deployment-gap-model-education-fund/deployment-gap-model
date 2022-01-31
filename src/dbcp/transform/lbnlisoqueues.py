@@ -141,60 +141,6 @@ def withdrawn_iso_queue_projects(withdrawn_projects: pd.DataFrame) -> pd.DataFra
     return withdrawn_projects
 
 
-def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
-    """
-    Transform LBNL ISO Queues dataframes.
-
-    Args:
-        lbnl_raw_dfs: Dictionary of the raw extracted data for each table.
-
-    Returns:
-        lbnl_transformed_dfs: Dictionary of the transformed tables.
-    """
-    lbnl_transformed_dfs = {name: df.copy()
-                            for name, df in lbnl_raw_dfs.items()}
-    _set_global_project_ids(lbnl_transformed_dfs)
-
-    lbnl_transform_functions = {
-        "active_iso_queue_projects": active_iso_queue_projects,
-        "completed_iso_queue_projects": completed_iso_queue_projects,
-        "withdrawn_iso_queue_projects": withdrawn_iso_queue_projects,
-    }
-
-    for table_name, transform_func in lbnl_transform_functions.items():
-        logger.info(f"LBNL ISO Queues: Transforming {table_name} table.")
-        lbnl_transformed_dfs[table_name] = transform_func(
-            lbnl_transformed_dfs[table_name])
-    # Combine and normalize iso queue tables
-    lbnl_normalized_dfs = normalize_lbnl_dfs(lbnl_transformed_dfs)
-    # data enrichment
-    # Add Fips Codes and Clean Counties
-    lbnl_normalized_dfs['iso_locations'] = add_county_fips_with_backup_geocoding(
-        lbnl_normalized_dfs['iso_locations'])
-    lbnl_normalized_dfs['iso_locations'] = _fix_independent_city_fips(lbnl_normalized_dfs['iso_locations'])
-
-    # Clean up and categorize resources
-    lbnl_normalized_dfs['iso_resource_capacity'] = (
-        lbnl_normalized_dfs['iso_resource_capacity']
-        .pipe(clean_resource_type)
-        .pipe(add_resource_classification)
-        .pipe(add_project_classification))
-    if lbnl_normalized_dfs['iso_resource_capacity'].resource_clean.isna().any():
-        raise AssertionError("Missing Resources!")
-
-    lbnl_normalized_dfs['iso_projects'].reset_index(inplace=True)
-
-    iso_for_tableau = denormalize(lbnl_normalized_dfs)
-    iso_for_tableau = add_co2e_estimate(iso_for_tableau)
-    lbnl_normalized_dfs['iso_for_tableau'] = iso_for_tableau
-
-    # Validate schema
-    for name, df in lbnl_normalized_dfs.items():
-        lbnl_normalized_dfs[name] = TABLE_SCHEMAS[name].validate(df)
-
-    return lbnl_normalized_dfs
-
-
 def _set_global_project_ids(lbnl_dfs: Dict[str, pd.DataFrame]) -> None:
     """Reindex (in place) the three LBNL queues with IDs unique between all three dataframes.
 
@@ -463,70 +409,87 @@ def denormalize(lbnl_normalized_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     return all_proj
 
 
-def remove_duplicates(df: pd.DataFrame) -> pd.DataFrame:
+def remove_duplicates(df: pd.DataFrame, uncombined=True) -> pd.DataFrame:
     """First draft deduplication of ISO queues.
 
     Args:
         df (pd.DataFrame): a queue dataframe
+        uncombined: whether the dataframe is the final clean, denormalized version 
+            with all queue statuses combined.
+            If this is False, then this is a second pass at deduplication.
+            This could be restructured better so deduplication isn't called twice.
 
     Returns:
         pd.DataFrame: queue dataframe with duplicates removed
     """
-    df = df.copy()
-    # do some string cleaning on point_of_interconnection
-    # for now "tbd" is mapped to "nan"
-    df["point_of_interconnection_clean"] = (
-        df["point_of_interconnection"]
-        .astype(str)
-        .str.lower()
-        .str.replace("substation", "")
-        .str.replace("kv", "")
-        .str.replace("-", " ")
-        .str.replace("station", "")
-        .str.replace(",", "")
-        .str.replace("at", "")
-        .str.replace("tbd", "nan")
-    )
+    if uncombined:
+        df = df.copy()
+        # do some string cleaning on point_of_interconnection
+        # for now "tbd" is mapped to "nan"
+        df["point_of_interconnection_clean"] = (
+            df["point_of_interconnection"]
+            .astype(str)
+            .str.lower()
+            .str.replace("substation", "")
+            .str.replace("kv", "")
+            .str.replace("-", " ")
+            .str.replace("station", "")
+            .str.replace(",", "")
+            .str.replace("at", "")
+            .str.replace("tbd", "nan")
+        )
 
-    df["point_of_interconnection_clean"] = [
-        " ".join(sorted(x)) for x in df["point_of_interconnection_clean"].str.split()
-    ]
-    df["point_of_interconnection_clean"] = df["point_of_interconnection_clean"].str.strip()
-
-    # groupby this set of keys and keep the duplicate with the most listed resources
-    # Note: "active" projects have county_1 and region, "completed" and "withdrawn" only have county and entity
-    if "county_1" in df.columns:  # active projects
-        key = [
-            "point_of_interconnection_clean",
-            "capacity_mw_resource_1",
-            "county_1",
-            "state",
-            "region",
-            "resource_type_1",
+        df["point_of_interconnection_clean"] = [
+            " ".join(sorted(x)) for x in df["point_of_interconnection_clean"].str.split()
         ]
-    else:  # completed and withdrawn projects
+        df["point_of_interconnection_clean"] = df["point_of_interconnection_clean"].str.strip()
+
+        # groupby this set of keys and keep the duplicate with the most listed resources
+        # Note: "active" projects have county_1 and region, "completed" and "withdrawn" only have county and entity
+        if "county_1" in df.columns:  # active projects
+            key = [
+                "point_of_interconnection_clean",
+                "capacity_mw_resource_1",
+                "county_1",
+                "state",
+                "region",
+                "resource_type_1",
+            ]
+        else:  # completed and withdrawn projects
+            key = [
+                "point_of_interconnection_clean",
+                "capacity_mw_resource_1",
+                "county",
+                "state",
+                "entity",
+                "resource_type_1",
+            ]
+        df["len_resource_type"] = df.resource_type_lbnl.str.len()
+        df = df.reset_index()
+        dups = df.copy()
+        dups = dups.groupby(key, as_index=False, dropna=False).len_resource_type.max()
+        df = dups.merge(df, on=(key + ["len_resource_type"]))
+        # merge added duplicates with same len_resource_type, drop these
+        df = df[~(df.duplicated(key, keep="first"))]
+
+        # some final cleanup
+        df = (
+            df.drop(["len_resource_type"], axis=1)
+            .set_index("project_id")
+            .sort_index()
+        )
+    else:
         key = [
             "point_of_interconnection_clean",
-            "capacity_mw_resource_1",
-            "county",
-            "state",
+            "capacity_mw",
+            "county_id_fips",
+            "queue_status",
             "entity",
-            "resource_type_1",
+            "resource_clean"
         ]
-    df["len_resource_type"] = df.resource_type_lbnl.str.len()
-    df = df.reset_index()
-    dups = df.copy()
-    dups = dups.groupby(key, as_index=False, dropna=False).len_resource_type.max()
-    df = dups.merge(df, on=(key + ["len_resource_type"]))
-    # merge added duplicates with same len_resource_type, drop these
-    df = df[~(df.duplicated(key, keep="first"))]
+        df = df[~(df.duplicated(key, keep="first"))]
+        df = df.drop(["point_of_interconnection_clean"], axis=1)
 
-    # some final cleanup
-    df = (
-        df.drop(["len_resource_type", "point_of_interconnection_clean"], axis=1)
-        .set_index("project_id")
-        .sort_index()
-    )
     return df
 
 
@@ -636,3 +599,61 @@ def _fix_independent_city_fips(location_df: pd.DataFrame) -> pd.DataFrame:
     locs.loc[:, 'county_id_fips'].fillna(
         nan_fips['county_id_fips'], inplace=True)
     return locs
+
+
+def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
+    """
+    Transform LBNL ISO Queues dataframes.
+
+    Args:
+        lbnl_raw_dfs: Dictionary of the raw extracted data for each table.
+
+    Returns:
+        lbnl_transformed_dfs: Dictionary of the transformed tables.
+    """
+    lbnl_transformed_dfs = {name: df.copy()
+                            for name, df in lbnl_raw_dfs.items()}
+    _set_global_project_ids(lbnl_transformed_dfs)
+
+    lbnl_transform_functions = {
+        "active_iso_queue_projects": active_iso_queue_projects,
+        "completed_iso_queue_projects": completed_iso_queue_projects,
+        "withdrawn_iso_queue_projects": withdrawn_iso_queue_projects,
+    }
+
+    for table_name, transform_func in lbnl_transform_functions.items():
+        logger.info(f"LBNL ISO Queues: Transforming {table_name} table.")
+        lbnl_transformed_dfs[table_name] = transform_func(
+            lbnl_transformed_dfs[table_name])
+    # Combine and normalize iso queue tables
+    lbnl_normalized_dfs = normalize_lbnl_dfs(lbnl_transformed_dfs)
+    # data enrichment
+    # Add Fips Codes and Clean Counties
+    lbnl_normalized_dfs['iso_locations'] = add_county_fips_with_backup_geocoding(
+        lbnl_normalized_dfs['iso_locations'])
+    lbnl_normalized_dfs['iso_locations'] = _fix_independent_city_fips(lbnl_normalized_dfs['iso_locations'])
+
+    # Clean up and categorize resources
+    lbnl_normalized_dfs['iso_resource_capacity'] = (
+        lbnl_normalized_dfs['iso_resource_capacity']
+        .pipe(clean_resource_type)
+        .pipe(add_resource_classification)
+        .pipe(add_project_classification))
+    if lbnl_normalized_dfs['iso_resource_capacity'].resource_clean.isna().any():
+        raise AssertionError("Missing Resources!")
+
+    lbnl_normalized_dfs['iso_projects'].reset_index(inplace=True)
+
+    iso_for_tableau = denormalize(lbnl_normalized_dfs)
+    from pdb import set_trace as bp
+    bp()
+    # remove duplicates again now table is denormalized and cleaned
+    iso_for_tableau = remove_duplicates(iso_for_tableau, uncombined=False)
+    iso_for_tableau = add_co2e_estimate(iso_for_tableau)
+    lbnl_normalized_dfs['iso_for_tableau'] = iso_for_tableau
+
+    # Validate schema
+    for name, df in lbnl_normalized_dfs.items():
+        lbnl_normalized_dfs[name] = TABLE_SCHEMAS[name].validate(df)
+
+    return lbnl_normalized_dfs
