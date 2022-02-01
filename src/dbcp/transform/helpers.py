@@ -27,7 +27,8 @@ except AssertionError:  # local path
         __file__).resolve().parents[3] / "data/geocoder_cache"
     assert geocoder_local_cache.exists()
 # cache needs to be accessed outside this module to call .clear()
-GEOCODER_CACHE = Memory(location=geocoder_local_cache)
+# limit cache size to 100 KB, keeps most recently accessed first
+GEOCODER_CACHE = Memory(location=geocoder_local_cache, bytes_limit=100000)
 
 
 def normalize_multicolumns_to_rows(
