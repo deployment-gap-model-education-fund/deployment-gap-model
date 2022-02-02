@@ -546,7 +546,8 @@ def add_co2e_estimate(df: pd.DataFrame,
         gas_df['prime_mover_inferred'] == 'GT', cc_cf)
 
     # Put it all together
-    gas_df['MWh'] = gas_df['capacity_mw'] * gas_df['capacity_factor_estimated']
+    hours_per_year = 8766 # extra 6 hours to average in leap years
+    gas_df['MWh'] = gas_df['capacity_mw'] * gas_df['capacity_factor_estimated'] * hours_per_year
     kwh_per_mwh = 1000
     tons_per_kg = 1 / 1000
     # put in units of tons per year to match EIP data
