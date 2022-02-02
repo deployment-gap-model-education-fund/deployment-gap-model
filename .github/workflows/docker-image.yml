@@ -10,3 +10,7 @@ jobs:
     - uses: actions/checkout@v2
     - name: Build the Docker images
       run: docker compose build
+    - env:
+      JUPYTER_PORT: 8888
+      POSTGRES_PORT: 5432
+
