@@ -56,7 +56,7 @@ RESOURCE_DICT = {
         "type": "Fossil"},
     "Nuclear": {
         "codes": ["NU", "NUC"],
-        "type": "Renewable"},
+        "type": "Fossil"},
     "Offshore Wind": {
         "codes": [],
         "type": "Renewable"},
