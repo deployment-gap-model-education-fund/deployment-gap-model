@@ -119,10 +119,11 @@ def etl_master_fips_table() -> Dict[str, pd.DataFrame]:
     # going to change this in the future/maybe just absorb addfips
     county_pattern = r" (county|city|city and borough|borough|census area|municipio|municipality|district|parish)$"
     county_df['county'] = county_df['county'].str.replace(county_pattern, '', regex=True)
-    county_df['county'] = county_df['county'].str.replace('st.', 'saint')
+    county_df['county'] = county_df['county'].str.replace('st.', 'saint', regex=False)
     county_df = county_df.drop_duplicates()
     county_df['county_id_fips'] = county_df['state_id_fips'] + county_df['county_id_fips']
     county_df = county_df.join(state_df.set_index('state_id_fips'), on='state_id_fips').reset_index(drop=True)
+    county_df = county_df[['state_id_fips', 'county_id_fips', 'state', 'county']]
 
     return {'state_county_fips_table': county_df}
 
