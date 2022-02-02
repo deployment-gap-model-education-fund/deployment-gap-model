@@ -13,4 +13,5 @@ jobs:
       env:
         JUPYTER_PORT: 8888
         POSTGRES_PORT: 5432
+        ENV_FILE: default.env
 
