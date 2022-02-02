@@ -80,8 +80,10 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
     )
 
     mcoe = pudl_out.mcoe(all_gens=True)
+    # filter to existing operational status
+    mcoe = mcoe[mcoe.operational_status == 'existing']
     # add FIPS
-    filled_location = mcoe.loc[:,['state', 'county']].fillna('')
+    filled_location = mcoe.loc[:, ['state', 'county']].fillna('')
     fips = _add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
     mcoe = pd.concat([mcoe, fips[['state_id_fips', 'county_id_fips']]], axis=1, copy=False)
     mcoe = TABLE_SCHEMAS["mcoe"].validate(mcoe)
@@ -104,7 +106,7 @@ def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
 
 def etl_master_fips_table() -> Dict[str, pd.DataFrame]:
     """Master state and county FIPS table ETL."""
-    af = addfips.AddFIPS()
+    af = addfips.AddFIPS(vintage=FIPS_CODE_VINTAGE)
     county_dict = af._counties
     state_dict = af._states
     state_df = pd.DataFrame(state_dict.items(), columns=['state', 'state_id_fips'])
