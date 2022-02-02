@@ -2,7 +2,7 @@ version: '3.9'
 services:
   app:
     build: .
-    env_file: local.env
+    env_file: ${ENV_FILE}
     depends_on:
       - postgres
     volumes:
