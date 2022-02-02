@@ -1,18 +1,19 @@
-from typing import Optional, List, Dict
-import googlemaps
-import os
-from logging import getLogger
+import os  # noqa: D100
 from functools import lru_cache
+from logging import getLogger
+from typing import Dict, List, Optional
+
+import googlemaps
 
 logger = getLogger('__name__')
 
 
-class GoogleGeocoder(object):
+class GoogleGeocoder(object):  # noqa: D101
     COUNTY_LABEL = 'administrative_area_level_2'
     CITY_LABEL = 'locality'
     TOWN_LABEL = 'administrative_area_level_3'
 
-    def __init__(self, key=None) -> None:
+    def __init__(self, key=None) -> None:  # noqa: D107
         if key is None:
             try:
                 key = os.environ["API_KEY_GOOGLE_MAPS"]
@@ -33,20 +34,21 @@ class GoogleGeocoder(object):
         self._response: Dict[str, List[Dict[str, str]]] = {}
         return
 
-    def geocode_request(self, name: str, state: str, country: Optional[str] = None) -> None:
+    def geocode_request(self, name: str, state: str, country: Optional[str] = None) -> None:  # noqa: D102
         if country is None:
             country = 'US'
         self._name = name
         self._state = state
         self._country = country
-        response = _get_geocode_response(client=self.client, name=name, state=state, country=country)
-        if not response: # empty dict
-            logger.info(
-            f"Address not found: {self._name}, {self._state}, {self._country}")
-        
+        response = _get_geocode_response(
+            client=self.client, name=name, state=state, country=country)
+        if not response:  # empty dict
+            logger.debug(
+                f"Address not found: {self._name}, {self._state}, {self._country}")
+
         return
 
-    def get_county(self) -> str:
+    def get_county(self) -> str:  # noqa: D102
         # limitation: some cities span multiple counties.
         # This only returns one county - the one that contains the city center.
         for component in self._response['address_components']:
@@ -59,16 +61,16 @@ class GoogleGeocoder(object):
             return self._name
         return ''
 
-    def is_city(self) -> bool:
+    def is_city(self) -> bool:  # noqa: D102
         return GoogleGeocoder.CITY_LABEL in self._response['types']
 
-    def is_county(self) -> bool:
+    def is_county(self) -> bool:  # noqa: D102
         return GoogleGeocoder.COUNTY_LABEL in self._response['types']
 
-    def is_town(self) -> bool:
+    def is_town(self) -> bool:  # noqa: D102
         return GoogleGeocoder.TOWN_LABEL in self._response['types']
 
-    def describe(self) -> List[str]:
+    def describe(self) -> List[str]:  # noqa: D102
         if not self._response:  # empty
             return ['', '', '', ]
 
@@ -85,11 +87,12 @@ class GoogleGeocoder(object):
         containing_county = self.get_county()
         return [object_name, object_type, containing_county]
 
+
 @lru_cache(maxsize=512)
 def _get_geocode_response(*, client: googlemaps.Client, name: str, state: str, country: str) -> Dict:
     """Get Google Maps Platform's interpretation of which place a name belongs to.
-    
-    This pure function with hashable inputs is factored out of the GoogleGeocoder class 
+
+    This pure function with hashable inputs is factored out of the GoogleGeocoder class
     to enable memoization of API calls.
 
     Args:
