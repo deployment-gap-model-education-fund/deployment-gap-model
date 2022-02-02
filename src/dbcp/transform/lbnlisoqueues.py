@@ -56,7 +56,7 @@ RESOURCE_DICT = {
         "type": "Fossil"},
     "Nuclear": {
         "codes": ["NU", "NUC"],
-        "type": "Renewable"},
+        "type": "Fossil"},
     "Offshore Wind": {
         "codes": [],
         "type": "Renewable"},
@@ -139,6 +139,61 @@ def withdrawn_iso_queue_projects(withdrawn_projects: pd.DataFrame) -> pd.DataFra
         'Executed', 'IA Executed', inplace=True)
 
     return withdrawn_projects
+
+
+def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
+    """
+    Transform LBNL ISO Queues dataframes.
+
+    Args:
+        lbnl_raw_dfs: Dictionary of the raw extracted data for each table.
+
+    Returns:
+        lbnl_transformed_dfs: Dictionary of the transformed tables.
+    """
+    lbnl_transformed_dfs = {name: df.copy()
+                            for name, df in lbnl_raw_dfs.items()}
+    _set_global_project_ids(lbnl_transformed_dfs)
+
+    lbnl_transform_functions = {
+        "active_iso_queue_projects": active_iso_queue_projects,
+        "completed_iso_queue_projects": completed_iso_queue_projects,
+        "withdrawn_iso_queue_projects": withdrawn_iso_queue_projects,
+    }
+
+    for table_name, transform_func in lbnl_transform_functions.items():
+        logger.info(f"LBNL ISO Queues: Transforming {table_name} table.")
+        lbnl_transformed_dfs[table_name] = transform_func(
+            lbnl_transformed_dfs[table_name])
+    # Combine and normalize iso queue tables
+    lbnl_normalized_dfs = normalize_lbnl_dfs(lbnl_transformed_dfs)
+    # data enrichment
+    # Add Fips Codes and Clean Counties
+    lbnl_normalized_dfs['iso_locations'] = add_county_fips_with_backup_geocoding(
+        lbnl_normalized_dfs['iso_locations'])
+    lbnl_normalized_dfs['iso_locations'] = _fix_independent_city_fips(lbnl_normalized_dfs['iso_locations'])
+
+    # Clean up and categorize resources
+    lbnl_normalized_dfs['iso_resource_capacity'] = (
+        lbnl_normalized_dfs['iso_resource_capacity']
+        .pipe(clean_resource_type)
+        .pipe(add_resource_classification)
+        .pipe(add_project_classification))
+    if lbnl_normalized_dfs['iso_resource_capacity'].resource_clean.isna().any():
+        raise AssertionError("Missing Resources!")
+
+    lbnl_normalized_dfs['iso_projects'].reset_index(inplace=True)
+
+    iso_for_tableau = denormalize(lbnl_normalized_dfs)
+    iso_for_tableau = add_co2e_estimate(iso_for_tableau)
+    iso_for_tableau = iso_for_tableau.reset_index()
+    lbnl_normalized_dfs['iso_for_tableau'] = iso_for_tableau
+
+    # Validate schema
+    for name, df in lbnl_normalized_dfs.items():
+        lbnl_normalized_dfs[name] = TABLE_SCHEMAS[name].validate(df)
+
+    return lbnl_normalized_dfs
 
 
 def _set_global_project_ids(lbnl_dfs: Dict[str, pd.DataFrame]) -> None:
