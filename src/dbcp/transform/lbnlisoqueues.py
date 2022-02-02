@@ -56,7 +56,7 @@ RESOURCE_DICT = {
         "type": "Fossil"},
     "Nuclear": {
         "codes": ["NU", "NUC"],
-        "type": "Renewable"},
+        "type": "Unknown Resource"},
     "Offshore Wind": {
         "codes": [],
         "type": "Renewable"},
@@ -70,10 +70,10 @@ RESOURCE_DICT = {
         "codes": ["Wind", "WND", "Wind Turbine"],
         "type": "Renewable"},
     "Other": {
-        "codes": [], # 
+        "codes": [],
         "type": "Unknown Resource"},
     "Unknown": {
-        "codes": ["Wo", "F", "Hybrid", "M",],
+        "codes": ["Wo", "F", "Hybrid", "M"],
         "type": "Unknown Resource"},
     "Other Storage": {
         "codes": ["Flywheel", "Storage"],
