@@ -39,8 +39,8 @@ class GoogleGeocoder(object):
         self._name = name
         self._state = state
         self._country = country
-        response = _get_geocode_response(client=self.client, name=name, state=state, country=country)
-        if not response: # empty dict
+        self._response = _get_geocode_response(client=self.client, name=name, state=state, country=country)
+        if not self._response: # empty dict
             logger.info(
             f"Address not found: {self._name}, {self._state}, {self._country}")
         
