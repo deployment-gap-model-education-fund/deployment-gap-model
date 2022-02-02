@@ -56,7 +56,7 @@ RESOURCE_DICT = {
         "type": "Fossil"},
     "Nuclear": {
         "codes": ["NU", "NUC"],
-        "type": "Renewable"},
+        "type": "Fossil"},
     "Offshore Wind": {
         "codes": [],
         "type": "Renewable"},
@@ -186,6 +186,7 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
 
     iso_for_tableau = denormalize(lbnl_normalized_dfs)
     iso_for_tableau = add_co2e_estimate(iso_for_tableau)
+    iso_for_tableau = iso_for_tableau.reset_index()
     lbnl_normalized_dfs['iso_for_tableau'] = iso_for_tableau
 
     # Validate schema
