@@ -123,6 +123,8 @@ def etl_master_fips_table() -> Dict[str, pd.DataFrame]:
     county_df = county_df.drop_duplicates()
     county_df['county_id_fips'] = county_df['state_id_fips'] + county_df['county_id_fips']
     county_df = county_df.join(state_df.set_index('state_id_fips'), on='state_id_fips').reset_index(drop=True)
+    # us minor outlying islands isnt in the state df, manually enter
+    county_df.loc[lambda county_df: county_df['state_id_fips'] == '74', 'state'] = 'um'
     county_df = county_df[['state_id_fips', 'county_id_fips', 'state', 'county']]
 
     return {'state_county_fips_table': county_df}
