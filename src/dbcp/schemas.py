@@ -299,10 +299,10 @@ TABLE_SCHEMAS = {
 
 
 ISO_FOR_TABLEAU = (TABLE_SCHEMAS["iso_projects"]
-    .add_columns(TABLE_SCHEMAS["iso_locations"].columns)
-    .add_columns(TABLE_SCHEMAS["iso_resource_capacity"].columns)
-    .add_columns(pa.DataFrameSchema({'co2e_tpy': pa.Column(float, nullable=True)}).columns)
-    .remove_columns(['locality_name', 'locality_type', 'containing_county',])
-    )
+                   .add_columns(TABLE_SCHEMAS["iso_locations"].columns)
+                   .add_columns(TABLE_SCHEMAS["iso_resource_capacity"].columns)
+                   .add_columns(pa.DataFrameSchema({'co2e_tpy': pa.Column(float, nullable=True), "index": pa.Column(pd.Int64Dtype)}).columns)
+                   .remove_columns(['locality_name', 'locality_type', 'containing_county', ])
+                   )
 
 TABLE_SCHEMAS["iso_for_tableau"] = ISO_FOR_TABLEAU
