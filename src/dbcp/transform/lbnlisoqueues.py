@@ -184,7 +184,6 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     lbnl_normalized_dfs = normalize_lbnl_dfs(lbnl_transformed_dfs)
     # data enrichment
     # Add Fips Codes and Clean Counties
-    lbnl_normalized_dfs['iso_locations'] = _clean_county_names
     lbnl_normalized_dfs['iso_locations'] = add_county_fips_with_backup_geocoding(
         lbnl_normalized_dfs['iso_locations'])
     lbnl_normalized_dfs['iso_locations'] = _fix_independent_fips(lbnl_normalized_dfs['iso_locations'])
