@@ -101,6 +101,21 @@ RESOURCE_DICT = {
         "type": "Renewable"},
 }
 
+COUNTY_STATE_NAME_FIXES = [
+    ['skamania', 'or', 'skamania', 'wa'],
+    ['franklin-clinton', 'ny', 'franklin', 'ny'],
+    ['san juan', 'az', 'san juan', 'nm'],
+    ['hidalgo', 'co', 'hidalgo', 'nm'],
+    ['antelope & wheeler', 'ne', 'antelope', 'ne'],
+    ['linden', 'ny', 'union', 'nj'],
+    ['church', 'nv', 'churchill', 'nv'],
+    ['churchill/pershing', 'ca', 'churchill', 'nv'],
+    ['shasta/trinity', 'ca', 'shasta', 'ca'],
+    ['san benito', 'nv', 'san benito', 'ca'],
+    ['frqanklin', 'me', 'franklin', 'me'],
+    ['logan,menard', 'il', 'logan', 'il'],
+    ['new york-nj', 'ny', 'new york', 'ny']
+]
 
 def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform active iso queue data."""
@@ -169,9 +184,10 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     lbnl_normalized_dfs = normalize_lbnl_dfs(lbnl_transformed_dfs)
     # data enrichment
     # Add Fips Codes and Clean Counties
+    lbnl_normalized_dfs['iso_locations'] = _clean_county_names
     lbnl_normalized_dfs['iso_locations'] = add_county_fips_with_backup_geocoding(
         lbnl_normalized_dfs['iso_locations'])
-    lbnl_normalized_dfs['iso_locations'] = _fix_independent_city_fips(lbnl_normalized_dfs['iso_locations'])
+    lbnl_normalized_dfs['iso_locations'] = _fix_independent_fips(lbnl_normalized_dfs['iso_locations'])
 
     # Clean up and categorize resources
     lbnl_normalized_dfs['iso_resource_capacity'] = (
@@ -631,8 +647,12 @@ def _clean_county_names(location_df: pd.DataFrame) -> pd.DataFrame:
     location_df = location_df.loc[:, ['project_id', 'county', 'state', 'state_id_fips', 'county_id_fips']]
     return location_df
 
-def _fix_independent_city_fips(location_df: pd.DataFrame) -> pd.DataFrame:
-    """fix about 50 independent cities with wrong name order.
+
+def _fix_independent_fips(location_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Fix about 50 independent cities with wrong name order.
+
+    Fix another 20 or so with incorrect county, state names
 
     Args:
         location_df (pd.DataFrame): normalized ISO locations
@@ -651,10 +671,16 @@ def _fix_independent_city_fips(location_df: pd.DataFrame) -> pd.DataFrame:
         lambda x: x.group(1) + ' city',
         regex=True
     )
+    # clean up one off incorrect county, state names
+    nan_fips.loc[:, 'state'] = nan_fips.state.str.lower()
+    corrected = pd.DataFrame(COUNTY_STATE_NAME_FIXES, columns=['county', 'state', 'clean_county', 'clean_state'])
+    nan_fips = nan_fips.merge(corrected, how='left', on=['county', 'state'])
+    nan_fips.loc[:, ['county']] = nan_fips.county.where(nan_fips.clean_county.isna(), nan_fips.clean_county)
+    nan_fips.loc[:, ['state']] = nan_fips.state.where(nan_fips.clean_state.isna(), nan_fips.clean_state)
+    nan_fips = nan_fips.drop(['clean_county', 'clean_state'], axis=1)
     nan_fips = _add_fips_ids(nan_fips)
 
     locs = location_df.copy()
     locs.loc[:, 'county_id_fips'].fillna(
         nan_fips['county_id_fips'], inplace=True)
     return locs
-
