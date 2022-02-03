@@ -114,8 +114,10 @@ COUNTY_STATE_NAME_FIXES = [
     ['san benito', 'nv', 'san benito', 'ca'],
     ['frqanklin', 'me', 'franklin', 'me'],
     ['logan,menard', 'il', 'logan', 'il'],
-    ['new york-nj', 'ny', 'new york', 'ny']
+    ['new york-nj', 'ny', 'new york', 'ny'],
+    ['peneobscot/washington', 'me', 'penobscot', 'me']
 ]
+
 
 def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform active iso queue data."""
@@ -650,10 +652,10 @@ def _clean_county_names(location_df: pd.DataFrame) -> pd.DataFrame:
           .drop(['locality_name', 'locality_type', 'county'], axis=1)
           .rename(columns={'containing_county': 'county'}))
     location_df['county'] = location_df['county'].str.lower()
-    location_df['county'] = location_df.county.str.replace(' county', '')
-    location_df['county'] = location_df.county.str.replace(' parish', '')
-    location_df['county'] = location_df.county.str.replace('st.', 'saint')
-    location_df['county'] = location_df.county.str.replace('ñ', 'n')
+    location_df['county'] = location_df.county.str.replace(' county', '', regex=False)
+    location_df['county'] = location_df.county.str.replace(' parish', '', regex=False)
+    location_df['county'] = location_df.county.str.replace('st.', 'saint', regex=False)
+    location_df['county'] = location_df.county.str.replace('ñ', 'n', regex=False)
 
     location_df = location_df.loc[:, ['project_id', 'county', 'state', 'state_id_fips', 'county_id_fips']]
     return location_df
