@@ -184,9 +184,11 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     lbnl_normalized_dfs = normalize_lbnl_dfs(lbnl_transformed_dfs)
     # data enrichment
     # Add Fips Codes and Clean Counties
+    lbnl_normalized_dfs['iso_locations'] = _fix_incorrect_county_state_names(
+        lbnl_normalized_dfs['iso_locations'])
     lbnl_normalized_dfs['iso_locations'] = add_county_fips_with_backup_geocoding(
         lbnl_normalized_dfs['iso_locations'])
-    lbnl_normalized_dfs['iso_locations'] = _fix_independent_fips(lbnl_normalized_dfs['iso_locations'])
+    lbnl_normalized_dfs['iso_locations'] = _fix_independent_city_fips(lbnl_normalized_dfs['iso_locations'])
 
     # Clean up and categorize resources
     lbnl_normalized_dfs['iso_resource_capacity'] = (
@@ -481,6 +483,33 @@ def denormalize(lbnl_normalized_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     return all_proj
 
 
+def _clean_point_of_interconnection(df) -> pd.DataFrame:
+    """String cleaning on point of interconnection column.
+    
+    Args:
+        df (pd.DataFrame): a queue dataframe with column 'point_of_interconnection'
+    """
+    # for now "tbd" is mapped to "nan"
+    df["point_of_interconnection_clean"] = (
+        df["point_of_interconnection"]
+        .astype(str)
+        .str.lower()
+        .str.replace("substation", "")
+        .str.replace("kv", "")
+        .str.replace("-", " ")
+        .str.replace("station", "")
+        .str.replace(",", "")
+        .str.replace("at", "")
+        .str.replace("tbd", "nan")
+    )
+
+    df["point_of_interconnection_clean"] = [
+        " ".join(sorted(x)) for x in df["point_of_interconnection_clean"].str.split()
+    ]
+    df["point_of_interconnection_clean"] = df["point_of_interconnection_clean"].str.strip()
+    return df
+
+
 def remove_duplicates(df: pd.DataFrame, uncombined=True) -> pd.DataFrame:
     """First draft deduplication of ISO queues.
 
@@ -496,25 +525,7 @@ def remove_duplicates(df: pd.DataFrame, uncombined=True) -> pd.DataFrame:
     """
     if uncombined:
         df = df.copy()
-        # do some string cleaning on point_of_interconnection
-        # for now "tbd" is mapped to "nan"
-        df["point_of_interconnection_clean"] = (
-            df["point_of_interconnection"]
-            .astype(str)
-            .str.lower()
-            .str.replace("substation", "")
-            .str.replace("kv", "")
-            .str.replace("-", " ")
-            .str.replace("station", "")
-            .str.replace(",", "")
-            .str.replace("at", "")
-            .str.replace("tbd", "nan")
-        )
-
-        df["point_of_interconnection_clean"] = [
-            " ".join(sorted(x)) for x in df["point_of_interconnection_clean"].str.split()
-        ]
-        df["point_of_interconnection_clean"] = df["point_of_interconnection_clean"].str.strip()
+        df = _clean_point_of_interconnection(df)
 
         # groupby this set of keys and keep the duplicate with the most listed resources
         # Note: "active" projects have county_1 and region, "completed" and "withdrawn" only have county and entity
@@ -546,11 +557,12 @@ def remove_duplicates(df: pd.DataFrame, uncombined=True) -> pd.DataFrame:
 
         # some final cleanup
         df = (
-            df.drop(["len_resource_type"], axis=1)
+            df.drop(["len_resource_type", "point_of_interconnection_clean"], axis=1)
             .set_index("project_id")
             .sort_index()
         )
     else:
+        df = _clean_point_of_interconnection(df)
         key = [
             "point_of_interconnection_clean",
             "capacity_mw",
@@ -647,18 +659,13 @@ def _clean_county_names(location_df: pd.DataFrame) -> pd.DataFrame:
     return location_df
 
 
-def _fix_independent_fips(location_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Fix about 50 independent cities with wrong name order.
-
-    Fix another 20 or so with incorrect county, state names
+def _fix_independent_city_fips(location_df: pd.DataFrame) -> pd.DataFrame:
+    """Fix about 50 independent cities with wrong name order.
 
     Args:
         location_df (pd.DataFrame): normalized ISO locations
-
     Raises:
         ValueError: if add_county_fips_with_backup_geocoding has not been applied first
-
     Returns:
         pd.DataFrame: copy of location_df with fewer nan fips codes
     """
@@ -670,16 +677,28 @@ def _fix_independent_fips(location_df: pd.DataFrame) -> pd.DataFrame:
         lambda x: x.group(1) + ' city',
         regex=True
     )
-    # clean up one off incorrect county, state names
-    nan_fips.loc[:, 'state'] = nan_fips.state.str.lower()
-    corrected = pd.DataFrame(COUNTY_STATE_NAME_FIXES, columns=['county', 'state', 'clean_county', 'clean_state'])
-    nan_fips = nan_fips.merge(corrected, how='left', on=['county', 'state'])
-    nan_fips.loc[:, ['county']] = nan_fips.county.where(nan_fips.clean_county.isna(), nan_fips.clean_county)
-    nan_fips.loc[:, ['state']] = nan_fips.state.where(nan_fips.clean_state.isna(), nan_fips.clean_state)
-    nan_fips = nan_fips.drop(['clean_county', 'clean_state'], axis=1)
     nan_fips = _add_fips_ids(nan_fips)
 
     locs = location_df.copy()
     locs.loc[:, 'county_id_fips'].fillna(
         nan_fips['county_id_fips'], inplace=True)
     return locs
+
+
+def _fix_incorrect_county_state_names(location_df: pd.DataFrame) -> pd.DataFrame:
+    """Fix around 20 incorrect county, state names.
+
+    Args:
+        location_df (pd.DataFrame): normalized ISO locations
+    Returns:
+        pd.DataFrame: copy of location_df with more correct county, state pairs
+    
+    """
+    location_df.county = location_df.county.str.lower()
+    location_df.state = location_df.state.str.lower()
+    corrected = pd.DataFrame(COUNTY_STATE_NAME_FIXES, columns=['county', 'state', 'clean_county', 'clean_state'])
+    location_df = location_df.merge(corrected, how='left', on=['county', 'state'])
+    location_df.loc[:, ['county']] = location_df.county.where(location_df.clean_county.isna(), location_df.clean_county)
+    location_df.loc[:, ['state']] = location_df.state.where(location_df.clean_state.isna(), location_df.clean_state)
+    location_df = location_df.drop(['clean_county', 'clean_state'], axis=1)
+    return location_df
