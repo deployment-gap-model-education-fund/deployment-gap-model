@@ -694,7 +694,7 @@ def _fix_incorrect_county_state_names(location_df: pd.DataFrame) -> pd.DataFrame
         location_df (pd.DataFrame): normalized ISO locations
     Returns:
         pd.DataFrame: copy of location_df with more correct county, state pairs
-    
+
     """
     location_df.county = location_df.county.str.lower()
     location_df.state = location_df.state.str.lower()
