@@ -1,7 +1,9 @@
 """Common transform operations."""
 from typing import Optional, List, Dict
+from pathlib import Path
 
 import pandas as pd
+from joblib import Memory
 
 from pudl.helpers import add_fips_ids as _add_fips_ids
 
@@ -14,6 +16,19 @@ UNIX_EPOCH_ORIGIN = pd.Timestamp('01/01/1970')
 # 1900 was a leap year, I cancel out that error by setting the origin to 12/30/1899.
 # See xlrd.xldate.py:xldate_as_datetime for complete implementation.
 EXCEL_EPOCH_ORIGIN = pd.Timestamp('12/30/1899')
+
+try:  # docker path
+    # 3 directories above current module
+    geocoder_local_cache = Path("/app/data/geocoder_cache")
+    assert geocoder_local_cache.exists()
+except AssertionError:  # local path
+    # 4 directories above current module
+    geocoder_local_cache = Path(
+        __file__).resolve().parents[3] / "data/geocoder_cache"
+    assert geocoder_local_cache.exists()
+# cache needs to be accessed outside this module to call .clear()
+# limit cache size to 100 KB, keeps most recently accessed first
+GEOCODER_CACHE = Memory(location=geocoder_local_cache, bytes_limit=100000)
 
 
 def normalize_multicolumns_to_rows(
@@ -217,6 +232,7 @@ def _geocode_row(ser: pd.Series, client: GoogleGeocoder, state_col='state', loca
     return client.describe()
 
 
+@GEOCODER_CACHE.cache()
 def _geocode_locality(state_locality_df: pd.DataFrame, state_col='state', locality_col='county') -> pd.DataFrame:
     """Use Google Maps Platform API to look up information about state/locality pairs in a dataframe.
 
@@ -228,6 +244,15 @@ def _geocode_locality(state_locality_df: pd.DataFrame, state_col='state', locali
     Returns:
         pd.DataFrame: new columns 'locality_name', 'locality_type', 'containing_county'
     """
+    # NOTE: the purpose of the cache decorator is primarily to
+    # reduce API calls during development. A secondary benefit is to reduce
+    # execution time due to slow synchronous requests.
+    # That's why this is persisted to disk with joblib, not in memory with LRU_cache or something.
+    # Because it is on disk, caching the higher level dataframe function causes less IO overhead
+    # than caching individual API calls would.
+    # Because the entire input dataframe must be identical to the cached version, I
+    # recommend subsetting the dataframe to only state_col and locality_col when calling
+    # this function. That allows other, unrelated columns to change but still use the geocode cache.
     geocoder = GoogleGeocoder()
     new_cols = state_locality_df.apply(
         _geocode_row, axis=1, result_type='expand', client=geocoder, state_col=state_col, locality_col=locality_col)
@@ -271,7 +296,12 @@ def add_county_fips_with_backup_geocoding(state_locality_df: pd.DataFrame, state
     # geocode the lookup failures - they are often city/town names (instead of counties) or simply mis-spelled
     nan_fips = with_fips.loc[fips_is_nan, :].copy()
     geocoded = _geocode_locality(
-        nan_fips, state_col=state_col, locality_col=locality_col)
+        nan_fips.loc[:, [state_col, locality_col]],
+        # pass subset to _geocode_locality to maximize chance of a cache hit
+        # (this way other columns can change but caching still works)
+        state_col=state_col,
+        locality_col=locality_col
+    )
     nan_fips = pd.concat([nan_fips, geocoded], axis=1)
     # add fips using geocoded names
     filled_fips = _add_fips_ids(nan_fips, state_col=state_col,
