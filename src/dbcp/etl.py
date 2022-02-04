@@ -12,6 +12,7 @@ import sqlalchemy as sa
 import dbcp
 from dbcp.constants import FIPS_CODE_VINTAGE, WORKING_PARTITIONS
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
+from dbcp.transform.helpers import GEOCODER_CACHE
 from dbcp.schemas import TABLE_SCHEMAS
 from dbcp.workspace.datastore import DBCPDatastore
 from pudl.helpers import add_fips_ids as _add_fips_ids
@@ -136,6 +137,9 @@ def etl(args):
     engine = dbcp.helpers.get_sql_engine()
     with engine.connect() as con:
         engine.execute("CREATE SCHEMA IF NOT EXISTS dbcp")
+
+    # Reduce size of geocoder cache if necessary
+    GEOCODER_CACHE.reduce_size()
 
     etl_funcs = {
         "eipinfrastructure": etl_eipinfrastructure,
