@@ -158,7 +158,8 @@ def withdrawn_iso_queue_projects(withdrawn_projects: pd.DataFrame) -> pd.DataFra
     return withdrawn_projects
 
 
-def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
+def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame],
+              full_fips_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     """
     Transform LBNL ISO Queues dataframes.
 
@@ -186,11 +187,18 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     lbnl_normalized_dfs = normalize_lbnl_dfs(lbnl_transformed_dfs)
     # data enrichment
     # Add Fips Codes and Clean Counties
+    lbnl_normalized_dfs['iso_locations'][
+        'raw_place_name'] = lbnl_normalized_dfs['iso_locations']['county']
+    lbnl_normalized_dfs['iso_locations'][
+        'raw_state_name'] = lbnl_normalized_dfs['iso_locations']['state']
     lbnl_normalized_dfs['iso_locations'] = _fix_incorrect_county_state_names(
         lbnl_normalized_dfs['iso_locations'])
     lbnl_normalized_dfs['iso_locations'] = add_county_fips_with_backup_geocoding(
         lbnl_normalized_dfs['iso_locations'])
-    lbnl_normalized_dfs['iso_locations'] = _fix_independent_city_fips(lbnl_normalized_dfs['iso_locations'])
+    lbnl_normalized_dfs['iso_locations'] = _fix_independent_city_fips(
+        lbnl_normalized_dfs['iso_locations'])
+    lbnl_normalized_dfs['iso_locations'] = _join_on_full_fips_table(
+        lbnl_normalized_dfs['iso_locations'], full_fips_df)
 
     # Clean up and categorize resources
     lbnl_normalized_dfs['iso_resource_capacity'] = (
@@ -474,8 +482,15 @@ def add_project_classification(resource_df: pd.DataFrame) -> pd.DataFrame:
 def denormalize(lbnl_normalized_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     """Denormalize lbnl dataframes."""
     # TODO: this should be a view in SQL
-    simple_location = _clean_county_names(lbnl_normalized_dfs['iso_locations'])
     # If multiple counties, just pick the first one. This is simplistic but there are only 26/13259 (0.1%)
+    simple_location = lbnl_normalized_dfs['iso_locations'].drop(
+        ['raw_state_name',
+         'raw_place_name',
+         'locality_name_geocoded',
+         'locality_type_geocoded',
+         'containing_county_geocoded'],
+        axis=1
+    )
     simple_location = simple_location.groupby('project_id', as_index=False).nth(0)
 
     loc_proj = simple_location.merge(
@@ -487,7 +502,7 @@ def denormalize(lbnl_normalized_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
 
 def _clean_point_of_interconnection(df) -> pd.DataFrame:
     """String cleaning on point of interconnection column.
-    
+
     Args:
         df (pd.DataFrame): a queue dataframe with column 'point_of_interconnection'
     """
@@ -632,7 +647,7 @@ def add_co2e_estimate(df: pd.DataFrame,
         gas_df['prime_mover_inferred'] == 'GT', cc_cf)
 
     # Put it all together
-    hours_per_year = 8766 # extra 6 hours to average in leap years
+    hours_per_year = 8766  # extra 6 hours to average in leap years
     gas_df['MWh'] = gas_df['capacity_mw'] * gas_df['capacity_factor_estimated'] * hours_per_year
     kwh_per_mwh = 1000
     tons_per_kg = 1 / 1000
@@ -642,23 +657,6 @@ def add_co2e_estimate(df: pd.DataFrame,
     # rejoin
     out = df.join(gas_df['co2e_tpy'], how='left')
     return out
-
-
-def _clean_county_names(location_df: pd.DataFrame) -> pd.DataFrame:
-    # temporary until normalization
-    # for now dropping Nans where geocoder didn't fill in a county fips
-    location_df = location_df.loc[location_df.county_id_fips.notnull(), :].copy()
-    location_df = (location_df
-          .drop(['locality_name', 'locality_type', 'county'], axis=1)
-          .rename(columns={'containing_county': 'county'}))
-    location_df['county'] = location_df['county'].str.lower()
-    location_df['county'] = location_df.county.str.replace(' county', '', regex=False)
-    location_df['county'] = location_df.county.str.replace(' parish', '', regex=False)
-    location_df['county'] = location_df.county.str.replace('st.', 'saint', regex=False)
-    location_df['county'] = location_df.county.str.replace('ñ', 'n', regex=False)
-
-    location_df = location_df.loc[:, ['project_id', 'county', 'state', 'state_id_fips', 'county_id_fips']]
-    return location_df
 
 
 def _fix_independent_city_fips(location_df: pd.DataFrame) -> pd.DataFrame:
@@ -703,4 +701,31 @@ def _fix_incorrect_county_state_names(location_df: pd.DataFrame) -> pd.DataFrame
     location_df.loc[:, ['county']] = location_df.county.where(location_df.clean_county.isna(), location_df.clean_county)
     location_df.loc[:, ['state']] = location_df.state.where(location_df.clean_state.isna(), location_df.clean_state)
     location_df = location_df.drop(['clean_county', 'clean_state'], axis=1)
+    return location_df
+
+
+def _join_on_full_fips_table(location_df: pd.DataFrame,
+                             full_fips_df: pd.DataFrame) -> pd.DataFrame:
+    """Join the FIPS table containing all counties onto locations df.
+
+    This results in standardized and cleaned county and state names.
+    Args:
+        location_df (pd.DataFrame): normalized ISO locations
+    Returns:
+        pd.DataFrame: copy of location_df with clean county and state names
+    """
+    full_fips_df = full_fips_df.set_index('county_id_fips')[['state', 'county']]
+    location_df = location_df.join(full_fips_df, on='county_id_fips', rsuffix='_clean')
+    location_df.loc[:, 'county'] = location_df['county_clean']
+    location_df.loc[:, 'state'] = location_df['state_clean']
+    location_df = location_df[['project_id',
+                               'state',
+                               'county',
+                               'state_id_fips',
+                               'county_id_fips',
+                               'raw_state_name',
+                               'raw_place_name',
+                               'locality_name_geocoded',
+                               'locality_type_geocoded',
+                               'containing_county_geocoded']]
     return location_df

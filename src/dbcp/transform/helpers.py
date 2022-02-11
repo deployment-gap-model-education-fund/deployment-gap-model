@@ -226,12 +226,12 @@ def _geocode_locality(state_locality_df: pd.DataFrame, state_col='state', locali
         locality_col (str, optional): name of the column of locality names. Defaults to 'county'.
 
     Returns:
-        pd.DataFrame: new columns 'locality_name', 'locality_type', 'containing_county'
+        pd.DataFrame: new columns 'locality_name_geocoded', 'locality_type_geocoded', 'containing_county_geocoded'
     """
     geocoder = GoogleGeocoder()
     new_cols = state_locality_df.apply(
         _geocode_row, axis=1, result_type='expand', client=geocoder, state_col=state_col, locality_col=locality_col)
-    new_cols.columns = ['locality_name', 'locality_type', 'containing_county']
+    new_cols.columns = ['locality_name_geocoded', 'locality_type_geocoded', 'containing_county_geocoded']
     return new_cols
 
 
@@ -257,16 +257,16 @@ def add_county_fips_with_backup_geocoding(state_locality_df: pd.DataFrame, state
     fips_is_nan = with_fips.loc[:, 'county_id_fips'].isna()
     if not fips_is_nan.any():
         # standardize output columns
-        with_fips['locality_name'] = with_fips[locality_col]
-        with_fips['locality_type'] = 'county'
-        with_fips['containing_county'] = with_fips[locality_col]
+        with_fips['locality_name_geocoded'] = with_fips[locality_col]
+        with_fips['locality_type_geocoded'] = 'county'
+        with_fips['containing_county_geocoded'] = with_fips[locality_col]
         return with_fips
 
     good_fips = with_fips.loc[~fips_is_nan, :].copy()
     # standardize output columns
-    good_fips['locality_name'] = good_fips[locality_col]
-    good_fips['locality_type'] = 'county'
-    good_fips['containing_county'] = good_fips[locality_col]
+    good_fips['locality_name_geocoded'] = good_fips[locality_col]
+    good_fips['locality_type_geocoded'] = 'county'
+    good_fips['containing_county_geocoded'] = good_fips[locality_col]
 
     # geocode the lookup failures - they are often city/town names (instead of counties) or simply mis-spelled
     nan_fips = with_fips.loc[fips_is_nan, :].copy()
@@ -275,10 +275,14 @@ def add_county_fips_with_backup_geocoding(state_locality_df: pd.DataFrame, state
     nan_fips = pd.concat([nan_fips, geocoded], axis=1)
     # add fips using geocoded names
     filled_fips = _add_fips_ids(nan_fips, state_col=state_col,
-                                county_col='containing_county', vintage=FIPS_CODE_VINTAGE)
+                                county_col='containing_county_geocoded', vintage=FIPS_CODE_VINTAGE)
     
     # recombine and restore row order
-    cols_to_keep = ['state_id_fips', 'county_id_fips', 'locality_name', 'locality_type', 'containing_county',]
+    cols_to_keep = ['state_id_fips',
+                    'county_id_fips',
+                    'locality_name_geocoded',
+                    'locality_type_geocoded',
+                    'containing_county_geocoded']
     recombined = pd.concat([good_fips, filled_fips], axis=0).loc[state_locality_df.index, cols_to_keep]
 
     # attach to original df

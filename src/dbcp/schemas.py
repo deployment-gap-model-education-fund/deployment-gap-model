@@ -278,9 +278,11 @@ TABLE_SCHEMAS = {
             "state": pa.Column(pd.StringDtype, nullable=True),
             "state_id_fips": pa.Column(pd.StringDtype, nullable=True),
             "county_id_fips": pa.Column(pd.StringDtype, nullable=True),
-            'locality_name': pa.Column(pd.StringDtype, nullable=True),
-            'locality_type': pa.Column(pd.StringDtype, nullable=True),
-            'containing_county': pa.Column(pd.StringDtype, nullable=True),
+            "raw_state_name": pa.Column(pd.StringDtype, nullable=True),
+            "raw_place_name": pa.Column(pd.StringDtype, nullable=True),
+            "locality_name_geocoded": pa.Column(pd.StringDtype, nullable=True),
+            "locality_type_geocoded": pa.Column(pd.StringDtype, nullable=True),
+            "containing_county_geocoded": pa.Column(pd.StringDtype, nullable=True),
         },
             strict=True,
             coerce=True),
@@ -302,7 +304,11 @@ ISO_FOR_TABLEAU = (TABLE_SCHEMAS["iso_projects"]
                    .add_columns(TABLE_SCHEMAS["iso_locations"].columns)
                    .add_columns(TABLE_SCHEMAS["iso_resource_capacity"].columns)
                    .add_columns(pa.DataFrameSchema({'co2e_tpy': pa.Column(float, nullable=True), "index": pa.Column(pd.Int64Dtype)}).columns)
-                   .remove_columns(['locality_name', 'locality_type', 'containing_county', ])
+                   .remove_columns(['raw_state_name',
+                                    'raw_place_name',
+                                    'locality_name_geocoded',
+                                    'locality_type_geocoded',
+                                    'containing_county_geocoded'])
                    )
 
 TABLE_SCHEMAS["iso_for_tableau"] = ISO_FOR_TABLEAU

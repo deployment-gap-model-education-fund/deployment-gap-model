@@ -20,6 +20,18 @@ from pudl.output.pudltabl import PudlTabl
 logger = logging.getLogger(__name__)
 
 
+FIPS_DUP_COUNTY_NAMES = ['wade hampton',
+                         'washington',
+                         'ste. genevieve',
+                         'the bronx',
+                         'brooklyn',
+                         'manhattan',
+                         'staten island',
+                         'shannon',
+                         'ft. bend',
+                         'rose island']
+
+
 def etl_eipinfrastructure() -> Dict[str, pd.DataFrame]:
     """EIP Infrastructure ETL."""
     # Extract
@@ -34,7 +46,7 @@ def etl_eipinfrastructure() -> Dict[str, pd.DataFrame]:
     return eip_transformed_dfs
 
 
-def etl_lbnlisoqueues() -> Dict[str, pd.DataFrame]:
+def etl_lbnlisoqueues(full_fips_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     """LBNL ISO Queues ETL."""
     # Extract
     ds = DBCPDatastore(sandbox=True, local_cache_path="/app/data/data_cache")
@@ -42,7 +54,8 @@ def etl_lbnlisoqueues() -> Dict[str, pd.DataFrame]:
         update_date=WORKING_PARTITIONS["lbnlisoqueues"]["update_date"])
 
     # Transform
-    lbnl_transformed_dfs = dbcp.transform.lbnlisoqueues.transform(lbnl_raw_dfs)
+    lbnl_transformed_dfs = dbcp.transform.lbnlisoqueues.transform(
+        lbnl_raw_dfs, full_fips_df)
 
     return lbnl_transformed_dfs
 
@@ -112,12 +125,12 @@ def etl_master_fips_table() -> Dict[str, pd.DataFrame]:
     state_df = state_df[state_df.state.str.len() == 2].reset_index(drop=True)
 
     county_df = pd.concat([pd.DataFrame({'state_id_fips': item[0],
-                          'county': item[1].keys(),
-                          'county_id_fips': item[1].values()})
-            for item in county_dict.items()], axis=0)
+                                         'county': item[1].keys(),
+                                         'county_id_fips': item[1].values()})
+                           for item in county_dict.items()], axis=0)
     # this county_pattern is taken directly from addfips
     # going to change this in the future/maybe just absorb addfips
-    county_pattern = r" (county|city|city and borough|borough|census area|municipio|municipality|district|parish)$"
+    county_pattern = r" (county|city|city county|city and borough|borough|census area|municipio|municipality|district|parish)$"
     county_df['county'] = county_df['county'].str.replace(county_pattern, '', regex=True)
     county_df['county'] = county_df['county'].str.replace('st.', 'saint', regex=False)
     county_df = county_df.drop_duplicates()
@@ -125,6 +138,11 @@ def etl_master_fips_table() -> Dict[str, pd.DataFrame]:
     county_df = county_df.join(state_df.set_index('state_id_fips'), on='state_id_fips').reset_index(drop=True)
     # us minor outlying islands isnt in the state df, manually enter
     county_df.loc[lambda county_df: county_df['state_id_fips'] == '74', 'state'] = 'um'
+    # consolidate and drop fips codes with two county names
+    mult_fips = county_df[county_df.duplicated('county_id_fips', keep=False)]
+    unique_fips = county_df[~(county_df.duplicated('county_id_fips', keep=False))]
+    mult_fips = mult_fips[~(mult_fips.county.isin(FIPS_DUP_COUNTY_NAMES))]
+    county_df = pd.concat([unique_fips, mult_fips], axis=0).sort_values('county_id_fips')
     county_df = county_df[['state_id_fips', 'county_id_fips', 'state', 'county']]
 
     return {'state_county_fips_table': county_df}
@@ -138,19 +156,23 @@ def etl(args):
         engine.execute("CREATE SCHEMA IF NOT EXISTS dbcp")
 
     etl_funcs = {
+        "master_fips_table": etl_master_fips_table,
         "eipinfrastructure": etl_eipinfrastructure,
         "lbnlisoqueues": etl_lbnlisoqueues,
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
-        "columbia_local_opp": etl_columbia_local_opp,
-        "master_fips_table": etl_master_fips_table
+        "columbia_local_opp": etl_columbia_local_opp
     }
 
     # Extract and transform the data sets
     transformed_dfs = {}
     for dataset, etl_func in etl_funcs.items():
         logger.info(f"Processing: {dataset}")
-        transformed_dfs.update(etl_func())
+        if dataset != "lbnlisoqueues":
+            transformed_dfs.update(etl_func())
+        else:
+            transformed_dfs.update(etl_func(
+                transformed_dfs['state_county_fips_table'])) 
 
     # Load table into postgres
     with engine.connect() as con:
