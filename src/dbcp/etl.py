@@ -3,7 +3,6 @@ import logging
 from pathlib import Path
 from typing import Dict
 
-import addfips
 import pandas as pd
 import pandas_gbq
 import pydata_google_auth
@@ -75,16 +74,17 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
         start_date='2020-01-01',
         end_date='2020-12-31',
         freq='AS',
-        fill_fuel_cost=True,
+        fill_fuel_cost=False,
         roll_fuel_cost=True,
         fill_net_gen=True,
     )
 
     mcoe = pudl_out.mcoe(all_gens=True)
     # add FIPS
-    filled_location = mcoe.loc[:,['state', 'county']].fillna('')
+    filled_location = mcoe.loc[:, ['state', 'county']].fillna('')
     fips = _add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
-    mcoe = pd.concat([mcoe, fips[['state_id_fips', 'county_id_fips']]], axis=1, copy=False)
+    mcoe = pd.concat([mcoe, fips[['state_id_fips', 'county_id_fips']]],
+                     axis=1, copy=False)
     mcoe = TABLE_SCHEMAS["mcoe"].validate(mcoe)
     pudl_tables["mcoe"] = mcoe
 
@@ -103,34 +103,6 @@ def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
     return out
 
 
-def etl_master_fips_table() -> Dict[str, pd.DataFrame]:
-    """Master state and county FIPS table ETL."""
-    af = addfips.AddFIPS()
-    county_dict = af._counties
-    state_dict = af._states
-    state_df = pd.DataFrame(state_dict.items(), columns=['state', 'state_id_fips'])
-    # for now keep only the two letter state abbreviations
-    state_df = state_df[state_df.state.str.len() == 2].reset_index(drop=True)
-
-    county_df = pd.concat([pd.DataFrame({'state_id_fips': item[0],
-                          'county': item[1].keys(),
-                          'county_id_fips': item[1].values()})
-            for item in county_dict.items()], axis=0)
-    # this county_pattern is taken directly from addfips
-    # going to change this in the future/maybe just absorb addfips
-    county_pattern = r" (county|city|city and borough|borough|census area|municipio|municipality|district|parish)$"
-    county_df['county'] = county_df['county'].str.replace(county_pattern, '', regex=True)
-    county_df['county'] = county_df['county'].str.replace('st.', 'saint', regex=False)
-    county_df = county_df.drop_duplicates()
-    county_df['county_id_fips'] = county_df['state_id_fips'] + county_df['county_id_fips']
-    county_df = county_df.join(state_df.set_index('state_id_fips'), on='state_id_fips').reset_index(drop=True)
-    # us minor outlying islands isnt in the state df, manually enter
-    county_df.loc[lambda county_df: county_df['state_id_fips'] == '74', 'state'] = 'um'
-    county_df = county_df[['state_id_fips', 'county_id_fips', 'state', 'county']]
-
-    return {'state_county_fips_table': county_df}
-
-
 def etl(args):
     """Run dbc ETL."""
     # Setup postgres
@@ -147,7 +119,6 @@ def etl(args):
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
         "columbia_local_opp": etl_columbia_local_opp,
-        "master_fips_table": etl_master_fips_table
     }
 
     # Extract and transform the data sets
