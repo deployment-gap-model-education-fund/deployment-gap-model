@@ -6,7 +6,7 @@ import sys
 import coloredlogs
 
 import dbcp
-
+from dbcp.transform.helpers import GEOCODER_CACHE
 
 def parse_command_line():
     """
@@ -37,6 +37,12 @@ def parse_command_line():
         help="Set logging level (DEBUG, INFO, WARNING, ERROR, or CRITICAL).",
         default="INFO",
     )
+    parser.add_argument(
+        '--clear_geocoder_cache',
+        action='store_true',
+        default=False,
+        help="Delete saved geocoder results, forcing fresh API calls.",
+    )
     arguments = parser.parse_args()
     return arguments
 
@@ -50,6 +56,8 @@ def main():
     log_format = '%(asctime)s [%(levelname)8s] %(name)s:%(lineno)s %(message)s'
     coloredlogs.install(fmt=log_format, level=args.loglevel, logger=dbcp_logger)
 
+    if args.clear_geocoder_cache:
+        GEOCODER_CACHE.clear()
     dbcp.etl.etl(args)
 
 
