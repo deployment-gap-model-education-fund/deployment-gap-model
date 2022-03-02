@@ -6,7 +6,9 @@ from typing import Any, Dict, List
 import pandas as pd
 
 from dbcp.schemas import TABLE_SCHEMAS
-from dbcp.transform.helpers import add_county_fips_with_backup_geocoding, normalize_multicolumns_to_rows, parse_dates
+from dbcp.transform.helpers import (add_county_fips_with_backup_geocoding,
+                                    normalize_multicolumns_to_rows,
+                                    parse_dates)
 from pudl.helpers import add_fips_ids as _add_fips_ids
 
 logger = logging.getLogger(__name__)
@@ -56,7 +58,7 @@ RESOURCE_DICT = {
         "type": "Fossil"},
     "Nuclear": {
         "codes": ["NU", "NUC"],
-        "type": "Fossil"},
+        "type": "Renewable"},
     "Offshore Wind": {
         "codes": [],
         "type": "Renewable"},
@@ -94,7 +96,7 @@ RESOURCE_DICT = {
         "codes": ["ST"],
         "type": "Fossil"},
     "Waste Heat": {
-        "codes": ["Waste Heat Recovery", "Heat Recovery", "Co-Gen",],
+        "codes": ["Waste Heat Recovery", "Heat Recovery", "Co-Gen", ],
         "type": "Fossil"},
     "Wind; Storage": {
         "codes": ["WND BAT"],
@@ -171,7 +173,8 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     # Add Fips Codes and Clean Counties
     lbnl_normalized_dfs['iso_locations'] = add_county_fips_with_backup_geocoding(
         lbnl_normalized_dfs['iso_locations'])
-    lbnl_normalized_dfs['iso_locations'] = _fix_independent_city_fips(lbnl_normalized_dfs['iso_locations'])
+    lbnl_normalized_dfs['iso_locations'] = _fix_independent_city_fips(
+        lbnl_normalized_dfs['iso_locations'])
 
     # Clean up and categorize resources
     lbnl_normalized_dfs['iso_resource_capacity'] = (
@@ -541,8 +544,9 @@ def add_co2e_estimate(df: pd.DataFrame,
                       big_gt_cf=0.0983,
                       cc_cf=0.5244) -> pd.DataFrame:
     """NOTE: most the arguments to this function shouldn't exist, because they are interdependent model parameters.
+
     Changing any of them simply produces an incoherent output. Issue # 83 raises this issue.
-    
+
     For gas plants, estimate CO2e tons per year from capacity.
 
     heat rate source: https://www.eia.gov/electricity/annual/html/epa_08_02.html
@@ -564,7 +568,6 @@ def add_co2e_estimate(df: pd.DataFrame,
     Returns:
         pd.DataFrame: copy of input dataframe with new column 'co2e_tpy'
     """
-
     gas_df = df.loc[(df.resource == 'Gas') & df['queue_status'].eq('active'), :].copy()
     gas_df['prime_mover_inferred'] = 'GT'
     gas_df['prime_mover_inferred'] = gas_df['prime_mover_inferred'].where(
@@ -584,8 +587,9 @@ def add_co2e_estimate(df: pd.DataFrame,
         gas_df['prime_mover_inferred'] == 'GT', cc_cf)
 
     # Put it all together
-    hours_per_year = 8766 # extra 6 hours to average in leap years
-    gas_df['MWh'] = gas_df['capacity_mw'] * gas_df['capacity_factor_estimated'] * hours_per_year
+    hours_per_year = 8766  # extra 6 hours to average in leap years
+    gas_df['MWh'] = gas_df['capacity_mw'] * \
+        gas_df['capacity_factor_estimated'] * hours_per_year
     kwh_per_mwh = 1000
     tons_per_kg = 1 / 1000
     # put in units of tons per year to match EIP data
@@ -601,19 +605,21 @@ def _clean_county_names(location_df: pd.DataFrame) -> pd.DataFrame:
     # for now dropping Nans where geocoder didn't fill in a county fips
     location_df = location_df.loc[location_df.county_id_fips.notnull(), :].copy()
     location_df = (location_df
-          .drop(['locality_name', 'locality_type', 'county'], axis=1)
-          .rename(columns={'containing_county': 'county'}))
+                   .drop(['locality_name', 'locality_type', 'county'], axis=1)
+                   .rename(columns={'containing_county': 'county'}))
     location_df['county'] = location_df['county'].str.lower()
     location_df['county'] = location_df.county.str.replace(' county', '')
     location_df['county'] = location_df.county.str.replace(' parish', '')
     location_df['county'] = location_df.county.str.replace('st.', 'saint')
     location_df['county'] = location_df.county.str.replace('ñ', 'n')
 
-    location_df = location_df.loc[:, ['project_id', 'county', 'state', 'state_id_fips', 'county_id_fips']]
+    location_df = location_df.loc[:, ['project_id',
+                                      'county', 'state', 'state_id_fips', 'county_id_fips']]
     return location_df
 
+
 def _fix_independent_city_fips(location_df: pd.DataFrame) -> pd.DataFrame:
-    """fix about 50 independent cities with wrong name order.
+    """Fix about 50 independent cities with wrong name order.
 
     Args:
         location_df (pd.DataFrame): normalized ISO locations
@@ -626,7 +632,8 @@ def _fix_independent_city_fips(location_df: pd.DataFrame) -> pd.DataFrame:
     """
     if 'county_id_fips' not in location_df.columns:
         raise ValueError("Use add_county_fips_with_backup_geocoding() first.")
-    nan_fips = location_df.loc[location_df['county_id_fips'].isna(), ['state', 'county']].fillna('')
+    nan_fips = location_df.loc[location_df['county_id_fips'].isna(), [
+        'state', 'county']].fillna('')
     nan_fips.loc[:, 'county'] = nan_fips.loc[:, 'county'].str.lower().str.replace(
         '^city of (.+)',
         lambda x: x.group(1) + ' city',
