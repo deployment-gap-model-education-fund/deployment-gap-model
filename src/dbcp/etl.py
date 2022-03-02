@@ -74,7 +74,7 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
         start_date='2020-01-01',
         end_date='2020-12-31',
         freq='AS',
-        fill_fuel_cost=True,
+        fill_fuel_cost=False,
         roll_fuel_cost=True,
         fill_net_gen=True,
     )
