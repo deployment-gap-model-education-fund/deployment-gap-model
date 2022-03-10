@@ -9,6 +9,7 @@ setup(
     description='Data engineering for the Down Ballot Climate Project (DBCP)',
     packages=find_packages("src"),
     package_dir={"": "src"},
+    python_requires=">=3.9,<3.11",
     install_requires=['catalystcoop.pudl>=0.5',
                       'psycopg2',
                       'tqdm',
