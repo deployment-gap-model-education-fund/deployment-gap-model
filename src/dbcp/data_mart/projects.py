@@ -4,6 +4,7 @@ from re import IGNORECASE
 
 import sqlalchemy as sa
 import pandas as pd
+import numpy as np
 from dbcp.helpers import get_sql_engine
 
 
@@ -64,7 +65,7 @@ def _get_iso_project_df(engine: sa.engine.Engine) -> pd.DataFrame:
         'queue_status',
         #'queue_year',   # year info is contained in queue_date
         'region',
-        'resource_type_lbnl',
+        #'resource_type_lbnl',  # just use clean types for simplicity
         'utility',
         'withdrawl_reason',
         #'year_operational',  # year info is contained in date_operational
@@ -118,12 +119,42 @@ def _get_state_opposition_df(engine: sa.engine.Engine) -> pd.DataFrame:
     df = _subset_db_columns(cols, db, engine)
     return df
 
-def _combine_state_and_local_opposition_as_counties(state_df: pd.DataFrame, local_df: pd.DataFrame) -> pd.DataFrame:
+def _get_county_fips_df(engine: sa.engine.Engine) -> pd.DataFrame:
+    cols = ['*']
+    db = 'dbcp.county_fips'
+    df = _subset_db_columns(cols, db, engine)
+    return df
+
+
+def _get_state_fips_df(engine: sa.engine.Engine) -> pd.DataFrame:
+    cols = ['*']
+    db = 'dbcp.state_fips'
+    df = _subset_db_columns(cols, db, engine)
+    return df
+
+def _combine_state_and_local_opposition_as_counties(state_df: pd.DataFrame, local_df: pd.DataFrame, county_fips_df: pd.DataFrame, state_fips_df: pd.DataFrame) -> pd.DataFrame:
     # drop states that repealed their policies or whose policy was pro-RE not anti-RE
     fips_codes_to_drop = {'23', '36'} # Maine, New York
     filtered_state_df = state_df.loc[~state_df.loc[:, 'state_id_fips'].isin(fips_codes_to_drop),:]
-    raise NotImplementedError("need master county FIPS table to do this")
+    filtered_state_df = filtered_state_df.merge(state_fips_df[['state_abbrev', 'state_id_fips']], on='state_id_fips', how='left')
+    states_as_counties = filtered_state_df.merge(county_fips_df, on='state_id_fips', how='left')
+    combined = states_as_counties.merge(local_df, on='county_id_fips', how='outer')
 
+    assert local_df['locality_type'].isna().sum() == 0
+    combined['locality_type'] = combined['locality_type'].fillna('state')
+    combined['locality_name'] = combined['locality_name'].fillna(combined['state_abbrev'])
+    
+    # resolve overlapping columns
+    # fillna county earliest year with state earliest year
+    combined['ordinance_earliest_year_mentioned'] = combined['earliest_year_mentioned_y'].fillna(combined['earliest_year_mentioned_x'])
+
+    # concatenate the intersection (only 4 counties)
+    has_both = combined[['ordinance', 'policy']].notna().all(axis=1)
+    combined.loc[has_both, 'ordinance'] = combined.loc[has_both, 'ordinance'] + (' State Policy: ' + combined.loc[has_both, 'policy'])
+    combined.loc[:, 'ordinance'] = combined['ordinance'].fillna('State Policy: ' + combined['policy'])
+
+    combined = combined[['county_id_fips', 'locality_name', 'locality_type', 'ordinance', 'ordinance_earliest_year_mentioned']]
+    return combined
 
 def _convert_resource_df_long_to_wide(resource_df: pd.DataFrame) -> pd.DataFrame:
     res_df = resource_df.copy()
@@ -165,7 +196,43 @@ def _get_and_join_iso_tables(engine: Optional[sa.engine.Engine]=None) -> pd.Data
     n_total_projects = project_df.loc[:, 'project_id'].nunique()
     combined = resource_df.join([project_df.set_index('project_id'), location_df.set_index('project_id')], how='outer')
     assert len(combined) == n_total_projects
-    return combined
+    return combined.reset_index()
+
+def _add_derived_columns(mart: pd.DataFrame) -> pd.DataFrame:
+    out = mart.copy()
+    out['has_ordinance'] = out['ordinance'].notna()
+    out['is_hybrid'] = out[['generation_type_1', 'storage_type']].notna().all(axis=1)
+
+    resource_map = {
+        'Onshore Wind': 'renewable',
+        'Solar': 'renewable',
+        'Natural Gas': 'fossil',
+        'Other': 'fossil',
+        'Hydro': 'renewable',
+        'Geothermal': 'renewable',
+        'Offshore Wind': 'renewable',
+        'Nuclear': 'other',
+        'Coal': 'fossil',
+        'Waste Heat': 'fossil',
+        'Biofuel': 'renewable',
+        'Biomass': 'renewable',
+        'Landfill Gas': 'fossil',
+        'Oil': 'fossil',
+        'Unknown': np.nan,
+        'Combustion Turbine': 'fossil',
+        'Oil; Biomass': 'fossil',
+        'Municipal Solid Waste': 'fossil',
+        'Fuel Cell': 'renewable',
+        'Steam': np.nan,
+        'Solar; Biomass': 'renewable',
+        'Methane; Solar': 'other',
+        np.nan: np.nan,
+    }
+    # note that this classifies pure storage facilities as np.nan
+    assert set(out['generation_type_1'].unique()) == set(resource_map.keys())
+    out['resource_class'] = out['generation_type_1'].map(resource_map)
+    
+    return out
 
 def make_project_data_mart_table(engine: Optional[sa.engine.Engine]=None) -> pd.DataFrame:
     if engine is None:
@@ -174,7 +241,68 @@ def make_project_data_mart_table(engine: Optional[sa.engine.Engine]=None) -> pd.
     ncsl = _get_ncsl_wind_permitting_df(engine)
     local_opp = _get_local_opposition_df(engine)
     state_opp = _get_state_opposition_df(engine)
+    all_counties = _get_county_fips_df(engine)
+    all_states = _get_state_fips_df(engine)
 
-    combined_opp = _combine_state_and_local_opposition_as_counties(state_df=state_opp, local_df=local_opp)
-    combined = iso.merge(ncsl, on='state_fips_id', how='left')
-    combined = combined.merge(combined_opp, on='county_fips_id')
+    combined_opp = _combine_state_and_local_opposition_as_counties(state_df=state_opp, local_df=local_opp, county_fips_df=all_counties, state_fips_df=all_states)
+    
+    # use canonical state and county names
+    iso = iso.drop(columns=['state', 'containing_county']).merge(all_states[['state_abbrev', 'state_id_fips']], on='state_id_fips', how='left')
+    iso = iso.merge(all_counties[['county_name', 'county_id_fips']], on='county_id_fips', how='left')
+
+    combined = iso.merge(ncsl, on='state_id_fips', how='left')
+    combined = combined.merge(combined_opp, on='county_id_fips', how='left')
+
+    combined = _add_derived_columns(combined)
+
+    rename_dict = {
+        'date_proposed': 'date_proposed_online',
+        'interconnection_status_lbnl': 'interconnection_status',
+        'queue_date': 'date_entered_queue',
+        'region': 'iso_region',
+        'locality_name': 'ordinance_jurisdiction_name',
+        'locality_type': 'ordinance_jurisdiction_type',
+        'description': 'state_permitting_text',
+        'permitting_type': 'state_permitting_type',
+        'state_abbrev': 'state',
+        'county_name': 'county',
+    }
+    combined = combined.rename(columns=rename_dict)
+
+    col_order = [
+        'project_name',
+        'project_id',
+        'iso_region',
+        'entity',
+        'utility',
+        'developer',
+        'state',
+        'county',
+        'state_id_fips',
+        'county_id_fips',
+        'resource_class',
+        'is_hybrid',
+        'generation_type_1',
+        'generation_capacity_mw_1',
+        'generation_type_2',
+        'generation_capacity_mw_2',
+        'storage_type',
+        'storage_capacity_mw',
+        'date_entered_queue',
+        'date_operational',
+        'date_proposed_online',
+        'date_withdrawn',
+        'days_in_queue',
+        'interconnection_status',
+        'point_of_interconnection',
+        'queue_status',
+        'withdrawl_reason',
+        'has_ordinance',
+        'ordinance_jurisdiction_name',
+        'ordinance_jurisdiction_type',
+        'ordinance_earliest_year_mentioned',
+        'ordinance',
+        'state_permitting_type',
+        'state_permitting_text',
+    ]
+    return combined[col_order]
