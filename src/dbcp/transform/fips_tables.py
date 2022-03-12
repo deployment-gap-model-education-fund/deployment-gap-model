@@ -1,3 +1,4 @@
+"""Tranform raw FIPS tables to a database-ready form."""
 from typing import Dict, Sequence
 import logging
 import pandas as pd
@@ -80,7 +81,18 @@ def transform(fips_tables: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     return transformed_fips_tables
 
 def _dedupe_keep_shortest_name(df: pd.DataFrame, idx_cols: Sequence[str], name_col: str='name') -> pd.DataFrame:
-    
+    """Several states and counties have multiple entries with short- and long-form names. This function removes all but the shortest.
+
+    Example: 'Rhode Island' vs 'Rhode Island and Providence Plantations'
+
+    Args:
+        df (pd.DataFrame): input dataframe of states or counties
+        idx_cols (Sequence[str]): column(s) comprising a (compound) key. Also determines output sort order.
+        name_col (str, optional): column used for sorting based on length. Defaults to 'name'.
+
+    Returns:
+        pd.DataFrame: deduplicated copy of input dataframe, sorted by idx_cols
+    """
     sorted_idx = df[name_col].str.len().sort_values(ascending=True).index
     sorted_ = df.loc[sorted_idx,:]
     deduped = sorted_.drop_duplicates(subset=idx_cols, keep='first').sort_values(idx_cols)
