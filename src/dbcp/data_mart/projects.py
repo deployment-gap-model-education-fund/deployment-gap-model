@@ -132,30 +132,29 @@ def _get_state_fips_df(engine: sa.engine.Engine) -> pd.DataFrame:
     df = _subset_db_columns(cols, db, engine)
     return df
 
-def _combine_state_and_local_opposition_as_counties(state_df: pd.DataFrame, local_df: pd.DataFrame, county_fips_df: pd.DataFrame, state_fips_df: pd.DataFrame) -> pd.DataFrame:
+def _filter_state_opposition(state_df: pd.DataFrame) -> pd.DataFrame:
     # drop states that repealed their policies or whose policy was pro-RE not anti-RE
     fips_codes_to_drop = {'23', '36'} # Maine, New York
-    filtered_state_df = state_df.loc[~state_df.loc[:, 'state_id_fips'].isin(fips_codes_to_drop),:]
-    filtered_state_df = filtered_state_df.merge(state_fips_df[['state_abbrev', 'state_id_fips']], on='state_id_fips', how='left')
-    states_as_counties = filtered_state_df.merge(county_fips_df, on='state_id_fips', how='left')
-    combined = states_as_counties.merge(local_df, on='county_id_fips', how='outer')
+    not_dropped = ~state_df.loc[:, 'state_id_fips'].isin(fips_codes_to_drop)
+    filtered_state_df = state_df.loc[not_dropped,:].copy()
+    return filtered_state_df
 
-    assert local_df['locality_type'].isna().sum() == 0
-    combined['locality_type'] = combined['locality_type'].fillna('state')
-    combined['locality_name'] = combined['locality_name'].fillna(combined['state_abbrev'])
+def _represent_state_opposition_as_counties(state_df: pd.DataFrame, county_fips_df: pd.DataFrame, state_fips_df: pd.DataFrame) -> pd.DataFrame:
     
-    # resolve overlapping columns
-    # fillna county earliest year with state earliest year
-    combined['earliest_year_mentioned'] = combined['earliest_year_mentioned_y'].fillna(combined['earliest_year_mentioned_x'])
-
-    # concatenate the intersection (only 4 counties)
-    has_both = combined[['ordinance', 'policy']].notna().all(axis=1)
-    combined.loc[has_both, 'ordinance'] = combined.loc[has_both, 'ordinance'] + (' State Policy: ' + combined.loc[has_both, 'policy'])
-    combined.loc[:, 'ordinance'] = combined['ordinance'].fillna('State Policy: ' + combined['policy'])
-
-    combined = combined[['county_id_fips', 'locality_name', 'locality_type', 'ordinance', 'earliest_year_mentioned']]
-    return combined
-
+    # fan out
+    states_as_counties = state_df.merge(county_fips_df.loc[:, ['county_id_fips', 'state_id_fips']], on='state_id_fips', how='left')
+    
+    # replicate local opposition columns
+    # locality_name
+    states_as_counties = states_as_counties.merge(state_fips_df.loc[:, ['state_name', 'state_id_fips']], on='state_id_fips', how='left')
+    # locality_type
+    states_as_counties['locality_type'] = 'state'
+    rename_dict = {
+        'state_name': 'locality_name',
+        'policy': 'ordinance',
+    }
+    states_as_counties = states_as_counties.rename(columns=rename_dict).drop(columns=['state_id_fips'])
+    return states_as_counties
 
 def _agg_local_ordinances_to_counties(ordinances: pd.DataFrame) -> pd.DataFrame:
 
@@ -267,7 +266,11 @@ def make_project_data_mart_table(engine: Optional[sa.engine.Engine]=None) -> pd.
     all_counties = _get_county_fips_df(engine)
     all_states = _get_state_fips_df(engine)
 
-    combined_opp = _combine_state_and_local_opposition_as_counties(state_df=state_opp, local_df=local_opp, county_fips_df=all_counties, state_fips_df=all_states)
+    # model local opposition
+    filtered_state_opp = _filter_state_opposition(state_opp)
+    states_to_counties = _represent_state_opposition_as_counties(filtered_state_opp, county_fips_df=all_counties, state_fips_df=all_states)
+    combined_opp = pd.concat([local_opp, states_to_counties], axis=0)
+    combined_opp = _agg_local_ordinances_to_counties(combined_opp)
     
     # use canonical state and county names
     iso = iso.merge(all_states[['state_abbrev', 'state_id_fips']], on='state_id_fips', how='left', validate='m:1')
@@ -285,6 +288,7 @@ def make_project_data_mart_table(engine: Optional[sa.engine.Engine]=None) -> pd.
         'region': 'iso_region',
         'locality_name': 'ordinance_jurisdiction_name',
         'locality_type': 'ordinance_jurisdiction_type',
+        'earliest_year_mentioned': 'ordinance_earliest_year_mentioned',
         'description': 'state_permitting_text',
         'permitting_type': 'state_permitting_type',
         'state_abbrev': 'state',
