@@ -133,14 +133,32 @@ def _get_state_fips_df(engine: sa.engine.Engine) -> pd.DataFrame:
     return df
 
 def _filter_state_opposition(state_df: pd.DataFrame) -> pd.DataFrame:
-    # drop states that repealed their policies or whose policy was pro-RE not anti-RE
-    fips_codes_to_drop = {'23', '36'} # Maine, New York
+    """Drop states that repealed their policies or whose policy was pro-renewables instead of anti-renewables.
+
+    Args:
+        state_df (pd.DataFrame): state policy dataframe
+
+    Returns:
+        pd.DataFrame: filtered copy of the input state policy dataframe
+    """
+    fips_codes_to_drop = {'23', '36'} # Maine (repealed), New York (pro-RE)
     not_dropped = ~state_df.loc[:, 'state_id_fips'].isin(fips_codes_to_drop)
     filtered_state_df = state_df.loc[not_dropped,:].copy()
     return filtered_state_df
 
 def _represent_state_opposition_as_counties(state_df: pd.DataFrame, county_fips_df: pd.DataFrame, state_fips_df: pd.DataFrame) -> pd.DataFrame:
-    
+    """Downscale state policies to look like county-level ordinances at each county in the respective state.
+
+    To make concatenation easier, the output dataframe imitates the columns of the local ordinance table.
+
+    Args:
+        state_df (pd.DataFrame): state opposition dataframe
+        county_fips_df (pd.DataFrame): master table of all counties
+        state_fips_df (pd.DataFrame): master table of all states
+
+    Returns:
+        pd.DataFrame: fanned out state policy dataframe
+    """
     # fan out
     states_as_counties = state_df.merge(county_fips_df.loc[:, ['county_id_fips', 'state_id_fips']], on='state_id_fips', how='left')
     
@@ -157,7 +175,27 @@ def _represent_state_opposition_as_counties(state_df: pd.DataFrame, county_fips_
     return states_as_counties
 
 def _agg_local_ordinances_to_counties(ordinances: pd.DataFrame) -> pd.DataFrame:
+    """Force the local ordinance table to have 1 row = 1 county. Only 8/92 counties have multiple ordinances.
 
+    This is necessary for joining into the ISO project table. ISO projects are only located by county.
+    Aggregation method:
+    * take min of earliest_year_mentioned
+    * if only one locality_name, use it. Otherwise replace with "multiple"
+    * same with 'locality type'
+    * concatenate the rdinances, each with locality_name prefix, eg "Great County: <ordinance>\nSmall Town: <ordinance>"
+
+    Value Counts of # ordinances per county (as of 3/14/2022):
+    1 ord    84 counties
+    2 ord     6 counties
+    3 ord     1 county
+    4 ord     1 county
+
+    Args:
+        ordinances (pd.DataFrame): local ordinance dataframe
+
+    Returns:
+        pd.DataFrame: aggregated local ordinance dataframe
+    """
     dupe_counties = ordinances.duplicated(subset='county_id_fips', keep=False)
     dupes = ordinances.loc[dupe_counties,:].copy()
     not_dupes = ordinances.loc[~dupe_counties,:].copy()
