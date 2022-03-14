@@ -16,13 +16,13 @@ def _subset_db_columns(columns: Sequence[str], table: str, engine: sa.engine.Eng
 def _get_iso_location_df(engine: sa.engine.Engine) -> pd.DataFrame:
     cols = [
         'project_id',
-        #'county',  # drop raw name in favor of geocoded containing_county
-        'state',
+        #'county',  # drop raw name in favor of canonical FIPS name
+        #'state',  # drop raw name in favor of canonical FIPS name
         'state_id_fips',
         'county_id_fips',
         #'locality_name',  # drop detailed location info for simplicity
         #'locality_type',  # drop detailed location info for simplicity
-        'containing_county',
+        #'containing_county',  # drop geocoded name in favor of canonical FIPS name
     ]
     db = 'dbcp.iso_locations'
     
@@ -146,15 +146,38 @@ def _combine_state_and_local_opposition_as_counties(state_df: pd.DataFrame, loca
     
     # resolve overlapping columns
     # fillna county earliest year with state earliest year
-    combined['ordinance_earliest_year_mentioned'] = combined['earliest_year_mentioned_y'].fillna(combined['earliest_year_mentioned_x'])
+    combined['earliest_year_mentioned'] = combined['earliest_year_mentioned_y'].fillna(combined['earliest_year_mentioned_x'])
 
     # concatenate the intersection (only 4 counties)
     has_both = combined[['ordinance', 'policy']].notna().all(axis=1)
     combined.loc[has_both, 'ordinance'] = combined.loc[has_both, 'ordinance'] + (' State Policy: ' + combined.loc[has_both, 'policy'])
     combined.loc[:, 'ordinance'] = combined['ordinance'].fillna('State Policy: ' + combined['policy'])
 
-    combined = combined[['county_id_fips', 'locality_name', 'locality_type', 'ordinance', 'ordinance_earliest_year_mentioned']]
+    combined = combined[['county_id_fips', 'locality_name', 'locality_type', 'ordinance', 'earliest_year_mentioned']]
     return combined
+
+
+def _agg_local_ordinances_to_counties(ordinances: pd.DataFrame) -> pd.DataFrame:
+
+    dupe_counties = ordinances.duplicated(subset='county_id_fips', keep=False)
+    dupes = ordinances.loc[dupe_counties,:].copy()
+    not_dupes = ordinances.loc[~dupe_counties,:].copy()
+    
+    dupes['ordinance'] = dupes['locality_name'] + ': ' + dupes['ordinance'] + '\n'
+    grp = dupes.groupby('county_id_fips')
+
+    years = grp['earliest_year_mentioned'].min()
+
+    n_unique = grp[['locality_name', 'locality_type']].nunique()
+    localities = grp[['locality_name', 'locality_type']].nth(0).mask(n_unique > 1, other='multiple')
+
+    descriptions = grp['ordinance'].sum().str.strip()
+
+    agg_dupes = pd.concat([years, localities, descriptions], axis=1).reset_index()
+    recombined = pd.concat([not_dupes, agg_dupes], axis=0, ignore_index=True).sort_values('county_id_fips')
+    assert not recombined.duplicated(subset='county_id_fips').any()
+
+    return recombined
 
 def _convert_resource_df_long_to_wide(resource_df: pd.DataFrame) -> pd.DataFrame:
     res_df = resource_df.copy()
@@ -247,11 +270,11 @@ def make_project_data_mart_table(engine: Optional[sa.engine.Engine]=None) -> pd.
     combined_opp = _combine_state_and_local_opposition_as_counties(state_df=state_opp, local_df=local_opp, county_fips_df=all_counties, state_fips_df=all_states)
     
     # use canonical state and county names
-    iso = iso.drop(columns=['state', 'containing_county']).merge(all_states[['state_abbrev', 'state_id_fips']], on='state_id_fips', how='left')
-    iso = iso.merge(all_counties[['county_name', 'county_id_fips']], on='county_id_fips', how='left')
+    iso = iso.merge(all_states[['state_abbrev', 'state_id_fips']], on='state_id_fips', how='left', validate='m:1')
+    iso = iso.merge(all_counties[['county_name', 'county_id_fips']], on='county_id_fips', how='left', validate='m:1')
 
-    combined = iso.merge(ncsl, on='state_id_fips', how='left')
-    combined = combined.merge(combined_opp, on='county_id_fips', how='left')
+    combined = iso.merge(ncsl, on='state_id_fips', how='left', validate='m:1')
+    combined = combined.merge(combined_opp, on='county_id_fips', how='left', validate='m:1')
 
     combined = _add_derived_columns(combined)
 
