@@ -335,8 +335,8 @@ def make_project_data_mart_table(engine: Optional[sa.engine.Engine]=None) -> pd.
     combined = combined.rename(columns=rename_dict)
 
     col_order = [
-        'project_name',
         'project_id',
+        'project_name',
         'iso_region',
         'entity',
         'utility',
