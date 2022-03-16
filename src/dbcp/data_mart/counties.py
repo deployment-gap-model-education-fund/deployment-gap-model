@@ -379,11 +379,11 @@ def _agg_iso_projects_to_counties(iso_df: pd.DataFrame) -> pd.DataFrame:
         'Offshore Wind': 'renewable',
         #'Other Storage': '',
         #'Other': '',
-        'Hydro': 'renewable',
+        #'Hydro': '',  # remove by client request
         #'Nuclear': '',
         #'Pumped Storage': '',
         'Geothermal': 'renewable',
-        #'Coal': 'fossil',
+        'Coal': 'fossil',
         #'Waste Heat': '',
     }
     
@@ -420,7 +420,7 @@ def _agg_pudl_to_counties(pudl_df: pd.DataFrame) -> pd.DataFrame:
     # define categories
     renewable_fossil_dict = {
         'gas': 'fossil',
-        'hydro': 'renewable',
+        #'hydro': '',  # remove by client request
         'oil': 'fossil',
         #'nuclear': '',
         'coal': 'fossil',
