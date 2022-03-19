@@ -1,6 +1,6 @@
 catalystcoop.pudl>=0.5
 psycopg2~=2.9.3
-pytest~=6.2.5
+pytest~=7.1.1
 tqdm~=4.62.3
 beautifulsoup4~=4.10.0
 python-docx~=0.8.11
