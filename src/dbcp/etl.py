@@ -12,6 +12,7 @@ import sqlalchemy as sa
 import dbcp
 from dbcp.constants import FIPS_CODE_VINTAGE, WORKING_PARTITIONS
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
+from dbcp.transform.helpers import GEOCODER_CACHE
 from dbcp.schemas import TABLE_SCHEMAS
 from dbcp.workspace.datastore import DBCPDatastore
 from pudl.helpers import add_fips_ids as _add_fips_ids
@@ -87,7 +88,7 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
         start_date='2020-01-01',
         end_date='2020-12-31',
         freq='AS',
-        fill_fuel_cost=True,
+        fill_fuel_cost=False,
         roll_fuel_cost=True,
         fill_net_gen=True,
     )
@@ -115,37 +116,12 @@ def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
     return out
 
 
-def etl_master_fips_table() -> Dict[str, pd.DataFrame]:
+def etl_fips_tables() -> Dict[str, pd.DataFrame]:
     """Master state and county FIPS table ETL."""
-    af = addfips.AddFIPS()
-    county_dict = af._counties
-    state_dict = af._states
-    state_df = pd.DataFrame(state_dict.items(), columns=['state', 'state_id_fips'])
-    # for now keep only the two letter state abbreviations
-    state_df = state_df[state_df.state.str.len() == 2].reset_index(drop=True)
+    fips = dbcp.extract.fips_tables.extract(vintage=FIPS_CODE_VINTAGE)
+    out = dbcp.transform.fips_tables.transform(fips)
 
-    county_df = pd.concat([pd.DataFrame({'state_id_fips': item[0],
-                                         'county': item[1].keys(),
-                                         'county_id_fips': item[1].values()})
-                           for item in county_dict.items()], axis=0)
-    # this county_pattern is taken directly from addfips
-    # going to change this in the future/maybe just absorb addfips
-    county_pattern = r" (county|city|city county|city and borough|borough|census area|municipio|municipality|district|parish)$"
-    county_df['county'] = county_df['county'].str.replace(county_pattern, '', regex=True)
-    county_df['county'] = county_df['county'].str.replace('st.', 'saint', regex=False)
-    county_df = county_df.drop_duplicates()
-    county_df['county_id_fips'] = county_df['state_id_fips'] + county_df['county_id_fips']
-    county_df = county_df.join(state_df.set_index('state_id_fips'), on='state_id_fips').reset_index(drop=True)
-    # us minor outlying islands isnt in the state df, manually enter
-    county_df.loc[lambda county_df: county_df['state_id_fips'] == '74', 'state'] = 'um'
-    # consolidate and drop fips codes with two county names
-    mult_fips = county_df[county_df.duplicated('county_id_fips', keep=False)]
-    unique_fips = county_df[~(county_df.duplicated('county_id_fips', keep=False))]
-    mult_fips = mult_fips[~(mult_fips.county.isin(FIPS_DUP_COUNTY_NAMES))]
-    county_df = pd.concat([unique_fips, mult_fips], axis=0).sort_values('county_id_fips')
-    county_df = county_df[['state_id_fips', 'county_id_fips', 'state', 'county']]
-
-    return {'state_county_fips_table': county_df}
+    return out
 
 
 def etl(args):
@@ -155,13 +131,16 @@ def etl(args):
     with engine.connect() as con:
         engine.execute("CREATE SCHEMA IF NOT EXISTS dbcp")
 
+    # Reduce size of geocoder cache if necessary
+    GEOCODER_CACHE.reduce_size()
+
     etl_funcs = {
-        "master_fips_table": etl_master_fips_table,
         "eipinfrastructure": etl_eipinfrastructure,
         "lbnlisoqueues": etl_lbnlisoqueues,
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
-        "columbia_local_opp": etl_columbia_local_opp
+        "columbia_local_opp": etl_columbia_local_opp,
+        "fips_tables": etl_fips_tables
     }
 
     # Extract and transform the data sets

@@ -296,6 +296,22 @@ TABLE_SCHEMAS = {
             "capacity_mw": pa.Column(float, nullable=True),
         },
             strict=True,
+            coerce=True),
+    "county_fips":
+        pa.DataFrameSchema({
+            "state_id_fips": pa.Column(pd.StringDtype, nullable=False),
+            "county_id_fips": pa.Column(pd.StringDtype, nullable=False),
+            "county_name": pa.Column(pd.StringDtype, nullable=False),
+        },
+            strict=True,
+            coerce=True),
+    "state_fips":
+        pa.DataFrameSchema({
+            "state_id_fips": pa.Column(pd.StringDtype, nullable=False),
+            "state_name": pa.Column(pd.StringDtype, nullable=False),
+            "state_abbrev": pa.Column(pd.StringDtype, nullable=False),
+        },
+            strict=True,
             coerce=True)
 }
 
