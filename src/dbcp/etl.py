@@ -3,7 +3,6 @@ import logging
 from pathlib import Path
 from typing import Dict
 
-import addfips
 import pandas as pd
 import pandas_gbq
 import pydata_google_auth
@@ -82,7 +81,7 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
 
     mcoe = pudl_out.mcoe(all_gens=True)
     # add FIPS
-    filled_location = mcoe.loc[:,['state', 'county']].fillna('')
+    filled_location = mcoe.loc[:, ['state', 'county']].fillna('')
     fips = _add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
     mcoe = pd.concat([mcoe, fips[['state_id_fips', 'county_id_fips']]], axis=1, copy=False)
     mcoe = TABLE_SCHEMAS["mcoe"].validate(mcoe)
