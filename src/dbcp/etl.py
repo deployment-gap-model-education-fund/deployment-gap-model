@@ -83,7 +83,8 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
     # add FIPS
     filled_location = mcoe.loc[:, ['state', 'county']].fillna('')
     fips = _add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
-    mcoe = pd.concat([mcoe, fips[['state_id_fips', 'county_id_fips']]], axis=1, copy=False)
+    mcoe = pd.concat([mcoe, fips[['state_id_fips', 'county_id_fips']]],
+                     axis=1, copy=False)
     mcoe = TABLE_SCHEMAS["mcoe"].validate(mcoe)
     pudl_tables["mcoe"] = mcoe
 
