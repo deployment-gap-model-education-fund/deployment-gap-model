@@ -274,8 +274,8 @@ TABLE_SCHEMAS = {
     "iso_locations":
         pa.DataFrameSchema({
             "project_id": pa.Column(pd.Int64Dtype),
-            "county": pa.Column(pd.StringDtype, nullable=True),
-            "state": pa.Column(pd.StringDtype, nullable=True),
+            "raw_county_name": pa.Column(pd.StringDtype, nullable=True),
+            "raw_state_name": pa.Column(pd.StringDtype, nullable=True),
             "state_id_fips": pa.Column(pd.StringDtype, nullable=True),
             "county_id_fips": pa.Column(pd.StringDtype, nullable=True),
             'locality_name': pa.Column(pd.StringDtype, nullable=True),
