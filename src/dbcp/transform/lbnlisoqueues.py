@@ -614,7 +614,7 @@ def _clean_county_names(location_df: pd.DataFrame) -> pd.DataFrame:
     location_df['county'] = location_df['county'].str.lower()
     location_df['county'] = location_df.county.str.replace(' county', '')
     location_df['county'] = location_df.county.str.replace(' parish', '')
-    location_df['county'] = location_df.county.str.replace('st.', 'saint')
+    location_df['county'] = location_df.county.str.replace('st.', 'saint', regex=False)
     location_df['county'] = location_df.county.str.replace('ñ', 'n')
 
     location_df = location_df.loc[:, ['project_id',
