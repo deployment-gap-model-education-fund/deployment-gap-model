@@ -229,8 +229,8 @@ def _get_local_opposition_df(engine: sa.engine.Engine) -> pd.DataFrame:
         'locality_type',
         #'n_years_mentioned',  # for simplicity, only include one year metric (earliest_year_mentioned)
         'ordinance',
-        #'raw_locality_name',  # drop raw name in favor of geocoded one
-        #'state',  # only need FIPS, names come from elsewhere
+        #'raw_locality_name',  # drop raw name in favor of canonical one
+        #'raw_state_name',  # drop raw name in favor of canonical one
         #'state_id_fips',  # will join on 5-digit county FIPS, which includes state
     ]
     db = 'dbcp.local_ordinance'
@@ -243,7 +243,7 @@ def _get_state_opposition_df(engine: sa.engine.Engine) -> pd.DataFrame:
         #'latest_year_mentioned',  # for simplicity, only include one year metric (earliest_year_mentioned)
         #'n_years_mentioned',  # for simplicity, only include one year metric (earliest_year_mentioned)
         'policy',
-        #'state',  # only need FIPS, names come from elsewhere
+        #'raw_state_name',  # drop raw name in favor of canonical one
         'state_id_fips',
     ]
     db = 'dbcp.state_policy'
