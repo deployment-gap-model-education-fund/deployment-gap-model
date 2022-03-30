@@ -6,7 +6,9 @@ from typing import Any, Dict, List
 import pandas as pd
 
 from dbcp.schemas import TABLE_SCHEMAS
-from dbcp.transform.helpers import add_county_fips_with_backup_geocoding, normalize_multicolumns_to_rows, parse_dates
+from dbcp.transform.helpers import (add_county_fips_with_backup_geocoding,
+                                    normalize_multicolumns_to_rows,
+                                    parse_dates)
 from pudl.helpers import add_fips_ids as _add_fips_ids
 
 logger = logging.getLogger(__name__)
@@ -56,7 +58,7 @@ RESOURCE_DICT = {
         "type": "Fossil"},
     "Nuclear": {
         "codes": ["NU", "NUC"],
-        "type": "Fossil"},
+        "type": "Renewable"},
     "Offshore Wind": {
         "codes": [],
         "type": "Renewable"},
@@ -547,6 +549,7 @@ def add_co2e_estimate(df: pd.DataFrame,
                       big_gt_cf=0.0983,
                       cc_cf=0.5244) -> pd.DataFrame:
     """NOTE: most the arguments to this function shouldn't exist, because they are interdependent model parameters.
+
     Changing any of them simply produces an incoherent output. Issue # 83 raises this issue.
 
     For gas plants, estimate CO2e tons per year from capacity.
@@ -570,7 +573,6 @@ def add_co2e_estimate(df: pd.DataFrame,
     Returns:
         pd.DataFrame: copy of input dataframe with new column 'co2e_tpy'
     """
-
     gas_df = df.loc[(df.resource == 'Gas') & df['queue_status'].eq('active'), :].copy()
     gas_df['prime_mover_inferred'] = 'GT'
     gas_df['prime_mover_inferred'] = gas_df['prime_mover_inferred'].where(
@@ -615,12 +617,13 @@ def _clean_county_names(location_df: pd.DataFrame) -> pd.DataFrame:
     location_df['county'] = location_df.county.str.replace('st.', 'saint')
     location_df['county'] = location_df.county.str.replace('ñ', 'n')
 
-    location_df = location_df.loc[:, ['project_id', 'county', 'state', 'state_id_fips', 'county_id_fips']]
+    location_df = location_df.loc[:, ['project_id',
+                                      'county', 'state', 'state_id_fips', 'county_id_fips']]
     return location_df
 
 
 def _fix_independent_city_fips(location_df: pd.DataFrame) -> pd.DataFrame:
-    """fix about 50 independent cities with wrong name order.
+    """Fix about 50 independent cities with wrong name order.
 
     Args:
         location_df (pd.DataFrame): normalized ISO locations
