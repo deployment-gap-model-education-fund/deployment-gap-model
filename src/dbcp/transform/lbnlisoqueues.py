@@ -75,7 +75,7 @@ RESOURCE_DICT = {
         "codes": [],
         "type": "Unknown Resource"},
     "Unknown": {
-        "codes": ["Wo", "F", "Hybrid", "M", ],
+        "codes": ["Wo", "F", "Hybrid", "M"],
         "type": "Unknown Resource"},
     "Other Storage": {
         "codes": ["Flywheel", "Storage"],
@@ -169,12 +169,17 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
             lbnl_transformed_dfs[table_name])
     # Combine and normalize iso queue tables
     lbnl_normalized_dfs = normalize_lbnl_dfs(lbnl_transformed_dfs)
+
     # data enrichment
-    # Add Fips Codes and Clean Counties
-    lbnl_normalized_dfs['iso_locations'] = add_county_fips_with_backup_geocoding(
-        lbnl_normalized_dfs['iso_locations'])
-    lbnl_normalized_dfs['iso_locations'] = _fix_independent_city_fips(
-        lbnl_normalized_dfs['iso_locations'])
+    # Add Fips Codes
+    # I write to a new variable because _manual_county_state_name_fixes overwrites
+    # raw names with lowercase + manual corrections. I want to preserve raw names in the final
+    # output but didn't want to refactor these functions to do it.
+    new_locs = _manual_county_state_name_fixes(lbnl_normalized_dfs['iso_locations'])
+    new_locs = add_county_fips_with_backup_geocoding(new_locs)
+    new_locs = _fix_independent_city_fips(new_locs)
+    new_locs.loc[:, ['state', 'county']] = lbnl_normalized_dfs['iso_locations'].loc[:, ['state', 'county']].copy()
+    lbnl_normalized_dfs['iso_locations'] = new_locs
 
     # Clean up and categorize resources
     lbnl_normalized_dfs['iso_resource_capacity'] = (
@@ -588,8 +593,7 @@ def add_co2e_estimate(df: pd.DataFrame,
 
     # Put it all together
     hours_per_year = 8766  # extra 6 hours to average in leap years
-    gas_df['MWh'] = gas_df['capacity_mw'] * \
-        gas_df['capacity_factor_estimated'] * hours_per_year
+    gas_df['MWh'] = gas_df['capacity_mw'] * gas_df['capacity_factor_estimated'] * hours_per_year
     kwh_per_mwh = 1000
     tons_per_kg = 1 / 1000
     # put in units of tons per year to match EIP data
@@ -610,7 +614,7 @@ def _clean_county_names(location_df: pd.DataFrame) -> pd.DataFrame:
     location_df['county'] = location_df['county'].str.lower()
     location_df['county'] = location_df.county.str.replace(' county', '')
     location_df['county'] = location_df.county.str.replace(' parish', '')
-    location_df['county'] = location_df.county.str.replace('st.', 'saint')
+    location_df['county'] = location_df.county.str.replace('st.', 'saint', regex=False)
     location_df['county'] = location_df.county.str.replace('ñ', 'n')
 
     location_df = location_df.loc[:, ['project_id',
@@ -632,8 +636,7 @@ def _fix_independent_city_fips(location_df: pd.DataFrame) -> pd.DataFrame:
     """
     if 'county_id_fips' not in location_df.columns:
         raise ValueError("Use add_county_fips_with_backup_geocoding() first.")
-    nan_fips = location_df.loc[location_df['county_id_fips'].isna(), [
-        'state', 'county']].fillna('')
+    nan_fips = location_df.loc[location_df['county_id_fips'].isna(), ['state', 'county']].fillna('')  # copy
     nan_fips.loc[:, 'county'] = nan_fips.loc[:, 'county'].str.lower().str.replace(
         '^city of (.+)',
         lambda x: x.group(1) + ' city',
@@ -644,4 +647,43 @@ def _fix_independent_city_fips(location_df: pd.DataFrame) -> pd.DataFrame:
     locs = location_df.copy()
     locs.loc[:, 'county_id_fips'].fillna(
         nan_fips['county_id_fips'], inplace=True)
+    return locs
+
+
+def _manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
+    """Fix around 20 incorrect county, state names.
+
+    Args:
+        location_df (pd.DataFrame): normalized ISO locations
+    Returns:
+        pd.DataFrame: copy of location_df with more correct county, state pairs
+
+    """
+    # the following code was copied from unmerged PR #105 and lightly edited
+    manual_county_state_name_fixes = [
+        ['skamania', 'or', 'skamania', 'wa'],
+        ['franklin-clinton', 'ny', 'franklin', 'ny'],
+        ['san juan', 'az', 'san juan', 'nm'],
+        ['hidalgo', 'co', 'hidalgo', 'nm'],
+        ['antelope & wheeler', 'ne', 'antelope', 'ne'],
+        ['linden', 'ny', 'union', 'nj'],
+        ['church', 'nv', 'churchill', 'nv'],
+        ['churchill/pershing', 'ca', 'churchill', 'nv'],
+        ['shasta/trinity', 'ca', 'shasta', 'ca'],
+        ['san benito', 'nv', 'san benito', 'ca'],
+        ['frqanklin', 'me', 'franklin', 'me'],
+        ['logan,menard', 'il', 'logan', 'il'],
+        ['new york-nj', 'ny', 'new york', 'ny'],
+        ['peneobscot/washington', 'me', 'penobscot', 'me']
+    ]
+    manual_county_state_name_fixes = pd.DataFrame(manual_county_state_name_fixes, columns=[
+                                                  'county', 'state', 'clean_county', 'clean_state'])
+
+    locs = location_df.copy()
+    locs.county = locs.county.str.lower()
+    locs.state = locs.state.str.lower()
+    locs = locs.merge(manual_county_state_name_fixes, how='left', on=['county', 'state'])
+    locs.loc[:, 'county'] = locs.clean_county.fillna(locs.county)
+    locs.loc[:, 'state'] = locs.clean_state.fillna(locs.state)
+    locs = locs.drop(['clean_county', 'clean_state'], axis=1)
     return locs

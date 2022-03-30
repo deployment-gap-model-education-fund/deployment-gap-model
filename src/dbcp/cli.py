@@ -38,7 +38,8 @@ def parse_command_line():
         default="INFO",
     )
     parser.add_argument(
-        '--clear_geocoder_cache',
+        '-clr',
+        '--clear-geocoder-cache',
         action='store_true',
         default=False,
         help="Delete saved geocoder results, forcing fresh API calls.",
@@ -56,7 +57,7 @@ def main():
     log_format = '%(asctime)s [%(levelname)8s] %(name)s:%(lineno)s %(message)s'
     coloredlogs.install(fmt=log_format, level=args.loglevel, logger=dbcp_logger)
 
-    if args.clear_geocoder_cache:
+    if args.clear_geocoder_cache or args.upload_to_bigquery:
         GEOCODER_CACHE.clear()
     dbcp.etl.etl(args)
 
