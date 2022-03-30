@@ -103,6 +103,14 @@ def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
     return out
 
 
+def etl_fips_tables() -> Dict[str, pd.DataFrame]:
+    """Master state and county FIPS table ETL."""
+    fips = dbcp.extract.fips_tables.extract(vintage=FIPS_CODE_VINTAGE)
+    out = dbcp.transform.fips_tables.transform(fips)
+
+    return out
+
+
 def etl(args):
     """Run dbc ETL."""
     # Setup postgres
@@ -119,6 +127,7 @@ def etl(args):
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
         "columbia_local_opp": etl_columbia_local_opp,
+        "fips_tables": etl_fips_tables
     }
 
     # Extract and transform the data sets
