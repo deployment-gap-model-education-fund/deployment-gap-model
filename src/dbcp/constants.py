@@ -24,3 +24,5 @@ PUDL_TABLES: Dict[str, Tuple[str, ...]] = {
 }
 
 FIPS_CODE_VINTAGE = 2020
+
+PUDL_LATEST_YEAR = 2020

@@ -1,5 +1,8 @@
 """The Down Ballot Climate Project (DBCP) Project."""
 import dbcp.etl  # noqa: F401
+import dbcp.data_mart  # noqa: F401
+import dbcp.data_mart.projects  # noqa: F401
+import dbcp.data_mart.counties  # noqa: F401
 import dbcp.extract  # noqa: F401
 import dbcp.extract.eipinfrastructure  # noqa: F401
 import dbcp.extract.lbnlisoqueues  # noqa: F401
