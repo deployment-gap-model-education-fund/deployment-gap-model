@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict
 import pandas as pd
 
 from pudl.helpers import add_fips_ids as _add_fips_ids
@@ -10,7 +10,7 @@ def _extract_years(ser: pd.Series) -> pd.Series:
     """Extract year-like strings from text and summarize with min, max, count.
 
     The key assumption behind this is that all numbers 1990 - 2029 are interpreted as years
-    Also, the purpose of these summaries is really to help users to assume 
+    Also, the purpose of these summaries is really to help users to assume
     earliest_year_mentioned means 'year enacted', which is not always true.
 
     Args:
@@ -52,6 +52,7 @@ def _transform_state_policy(state_policy_df: pd.DataFrame) -> pd.DataFrame:
         columns='county_id_fips')
     year_summaries = _extract_years(state.loc[:, 'policy'])
     state = pd.concat([state, year_summaries], axis=1)
+    state.rename(columns={'state': 'raw_state_name'}, inplace=True)
     return state
 
 
@@ -76,7 +77,7 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
 
     year_summaries = _extract_years(local['ordinance'])
     local = pd.concat([with_fips, year_summaries], axis=1)
-    local.rename(columns={'locality': 'raw_locality_name'}, inplace=True)
+    local.rename(columns={'locality': 'raw_locality_name', 'state': 'raw_state_name'}, inplace=True)
 
     return local
 
@@ -94,6 +95,7 @@ def _transform_contested_projects(project_df: pd.DataFrame) -> pd.DataFrame:
         columns='county_id_fips')
     year_summaries = _extract_years(proj.loc[:, 'description'])
     proj = pd.concat([proj, year_summaries], axis=1)
+    proj.rename(columns={'state': 'raw_state_name'}, inplace=True)
     return proj
 
 
