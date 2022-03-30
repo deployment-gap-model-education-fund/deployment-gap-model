@@ -1,10 +1,8 @@
 """Module to create a county-level table for DBCP to use in spreadsheet tools."""
 from typing import Sequence, Optional
-from re import IGNORECASE
 
 import sqlalchemy as sa
 import pandas as pd
-import numpy as np
 from dbcp.helpers import get_sql_engine
 from dbcp.constants import PUDL_LATEST_YEAR
 
@@ -395,10 +393,9 @@ def _agg_iso_projects_to_counties(iso_df: pd.DataFrame) -> pd.DataFrame:
     category_aggs = category_aggs.unstack()
 
     # calculate fuel breakout aggregates
-    # combine onshore and offshore wind
-    projects['breakout_fuels'] = projects.loc[:,'resource_clean'].replace({'Onshore Wind': 'Wind', 'Offshore Wind': 'Wind', 'Natural Gas': 'Gas'})
+    projects['breakout_fuels'] = projects.loc[:,'resource_clean'].replace({'Natural Gas': 'Gas'})
     projects.loc[:, 'breakout_fuels'] = projects.loc[:, 'breakout_fuels'].str.lower()
-    fuels_to_breakout = {'solar', 'wind', 'gas', 'battery storage', 'coal'}
+    fuels_to_breakout = {'solar', 'onshore wind', 'offshore wind', 'gas', 'battery storage'}
     to_breakout = projects.loc[:, 'breakout_fuels'].isin(fuels_to_breakout)
     projects = projects.loc[to_breakout,:]
 
@@ -439,11 +436,11 @@ def _agg_pudl_to_counties(pudl_df: pd.DataFrame) -> pd.DataFrame:
 
     # calculate fuel breakout aggregates
     # relabel battery storage (this ignores pumped hydro)
-    plants['breakout_fuels'] = plants.loc[:,'fuel_type_code_pudl'].copy()
+    plants['breakout_fuels'] = plants.loc[:,'fuel_type_code_pudl'].replace({'wind': 'onshore wind'})  # copy
     is_battery = plants.loc[:, 'technology_description'] == 'Batteries'
     plants.loc[is_battery, 'breakout_fuels'] = 'battery storage'
 
-    fuels_to_breakout = {'solar', 'wind', 'gas', 'battery storage', 'coal'}
+    fuels_to_breakout = {'solar', 'onshore wind', 'gas', 'battery storage', 'coal'}
     to_breakout = plants.loc[:, 'breakout_fuels'].isin(fuels_to_breakout)
     plants = plants.loc[to_breakout,:]
 
@@ -542,12 +539,10 @@ def make_county_data_mart_table(engine: Optional[sa.engine.Engine]=None) -> pd.D
         'battery_storage_existing_count_plants',
         'battery_storage_proposed_capacity_mw',
         'battery_storage_proposed_count_plants',
-        'coal_built_in_2020_capacity_mw',
-        'coal_built_in_2020_count_plants',
+        #'coal_built_in_2020_capacity_mw',  # drop
+        #'coal_built_in_2020_count_plants',  # drop
         'coal_existing_capacity_mw',
         'coal_existing_count_plants',
-        'coal_proposed_capacity_mw',
-        'coal_proposed_count_plants',
         'gas_built_in_2020_capacity_mw',
         'gas_built_in_2020_count_plants',
         'gas_existing_capacity_mw',
@@ -560,12 +555,14 @@ def make_county_data_mart_table(engine: Optional[sa.engine.Engine]=None) -> pd.D
         'solar_existing_count_plants',
         'solar_proposed_capacity_mw',
         'solar_proposed_count_plants',
-        'wind_built_in_2020_capacity_mw',
-        'wind_built_in_2020_count_plants',
-        'wind_existing_capacity_mw',
-        'wind_existing_count_plants',
-        'wind_proposed_capacity_mw',
-        'wind_proposed_count_plants',
+        'onshore_wind_built_in_2020_capacity_mw',
+        'onshore_wind_built_in_2020_count_plants',
+        'onshore_wind_existing_capacity_mw',
+        'onshore_wind_existing_count_plants',
+        'onshore_wind_proposed_capacity_mw',
+        'onshore_wind_proposed_count_plants',
+        'offshore_wind_proposed_capacity_mw',
+        'offshore_wind_proposed_count_plants',
         'has_ordinance',
         'ordinance_jurisdiction_name',
         'ordinance_jurisdiction_type',
