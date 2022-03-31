@@ -19,9 +19,9 @@ def _get_iso_location_df(engine: sa.engine.Engine) -> pd.DataFrame:
         #'state',  # drop raw state in favor of canonical FIPS name
         #'state_id_fips',
         'county_id_fips',
-        #'locality_name',  # drop detailed location info for simplicity
-        #'locality_type',  # drop detailed location info for simplicity
-        #'containing_county',  # drop geocoded name in favor of canonical FIPS name
+        #'geocoded_locality_name',  # drop detailed location info for simplicity
+        #'geocoded_locality_type',  # drop detailed location info for simplicity
+        #'geocoded_containing_county',  # drop geocoded name in favor of canonical FIPS name
     ]
     db = 'dbcp.iso_locations'
     
@@ -221,12 +221,12 @@ def _get_ncsl_wind_permitting_df(engine: sa.engine.Engine) -> pd.DataFrame:
 
 def _get_local_opposition_df(engine: sa.engine.Engine) -> pd.DataFrame:
     cols = [
-        #'containing_county',  # only need FIPS, names come from elsewhere
+        #'geocoded_containing_county',  # only need FIPS, names come from elsewhere
         'county_id_fips',
         'earliest_year_mentioned',
         #'latest_year_mentioned',  # for simplicity, only include one year metric (earliest_year_mentioned)
-        'locality_name',
-        'locality_type',
+        'geocoded_locality_name',
+        'geocoded_locality_type',
         #'n_years_mentioned',  # for simplicity, only include one year metric (earliest_year_mentioned)
         'ordinance',
         #'raw_locality_name',  # drop raw name in favor of canonical one
@@ -294,12 +294,12 @@ def _represent_state_opposition_as_counties(state_df: pd.DataFrame, county_fips_
     states_as_counties = state_df.merge(county_fips_df.loc[:, ['county_id_fips', 'state_id_fips']], on='state_id_fips', how='left')
     
     # replicate local opposition columns
-    # locality_name
+    # geocoded_locality_name
     states_as_counties = states_as_counties.merge(state_fips_df.loc[:, ['state_name', 'state_id_fips']], on='state_id_fips', how='left')
-    # locality_type
-    states_as_counties['locality_type'] = 'state'
+    # geocoded_locality_type
+    states_as_counties['geocoded_locality_type'] = 'state'
     rename_dict = {
-        'state_name': 'locality_name',
+        'state_name': 'geocoded_locality_name',
         'policy': 'ordinance',
     }
     states_as_counties = states_as_counties.rename(columns=rename_dict).drop(columns=['state_id_fips'])
@@ -311,9 +311,9 @@ def _agg_local_ordinances_to_counties(ordinances: pd.DataFrame) -> pd.DataFrame:
     This is necessary for joining into the ISO project table. ISO projects are only located by county.
     Aggregation method:
     * take min of earliest_year_mentioned
-    * if only one locality_name, use it. Otherwise replace with "multiple"
+    * if only one geocoded_locality_name, use it. Otherwise replace with "multiple"
     * same with 'locality type'
-    * concatenate the rdinances, each with locality_name prefix, eg "Great County: <ordinance>\nSmall Town: <ordinance>"
+    * concatenate the rdinances, each with geocoded_locality_name prefix, eg "Great County: <ordinance>\nSmall Town: <ordinance>"
 
     Value Counts of # ordinances per county (as of 3/14/2022):
     1 ord    84 counties
@@ -331,13 +331,13 @@ def _agg_local_ordinances_to_counties(ordinances: pd.DataFrame) -> pd.DataFrame:
     dupes = ordinances.loc[dupe_counties,:].copy()
     not_dupes = ordinances.loc[~dupe_counties,:].copy()
     
-    dupes['ordinance'] = dupes['locality_name'] + ': ' + dupes['ordinance'] + '\n'
+    dupes['ordinance'] = dupes['geocoded_locality_name'] + ': ' + dupes['ordinance'] + '\n'
     grp = dupes.groupby('county_id_fips')
 
     years = grp['earliest_year_mentioned'].min()
 
-    n_unique = grp[['locality_name', 'locality_type']].nunique()
-    localities = grp[['locality_name', 'locality_type']].nth(0).mask(n_unique > 1, other='multiple')
+    n_unique = grp[['geocoded_locality_name', 'geocoded_locality_type']].nunique()
+    localities = grp[['geocoded_locality_name', 'geocoded_locality_type']].nth(0).mask(n_unique > 1, other='multiple')
 
     descriptions = grp['ordinance'].sum().str.strip()
 
@@ -506,8 +506,8 @@ def make_county_data_mart_table(engine: Optional[sa.engine.Engine]=None) -> pd.D
     
     assert len(out) <= len(all_counties)
     rename_dict = {
-        'locality_name': 'ordinance_jurisdiction_name',
-        'locality_type': 'ordinance_jurisdiction_type',
+        'geocoded_locality_name': 'ordinance_jurisdiction_name',
+        'geocoded_locality_type': 'ordinance_jurisdiction_type',
         'earliest_year_mentioned': 'ordinance_earliest_year_mentioned',
         'description': 'state_permitting_text',
         'permitting_type': 'state_permitting_type',
