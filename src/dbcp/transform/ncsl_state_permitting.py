@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict
 
 import pandas as pd
 import numpy as np
@@ -37,6 +37,7 @@ def transform(raw_df: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     transform_df = transform_df.astype(dtypes, copy=False)
     transform_df = _add_fips_ids(
         transform_df, county_col='description').drop(columns='county_id_fips')
+    transform_df.rename(columns={'state': 'raw_state_name'}, inplace=True)
     validate(transform_df)
     return {'ncsl_state_permitting': transform_df}
 
@@ -52,7 +53,7 @@ def validate(ncsl_df: pd.DataFrame) -> None:
         AssertionError: if unexpected permitting type is found
     """
     expected_states = set(US_STATES_TERRITORIES.values())
-    df_states = set(ncsl_df.loc[:, 'state'].unique())
+    df_states = set(ncsl_df.loc[:, 'raw_state_name'].unique())
     # don't want symmetric diff due to territories
     set_diff = df_states.difference(expected_states)
     if len(set_diff) > 0:
