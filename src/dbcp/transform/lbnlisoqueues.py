@@ -626,8 +626,8 @@ def _clean_county_names(location_df: pd.DataFrame) -> pd.DataFrame:
     # for now dropping Nans where geocoder didn't fill in a county fips
     location_df = location_df.loc[location_df.county_id_fips.notnull(), :].copy()
     location_df = (location_df
-                   .drop(['locality_name', 'locality_type', 'raw_county_name'], axis=1)
-                   .rename(columns={'containing_county': 'raw_county_name'}))
+                   .drop(['geocoded_locality_name', 'geocoded_locality_type', 'raw_county_name'], axis=1)
+                   .rename(columns={'geocoded_containing_county': 'raw_county_name'}))
     location_df['raw_county_name'] = location_df['raw_county_name'].str.lower()
     location_df = location_df.loc[:, ['project_id',
                                       'raw_county_name', 'raw_state_name', 'state_id_fips', 'county_id_fips']]
