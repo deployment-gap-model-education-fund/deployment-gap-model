@@ -106,10 +106,15 @@ RESOURCE_DICT = {
 
 def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform active iso queue data."""
+    rename_dict = {
+        'state': 'raw_state_name',
+        'county': 'raw_county_name',
+    }
+    active_projects = active_projects.rename(columns=rename_dict)  # copy
     active_projects = remove_duplicates(active_projects)
     parse_date_columns(active_projects)
     replace_value_with_count_validation(active_projects,
-                                        col='state',
+                                        col='raw_state_name',
                                         val_to_replace='NN',
                                         replacement='CA',
                                         expected_count=2,
@@ -119,6 +124,11 @@ def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
 
 def completed_iso_queue_projects(completed_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform completed iso queue data."""
+    rename_dict = {
+        'state': 'raw_state_name',
+        'county': 'raw_county_name',
+    }
+    completed_projects = completed_projects.rename(columns=rename_dict)  # copy
     completed_projects = remove_duplicates(completed_projects)
     parse_date_columns(completed_projects)
     # standardize columns between queues
@@ -128,10 +138,15 @@ def completed_iso_queue_projects(completed_projects: pd.DataFrame) -> pd.DataFra
 
 def withdrawn_iso_queue_projects(withdrawn_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform withdrawn iso queue data."""
+    rename_dict = {
+        'state': 'raw_state_name',
+        'county': 'raw_county_name',
+    }
+    withdrawn_projects = withdrawn_projects.rename(columns=rename_dict)  # copy
     withdrawn_projects = remove_duplicates(withdrawn_projects)
     parse_date_columns(withdrawn_projects)
     replace_value_with_count_validation(withdrawn_projects,
-                                        col='state',
+                                        col='raw_state_name',
                                         val_to_replace='NN',
                                         replacement='CA',
                                         expected_count=5,
@@ -176,9 +191,11 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     # raw names with lowercase + manual corrections. I want to preserve raw names in the final
     # output but didn't want to refactor these functions to do it.
     new_locs = _manual_county_state_name_fixes(lbnl_normalized_dfs['iso_locations'])
-    new_locs = add_county_fips_with_backup_geocoding(new_locs)
+    new_locs = add_county_fips_with_backup_geocoding(
+        new_locs, state_col='raw_state_name', locality_col='raw_county_name')
     new_locs = _fix_independent_city_fips(new_locs)
-    new_locs.loc[:, ['state', 'county']] = lbnl_normalized_dfs['iso_locations'].loc[:, ['state', 'county']].copy()
+    new_locs.loc[:, ['raw_state_name', 'raw_county_name']
+                 ] = lbnl_normalized_dfs['iso_locations'].loc[:, ['raw_state_name', 'raw_county_name']].copy()
     lbnl_normalized_dfs['iso_locations'] = new_locs
 
     # Clean up and categorize resources
@@ -312,18 +329,18 @@ def _normalize_location(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         county_cols = ['county_' + str(n) for n in range(1, 4)]
         location_df = normalize_multicolumns_to_rows(lbnl_df,
                                                      attribute_columns_dict={
-                                                         'county': county_cols},
+                                                         'raw_county_name': county_cols},
                                                      preserve_original_names=False,
                                                      dropna=True)
         location_df = location_df.merge(
-            lbnl_df.loc[:, 'state'], on='project_id', validate='m:1')
+            lbnl_df.loc[:, 'raw_state_name'], on='project_id', validate='m:1')
 
-        project_df = lbnl_df.drop(columns=county_cols + ['state'])
+        project_df = lbnl_df.drop(columns=county_cols + ['raw_state_name'])
     else:
-        location_df = lbnl_df.loc[:, ['state', 'county']].reset_index()
-        project_df = lbnl_df.drop(columns=['state', 'county'])
+        location_df = lbnl_df.loc[:, ['raw_state_name', 'raw_county_name']].reset_index()
+        project_df = lbnl_df.drop(columns=['raw_state_name', 'raw_county_name'])
 
-    location_df.dropna(subset=['state', 'county'], how='all', inplace=True)
+    location_df.dropna(subset=['raw_state_name', 'raw_county_name'], how='all', inplace=True)
     return {'location_df': location_df, 'project_df': project_df}
 
 
@@ -509,7 +526,7 @@ def remove_duplicates(df: pd.DataFrame) -> pd.DataFrame:
             "point_of_interconnection_clean",
             "capacity_mw_resource_1",
             "county_1",
-            "state",
+            "raw_state_name",
             "region",
             "resource_type_1",
         ]
@@ -517,8 +534,8 @@ def remove_duplicates(df: pd.DataFrame) -> pd.DataFrame:
         key = [
             "point_of_interconnection_clean",
             "capacity_mw_resource_1",
-            "county",
-            "state",
+            "raw_county_name",
+            "raw_state_name",
             "entity",
             "resource_type_1",
         ]
@@ -609,16 +626,11 @@ def _clean_county_names(location_df: pd.DataFrame) -> pd.DataFrame:
     # for now dropping Nans where geocoder didn't fill in a county fips
     location_df = location_df.loc[location_df.county_id_fips.notnull(), :].copy()
     location_df = (location_df
-                   .drop(['locality_name', 'locality_type', 'county'], axis=1)
-                   .rename(columns={'containing_county': 'county'}))
-    location_df['county'] = location_df['county'].str.lower()
-    location_df['county'] = location_df.county.str.replace(' county', '')
-    location_df['county'] = location_df.county.str.replace(' parish', '')
-    location_df['county'] = location_df.county.str.replace('st.', 'saint', regex=False)
-    location_df['county'] = location_df.county.str.replace('ñ', 'n')
-
+                   .drop(['geocoded_locality_name', 'geocoded_locality_type', 'raw_county_name'], axis=1)
+                   .rename(columns={'geocoded_containing_county': 'raw_county_name'}))
+    location_df['raw_county_name'] = location_df['raw_county_name'].str.lower()
     location_df = location_df.loc[:, ['project_id',
-                                      'county', 'state', 'state_id_fips', 'county_id_fips']]
+                                      'raw_county_name', 'raw_state_name', 'state_id_fips', 'county_id_fips']]
     return location_df
 
 
@@ -636,13 +648,14 @@ def _fix_independent_city_fips(location_df: pd.DataFrame) -> pd.DataFrame:
     """
     if 'county_id_fips' not in location_df.columns:
         raise ValueError("Use add_county_fips_with_backup_geocoding() first.")
-    nan_fips = location_df.loc[location_df['county_id_fips'].isna(), ['state', 'county']].fillna('')  # copy
-    nan_fips.loc[:, 'county'] = nan_fips.loc[:, 'county'].str.lower().str.replace(
+    nan_fips = location_df.loc[location_df['county_id_fips'].isna(
+    ), ['raw_state_name', 'raw_county_name']].fillna('')  # copy
+    nan_fips.loc[:, 'raw_county_name'] = nan_fips.loc[:, 'raw_county_name'].str.lower().str.replace(
         '^city of (.+)',
         lambda x: x.group(1) + ' city',
         regex=True
     )
-    nan_fips = _add_fips_ids(nan_fips)
+    nan_fips = _add_fips_ids(nan_fips, state_col='raw_state_name', county_col='raw_county_name')
 
     locs = location_df.copy()
     locs.loc[:, 'county_id_fips'].fillna(
@@ -677,13 +690,13 @@ def _manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
         ['peneobscot/washington', 'me', 'penobscot', 'me']
     ]
     manual_county_state_name_fixes = pd.DataFrame(manual_county_state_name_fixes, columns=[
-                                                  'county', 'state', 'clean_county', 'clean_state'])
+                                                  'raw_county_name', 'raw_state_name', 'clean_county', 'clean_state'])
 
     locs = location_df.copy()
-    locs.county = locs.county.str.lower()
-    locs.state = locs.state.str.lower()
-    locs = locs.merge(manual_county_state_name_fixes, how='left', on=['county', 'state'])
-    locs.loc[:, 'county'] = locs.clean_county.fillna(locs.county)
-    locs.loc[:, 'state'] = locs.clean_state.fillna(locs.state)
+    locs.loc[:, 'raw_county_name'] = locs.loc[:, 'raw_county_name'].str.lower()
+    locs.loc[:, 'raw_state_name'] = locs.loc[:, 'raw_state_name'].str.lower()
+    locs = locs.merge(manual_county_state_name_fixes, how='left', on=['raw_county_name', 'raw_state_name'])
+    locs.loc[:, 'raw_county_name'] = locs.loc[:, 'clean_county'].fillna(locs.loc[:, 'raw_county_name'])
+    locs.loc[:, 'raw_state_name'] = locs.loc[:, 'clean_state'].fillna(locs.loc[:, 'raw_state_name'])
     locs = locs.drop(['clean_county', 'clean_state'], axis=1)
     return locs
