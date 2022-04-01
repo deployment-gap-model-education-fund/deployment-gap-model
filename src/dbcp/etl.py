@@ -20,15 +20,15 @@ from pudl.output.pudltabl import PudlTabl
 logger = logging.getLogger(__name__)
 
 
-def etl_eipinfrastructure() -> Dict[str, pd.DataFrame]:
+def etl_eip_infrastructure() -> Dict[str, pd.DataFrame]:
     """EIP Infrastructure ETL."""
     # Extract
     ds = DBCPDatastore(sandbox=True, local_cache_path="/app/data/data_cache")
-    eip_raw_dfs = dbcp.extract.eipinfrastructure.Extractor(ds).extract(
-        update_date=WORKING_PARTITIONS["eipinfrastructure"]["update_date"])
+    eip_raw_dfs = dbcp.extract.eip_infrastructure.Extractor(ds).extract(
+        update_date=WORKING_PARTITIONS["eip_infrastructure"]["update_date"])
 
     # Transform
-    eip_transformed_dfs = dbcp.transform.eipinfrastructure.transform(
+    eip_transformed_dfs = dbcp.transform.eip_infrastructure.transform(
         eip_raw_dfs)
 
     return eip_transformed_dfs
@@ -122,7 +122,7 @@ def etl(args):
     GEOCODER_CACHE.reduce_size()
 
     etl_funcs = {
-        "eipinfrastructure": etl_eipinfrastructure,
+        "eip_infrastructure": etl_eip_infrastructure,
         "lbnlisoqueues": etl_lbnlisoqueues,
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
