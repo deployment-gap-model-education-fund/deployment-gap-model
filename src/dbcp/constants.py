@@ -3,7 +3,7 @@
 from typing import Dict, Tuple
 
 WORKING_PARTITIONS: Dict[str, Dict] = {
-    "eipinfrastructure": {
+    "eip_infrastructure": {
         "update_date": "2021-05-03"
     },
     "lbnlisoqueues": {
@@ -12,7 +12,7 @@ WORKING_PARTITIONS: Dict[str, Dict] = {
 }
 
 PUDL_TABLES: Dict[str, Tuple[str, ...]] = {
-    "eipinfrastructure": (
+    "eip_infrastructure": (
         "natural_gas_pipelines",
         "emissions_increase"
     ),

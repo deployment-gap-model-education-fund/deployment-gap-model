@@ -17,7 +17,7 @@ class DBCPZenodoFetcher(ZenodoFetcher):
 
     DOI = {
         "sandbox": {
-            "eipinfrastructure": "10.5072/zenodo.971165",
+            "eip_infrastructure": "10.5072/zenodo.971165",
             "lbnlisoqueues": "10.5072/zenodo.982636"
         },
         "production": {
