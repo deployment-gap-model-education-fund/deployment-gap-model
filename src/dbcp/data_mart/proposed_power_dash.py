@@ -192,4 +192,14 @@ def make_dashboard_tables(engine: Optional[sa.engine.Engine] = None) -> Dict[str
         'existing_plants': _get_existing_plants(engine),
         'proposed_plants': _get_proposed_plants(engine),
     }
+    for key in ['existing_plants', 'proposed_plants']:
+        dfs[key] = _add_has_ordinance_column(county_df=dfs[key], local_opp=dfs['local_opp'])
+
     return dfs
+
+
+def _add_has_ordinance_column(*, county_df: pd.DataFrame, local_opp: pd.DataFrame) -> pd.DataFrame:
+    out = county_df.merge(local_opp[['has_ordinance', 'county_id_fips']], how='left',
+                          on='county_id_fips', copy=False, validate='m:1')
+    out.loc[:, 'has_ordinance'] = out.loc[:, 'has_ordinance'].fillna(False)
+    return out
