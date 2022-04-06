@@ -7,7 +7,7 @@ from typing import Optional, Dict
 import sqlalchemy as sa
 import pandas as pd
 from dbcp.helpers import get_sql_engine
-from dbcp.data_mart.helpers import CountyOpposition, _get_county_fips_df, _get_state_fips_df
+from dbcp.data_mart.helpers import CountyOpposition, _get_county_fips_df, _get_state_fips_df, _subset_db_columns
 
 
 def local_opposition(
@@ -194,6 +194,7 @@ def make_dashboard_tables(engine: Optional[sa.engine.Engine] = None) -> Dict[str
     }
     for key in ['existing_plants', 'proposed_plants']:
         dfs[key] = _add_has_ordinance_column(county_df=dfs[key], local_opp=dfs['local_opp'])
+    dfs['local_opp'] = _add_permitting_type_column(dfs['local_opp'], engine=engine)
 
     return dfs
 
@@ -202,4 +203,10 @@ def _add_has_ordinance_column(*, county_df: pd.DataFrame, local_opp: pd.DataFram
     out = county_df.merge(local_opp[['has_ordinance', 'county_id_fips']], how='left',
                           on='county_id_fips', copy=False, validate='m:1')
     out.loc[:, 'has_ordinance'] = out.loc[:, 'has_ordinance'].fillna(False)
+    return out
+
+
+def _add_permitting_type_column(local_opp: pd.DataFrame, engine: sa.engine.Engine) -> pd.DataFrame:
+    permit_df = _subset_db_columns(['state_id_fips', 'permitting_type'], 'dbcp.ncsl_state_permitting', engine)
+    out = local_opp.merge(permit_df, how='left', on='state_id_fips', copy=False, validate='m:1')
     return out
