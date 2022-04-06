@@ -150,4 +150,5 @@ class CountyOpposition(object):
             states_as_counties = self._represent_state_policy_as_local_ordinances()
             opposition = pd.concat([opposition, states_as_counties], axis=0)
         aggregated = self._agg_local_ordinances_to_counties(opposition)
+        aggregated['has_ordinance'] = True
         return aggregated
