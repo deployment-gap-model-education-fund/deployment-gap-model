@@ -15,6 +15,16 @@ def local_opposition(
     state_fips_df: Optional[pd.DataFrame] = None,
     engine: Optional[sa.engine.Engine] = None,
 ) -> pd.DataFrame:
+    """Combine state and local opposition policies; aggregate to county level.
+
+    Args:
+        county_fips_df (Optional[pd.DataFrame], optional): county table from warehouse. Defaults to None.
+        state_fips_df (Optional[pd.DataFrame], optional): state table from warehouse. Defaults to None.
+        engine (Optional[sa.engine.Engine], optional): database connection. Defaults to None.
+
+    Returns:
+        pd.DataFrame: county-level table of anti-renewable policies
+    """
     if engine is None:
         engine = get_sql_engine()
     if county_fips_df is None:
@@ -41,6 +51,15 @@ def local_opposition(
 
 
 def _get_existing_plants(engine: sa.engine.Engine) -> pd.DataFrame:
+    """Aggregate existing plants by county and resource to a long-format table.
+
+    Args:
+        engine (sa.engine.Engine): database connection.
+
+    Returns:
+        pd.DataFrame: county-resource level table of existing capacity.
+    """
+    # see last SELECT statement for output columns
     query = """
     WITH
     county_aggs as (
@@ -114,6 +133,15 @@ def _get_existing_plants(engine: sa.engine.Engine) -> pd.DataFrame:
 
 
 def _get_proposed_plants(engine: sa.engine.Engine) -> pd.DataFrame:
+    """Aggregate proposed (ISO active queue) plants by county and resource to a long-format table.
+
+    Args:
+        engine (sa.engine.Engine): database connection.
+
+    Returns:
+        pd.DataFrame: county-resource level table of proposed capacity.
+    """
+    # see last SELECT statement for output columns
     query = """
     WITH
     active_loc as (
@@ -184,7 +212,46 @@ def _get_proposed_plants(engine: sa.engine.Engine) -> pd.DataFrame:
     return df
 
 
+def _add_has_ordinance_column(*, county_df: pd.DataFrame, local_opp: pd.DataFrame) -> pd.DataFrame:
+    """Add boolean column has_ordinance to indicate presence of local opposition.
+
+    Args:
+        county_df (pd.DataFrame): dataframe with county FIPS codes
+        local_opp (pd.DataFrame): dataframe of local ordinances
+
+    Returns:
+        pd.DataFrame: county_df plus a new column
+    """
+    out = county_df.merge(local_opp[['has_ordinance', 'county_id_fips']], how='left',
+                          on='county_id_fips', copy=False, validate='m:1')
+    out.loc[:, 'has_ordinance'] = out.loc[:, 'has_ordinance'].fillna(False)
+    return out
+
+
+def _add_permitting_type_column(local_opp: pd.DataFrame, engine: sa.engine.Engine) -> pd.DataFrame:
+    """Add column permitting_type to indicate state/local/hybrid wind permitting.
+
+    Args:
+        local_opp (pd.DataFrame): dataframe with local ordinances
+        engine (sa.engine.Engine): database connection.
+
+    Returns:
+        pd.DataFrame: local_opp plus a new column
+    """
+    permit_df = _subset_db_columns(['state_id_fips', 'permitting_type'], 'dbcp.ncsl_state_permitting', engine)
+    out = local_opp.merge(permit_df, how='left', on='state_id_fips', copy=False, validate='m:1')
+    return out
+
+
 def make_dashboard_tables(engine: Optional[sa.engine.Engine] = None) -> Dict[str, pd.DataFrame]:
+    """API function to create the 3 tables used in the existing vs proposed power dashboard.
+
+    Args:
+        engine (Optional[sa.engine.Engine], optional): database connection. Defaults to None.
+
+    Returns:
+        Dict[str, pd.DataFrame]: Dataframes with local opposition, existing plants, and proposed plants.
+    """
     if engine is None:
         engine = get_sql_engine()
     dfs = {
@@ -197,16 +264,3 @@ def make_dashboard_tables(engine: Optional[sa.engine.Engine] = None) -> Dict[str
     dfs['local_opp'] = _add_permitting_type_column(dfs['local_opp'], engine=engine)
 
     return dfs
-
-
-def _add_has_ordinance_column(*, county_df: pd.DataFrame, local_opp: pd.DataFrame) -> pd.DataFrame:
-    out = county_df.merge(local_opp[['has_ordinance', 'county_id_fips']], how='left',
-                          on='county_id_fips', copy=False, validate='m:1')
-    out.loc[:, 'has_ordinance'] = out.loc[:, 'has_ordinance'].fillna(False)
-    return out
-
-
-def _add_permitting_type_column(local_opp: pd.DataFrame, engine: sa.engine.Engine) -> pd.DataFrame:
-    permit_df = _subset_db_columns(['state_id_fips', 'permitting_type'], 'dbcp.ncsl_state_permitting', engine)
-    out = local_opp.merge(permit_df, how='left', on='state_id_fips', copy=False, validate='m:1')
-    return out
