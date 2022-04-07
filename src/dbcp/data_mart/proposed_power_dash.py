@@ -164,7 +164,8 @@ def _get_proposed_plants(engine: sa.engine.Engine) -> pd.DataFrame:
                 ELSE res.resource_clean
             END
             ) as resource,
-            sum(res.capacity_mw) as capacity_mw
+            sum(res.capacity_mw) as capacity_mw,
+            count(loc.project_id) as project_count
         from active_loc as loc
         left join dbcp.iso_resource_capacity as res
             on res.project_id = loc.project_id
@@ -178,7 +179,8 @@ def _get_proposed_plants(engine: sa.engine.Engine) -> pd.DataFrame:
         cfip.state_id_fips,
         cfip.county_id_fips,
         agg.resource,
-        agg.capacity_mw
+        agg.capacity_mw,
+        agg.project_count
     from county_aggs as agg
     left join dbcp.county_fips as cfip
         on agg.county_id_fips = cfip.county_id_fips
@@ -190,7 +192,8 @@ def _get_proposed_plants(engine: sa.engine.Engine) -> pd.DataFrame:
             agg.state_id_fips,
             agg.county_id_fips,
             agg.resource,
-            agg.capacity_mw
+            agg.capacity_mw,
+            agg.project_count
         from w_county_names as agg
         left join dbcp.state_fips as sfip
             on agg.state_id_fips = sfip.state_id_fips
@@ -202,6 +205,7 @@ def _get_proposed_plants(engine: sa.engine.Engine) -> pd.DataFrame:
         agg.county_id_fips,
         agg.resource,
         agg.capacity_mw,
+        agg.project_count,
         ncsl.permitting_type
     from w_names as agg
     left join dbcp.ncsl_state_permitting as ncsl
