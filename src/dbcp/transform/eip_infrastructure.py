@@ -6,104 +6,60 @@ from typing import Dict
 import pandas as pd
 
 from dbcp.schemas import TABLE_SCHEMAS
+from dbcp.transform.helpers import add_county_fips_with_backup_geocoding
 
 logger = logging.getLogger(__name__)
 
 
-def natural_gas_pipelines(ng_pipes: pd.DataFrame) -> pd.DataFrame:
-    """
-    Apply transformations to natural_gas_pipelines table.
+class EIPTransformer(object):
+    def __init__(self, raw_dfs: Dict[str, pd.DataFrame]) -> None:
+        self.facilities = raw_dfs['eip_facilities'].copy()
+        self.projects = raw_dfs['eip_projects'].copy()
+        self.air_constr = raw_dfs['eip_air_constr_permits'].copy()
 
-    Transformations include:
+    @staticmethod
+    def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
+        fac = raw_fac_df.copy()
+        fac.columns = [f"raw_{col.lower().replace(' ','_').replace('(', '').replace(')', '')}"
+                       for col in fac.columns]
 
-    * Convert dollar amounts.
+        # fix 9 (as of 3/22/2022) states that are CSV duplicates like "LA, LA"
+        fac['state'] = fac['raw_state'].str.split(',', n=1).str[0]
 
-    Args:
-        ng_pipes: raw natural_gas_pipelines table.
+        # fix 4 counties (as of 3/22/2022) with multiple values as CSV.
+        # Simplify by only taking first county
+        fac['county'] = fac['raw_county_or_parish'].str.split(',', n=1).str[0]
+        # standardize null values (only 2)
+        fac['county'].replace('TDB', pd.NA, inplace=True)
 
-    Returns:
-        transformed natural_gas_pipelines table.
-    """
-    # Clean date fields
-    date_fields = ng_pipes.filter(regex=(".+_date")).select_dtypes("object").columns
-    for field in date_fields:
-        ng_pipes[field] = ng_pipes[field].astype("string")
-        ng_pipes[field] = ng_pipes[field].str.replace(r'(Q\d) (\d+)', r'\2-\1')
-        ng_pipes[field] = pd.to_datetime(ng_pipes[field], errors="coerce")
+        fac = add_county_fips_with_backup_geocoding(fac, state_col='state', locality_col='county')
+        fac.drop(columns=['state', 'county'], inplace=True)  # drop intermediates
 
-    # Remove 'TBD'
-    ng_pipes = ng_pipes.replace("TBD", None)
+        coords = fac.loc[:, 'raw_location'].str.split(',', n=1, expand=True)
+        for col in coords.columns:
+            coords.loc[:, col] = pd.to_numeric(coords.loc[:, col], errors='raise')
+        # check order is as assumed
+        assert coords.iloc[:, 0].max() < 0  # USA longitudes
+        assert coords.iloc[:, -1].min() > 0  # USA latitudes
+        fac[['longitude', 'latitude']] = coords
 
-    # Validate schema
-    ng_pipes = TABLE_SCHEMAS["natural_gas_pipelines"].validate(ng_pipes)
-    assert "object" not in ng_pipes.dtypes
+        fac['date_modified'] = pd.to_datetime(fac.loc[:, 'raw_modified_on'], infer_datetime_format=True)
+        rename_dict = {
+            'raw_id': 'facility_id',
 
-    # Convert cost to millions
-    ng_pipes["cost"] = ng_pipes["cost"] * 1_000_000
+        }
+        fac.rename(columns=rename_dict, inplace=True)
+        return fac
 
-    return ng_pipes
+    @staticmethod
+    def _parse_id_cols_to_associative_entity_tables(id_df: pd.DataFrame, idx_col: str) -> Dict[str, pd.DataFrame]:
+        ids = id_df.set_index(idx_col)  # copy
+        out = {f"eip_assoc_{idx_col}_to_{col}": EIPTransformer._id_col_to_associative_entity_table(ids.loc[:, col])
+               for col in ids.columns}
+        return out
 
-
-def emissions_increase(projects: pd.DataFrame) -> pd.DataFrame:
-    """
-    Apply transformations to emissions_increase table.
-
-    Transformations include:
-
-    * Create political party and representative columns.
-
-    Args:
-        projects: raw emissions_increase table.
-
-    Returns:
-        transformed emissions_increase table.
-    """
-    cong_split = projects.congressional_rep_party.str.split(",", expand=True)
-    projects["congressional_representative"] = cong_split[0]
-    projects["political_party"] = cong_split[1]
-    projects = projects.drop(columns=["congressional_rep_party"])
-
-    # Clean pct fields
-    pct_fields = projects.filter(regex=(".+_pct")).columns
-    for field in pct_fields:
-        projects[field] = projects[field].str.replace("%", "")
-        projects[field] = pd.to_numeric(
-            projects[field], downcast="float", errors="coerce") / 100
-
-    # Clean tpy fields
-    tpy_fields = projects.filter(regex=(".+_tpy")).columns
-    for field in tpy_fields:
-        projects[field] = pd.to_numeric(
-            projects[field], errors="coerce", downcast="float")
-
-    # Validate schema
-    projects = TABLE_SCHEMAS["emissions_increase"].validate(projects)
-    assert "object" not in projects.dtypes
-
-    return projects
-
-
-def transform(eip_raw_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
-    """
-    Transform EIP Infrastructure dataframes.
-
-    Args:
-        eip_raw_dfs: Dictionary of the raw extracted data for each table.
-
-    Returns:
-        eip_transformed_dfs: Dictionary of the transformed tables.
-    """
-    eip_transformed_dfs = {}
-
-    eip_transform_functions = {
-        "emissions_increase": emissions_increase,
-        "natural_gas_pipelines": natural_gas_pipelines
-    }
-
-    for table_name, transform_func in eip_transform_functions.items():
-        logger.info(f"EIP Infrastructure: Transforming {table_name} table.")
-
-        table_df = eip_raw_dfs[table_name].copy()
-        eip_transformed_dfs[table_name] = transform_func(table_df)
-
-    return eip_transformed_dfs
+    @staticmethod
+    def _id_col_to_associative_entity_table(id_ser: pd.Series) -> pd.DataFrame:
+        assoc_table = id_ser.str.split(',', expand=True).stack().droplevel(1, axis=0)
+        assoc_table = pd.to_numeric(assoc_table, downcast='unsigned')
+        return assoc_table
