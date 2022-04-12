@@ -15,10 +15,10 @@ def extract(path: Path) -> Dict[str, pd.DataFrame]:
     """
     sheets_to_read = [
         'Facility',
-        'Company',
+        # 'Company',
         'Project',
         'Air Construction',  # permit status is key to identifying actionable projects
-        'Pipelines',
+        # 'Pipelines',
         # 'NGA',
         # 'NAICS',
         # 'CWA-NPDES',
@@ -37,10 +37,8 @@ def extract(path: Path) -> Dict[str, pd.DataFrame]:
     raw_dfs = pd.read_excel(path, sheet_name=sheets_to_read)
     rename_dict = {
         'Facility': 'eip_facilities',
-        'Company': 'eip_companies',
         'Project': 'eip_projects',
         'Air Construction': 'eip_air_constr_permits',
-        'Pipelines': 'eip_pipelines',
     }
     raw_dfs = {rename_dict[key]: df for key, df in raw_dfs.items()}
     return raw_dfs
