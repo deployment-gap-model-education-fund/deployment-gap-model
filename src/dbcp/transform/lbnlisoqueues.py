@@ -1,14 +1,15 @@
 """Functions to transform EIP Infrastructure tables."""
 
 import logging
-from typing import Any, Dict, List
+from typing import Dict, List
 
 import pandas as pd
 
 from dbcp.schemas import TABLE_SCHEMAS
 from dbcp.transform.helpers import (add_county_fips_with_backup_geocoding,
                                     normalize_multicolumns_to_rows,
-                                    parse_dates)
+                                    parse_dates,
+                                    replace_value_with_count_validation)
 from pudl.helpers import add_fips_ids as _add_fips_ids
 
 logger = logging.getLogger(__name__)
@@ -261,31 +262,6 @@ def parse_date_columns(queue: pd.DataFrame) -> None:
         bad = new_dates.dt.year.isin({1899, 1900})
         new_dates.loc[bad] = pd.NaT
         queue.loc[:, date_col] = new_dates
-    return
-
-
-def replace_value_with_count_validation(df: pd.DataFrame, col: str, val_to_replace: Any, replacement: Any, expected_count: int) -> None:
-    """Manually replace values, but with a minimal form of validation to guard against future changes.
-
-    Args:
-        df (pd.DataFrame): the source dataframe
-        col (str): the name of the column containing values to replace
-        val_to_replace (Any): value to replace
-        replacement (Any): replacement value
-        expected_count (int): known number of replacements to make
-
-    Raises:
-        ValueError: if expected count of replacements does not match observed count
-    """
-    matches = df.loc[:, col] == val_to_replace
-    observed_count = matches.sum()
-    if observed_count != expected_count:
-        raise ValueError(
-            f"Expected count ({expected_count}) of {val_to_replace} "
-            f"does not match observed count ({observed_count})"
-        )
-
-    df.loc[matches, col] = replacement
     return
 
 
