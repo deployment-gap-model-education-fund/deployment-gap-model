@@ -1,5 +1,5 @@
 """Common transform operations."""
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from pathlib import Path
 
 import pandas as pd
@@ -316,3 +316,28 @@ def add_county_fips_with_backup_geocoding(state_locality_df: pd.DataFrame, state
     out = pd.concat([state_locality_df, recombined], axis=1)
 
     return out
+
+
+def replace_value_with_count_validation(df: pd.DataFrame, col: str, val_to_replace: Any, replacement: Any, expected_count: int) -> None:
+    """Manually replace values, but with a minimal form of validation to guard against future changes.
+
+    Args:
+        df (pd.DataFrame): the source dataframe
+        col (str): the name of the column containing values to replace
+        val_to_replace (Any): value to replace
+        replacement (Any): replacement value
+        expected_count (int): known number of replacements to make
+
+    Raises:
+        ValueError: if expected count of replacements does not match observed count
+    """
+    matches = df.loc[:, col] == val_to_replace
+    observed_count = matches.sum()
+    if observed_count != expected_count:
+        raise ValueError(
+            f"Expected count ({expected_count}) of {val_to_replace} "
+            f"does not match observed count ({observed_count})"
+        )
+
+    df.loc[matches, col] = replacement
+    return
