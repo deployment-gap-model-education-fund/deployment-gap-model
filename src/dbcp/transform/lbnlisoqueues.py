@@ -6,9 +6,11 @@ from typing import Any, Dict, List
 import pandas as pd
 
 from dbcp.schemas import TABLE_SCHEMAS
-from dbcp.transform.helpers import (add_county_fips_with_backup_geocoding,
-                                    normalize_multicolumns_to_rows,
-                                    parse_dates)
+from dbcp.transform.helpers import (
+    add_county_fips_with_backup_geocoding,
+    normalize_multicolumns_to_rows,
+    parse_dates,
+)
 from pudl.helpers import add_fips_ids as _add_fips_ids
 
 logger = logging.getLogger(__name__)
@@ -16,144 +18,130 @@ logger = logging.getLogger(__name__)
 RESOURCE_DICT = {
     "Battery Storage": {
         "codes": ["Battery", "Batteries", "BAT", "ES"],
-        "type": "Renewable"},
-    "Biofuel": {
-        "codes": [],
-        "type": "Renewable"},
-    "Biomass": {
-        "codes": ["Wood", "W", "BLQ WDS", "WDS"],
-        "type": "Renewable"},
-    "Coal": {
-        "codes": ["BIT", "C"],
-        "type": "Fossil"},
-    "Combustion Turbine": {
-        "codes": ["CT"],
-        "type": "Fossil"},
-    "Fuel Cell": {
-        "codes": ["Fuel Cell", "FC"],
-        "type": "Fossil"},
-    "Geothermal": {
-        "codes": [],
-        "type": "Renewable"},
-    "Hydro": {
-        "codes": ["WAT", "H", "Water"],
-        "type": "Renewable"},
-    "Landfill Gas": {
-        "codes": ["LFG", "L"],
-        "type": "Fossil"},
-    "Methane; Solar": {
-        "codes": [],
-        "type": "Hybrid"},
-    "Municipal Solid Waste": {
-        "codes": ["MSW"],
-        "type": "Fossil"},
+        "type": "Renewable",
+    },
+    "Biofuel": {"codes": [], "type": "Renewable"},
+    "Biomass": {"codes": ["Wood", "W", "BLQ WDS", "WDS"], "type": "Renewable"},
+    "Coal": {"codes": ["BIT", "C"], "type": "Fossil"},
+    "Combustion Turbine": {"codes": ["CT"], "type": "Fossil"},
+    "Fuel Cell": {"codes": ["Fuel Cell", "FC"], "type": "Fossil"},
+    "Geothermal": {"codes": [], "type": "Renewable"},
+    "Hydro": {"codes": ["WAT", "H", "Water"], "type": "Renewable"},
+    "Landfill Gas": {"codes": ["LFG", "L"], "type": "Fossil"},
+    "Methane; Solar": {"codes": [], "type": "Hybrid"},
+    "Municipal Solid Waste": {"codes": ["MSW"], "type": "Fossil"},
     "Natural Gas": {
-        "codes": ["NG", "Methane", "CT-NG", "CC", "CC-NG", "ST-NG", "CS-NG", "Combined Cycle", "Gas", "Natural Gas; Other", "DFO KER NG", "DFO NG", "Diesel; Methane", "JF KER NG", "NG WO", "KER NG", "Natural Gas; Diesel; Other; Storage", "Natural Gas; Oil"],
-        "type": "Fossil"},
-    "Natural Gas; Other; Storage; Solar": {
-        "codes": [],
-        "type": "Hybrid"},
-    "Natural Gas; Storage": {
-        "codes": [],
-        "type": "Fossil"},
-    "Nuclear": {
-        "codes": ["NU", "NUC"],
-        "type": "Renewable"},
-    "Offshore Wind": {
-        "codes": [],
-        "type": "Renewable"},
+        "codes": [
+            "NG",
+            "Methane",
+            "CT-NG",
+            "CC",
+            "CC-NG",
+            "ST-NG",
+            "CS-NG",
+            "Combined Cycle",
+            "Gas",
+            "Natural Gas; Other",
+            "DFO KER NG",
+            "DFO NG",
+            "Diesel; Methane",
+            "JF KER NG",
+            "NG WO",
+            "KER NG",
+            "Natural Gas; Diesel; Other; Storage",
+            "Natural Gas; Oil",
+        ],
+        "type": "Fossil",
+    },
+    "Natural Gas; Other; Storage; Solar": {"codes": [], "type": "Hybrid"},
+    "Natural Gas; Storage": {"codes": [], "type": "Fossil"},
+    "Nuclear": {"codes": ["NU", "NUC"], "type": "Renewable"},
+    "Offshore Wind": {"codes": [], "type": "Renewable"},
     "Oil": {
         "codes": ["DFO", "Diesel", "CT-D", "CC-D", "JF", "KER", "DFO KER", "D"],
-        "type": "Fossil"},
-    "Oil; Biomass": {
-        "codes": ["BLQ DFO KER WDS"],
-        "type": "Hybrid"},
-    "Onshore Wind": {
-        "codes": ["Wind", "WND", "Wind Turbine"],
-        "type": "Renewable"},
-    "Other": {
-        "codes": [],
-        "type": "Unknown Resource"},
-    "Unknown": {
-        "codes": ["Wo", "F", "Hybrid", "M"],
-        "type": "Unknown Resource"},
-    "Other Storage": {
-        "codes": ["Flywheel", "Storage"],
-        "type": "Renewable"},
+        "type": "Fossil",
+    },
+    "Oil; Biomass": {"codes": ["BLQ DFO KER WDS"], "type": "Hybrid"},
+    "Onshore Wind": {"codes": ["Wind", "WND", "Wind Turbine"], "type": "Renewable"},
+    "Other": {"codes": [], "type": "Unknown Resource"},
+    "Unknown": {"codes": ["Wo", "F", "Hybrid", "M"], "type": "Unknown Resource"},
+    "Other Storage": {"codes": ["Flywheel", "Storage"], "type": "Renewable"},
     "Pumped Storage": {
         "codes": ["Pump Storage", "Pumped-Storage hydro", "PS"],
-        "type": "Renewable"},
-    "Solar": {
-        "codes": ["SUN", "S"],
-        "type": "Renewable"},
-    "Solar; Biomass": {
-        "codes": [],
-        "type": "Renewable"},
+        "type": "Renewable",
+    },
+    "Solar": {"codes": ["SUN", "S"], "type": "Renewable"},
+    "Solar; Biomass": {"codes": [], "type": "Renewable"},
     "Solar; Storage": {
         "codes": ["Solar; Battery", "SUN BAT", "Storage; Solar"],
-        "type": "Renewable"},
-    "Steam": {
-        "codes": ["ST"],
-        "type": "Fossil"},
+        "type": "Renewable",
+    },
+    "Steam": {"codes": ["ST"], "type": "Fossil"},
     "Waste Heat": {
-        "codes": ["Waste Heat Recovery", "Heat Recovery", "Co-Gen", ],
-        "type": "Fossil"},
-    "Wind; Storage": {
-        "codes": ["WND BAT"],
-        "type": "Renewable"},
+        "codes": [
+            "Waste Heat Recovery",
+            "Heat Recovery",
+            "Co-Gen",
+        ],
+        "type": "Fossil",
+    },
+    "Wind; Storage": {"codes": ["WND BAT"], "type": "Renewable"},
 }
 
 
 def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform active iso queue data."""
     rename_dict = {
-        'state': 'raw_state_name',
-        'county': 'raw_county_name',
+        "state": "raw_state_name",
+        "county": "raw_county_name",
     }
     active_projects = active_projects.rename(columns=rename_dict)  # copy
     active_projects = remove_duplicates(active_projects)
     parse_date_columns(active_projects)
-    replace_value_with_count_validation(active_projects,
-                                        col='raw_state_name',
-                                        val_to_replace='NN',
-                                        replacement='CA',
-                                        expected_count=2,
-                                        )
+    replace_value_with_count_validation(
+        active_projects,
+        col="raw_state_name",
+        val_to_replace="NN",
+        replacement="CA",
+        expected_count=2,
+    )
     return active_projects
 
 
 def completed_iso_queue_projects(completed_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform completed iso queue data."""
     rename_dict = {
-        'state': 'raw_state_name',
-        'county': 'raw_county_name',
+        "state": "raw_state_name",
+        "county": "raw_county_name",
     }
     completed_projects = completed_projects.rename(columns=rename_dict)  # copy
     completed_projects = remove_duplicates(completed_projects)
     parse_date_columns(completed_projects)
     # standardize columns between queues
-    completed_projects.loc[:, 'interconnection_status_lbnl'] = 'IA Executed'
+    completed_projects.loc[:, "interconnection_status_lbnl"] = "IA Executed"
     return completed_projects
 
 
 def withdrawn_iso_queue_projects(withdrawn_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform withdrawn iso queue data."""
     rename_dict = {
-        'state': 'raw_state_name',
-        'county': 'raw_county_name',
+        "state": "raw_state_name",
+        "county": "raw_county_name",
     }
     withdrawn_projects = withdrawn_projects.rename(columns=rename_dict)  # copy
     withdrawn_projects = remove_duplicates(withdrawn_projects)
     parse_date_columns(withdrawn_projects)
-    replace_value_with_count_validation(withdrawn_projects,
-                                        col='raw_state_name',
-                                        val_to_replace='NN',
-                                        replacement='CA',
-                                        expected_count=5,
-                                        )
+    replace_value_with_count_validation(
+        withdrawn_projects,
+        col="raw_state_name",
+        val_to_replace="NN",
+        replacement="CA",
+        expected_count=5,
+    )
     # standardize values between queues
-    withdrawn_projects.loc[:, 'interconnection_status_lbnl'].replace(
-        'Executed', 'IA Executed', inplace=True)
+    withdrawn_projects.loc[:, "interconnection_status_lbnl"].replace(
+        "Executed", "IA Executed", inplace=True
+    )
 
     return withdrawn_projects
 
@@ -168,8 +156,7 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     Returns:
         lbnl_transformed_dfs: Dictionary of the transformed tables.
     """
-    lbnl_transformed_dfs = {name: df.copy()
-                            for name, df in lbnl_raw_dfs.items()}
+    lbnl_transformed_dfs = {name: df.copy() for name, df in lbnl_raw_dfs.items()}
     _set_global_project_ids(lbnl_transformed_dfs)
 
     lbnl_transform_functions = {
@@ -181,7 +168,8 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     for table_name, transform_func in lbnl_transform_functions.items():
         logger.info(f"LBNL ISO Queues: Transforming {table_name} table.")
         lbnl_transformed_dfs[table_name] = transform_func(
-            lbnl_transformed_dfs[table_name])
+            lbnl_transformed_dfs[table_name]
+        )
     # Combine and normalize iso queue tables
     lbnl_normalized_dfs = normalize_lbnl_dfs(lbnl_transformed_dfs)
 
@@ -190,29 +178,34 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     # I write to a new variable because _manual_county_state_name_fixes overwrites
     # raw names with lowercase + manual corrections. I want to preserve raw names in the final
     # output but didn't want to refactor these functions to do it.
-    new_locs = _manual_county_state_name_fixes(lbnl_normalized_dfs['iso_locations'])
+    new_locs = _manual_county_state_name_fixes(lbnl_normalized_dfs["iso_locations"])
     new_locs = add_county_fips_with_backup_geocoding(
-        new_locs, state_col='raw_state_name', locality_col='raw_county_name')
+        new_locs, state_col="raw_state_name", locality_col="raw_county_name"
+    )
     new_locs = _fix_independent_city_fips(new_locs)
-    new_locs.loc[:, ['raw_state_name', 'raw_county_name']
-                 ] = lbnl_normalized_dfs['iso_locations'].loc[:, ['raw_state_name', 'raw_county_name']].copy()
-    lbnl_normalized_dfs['iso_locations'] = new_locs
+    new_locs.loc[:, ["raw_state_name", "raw_county_name"]] = (
+        lbnl_normalized_dfs["iso_locations"]
+        .loc[:, ["raw_state_name", "raw_county_name"]]
+        .copy()
+    )
+    lbnl_normalized_dfs["iso_locations"] = new_locs
 
     # Clean up and categorize resources
-    lbnl_normalized_dfs['iso_resource_capacity'] = (
-        lbnl_normalized_dfs['iso_resource_capacity']
+    lbnl_normalized_dfs["iso_resource_capacity"] = (
+        lbnl_normalized_dfs["iso_resource_capacity"]
         .pipe(clean_resource_type)
         .pipe(add_resource_classification)
-        .pipe(add_project_classification))
-    if lbnl_normalized_dfs['iso_resource_capacity'].resource_clean.isna().any():
+        .pipe(add_project_classification)
+    )
+    if lbnl_normalized_dfs["iso_resource_capacity"].resource_clean.isna().any():
         raise AssertionError("Missing Resources!")
 
-    lbnl_normalized_dfs['iso_projects'].reset_index(inplace=True)
+    lbnl_normalized_dfs["iso_projects"].reset_index(inplace=True)
 
     iso_for_tableau = denormalize(lbnl_normalized_dfs)
     iso_for_tableau = add_co2e_estimate(iso_for_tableau)
     iso_for_tableau = iso_for_tableau.reset_index()
-    lbnl_normalized_dfs['iso_for_tableau'] = iso_for_tableau
+    lbnl_normalized_dfs["iso_for_tableau"] = iso_for_tableau
 
     # Validate schema
     for name, df in lbnl_normalized_dfs.items():
@@ -229,8 +222,9 @@ def _set_global_project_ids(lbnl_dfs: Dict[str, pd.DataFrame]) -> None:
     """
     previous_idx_max = 0
     for df in lbnl_dfs.values():
-        new_idx = pd.RangeIndex(previous_idx_max, len(
-            df) + previous_idx_max, name='project_id')
+        new_idx = pd.RangeIndex(
+            previous_idx_max, len(df) + previous_idx_max, name="project_id"
+        )
         df.set_index(new_idx, inplace=True)
         previous_idx_max = new_idx.max() + 1
     return
@@ -244,14 +238,18 @@ def parse_date_columns(queue: pd.DataFrame) -> None:
     Args:
         queue (pd.DataFrame): an LBNL ISO queue dataframe
     """
-    date_cols = [col for col in queue.columns if (
-        (col.startswith('date_') or col.endswith('_date'))
-        # datetime columns don't need parsing
-        and not pd.api.types.is_datetime64_any_dtype(queue.loc[:, col])
-    )]
+    date_cols = [
+        col
+        for col in queue.columns
+        if (
+            (col.startswith("date_") or col.endswith("_date"))
+            # datetime columns don't need parsing
+            and not pd.api.types.is_datetime64_any_dtype(queue.loc[:, col])
+        )
+    ]
 
     # add _raw suffix
-    rename_dict = dict(zip(date_cols, [col + '_raw' for col in date_cols]))
+    rename_dict = dict(zip(date_cols, [col + "_raw" for col in date_cols]))
     queue.rename(columns=rename_dict, inplace=True)
 
     for date_col, raw_col in rename_dict.items():
@@ -264,7 +262,13 @@ def parse_date_columns(queue: pd.DataFrame) -> None:
     return
 
 
-def replace_value_with_count_validation(df: pd.DataFrame, col: str, val_to_replace: Any, replacement: Any, expected_count: int) -> None:
+def replace_value_with_count_validation(
+    df: pd.DataFrame,
+    col: str,
+    val_to_replace: Any,
+    replacement: Any,
+    expected_count: int,
+) -> None:
     """Manually replace values, but with a minimal form of validation to guard against future changes.
 
     Args:
@@ -298,22 +302,26 @@ def _normalize_resource_capacity(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFram
     Returns:
         Dict[str, pd.DataFrame]: dict with the projects and multivalues split into two dataframes
     """
-    if 'capacity_mw_resource_3' in lbnl_df.columns:  # only active projects
+    if "capacity_mw_resource_3" in lbnl_df.columns:  # only active projects
         n_multicolumns = 3
     else:
         n_multicolumns = 2
     attr_columns = {
-        'resource': ['resource_type_' + str(n) for n in range(1, n_multicolumns + 1)],
-        'capacity_mw': ['capacity_mw_resource_' + str(n) for n in range(1, n_multicolumns + 1)]
+        "resource": ["resource_type_" + str(n) for n in range(1, n_multicolumns + 1)],
+        "capacity_mw": [
+            "capacity_mw_resource_" + str(n) for n in range(1, n_multicolumns + 1)
+        ],
     }
-    resource_capacity_df = normalize_multicolumns_to_rows(lbnl_df,
-                                                          attribute_columns_dict=attr_columns,
-                                                          preserve_original_names=False,
-                                                          dropna=True)
+    resource_capacity_df = normalize_multicolumns_to_rows(
+        lbnl_df,
+        attribute_columns_dict=attr_columns,
+        preserve_original_names=False,
+        dropna=True,
+    )
     combined_cols: List[str] = sum(attr_columns.values(), start=[])
     project_df = lbnl_df.drop(columns=combined_cols)
 
-    return {'resource_capacity_df': resource_capacity_df, 'project_df': project_df}
+    return {"resource_capacity_df": resource_capacity_df, "project_df": project_df}
 
 
 def _normalize_location(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
@@ -325,26 +333,34 @@ def _normalize_location(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     Returns:
         Dict[str, pd.DataFrame]: dict with the projects and locations split into two dataframes
     """
-    if 'county_3' in lbnl_df.columns:  # only active projects are multivalued
-        county_cols = ['county_' + str(n) for n in range(1, 4)]
-        location_df = normalize_multicolumns_to_rows(lbnl_df,
-                                                     attribute_columns_dict={
-                                                         'raw_county_name': county_cols},
-                                                     preserve_original_names=False,
-                                                     dropna=True)
+    if "county_3" in lbnl_df.columns:  # only active projects are multivalued
+        county_cols = ["county_" + str(n) for n in range(1, 4)]
+        location_df = normalize_multicolumns_to_rows(
+            lbnl_df,
+            attribute_columns_dict={"raw_county_name": county_cols},
+            preserve_original_names=False,
+            dropna=True,
+        )
         location_df = location_df.merge(
-            lbnl_df.loc[:, 'raw_state_name'], on='project_id', validate='m:1')
+            lbnl_df.loc[:, "raw_state_name"], on="project_id", validate="m:1"
+        )
 
-        project_df = lbnl_df.drop(columns=county_cols + ['raw_state_name'])
+        project_df = lbnl_df.drop(columns=county_cols + ["raw_state_name"])
     else:
-        location_df = lbnl_df.loc[:, ['raw_state_name', 'raw_county_name']].reset_index()
-        project_df = lbnl_df.drop(columns=['raw_state_name', 'raw_county_name'])
+        location_df = lbnl_df.loc[
+            :, ["raw_state_name", "raw_county_name"]
+        ].reset_index()
+        project_df = lbnl_df.drop(columns=["raw_state_name", "raw_county_name"])
 
-    location_df.dropna(subset=['raw_state_name', 'raw_county_name'], how='all', inplace=True)
-    return {'location_df': location_df, 'project_df': project_df}
+    location_df.dropna(
+        subset=["raw_state_name", "raw_county_name"], how="all", inplace=True
+    )
+    return {"location_df": location_df, "project_df": project_df}
 
 
-def normalize_lbnl_dfs(lbnl_transformed_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
+def normalize_lbnl_dfs(
+    lbnl_transformed_dfs: Dict[str, pd.DataFrame]
+) -> Dict[str, pd.DataFrame]:
     """Normalize one-to-many columns and combine the three queues.
 
     Args:
@@ -353,23 +369,26 @@ def normalize_lbnl_dfs(lbnl_transformed_dfs: Dict[str, pd.DataFrame]) -> Dict[st
     Returns:
         Dict[str, pd.DataFrame]: the combined queues, normalized into projects, locations, and resource_capacity
     """
-    resource_capacity_dfs = [_normalize_resource_capacity(df)
-                             for df in lbnl_transformed_dfs.values()
-                             ]
+    resource_capacity_dfs = [
+        _normalize_resource_capacity(df) for df in lbnl_transformed_dfs.values()
+    ]
     resource_capacity_df = pd.concat(
-        [df_dict['resource_capacity_df'] for df_dict in resource_capacity_dfs],
-        ignore_index=True)
-    location_dfs = [_normalize_location(df_dict['project_df'])
-                    for df_dict in resource_capacity_dfs]
-    location_df = pd.concat([df_dict['location_df']
-                             for df_dict in location_dfs],
-                            ignore_index=True)
-    project_df = pd.concat([df_dict['project_df']
-                            for df_dict in location_dfs])  # keep project_id index
+        [df_dict["resource_capacity_df"] for df_dict in resource_capacity_dfs],
+        ignore_index=True,
+    )
+    location_dfs = [
+        _normalize_location(df_dict["project_df"]) for df_dict in resource_capacity_dfs
+    ]
+    location_df = pd.concat(
+        [df_dict["location_df"] for df_dict in location_dfs], ignore_index=True
+    )
+    project_df = pd.concat(
+        [df_dict["project_df"] for df_dict in location_dfs]
+    )  # keep project_id index
     return {
-        'iso_projects': project_df,
-        'iso_locations': location_df,
-        'iso_resource_capacity': resource_capacity_df,
+        "iso_projects": project_df,
+        "iso_locations": location_df,
+        "iso_resource_capacity": resource_capacity_df,
     }
 
 
@@ -391,7 +410,7 @@ def clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
         for code in code_type_dict["codes"]:
             long_dict[code] = clean_name
     # Map clean resource values into new column
-    resource_df['resource_clean'] = resource_df.resource.fillna("Unknown")
+    resource_df["resource_clean"] = resource_df.resource.fillna("Unknown")
     resource_df = resource_df.replace({"resource_clean": long_dict})
     return resource_df
 
@@ -412,9 +431,9 @@ def add_resource_classification(resource_df: pd.DataFrame) -> pd.DataFrame:
     # Modify RESOURCE DICT for mapping
     long_dict = {}
     for clean_name, code_type_dict in RESOURCE_DICT.items():
-        long_dict[clean_name] = code_type_dict['type']
+        long_dict[clean_name] = code_type_dict["type"]
     # Map resources class values into new column
-    resource_df['resource_class'] = resource_df.resource_clean.map(long_dict)
+    resource_df["resource_class"] = resource_df.resource_clean.map(long_dict)
     return resource_df
 
 
@@ -465,27 +484,35 @@ def add_project_classification(resource_df: pd.DataFrame) -> pd.DataFrame:
 
     """
     resource_df_out = resource_df.copy()
-    project_groups = resource_df_out.groupby('project_id')
-    resource_df_out['project_class'] = (
-        project_groups.resource_class
-        .transform(lambda x: _check_project_class(x))
+    project_groups = resource_df_out.groupby("project_id")
+    resource_df_out["project_class"] = project_groups.resource_class.transform(
+        lambda x: _check_project_class(x)
     )
-    assert resource_df_out.project_class.isin([
-        "Fossil", "Renewable", "Hybrid", "Contains Unknown Resource"]).all()
+    assert resource_df_out.project_class.isin(
+        ["Fossil", "Renewable", "Hybrid", "Contains Unknown Resource"]
+    ).all()
     return resource_df_out
 
 
 def denormalize(lbnl_normalized_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     """Denormalize lbnl dataframes."""
     # TODO: this should be a view in SQL
-    simple_location = _clean_county_names(lbnl_normalized_dfs['iso_locations'])
+    simple_location = _clean_county_names(lbnl_normalized_dfs["iso_locations"])
     # If multiple counties, just pick the first one. This is simplistic but there are only 26/13259 (0.1%)
-    simple_location = simple_location.groupby('project_id', as_index=False).nth(0)
+    simple_location = simple_location.groupby("project_id", as_index=False).nth(0)
 
     loc_proj = simple_location.merge(
-        lbnl_normalized_dfs['iso_projects'], on='project_id', how='outer', validate='m:1')
+        lbnl_normalized_dfs["iso_projects"],
+        on="project_id",
+        how="outer",
+        validate="m:1",
+    )
     all_proj = loc_proj.merge(
-        lbnl_normalized_dfs['iso_resource_capacity'], on='project_id', how='outer', validate="m:m")
+        lbnl_normalized_dfs["iso_resource_capacity"],
+        on="project_id",
+        how="outer",
+        validate="m:m",
+    )
     return all_proj
 
 
@@ -517,7 +544,9 @@ def remove_duplicates(df: pd.DataFrame) -> pd.DataFrame:
     df["point_of_interconnection_clean"] = [
         " ".join(sorted(x)) for x in df["point_of_interconnection_clean"].str.split()
     ]
-    df["point_of_interconnection_clean"] = df["point_of_interconnection_clean"].str.strip()
+    df["point_of_interconnection_clean"] = df[
+        "point_of_interconnection_clean"
+    ].str.strip()
 
     # groupby this set of keys and keep the duplicate with the most listed resources
     # Note: "active" projects have county_1 and region, "completed" and "withdrawn" only have county and entity
@@ -556,15 +585,17 @@ def remove_duplicates(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def add_co2e_estimate(df: pd.DataFrame,
-                      gt_upper_capacity_threshold=110,
-                      gt_mid_capacity_threshold=40,
-                      gas_turbine_btu_per_kwh=11069,
-                      combined_cycle_btu_per_kwh=7604,
-                      gas_emission_factor=53.08,
-                      small_gt_cf=0.4425,
-                      big_gt_cf=0.0983,
-                      cc_cf=0.5244) -> pd.DataFrame:
+def add_co2e_estimate(
+    df: pd.DataFrame,
+    gt_upper_capacity_threshold=110,
+    gt_mid_capacity_threshold=40,
+    gas_turbine_btu_per_kwh=11069,
+    combined_cycle_btu_per_kwh=7604,
+    gas_emission_factor=53.08,
+    small_gt_cf=0.4425,
+    big_gt_cf=0.0983,
+    cc_cf=0.5244,
+) -> pd.DataFrame:
     """NOTE: most the arguments to this function shouldn't exist, because they are interdependent model parameters.
 
     Changing any of them simply produces an incoherent output. Issue # 83 raises this issue.
@@ -590,34 +621,42 @@ def add_co2e_estimate(df: pd.DataFrame,
     Returns:
         pd.DataFrame: copy of input dataframe with new column 'co2e_tpy'
     """
-    gas_df = df.loc[(df.resource == 'Gas') & df['queue_status'].eq('active'), :].copy()
-    gas_df['prime_mover_inferred'] = 'GT'
-    gas_df['prime_mover_inferred'] = gas_df['prime_mover_inferred'].where(
-        gas_df['capacity_mw'] <= gt_upper_capacity_threshold, 'CC')
-    gas_df['heat_rate_btu_per_kwh'] = gas_turbine_btu_per_kwh
-    gas_df['heat_rate_btu_per_kwh'] = gas_df['heat_rate_btu_per_kwh'].where(
-        gas_df['prime_mover_inferred'] == 'GT', combined_cycle_btu_per_kwh)
+    gas_df = df.loc[(df.resource == "Gas") & df["queue_status"].eq("active"), :].copy()
+    gas_df["prime_mover_inferred"] = "GT"
+    gas_df["prime_mover_inferred"] = gas_df["prime_mover_inferred"].where(
+        gas_df["capacity_mw"] <= gt_upper_capacity_threshold, "CC"
+    )
+    gas_df["heat_rate_btu_per_kwh"] = gas_turbine_btu_per_kwh
+    gas_df["heat_rate_btu_per_kwh"] = gas_df["heat_rate_btu_per_kwh"].where(
+        gas_df["prime_mover_inferred"] == "GT", combined_cycle_btu_per_kwh
+    )
     mmbtu_per_btu = 1 / 1000000
-    gas_df['kg_co2e_emission_per_kwh'] = gas_df['heat_rate_btu_per_kwh'] * \
-        mmbtu_per_btu * gas_emission_factor
+    gas_df["kg_co2e_emission_per_kwh"] = (
+        gas_df["heat_rate_btu_per_kwh"] * mmbtu_per_btu * gas_emission_factor
+    )
 
     # Estimate capacity factor
-    gas_df['capacity_factor_estimated'] = small_gt_cf
-    gas_df['capacity_factor_estimated'] = gas_df['capacity_factor_estimated'].where(
-        gas_df['capacity_mw'] < gt_mid_capacity_threshold, big_gt_cf)
-    gas_df['capacity_factor_estimated'] = gas_df['capacity_factor_estimated'].where(
-        gas_df['prime_mover_inferred'] == 'GT', cc_cf)
+    gas_df["capacity_factor_estimated"] = small_gt_cf
+    gas_df["capacity_factor_estimated"] = gas_df["capacity_factor_estimated"].where(
+        gas_df["capacity_mw"] < gt_mid_capacity_threshold, big_gt_cf
+    )
+    gas_df["capacity_factor_estimated"] = gas_df["capacity_factor_estimated"].where(
+        gas_df["prime_mover_inferred"] == "GT", cc_cf
+    )
 
     # Put it all together
     hours_per_year = 8766  # extra 6 hours to average in leap years
-    gas_df['MWh'] = gas_df['capacity_mw'] * gas_df['capacity_factor_estimated'] * hours_per_year
+    gas_df["MWh"] = (
+        gas_df["capacity_mw"] * gas_df["capacity_factor_estimated"] * hours_per_year
+    )
     kwh_per_mwh = 1000
     tons_per_kg = 1 / 1000
     # put in units of tons per year to match EIP data
-    gas_df['co2e_tpy'] = gas_df['kg_co2e_emission_per_kwh'] * \
-        kwh_per_mwh * tons_per_kg * gas_df['MWh']
+    gas_df["co2e_tpy"] = (
+        gas_df["kg_co2e_emission_per_kwh"] * kwh_per_mwh * tons_per_kg * gas_df["MWh"]
+    )
     # rejoin
-    out = df.join(gas_df['co2e_tpy'], how='left')
+    out = df.join(gas_df["co2e_tpy"], how="left")
     return out
 
 
@@ -625,12 +664,20 @@ def _clean_county_names(location_df: pd.DataFrame) -> pd.DataFrame:
     # temporary until normalization
     # for now dropping Nans where geocoder didn't fill in a county fips
     location_df = location_df.loc[location_df.county_id_fips.notnull(), :].copy()
-    location_df = (location_df
-                   .drop(['geocoded_locality_name', 'geocoded_locality_type', 'raw_county_name'], axis=1)
-                   .rename(columns={'geocoded_containing_county': 'raw_county_name'}))
-    location_df['raw_county_name'] = location_df['raw_county_name'].str.lower()
-    location_df = location_df.loc[:, ['project_id',
-                                      'raw_county_name', 'raw_state_name', 'state_id_fips', 'county_id_fips']]
+    location_df = location_df.drop(
+        ["geocoded_locality_name", "geocoded_locality_type", "raw_county_name"], axis=1
+    ).rename(columns={"geocoded_containing_county": "raw_county_name"})
+    location_df["raw_county_name"] = location_df["raw_county_name"].str.lower()
+    location_df = location_df.loc[
+        :,
+        [
+            "project_id",
+            "raw_county_name",
+            "raw_state_name",
+            "state_id_fips",
+            "county_id_fips",
+        ],
+    ]
     return location_df
 
 
@@ -646,20 +693,24 @@ def _fix_independent_city_fips(location_df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: copy of location_df with fewer nan fips codes
     """
-    if 'county_id_fips' not in location_df.columns:
+    if "county_id_fips" not in location_df.columns:
         raise ValueError("Use add_county_fips_with_backup_geocoding() first.")
-    nan_fips = location_df.loc[location_df['county_id_fips'].isna(
-    ), ['raw_state_name', 'raw_county_name']].fillna('')  # copy
-    nan_fips.loc[:, 'raw_county_name'] = nan_fips.loc[:, 'raw_county_name'].str.lower().str.replace(
-        '^city of (.+)',
-        lambda x: x.group(1) + ' city',
-        regex=True
+    nan_fips = location_df.loc[
+        location_df["county_id_fips"].isna(), ["raw_state_name", "raw_county_name"]
+    ].fillna(
+        ""
+    )  # copy
+    nan_fips.loc[:, "raw_county_name"] = (
+        nan_fips.loc[:, "raw_county_name"]
+        .str.lower()
+        .str.replace("^city of (.+)", lambda x: x.group(1) + " city", regex=True)
     )
-    nan_fips = _add_fips_ids(nan_fips, state_col='raw_state_name', county_col='raw_county_name')
+    nan_fips = _add_fips_ids(
+        nan_fips, state_col="raw_state_name", county_col="raw_county_name"
+    )
 
     locs = location_df.copy()
-    locs.loc[:, 'county_id_fips'].fillna(
-        nan_fips['county_id_fips'], inplace=True)
+    locs.loc[:, "county_id_fips"].fillna(nan_fips["county_id_fips"], inplace=True)
     return locs
 
 
@@ -674,29 +725,39 @@ def _manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
     """
     # the following code was copied from unmerged PR #105 and lightly edited
     manual_county_state_name_fixes = [
-        ['skamania', 'or', 'skamania', 'wa'],
-        ['franklin-clinton', 'ny', 'franklin', 'ny'],
-        ['san juan', 'az', 'san juan', 'nm'],
-        ['hidalgo', 'co', 'hidalgo', 'nm'],
-        ['antelope & wheeler', 'ne', 'antelope', 'ne'],
-        ['linden', 'ny', 'union', 'nj'],
-        ['church', 'nv', 'churchill', 'nv'],
-        ['churchill/pershing', 'ca', 'churchill', 'nv'],
-        ['shasta/trinity', 'ca', 'shasta', 'ca'],
-        ['san benito', 'nv', 'san benito', 'ca'],
-        ['frqanklin', 'me', 'franklin', 'me'],
-        ['logan,menard', 'il', 'logan', 'il'],
-        ['new york-nj', 'ny', 'new york', 'ny'],
-        ['peneobscot/washington', 'me', 'penobscot', 'me']
+        ["skamania", "or", "skamania", "wa"],
+        ["franklin-clinton", "ny", "franklin", "ny"],
+        ["san juan", "az", "san juan", "nm"],
+        ["hidalgo", "co", "hidalgo", "nm"],
+        ["antelope & wheeler", "ne", "antelope", "ne"],
+        ["linden", "ny", "union", "nj"],
+        ["church", "nv", "churchill", "nv"],
+        ["churchill/pershing", "ca", "churchill", "nv"],
+        ["shasta/trinity", "ca", "shasta", "ca"],
+        ["san benito", "nv", "san benito", "ca"],
+        ["frqanklin", "me", "franklin", "me"],
+        ["logan,menard", "il", "logan", "il"],
+        ["new york-nj", "ny", "new york", "ny"],
+        ["peneobscot/washington", "me", "penobscot", "me"],
     ]
-    manual_county_state_name_fixes = pd.DataFrame(manual_county_state_name_fixes, columns=[
-                                                  'raw_county_name', 'raw_state_name', 'clean_county', 'clean_state'])
+    manual_county_state_name_fixes = pd.DataFrame(
+        manual_county_state_name_fixes,
+        columns=["raw_county_name", "raw_state_name", "clean_county", "clean_state"],
+    )
 
     locs = location_df.copy()
-    locs.loc[:, 'raw_county_name'] = locs.loc[:, 'raw_county_name'].str.lower()
-    locs.loc[:, 'raw_state_name'] = locs.loc[:, 'raw_state_name'].str.lower()
-    locs = locs.merge(manual_county_state_name_fixes, how='left', on=['raw_county_name', 'raw_state_name'])
-    locs.loc[:, 'raw_county_name'] = locs.loc[:, 'clean_county'].fillna(locs.loc[:, 'raw_county_name'])
-    locs.loc[:, 'raw_state_name'] = locs.loc[:, 'clean_state'].fillna(locs.loc[:, 'raw_state_name'])
-    locs = locs.drop(['clean_county', 'clean_state'], axis=1)
+    locs.loc[:, "raw_county_name"] = locs.loc[:, "raw_county_name"].str.lower()
+    locs.loc[:, "raw_state_name"] = locs.loc[:, "raw_state_name"].str.lower()
+    locs = locs.merge(
+        manual_county_state_name_fixes,
+        how="left",
+        on=["raw_county_name", "raw_state_name"],
+    )
+    locs.loc[:, "raw_county_name"] = locs.loc[:, "clean_county"].fillna(
+        locs.loc[:, "raw_county_name"]
+    )
+    locs.loc[:, "raw_state_name"] = locs.loc[:, "clean_state"].fillna(
+        locs.loc[:, "raw_state_name"]
+    )
+    locs = locs.drop(["clean_county", "clean_state"], axis=1)
     return locs
