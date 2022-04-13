@@ -147,11 +147,18 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
         '***REMOVED***': 'is_ally_target',
         '***REMOVED***': 'is_ally_secondary_target',
         '***REMOVED***': 'ally_flag',
+        # add tons per year units
+        'carbon_monoxide_co': 'carbon_monoxide_co_tpy',
+        'greenhouse_gases_co2e': 'greenhouse_gases_co2e_tpy',
+        'hazardous_air_pollutants_haps': 'hazardous_air_pollutants_haps_tpy',
+        'nitrogen_oxides_nox': 'raw_nitrogen_oxides_nox',
+        'particulate_matter_pm2.5': 'raw_particulate_matter_pm2.5',
+        'volatile_organic_compounds_voc': 'raw_volatile_organic_compounds_voc',
     }
     proj.rename(columns=rename_dict, inplace=True)
 
     # transform columns
-    proj['so2_tons_per_year'] = _fix_erroneous_array_items(proj.loc[:, 'raw_sulfur_dioxide_so2'])
+    proj['sulfur_dioxide_so2_tpy'] = _fix_erroneous_array_items(proj.loc[:, 'raw_sulfur_dioxide_so2'])
     proj['cost_millions'] = _fix_erroneous_array_items(proj.loc[:, 'raw_project_cost_million_$'])
     proj['date_modified'] = pd.to_datetime(proj.loc[:, 'raw_modified_on'], infer_datetime_format=True)
     proj['operating_status'] = proj.loc[:, 'raw_operating_status'].copy()
