@@ -8,6 +8,8 @@ import coloredlogs
 import dbcp
 from dbcp.transform.helpers import GEOCODER_CACHE
 
+logger = logging.getLogger(__name__)
+
 
 def parse_command_line():
     """
@@ -79,6 +81,9 @@ def main():
         dbcp.etl.etl(args)
     if args.data_mart:
         dbcp.data_mart.create_data_marts(args)
+    if args.upload_to_bigquery:
+        dbcp.helpers.upload_schema_to_bigquery("data_warehouse")
+        dbcp.helpers.upload_schema_to_bigquery("data_mart")
 
 
 if __name__ == "__main__":
