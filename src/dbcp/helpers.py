@@ -74,6 +74,11 @@ def upload_schema_to_bigquery(schema: str) -> None:
     engine = get_sql_engine()
     table_names = get_db_schema_tables(engine, schema)
 
+    if not table_names:
+        raise ValueError(
+            f"{schema} schema either doesn't exist or doesn't contain any tables. Try rerunning the etl and data mart pipelines."
+        )
+
     # read tables from dbcp schema in a dictionary of dfs
     loaded_tables = {}
     with engine.connect() as con:
