@@ -50,12 +50,37 @@ Here are additional make commands you can run.
 ```
 make build
 ```
-to build the dbcp docker images.
+Builds the dbcp docker images.
 
 ```
-make run_etl
+make etl_local
 ```
-to run the etl.
+Runs the etl and loads the data warehouse table to postgres.
+
+```
+make etl_bq
+```
+Runs the etl and upload the data warehouse to BigQuery.
+
+```
+make data_mart_local
+```
+Loads the data mart tables into postgres.
+
+```
+make data_mart_bq
+```
+Loads the data mart tables to BigQuery.
+
+```
+make all_local
+```
+Creates and loads the data warehouse and data mart tables into postgres.
+
+```
+make all_bq
+```
+Creates and loads the data warehouse and data mart tables to BigQuery.
 
 ```
 make sql_shell
@@ -65,7 +90,7 @@ starts a PostgreSQL interactive terminal. This is helpful for inspecting the loa
 ```
 make shell
 ```
-starts a bash interactive terminal. This is helpful for debugging. 
+starts a bash interactive terminal. This is helpful for debugging.
 
 ```
 make run_etl_bq
