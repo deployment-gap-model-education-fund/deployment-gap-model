@@ -10,7 +10,7 @@ import dbcp
 logger = logging.getLogger(__name__)
 
 
-def create_data_marts(args):
+def create_data_marts():
     """Collect and load all data mart tables to data warehouse."""
     data_marts = {}
     for module_info in pkgutil.iter_modules(__path__):
