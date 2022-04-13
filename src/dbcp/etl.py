@@ -23,9 +23,8 @@ logger = logging.getLogger(__name__)
 def etl_eip_infrastructure() -> Dict[str, pd.DataFrame]:
     """EIP Infrastructure ETL."""
     # Extract
-    ds = DBCPDatastore(sandbox=True, local_cache_path="/app/data/data_cache")
-    eip_raw_dfs = dbcp.extract.eip_infrastructure.Extractor(ds).extract(
-        update_date=WORKING_PARTITIONS["eip_infrastructure"]["update_date"])
+    source_path = Path('/app/data/raw/2022.03.22OGW.xlsx')
+    eip_raw_dfs = dbcp.extract.eip_infrastructure.extract(source_path)
 
     # Transform
     eip_transformed_dfs = dbcp.transform.eip_infrastructure.transform(
