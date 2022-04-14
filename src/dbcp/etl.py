@@ -137,6 +137,14 @@ def etl(args):
         logger.info(f"Processing: {dataset}")
         transformed_dfs.update(etl_func())
 
+    # Validate the date
+    for table_name, df in transformed_dfs.items():
+        if TABLE_SCHEMAS.get(table_name):
+            transformed_dfs[table_name] = TABLE_SCHEMAS[table_name].validate(df)
+        else:
+            logger.warning(f"{table_name} does not have a pandera schema!")
+            transformed_dfs[table_name] = df
+
     # Load table into postgres
     with engine.connect() as con:
         for table_name, df in transformed_dfs.items():

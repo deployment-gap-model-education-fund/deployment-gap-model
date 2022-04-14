@@ -1,0 +1,117 @@
+"""A module of pandera schemas for the EIP Infrastructure data source."""
+import pandas as pd
+import pandera as pa
+
+from dbcp.schemas import CoercedInt64
+
+TABLE_SCHEMAS = {
+    "emissions_increase": pa.DataFrameSchema(
+        {
+            ".+_pct": pa.Column(
+                float,
+                checks=pa.Check.greater_than_or_equal_to(0),
+                regex=True,
+                nullable=True,
+            ),
+            ".+_tpy": pa.Column(
+                float,
+                regex=True,
+                nullable=True,
+            ),
+            "cancer_risk": pa.Column(float, nullable=True),
+            "classification": pa.Column(pd.StringDtype),
+            "company": pa.Column(pd.StringDtype),
+            "completion_date": pa.Column(pd.StringDtype),
+            "county": pa.Column(pd.StringDtype, nullable=True),
+            "description": pa.Column(pd.StringDtype),
+            "ejscreen_report_url": pa.Column(pd.StringDtype, nullable=True),
+            "epa_compliance_report_url": pa.Column(pd.StringDtype, nullable=True),
+            "ghg_permit_status": pa.Column(pd.StringDtype),
+            "latitude": pa.Column(float),
+            "longitude": pa.Column(float),
+            "o3_ppb": pa.Column(float, nullable=True),
+            "operating_status": pa.Column(pd.StringDtype),
+            "operating_status_last_updated": pa.Column(pa.DateTime),
+            "operational_status_links": pa.Column(pd.StringDtype, nullable=True),
+            "operational_status_sources": pa.Column(pd.StringDtype, nullable=True),
+            "permit_documents_url": pa.Column(pd.StringDtype),
+            "permit_history": pa.Column(pd.StringDtype),
+            "permit_status_last_updated": pa.Column(pa.DateTime),
+            "permit_type": pa.Column(pd.StringDtype, nullable=True),
+            "pm2_5_ugpm3": pa.Column(float, nullable=True),
+            "population_within_3_miles": pa.Column(pd.Int64Dtype, nullable=True),
+            "project_name": pa.Column(pd.StringDtype),
+            "respiratory_hazard_index": pa.Column(float, nullable=True),
+            "sector": pa.Column(pd.StringDtype),
+            "state": pa.Column(pd.StringDtype),
+            "state_enforcement_records_url": pa.Column(pd.StringDtype, nullable=True),
+            "state_facility_id": pa.Column(pd.StringDtype, nullable=True),
+            "state_permitting_url": pa.Column(pd.StringDtype, nullable=True),
+            "type_s": pa.Column(pd.StringDtype),
+            "wastewater_discharge_indicator": pa.Column(float, nullable=True),
+            "congressional_representative": pa.Column(pd.StringDtype, nullable=True),
+            "political_party": pa.Column(pd.StringDtype, nullable=True),
+        },
+        strict=True,
+        coerce=True,
+    ),
+    "natural_gas_pipelines": pa.DataFrameSchema(
+        {
+            "actual_construction_start_date": pa.Column(pa.DateTime, nullable=True),
+            "actual_inservice_date": pa.Column(pa.DateTime, nullable=True),
+            "additional_capacity_mmcfpd": pa.Column(float, nullable=True),
+            "anticipated_construction_start_date": pa.Column(
+                pa.DateTime, nullable=True
+            ),
+            "anticipated_in_service_date": pa.Column(pa.DateTime, nullable=True),
+            "co2_tons": pa.Column(float, nullable=True),
+            "co2_tpy": pa.Column(float, nullable=True),
+            "co_tons": pa.Column(float, nullable=True),
+            "co_tpy": pa.Column(float, nullable=True),
+            "compressor_name": pa.Column(pd.StringDtype, nullable=True),
+            "compressor_states": pa.Column(pd.StringDtype, nullable=True),
+            "construction_duration_months": pa.Column(pd.Int64Dtype, nullable=True),
+            "cost": pa.Column(float, nullable=True),
+            "ferc_docket_no": pa.Column(pd.StringDtype, nullable=True),
+            "haps_tons": pa.Column(float, nullable=True),
+            "haps_tpy": pa.Column(float, nullable=True),
+            "miles": pa.Column(float, nullable=True),
+            "notes": pa.Column(pd.StringDtype, nullable=True),
+            "nox_tons": pa.Column(float, nullable=True),
+            "nox_tpy": pa.Column(float, nullable=True),
+            "num_modified_compressor_stations": pa.Column(pd.Int64Dtype, nullable=True),
+            "num_new_compressor_stations": pa.Column(CoercedInt64(), nullable=True),
+            "num_waterbody_crossings": pa.Column(pd.Int64Dtype, nullable=True),
+            "permanent_construction_workforce": pa.Column(
+                pd.StringDtype, nullable=True
+            ),
+            "pipeline_diameter_in": pa.Column(pd.StringDtype, nullable=True),
+            "pipeline_operator_name": pa.Column(pd.StringDtype),
+            "pipelines_states": pa.Column(pd.StringDtype),
+            "pm10_tons": pa.Column(float, nullable=True),
+            "pm10_tpy": pa.Column(float, nullable=True),
+            "pm2_5_tons": pa.Column(float, nullable=True),
+            "pm2_5_tpy": pa.Column(float, nullable=True),
+            "product": pa.Column(pd.StringDtype),
+            "project_description": pa.Column(pd.StringDtype),
+            "project_folder_eip_url": pa.Column(pd.StringDtype),
+            "project_name": pa.Column(pd.StringDtype),
+            "project_status_last_updated": pa.Column(pa.DateTime),
+            "project_type": pa.Column(pd.StringDtype),
+            "project_website": pa.Column(pd.StringDtype, nullable=True),
+            "so2_tons": pa.Column(float, nullable=True),
+            "so2_tpy": pa.Column(float, nullable=True),
+            "status": pa.Column(pd.StringDtype),
+            "total_wetlands_affected_permanently_acres": pa.Column(
+                float, nullable=True
+            ),
+            "total_wetlands_affected_temporarily_acres": pa.Column(
+                float, nullable=True
+            ),
+            "voc_tons": pa.Column(float, nullable=True),
+            "voc_tpy": pa.Column(float, nullable=True),
+        },
+        strict=True,
+        coerce=True,
+    ),
+}
