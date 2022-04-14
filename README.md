@@ -60,12 +60,37 @@ Here are additional make commands you can run.
 ```
 make build
 ```
-to build the dbcp docker images.
+Builds the dbcp docker images.
 
 ```
-make run_etl
+make etl_local
 ```
-to run the etl.
+Runs the etl and loads the data warehouse table to postgres.
+
+```
+make etl_bq
+```
+Runs the etl and upload the data warehouse to BigQuery.
+
+```
+make data_mart_local
+```
+Loads the data mart tables into postgres.
+
+```
+make data_mart_bq
+```
+Loads the data mart tables to BigQuery.
+
+```
+make all_local
+```
+Creates and loads the data warehouse and data mart tables into postgres.
+
+```
+make all_bq
+```
+Creates and loads the data warehouse and data mart tables to BigQuery.
 
 ```
 make sql_shell
@@ -90,3 +115,7 @@ starts a jupyter lab instance at `http://127.0.0.1:8888/`. If you have another j
 ```
 export JUPYTER_PORT=8890
 ```
+## Architecture
+DBCP roughly follows an ETL(T) architecture. `dbcp.etl.etl()` extracts the raw data, cleans it then loads it into a data warehouse, a local postgres database in ourcase. The tables in the data warehouse are normalized to a certain degree (we need to define a clear data model).
+
+Tableau doesn't handle normalized data tables very well so we create denomalized tables for specific dashboards we call "data marts". To create a new data mart, create a new python file in the `dbcp.data_mart` module and implement a `create_data_mart()` function that returns the data_mart as a pandas data frame.
