@@ -17,12 +17,11 @@ class Extractor(GenericExtractor):
         Args:
             ds (:class:datastore.Datastore): Initialized datastore.
         """
-        self.METADATA = Metadata('lbnlisoqueues')
+        self.METADATA = Metadata("lbnlisoqueues")
         self.cols_added = []
         super().__init__(*args, **kwargs)
 
     def process_raw(self, df, page, **partition):
         """Apply necessary pre-processing to the dataframe."""
-        df = df.rename(
-            columns=self._metadata.get_column_map(page, **partition))
+        df = df.rename(columns=self._metadata.get_column_map(page, **partition))
         return df

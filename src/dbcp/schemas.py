@@ -17,8 +17,8 @@ class CoercedInt64(pandas_engine.INT64):
 
 
 TABLE_SCHEMAS = {
-    "emissions_increase":
-        pa.DataFrameSchema({
+    "emissions_increase": pa.DataFrameSchema(
+        {
             ".+_pct": pa.Column(
                 float,
                 checks=pa.Check.greater_than_or_equal_to(0),
@@ -62,16 +62,19 @@ TABLE_SCHEMAS = {
             "type_s": pa.Column(pd.StringDtype),
             "wastewater_discharge_indicator": pa.Column(float, nullable=True),
             "congressional_representative": pa.Column(pd.StringDtype, nullable=True),
-            "political_party": pa.Column(pd.StringDtype, nullable=True)
+            "political_party": pa.Column(pd.StringDtype, nullable=True),
         },
-            strict=True,
-            coerce=True),
-    "natural_gas_pipelines":
-        pa.DataFrameSchema({
+        strict=True,
+        coerce=True,
+    ),
+    "natural_gas_pipelines": pa.DataFrameSchema(
+        {
             "actual_construction_start_date": pa.Column(pa.DateTime, nullable=True),
             "actual_inservice_date": pa.Column(pa.DateTime, nullable=True),
             "additional_capacity_mmcfpd": pa.Column(float, nullable=True),
-            "anticipated_construction_start_date": pa.Column(pa.DateTime, nullable=True),
+            "anticipated_construction_start_date": pa.Column(
+                pa.DateTime, nullable=True
+            ),
             "anticipated_in_service_date": pa.Column(pa.DateTime, nullable=True),
             "co2_tons": pa.Column(float, nullable=True),
             "co2_tpy": pa.Column(float, nullable=True),
@@ -91,7 +94,9 @@ TABLE_SCHEMAS = {
             "num_modified_compressor_stations": pa.Column(pd.Int64Dtype, nullable=True),
             "num_new_compressor_stations": pa.Column(CoercedInt64(), nullable=True),
             "num_waterbody_crossings": pa.Column(pd.Int64Dtype, nullable=True),
-            "permanent_construction_workforce": pa.Column(pd.StringDtype, nullable=True),
+            "permanent_construction_workforce": pa.Column(
+                pd.StringDtype, nullable=True
+            ),
             "pipeline_diameter_in": pa.Column(pd.StringDtype, nullable=True),
             "pipeline_operator_name": pa.Column(pd.StringDtype),
             "pipelines_states": pa.Column(pd.StringDtype),
@@ -109,15 +114,20 @@ TABLE_SCHEMAS = {
             "so2_tons": pa.Column(float, nullable=True),
             "so2_tpy": pa.Column(float, nullable=True),
             "status": pa.Column(pd.StringDtype),
-            "total_wetlands_affected_permanently_acres": pa.Column(float, nullable=True),
-            "total_wetlands_affected_temporarily_acres": pa.Column(float, nullable=True),
+            "total_wetlands_affected_permanently_acres": pa.Column(
+                float, nullable=True
+            ),
+            "total_wetlands_affected_temporarily_acres": pa.Column(
+                float, nullable=True
+            ),
             "voc_tons": pa.Column(float, nullable=True),
-            "voc_tpy": pa.Column(float, nullable=True)
+            "voc_tpy": pa.Column(float, nullable=True),
         },
-            strict=True,
-            coerce=True),
-    "mcoe":
-        pa.DataFrameSchema({
+        strict=True,
+        coerce=True,
+    ),
+    "mcoe": pa.DataFrameSchema(
+        {
             "plant_id_eia": pa.Column(pd.Int64Dtype),
             "generator_id": pa.Column(pd.StringDtype),
             "report_date": pa.Column(pa.DateTime),
@@ -156,7 +166,9 @@ TABLE_SCHEMAS = {
             "energy_source_code_5": pa.Column(pd.StringDtype, nullable=True),
             "energy_source_code_6": pa.Column(pd.StringDtype, nullable=True),
             "ferc_cogen_status": pa.Column(pd.BooleanDtype, nullable=True),
-            "ferc_exempt_wholesale_generator": pa.Column(pd.BooleanDtype, nullable=True),
+            "ferc_exempt_wholesale_generator": pa.Column(
+                pd.BooleanDtype, nullable=True
+            ),
             "ferc_small_power_producer": pa.Column(pd.BooleanDtype, nullable=True),
             "fluidized_bed_tech": pa.Column(pd.BooleanDtype, nullable=True),
             "fuel_cost_from_eiaapi": pa.Column(float, nullable=True),
@@ -204,7 +216,9 @@ TABLE_SCHEMAS = {
             "reactive_power_output_mvar": pa.Column(float, nullable=True),
             "retirement_date": pa.Column(pa.DateTime, nullable=True),
             "rto_iso_lmp_node_id": pa.Column(pd.StringDtype, nullable=True),
-            "rto_iso_location_wholesale_reporting_id": pa.Column(pd.StringDtype, nullable=True),
+            "rto_iso_location_wholesale_reporting_id": pa.Column(
+                pd.StringDtype, nullable=True
+            ),
             "sector_id_eia": pa.Column(pd.Int64Dtype, nullable=True),
             "sector_name_eia": pa.Column(pd.StringDtype, nullable=True),
             "solid_fuel_gasification": pa.Column(pd.BooleanDtype, nullable=True),
@@ -225,7 +239,9 @@ TABLE_SCHEMAS = {
             "switch_oil_gas": pa.Column(pd.BooleanDtype, nullable=True),
             "syncronized_transmission_grid": pa.Column(pd.BooleanDtype, nullable=True),
             "technology_description": pa.Column(pd.StringDtype, nullable=True),
-            "time_cold_shutdown_full_load_code": pa.Column(pd.StringDtype, nullable=True),
+            "time_cold_shutdown_full_load_code": pa.Column(
+                pd.StringDtype, nullable=True
+            ),
             "timezone": pa.Column(pd.StringDtype, nullable=True),
             "topping_bottoming_code": pa.Column(pd.StringDtype, nullable=True),
             "total_fuel_cost": pa.Column(float, nullable=True),
@@ -238,11 +254,13 @@ TABLE_SCHEMAS = {
             "winter_capacity_estimate": pa.Column(pd.BooleanDtype, nullable=True),
             "winter_capacity_mw": pa.Column(float, nullable=True),
             "winter_estimated_capability_mw": pa.Column(float, nullable=True),
-            "zip_code": pa.Column(CoercedInt64(), nullable=True)},
-            strict=True,
-            coerce=True),
-    "iso_projects":
-        pa.DataFrameSchema({
+            "zip_code": pa.Column(CoercedInt64(), nullable=True),
+        },
+        strict=True,
+        coerce=True,
+    ),
+    "iso_projects": pa.DataFrameSchema(
+        {
             "project_id": pa.Column(pd.Int64Dtype),
             "date_proposed_raw": pa.Column(pd.StringDtype, nullable=True),
             "developer": pa.Column(pd.StringDtype, nullable=True),
@@ -267,25 +285,27 @@ TABLE_SCHEMAS = {
             "date_withdrawn_raw": pa.Column(pd.StringDtype, nullable=True),
             "withdrawl_reason": pa.Column(pd.StringDtype, nullable=True),
             "year_withdrawn": pa.Column(CoercedInt64(), nullable=True),
-            "date_withdrawn": pa.Column(pa.DateTime, nullable=True)
+            "date_withdrawn": pa.Column(pa.DateTime, nullable=True),
         },
-            strict=True,
-            coerce=True),
-    "iso_locations":
-        pa.DataFrameSchema({
+        strict=True,
+        coerce=True,
+    ),
+    "iso_locations": pa.DataFrameSchema(
+        {
             "project_id": pa.Column(pd.Int64Dtype),
-            "county": pa.Column(pd.StringDtype, nullable=True),
-            "state": pa.Column(pd.StringDtype, nullable=True),
+            "raw_county_name": pa.Column(pd.StringDtype, nullable=True),
+            "raw_state_name": pa.Column(pd.StringDtype, nullable=True),
             "state_id_fips": pa.Column(pd.StringDtype, nullable=True),
             "county_id_fips": pa.Column(pd.StringDtype, nullable=True),
-            'locality_name': pa.Column(pd.StringDtype, nullable=True),
-            'locality_type': pa.Column(pd.StringDtype, nullable=True),
-            'containing_county': pa.Column(pd.StringDtype, nullable=True),
+            "geocoded_locality_name": pa.Column(pd.StringDtype, nullable=True),
+            "geocoded_locality_type": pa.Column(pd.StringDtype, nullable=True),
+            "geocoded_containing_county": pa.Column(pd.StringDtype, nullable=True),
         },
-            strict=True,
-            coerce=True),
-    "iso_resource_capacity":
-        pa.DataFrameSchema({
+        strict=True,
+        coerce=True,
+    ),
+    "iso_resource_capacity": pa.DataFrameSchema(
+        {
             "project_id": pa.Column(pd.Int64Dtype),
             "resource": pa.Column(pd.StringDtype, nullable=True),
             "resource_clean": pa.Column(pd.StringDtype, nullable=True),
@@ -293,32 +313,49 @@ TABLE_SCHEMAS = {
             "project_class": pa.Column(pd.StringDtype, nullable=True),
             "capacity_mw": pa.Column(float, nullable=True),
         },
-            strict=True,
-            coerce=True),
-    "county_fips":
-        pa.DataFrameSchema({
+        strict=True,
+        coerce=True,
+    ),
+    "county_fips": pa.DataFrameSchema(
+        {
             "state_id_fips": pa.Column(pd.StringDtype, nullable=False),
             "county_id_fips": pa.Column(pd.StringDtype, nullable=False),
             "county_name": pa.Column(pd.StringDtype, nullable=False),
         },
-            strict=True,
-            coerce=True),
-    "state_fips":
-        pa.DataFrameSchema({
+        strict=True,
+        coerce=True,
+    ),
+    "state_fips": pa.DataFrameSchema(
+        {
             "state_id_fips": pa.Column(pd.StringDtype, nullable=False),
             "state_name": pa.Column(pd.StringDtype, nullable=False),
             "state_abbrev": pa.Column(pd.StringDtype, nullable=False),
         },
-            strict=True,
-            coerce=True)
+        strict=True,
+        coerce=True,
+    ),
 }
 
 
-ISO_FOR_TABLEAU = (TABLE_SCHEMAS["iso_projects"]
-                   .add_columns(TABLE_SCHEMAS["iso_locations"].columns)
-                   .add_columns(TABLE_SCHEMAS["iso_resource_capacity"].columns)
-                   .add_columns(pa.DataFrameSchema({'co2e_tpy': pa.Column(float, nullable=True), "index": pa.Column(pd.Int64Dtype)}).columns)
-                   .remove_columns(['locality_name', 'locality_type', 'containing_county', ])
-                   )
+ISO_FOR_TABLEAU = (
+    TABLE_SCHEMAS["iso_projects"]
+    .add_columns(TABLE_SCHEMAS["iso_locations"].columns)
+    .add_columns(TABLE_SCHEMAS["iso_resource_capacity"].columns)
+    .add_columns(
+        pa.DataFrameSchema(
+            {
+                "co2e_tpy": pa.Column(float, nullable=True),
+                "index": pa.Column(pd.Int64Dtype),
+            }
+        ).columns
+    )
+    .remove_columns(
+        [
+            "geocoded_locality_name",
+            "geocoded_locality_type",
+            "geocoded_containing_county",
+        ]
+    )
+)
 
 TABLE_SCHEMAS["iso_for_tableau"] = ISO_FOR_TABLEAU
