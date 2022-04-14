@@ -157,4 +157,7 @@ def etl(args):
         for table_name, df in transformed_dfs.items():
             df.to_csv(output_path / f"{table_name}.csv", index=False)
 
+    if args.upload_to_bigquery:
+        dbcp.helpers.upload_schema_to_bigquery("data_warehouse")
+
     logger.info("Sucessfully finished ETL.")
