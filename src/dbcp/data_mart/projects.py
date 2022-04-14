@@ -88,7 +88,6 @@ def _get_ncsl_wind_permitting_df(engine: sa.engine.Engine) -> pd.DataFrame:
         "description",
         # 'link',  # too detailed?
         "permitting_type",
-        # 'raw_state_name', # drop raw name in favor of canonical one
         "state_id_fips",
     ]
     db = "data_warehouse.ncsl_state_permitting"
