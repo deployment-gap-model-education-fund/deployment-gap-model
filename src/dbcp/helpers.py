@@ -17,7 +17,7 @@ def get_sql_engine() -> sa.engine.Engine:
     user = os.environ["POSTGRES_USER"]
     password = os.environ["POSTGRES_PASSWORD"]
     db = os.environ["POSTGRES_DB"]
-    return sa.create_engine(f'postgresql://{user}:{password}@{db}:5432')
+    return sa.create_engine(f"postgresql://{user}:{password}@{db}:5432")
 
 
 def download_pudl_data() -> Path:
@@ -29,10 +29,10 @@ def download_pudl_data() -> Path:
     input_path = Path("/app/data/data_cache")
     pudl_data_path = input_path / PUDL_VERSION
     if not pudl_data_path.exists():
-        logger.info(
-            "PUDL data directory does not exist, downloading from Zenodo.")
+        logger.info("PUDL data directory does not exist, downloading from Zenodo.")
         response = requests.get(
-            f"https://zenodo.org/record/5701406/files/{PUDL_VERSION}.tgz", stream=True)
+            f"https://zenodo.org/record/5701406/files/{PUDL_VERSION}.tgz", stream=True
+        )
         tgz_file_path = input_path / f"{PUDL_VERSION}.tgz"
 
         tgz_file = open(tgz_file_path, "wb")
