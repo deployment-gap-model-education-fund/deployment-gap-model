@@ -313,7 +313,6 @@ def _represent_state_opposition_as_counties(
     )
 
     # replicate local opposition columns
-    # locality_name
     # geocoded_locality_name
     states_as_counties = states_as_counties.merge(
         state_fips_df.loc[:, ["state_name", "state_id_fips"]],
