@@ -12,13 +12,13 @@ class DBCPZenodoFetcher(ZenodoFetcher):
     TOKEN = {
         # Read-only personal access tokens for pudl@catalyst.coop:
         "sandbox": "qyPC29wGPaflUUVAv1oGw99ytwBqwEEdwi4NuUrpwc3xUcEwbmuB4emwysco",
-        "production": "KXcG5s9TqeuPh1Ukt5QYbzhCElp9LxuqAuiwdqHP0WS4qGIQiydHn6FBtdJ5"
+        "production": "KXcG5s9TqeuPh1Ukt5QYbzhCElp9LxuqAuiwdqHP0WS4qGIQiydHn6FBtdJ5",
     }
 
     DOI = {
         "sandbox": {
             "eipinfrastructure": "10.5072/zenodo.971165",
-            "lbnlisoqueues": "10.5072/zenodo.982636"
+            "lbnlisoqueues": "10.5072/zenodo.982636",
         },
         "production": {
             # TODO(bendnorman): archive a production dataset
@@ -36,6 +36,4 @@ class DBCPDatastore(Datastore):
     def __init__(self, sandbox: bool = False, timeout: float = 15, *args, **kwargs):
         """Inititalize a Datastore with DBCPZenodoFetcher."""
         super().__init__(*args, **kwargs)
-        self._zenodo_fetcher = DBCPZenodoFetcher(
-            sandbox=sandbox,
-            timeout=timeout)
+        self._zenodo_fetcher = DBCPZenodoFetcher(sandbox=sandbox, timeout=timeout)

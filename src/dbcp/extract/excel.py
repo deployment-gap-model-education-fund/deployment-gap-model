@@ -44,18 +44,18 @@ class Metadata(object):
             from. Files will be loaded from pudl.package_data.${dataset_name}
 
         """
-        pkg = f'dbcp.package_data.{dataset_name}'
+        pkg = f"dbcp.package_data.{dataset_name}"
         self._dataset_name = dataset_name
-        self._skiprows = self._load_csv(pkg, 'skiprows.csv')
-        self._skipfooter = self._load_csv(pkg, 'skipfooter.csv')
-        self._sheet_name = self._load_csv(pkg, 'page_map.csv')
-        self._file_name = self._load_csv(pkg, 'file_map.csv')
-        column_map_pkg = pkg + '.column_maps'
+        self._skiprows = self._load_csv(pkg, "skiprows.csv")
+        self._skipfooter = self._load_csv(pkg, "skipfooter.csv")
+        self._sheet_name = self._load_csv(pkg, "page_map.csv")
+        self._file_name = self._load_csv(pkg, "file_map.csv")
+        column_map_pkg = pkg + ".column_maps"
         self._column_map = {}
         for res in importlib.resources.contents(column_map_pkg):
             # res is expected to be ${page}.csv
-            parts = res.split('.')
-            if len(parts) != 2 or parts[1] != 'csv':
+            parts = res.split(".")
+            if len(parts) != 2 or parts[1] != "csv":
                 continue
             column_map = self._load_csv(column_map_pkg, res)
             self._column_map[parts[0]] = column_map
@@ -82,7 +82,14 @@ class Metadata(object):
 
     def get_column_map(self, page, **partition):
         """Return the dictionary mapping input columns to pudl columns for given partition and page."""
-        return {v: k for k, v in self._column_map[page].T.loc[str(self._get_partition_key(partition))].to_dict().items() if v != -1}
+        return {
+            v: k
+            for k, v in self._column_map[page]
+            .T.loc[str(self._get_partition_key(partition))]
+            .to_dict()
+            .items()
+            if v != -1
+        }
 
     def get_all_columns(self, page):
         """Return list of all pudl (standardized) columns for a given page (across all partition)."""
@@ -95,13 +102,15 @@ class Metadata(object):
     @staticmethod
     def _load_csv(package, filename):
         """Load metadata from a filename that is found in a package."""
-        return pd.read_csv(importlib.resources.open_text(package, filename),
-                           index_col=0, comment='#')
+        return pd.read_csv(
+            importlib.resources.open_text(package, filename), index_col=0, comment="#"
+        )
 
     @staticmethod
     def _get_partition_key(partition):
         """Grab the partition key."""
         if len(partition) != 1:
             raise AssertionError(
-                f"Expecting exactly one partition attribute (found: {partition})")
+                f"Expecting exactly one partition attribute (found: {partition})"
+            )
         return list(partition.values())[0]
