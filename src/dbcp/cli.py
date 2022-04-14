@@ -80,10 +80,7 @@ def main():
     if args.etl:
         dbcp.etl.etl(args)
     if args.data_mart:
-        dbcp.data_mart.create_data_marts()
-    if args.upload_to_bigquery:
-        dbcp.helpers.upload_schema_to_bigquery("data_warehouse")
-        dbcp.helpers.upload_schema_to_bigquery("data_mart")
+        dbcp.data_mart.create_data_marts(args)
 
 
 if __name__ == "__main__":

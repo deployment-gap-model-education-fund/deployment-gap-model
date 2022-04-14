@@ -23,9 +23,9 @@ def _get_iso_location_df(engine: sa.engine.Engine) -> pd.DataFrame:
         # 'state',  # drop raw state in favor of canonical FIPS name
         # 'state_id_fips',
         "county_id_fips",
-        # 'locality_name',  # drop detailed location info for simplicity
-        # 'locality_type',  # drop detailed location info for simplicity
-        # 'containing_county',  # drop geocoded name in favor of canonical FIPS name
+        # 'geocoded_locality_name',  # drop detailed location info for simplicity
+        # 'geocoded_locality_type',  # drop detailed location info for simplicity
+        # 'geocoded_containing_county',  # drop geocoded name in favor of canonical FIPS name
     ]
     db = "data_warehouse.iso_locations"
 
@@ -220,7 +220,7 @@ def _get_ncsl_wind_permitting_df(engine: sa.engine.Engine) -> pd.DataFrame:
         "description",
         # 'link',  # too detailed?
         "permitting_type",
-        # 'state',  # only need FIPS, state name comes from elsewhere
+        # 'raw_state_name', # drop raw name in favor of canonical one
         "state_id_fips",
     ]
     db = "data_warehouse.ncsl_state_permitting"
@@ -253,7 +253,7 @@ def _get_state_opposition_df(engine: sa.engine.Engine) -> pd.DataFrame:
         # 'latest_year_mentioned',  # for simplicity, only include one year metric (earliest_year_mentioned)
         # 'n_years_mentioned',  # for simplicity, only include one year metric (earliest_year_mentioned)
         "policy",
-        # 'state',  # only need FIPS, names come from elsewhere
+        # 'raw_state_name', # drop raw name in favor of canonical one
         "state_id_fips",
     ]
     db = "data_warehouse.state_policy"
