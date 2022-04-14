@@ -1,11 +1,9 @@
-"""DBC ETL logic."""
+"""The ETL module create the data warehouse tables."""
 import logging
 from pathlib import Path
 from typing import Dict
 
 import pandas as pd
-import pandas_gbq
-import pydata_google_auth
 import sqlalchemy as sa
 
 import dbcp
@@ -119,7 +117,7 @@ def etl(args):
     # Setup postgres
     engine = dbcp.helpers.get_sql_engine()
     with engine.connect() as con:
-        engine.execute("CREATE SCHEMA IF NOT EXISTS dbcp")
+        engine.execute("CREATE SCHEMA IF NOT EXISTS data_warehouse")
 
     # Reduce size of geocoder cache if necessary
     GEOCODER_CACHE.reduce_size()
@@ -148,7 +146,7 @@ def etl(args):
                 con=con,
                 if_exists="replace",
                 index=False,
-                schema="dbcp",
+                schema="data_warehouse",
             )
 
     # TODO: Writing to CSVs is a temporary solution for getting data into Tableau
@@ -160,40 +158,6 @@ def etl(args):
             df.to_csv(output_path / f"{table_name}.csv", index=False)
 
     if args.upload_to_bigquery:
-        logger.info("Loading tables to BigQuery.")
-
-        # read tables from dbcp schema in a dictionary of dfs
-        loaded_tables = {}
-        with engine.connect() as con:
-            query = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'dbcp';"
-            table_names = list(pd.read_sql(query, con)["table_name"])
-
-            for table_name in table_names:
-                table = pd.read_sql_table(table_name, con, schema="dbcp")
-                # Validate the schemas again
-                if TABLE_SCHEMAS.get(table_name):
-                    loaded_tables[table_name] = TABLE_SCHEMAS[table_name].validate(
-                        table
-                    )
-                else:
-                    loaded_tables[table_name] = table
-
-        # load to big query
-        SCOPES = [
-            "https://www.googleapis.com/auth/cloud-platform",
-        ]
-
-        credentials = pydata_google_auth.get_user_credentials(SCOPES)
-
-        for table_name, df in loaded_tables.items():
-            logger.info(f"Loading: {table_name}")
-            pandas_gbq.to_gbq(
-                df,
-                f"dbcp_data.{table_name}",
-                project_id="dbcp-dev",
-                if_exists="replace",
-                credentials=credentials,
-            )
-            logger.info(f"Finished: {table_name}")
+        dbcp.helpers.upload_schema_to_bigquery("data_warehouse")
 
     logger.info("Sucessfully finished ETL.")

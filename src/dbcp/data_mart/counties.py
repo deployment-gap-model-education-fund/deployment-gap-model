@@ -27,7 +27,7 @@ def _get_iso_location_df(engine: sa.engine.Engine) -> pd.DataFrame:
         # 'geocoded_locality_type',  # drop detailed location info for simplicity
         # 'geocoded_containing_county',  # drop geocoded name in favor of canonical FIPS name
     ]
-    db = "dbcp.iso_locations"
+    db = "data_warehouse.iso_locations"
 
     simple_location_df = _subset_db_columns(cols, db, engine)
     # If multiple counties, just pick the first one. This is simplistic but there are only 26/13259 (0.2%)
@@ -44,7 +44,7 @@ def _get_iso_resource_df(engine: sa.engine.Engine) -> pd.DataFrame:
         # 'resource_class',  # will model this according to client wants
         "resource_clean",
     ]
-    db = "dbcp.iso_resource_capacity"
+    db = "data_warehouse.iso_resource_capacity"
     df = _subset_db_columns(cols, db, engine)
     return df
 
@@ -77,7 +77,7 @@ def _get_iso_project_df(engine: sa.engine.Engine) -> pd.DataFrame:
         # 'year_proposed',  # year info is contained in date_proposed
         # 'year_withdrawn',  # year info is contained in date_withdrawn
     ]
-    db = "dbcp.iso_projects"
+    db = "data_warehouse.iso_projects"
     df = _subset_db_columns(cols, db, engine)
     return df
 
@@ -206,7 +206,7 @@ def _get_pudl_df(engine: sa.engine.Engine) -> pd.DataFrame:
         # 'winter_estimated_capability_mw',
         # 'zip_code',
     ]
-    db = "dbcp.mcoe"
+    db = "data_warehouse.mcoe"
     # I don't use _subset_db_columns because of extra filtering requirements
     query = f"""select {', '.join(cols)} from {db}
     where operational_status = 'existing'
@@ -223,7 +223,7 @@ def _get_ncsl_wind_permitting_df(engine: sa.engine.Engine) -> pd.DataFrame:
         # 'raw_state_name',  # drop raw name in favor of canonical one
         "state_id_fips",
     ]
-    db = "dbcp.ncsl_state_permitting"
+    db = "data_warehouse.ncsl_state_permitting"
     df = _subset_db_columns(cols, db, engine)
     return df
 
@@ -242,7 +242,7 @@ def _get_local_opposition_df(engine: sa.engine.Engine) -> pd.DataFrame:
         # 'raw_state_name',  # drop raw name in favor of canonical one
         # 'state_id_fips',  # will join on 5-digit county FIPS, which includes state
     ]
-    db = "dbcp.local_ordinance"
+    db = "data_warehouse.local_ordinance"
     df = _subset_db_columns(cols, db, engine)
     return df
 
@@ -256,21 +256,21 @@ def _get_state_opposition_df(engine: sa.engine.Engine) -> pd.DataFrame:
         # 'raw_state_name',  # drop raw name in favor of canonical one
         "state_id_fips",
     ]
-    db = "dbcp.state_policy"
+    db = "data_warehouse.state_policy"
     df = _subset_db_columns(cols, db, engine)
     return df
 
 
 def _get_county_fips_df(engine: sa.engine.Engine) -> pd.DataFrame:
     cols = ["*"]
-    db = "dbcp.county_fips"
+    db = "data_warehouse.county_fips"
     df = _subset_db_columns(cols, db, engine)
     return df
 
 
 def _get_state_fips_df(engine: sa.engine.Engine) -> pd.DataFrame:
     cols = ["*"]
-    db = "dbcp.state_fips"
+    db = "data_warehouse.state_fips"
     df = _subset_db_columns(cols, db, engine)
     return df
 
@@ -526,10 +526,8 @@ def _flatten_multiindex(multi_index: pd.MultiIndex, prefix: str) -> pd.Index:
     return pd.Index(flattened)
 
 
-def make_county_data_mart_table(
-    engine: Optional[sa.engine.Engine] = None,
-) -> pd.DataFrame:
-    """Create county data mart table."""
+def create_data_mart(engine: Optional[sa.engine.Engine] = None) -> pd.DataFrame:
+    """Create the counties datamart dataframe."""
     if engine is None:
         engine = get_sql_engine()
     iso = _get_and_join_iso_tables(engine)
