@@ -13,6 +13,16 @@ conda activate dbcp-dev
 ```
 This conda environment has python, pip and pre-commit installed in it. This env is just for running pre-commits, the actual ETL development happens in docker.
 
+## Git Pre-commit Hooks
+Git hooks let you automatically run scripts at various points as you manage your source code. “Pre-commit” hook scripts are run when you try to make a new commit. These scripts can review your code and identify bugs, formatting errors, bad coding habits, and other issues before the code gets checked in. This gives you the opportunity to fix those issues before publishing them.
+
+To make sure they are run before you commit any code, you need to enable the pre-commit hooks scripts with this command:
+```
+pre-commit install
+```
+The scripts that run are configured in the .pre-commit-config.yaml file.
+
+
 ## Docker
 [Install docker](https://docs.docker.com/get-docker/). Once you have docker installed, make sure it is running.
 
@@ -65,7 +75,7 @@ starts a PostgreSQL interactive terminal. This is helpful for inspecting the loa
 ```
 make shell
 ```
-starts a bash interactive terminal. This is helpful for debugging. 
+starts a bash interactive terminal. This is helpful for debugging.
 
 ```
 make run_etl_bq
