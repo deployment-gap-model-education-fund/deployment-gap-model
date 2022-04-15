@@ -80,6 +80,9 @@ local.env
 # geocoder disk cache
 data/geocoder_cache/*
 
+# EIP api reverse engineering stuff
+references/eip_api_reverse_eng/*
+
 # Mac OS-specific storage files
 .DS_Store
 
