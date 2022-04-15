@@ -1,6 +1,7 @@
 """Retrieve data from EIP Infrastructure spreadsheets for analysis."""
 from pathlib import Path
 from typing import Dict
+
 import pandas as pd
 
 
