@@ -65,7 +65,7 @@ starts a PostgreSQL interactive terminal. This is helpful for inspecting the loa
 ```
 make shell
 ```
-starts a bash interactive terminal. This is helpful for debugging. 
+starts a bash interactive terminal. This is helpful for debugging.
 
 ```
 make run_etl_bq
