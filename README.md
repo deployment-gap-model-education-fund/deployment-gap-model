@@ -51,9 +51,9 @@ Second, make a copy of `default.env` and call it `local.env`. Follow the instruc
 ## Run the ETL
 Now that we’ve built the image and set the environment variables run:
 ```
-make run_etl
+make all_local
 ```
-to run the ETL and load the data to postgres.
+to create and load the data warehouse and data mart tables into postgres.
 
 # Makefile
 Here are additional make commands you can run.
