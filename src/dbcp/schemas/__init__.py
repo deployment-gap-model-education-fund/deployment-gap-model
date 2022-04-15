@@ -22,5 +22,11 @@ class CoercedInt64(pandas_engine.INT64):
 TABLE_SCHEMAS = {}
 for module_info in pkgutil.iter_modules(__path__):
     module = importlib.import_module(f"{__name__}.{module_info.name}")
-    schemas = module.TABLE_SCHEMAS
+    try:
+        schemas = module.TABLE_SCHEMAS
+    except AttributeError:
+        raise AttributeError(
+            f"{module_info.name} has no attribute 'TABLE_SCHEMAS'."
+            "Make sure the schema module contains a TABLE_SCHEMAS dictionary."
+        )
     TABLE_SCHEMAS.update(schemas)

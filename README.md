@@ -119,3 +119,8 @@ export JUPYTER_PORT=8890
 DBCP roughly follows an ETL(T) architecture. `dbcp.etl.etl()` extracts the raw data, cleans it then loads it into a data warehouse, a local postgres database in ourcase. The tables in the data warehouse are normalized to a certain degree (we need to define a clear data model).
 
 Tableau doesn't handle normalized data tables very well so we create denomalized tables for specific dashboards we call "data marts". To create a new data mart, create a new python file in the `dbcp.data_mart` module and implement a `create_data_mart()` function that returns the data_mart as a pandas data frame.
+
+## Data Validation
+This repo uses [pandera](https://pandera.readthedocs.io/en/stable/index.html) to run data quality checks on the data. There is a sub module for each data source in the `dbcp.schemas` sub package. These pandera schemas validate the dataframes after they have been transformed and before they are loaded to postgress. The ETL will throw a warning if the a data table does not have a pandera schema. In the future, schemas should be required for all tables.
+
+If you add a new datasource, create a new module in `dbcp.schemas` and create a dictionary of table names to pandera schemas called `TABLE_SCHEMAS`.

@@ -137,7 +137,7 @@ def etl(args):
         logger.info(f"Processing: {dataset}")
         transformed_dfs.update(etl_func())
 
-    # Validate the date
+    # Validate the data
     for table_name, df in transformed_dfs.items():
         if TABLE_SCHEMAS.get(table_name):
             transformed_dfs[table_name] = TABLE_SCHEMAS[table_name].validate(df)
