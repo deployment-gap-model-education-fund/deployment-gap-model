@@ -5,7 +5,6 @@ from typing import Dict, List, Sequence
 
 import pandas as pd
 
-from dbcp.schemas import TABLE_SCHEMAS
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     replace_value_with_count_validation,
@@ -15,6 +14,14 @@ logger = logging.getLogger(__name__)
 
 
 def _format_column_names(cols: Sequence[str]) -> List[str]:
+    """Convert column names from human friendly to machine friendly.
+
+    Args:
+        cols (Sequence[str]): raw column names
+
+    Returns:
+        List[str]: list of converted column names
+    """
     out = [
         (col.lower().replace(" ", "_").replace("(", "").replace(")", ""))
         for col in cols
@@ -41,6 +48,14 @@ def _fix_erroneous_array_items(ser: pd.Series) -> pd.Series:
 
 
 def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
+    """Transform the facilities table from the EIP Excel database.
+
+    Args:
+        raw_fac_df (pd.DataFrame): raw facilities dataframe
+
+    Returns:
+        pd.DataFrame: transformed copy of the raw facilities dataframe
+    """
     fac = raw_fac_df.copy()
     fac.columns = _format_column_names(fac.columns)
     rename_dict = {  # add 'raw_' prefix to columns that need transformation
@@ -129,6 +144,14 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
+    """Transform the projects table from the EIP Excel database.
+
+    Args:
+        raw_fac_df (pd.DataFrame): raw projects dataframe
+
+    Returns:
+        pd.DataFrame: transformed copy of the raw projects dataframe
+    """
     proj = raw_proj_df.copy()
     proj.columns = _format_column_names(proj.columns)
     rename_dict = {  # add 'raw_' prefix to columns that need transformation
@@ -206,7 +229,15 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
     return proj
 
 
-def air_constr_transform(raw_air_constr_df: pd.DataFrame) -> pd.DataFrame:
+def air_construction_transform(raw_air_constr_df: pd.DataFrame) -> pd.DataFrame:
+    """Transform the air_construction table from the EIP Excel database.
+
+    Args:
+        raw_fac_df (pd.DataFrame): raw air_construction dataframe
+
+    Returns:
+        pd.DataFrame: transformed copy of the raw air_construction dataframe
+    """
     air = raw_air_constr_df.copy()
     air.columns = _format_column_names(air.columns)
     rename_dict = {  # add 'raw_' prefix to columns that need transformation
@@ -251,9 +282,19 @@ def air_constr_transform(raw_air_constr_df: pd.DataFrame) -> pd.DataFrame:
     return air
 
 
-def _generate_associative_entity_table(
+def _create_associative_entity_table(
     *, df: pd.DataFrame, idx_col: str, id_col: str
 ) -> pd.DataFrame:
+    """Create a long-format table linking a column of unique IDs to a column of arrays of IDs encoded as CSV strings.
+
+    Args:
+        df (pd.DataFrame): source dataframe
+        idx_col (str): column of unique IDs to use as the index. Must be the "one" in one-to-many.
+        id_col (str): column of CSV IDs to split. Must be the "many" in one-to-many.
+
+    Returns:
+        pd.DataFrame: long format associative entity table
+    """
     ids = df.loc[:, [id_col, idx_col]].set_index(idx_col).squeeze()  # copy
     assoc_table = ids.str.split(",", expand=True).stack().droplevel(1, axis=0)
     assoc_table = pd.to_numeric(assoc_table, downcast="unsigned", errors="raise")
@@ -265,10 +306,28 @@ def _generate_associative_entity_table(
 def associative_entity_table_from_dfs(
     *, df1: pd.DataFrame, idx_col1: str, df2: pd.DataFrame, idx_col2: str
 ) -> pd.DataFrame:
-    assoc1 = _generate_associative_entity_table(
+    """Create a long-format table linking IDs with a many-to-many relationship.
+
+    This is necessary because the EIP data is structured such that the many-to-many
+    relationship between project IDs and facility IDs is represented as two separate
+    one-to-many relationships -- one each in the `projects` table and `facilities` table.
+    The same problem occurs for the projects to air construction permits relationship.
+
+    This function combines those into a single many-to-many table of associative entities.
+
+    Args:
+        df1 (pd.DataFrame): first dataframe
+        idx_col1 (str): name of column with unique IDs in df1
+        df2 (pd.DataFrame): second dataframe
+        idx_col2 (str): name of column with unique IDs in df2
+
+    Returns:
+        pd.DataFrame: table of associative entities between idx_col1 and idx_col2.
+    """
+    assoc1 = _create_associative_entity_table(
         df=df1, idx_col=idx_col1, id_col=f"raw_{idx_col2}"
     )
-    assoc2 = _generate_associative_entity_table(
+    assoc2 = _create_associative_entity_table(
         df=df2, idx_col=idx_col2, id_col=f"raw_{idx_col1}"
     )
 
@@ -278,10 +337,18 @@ def associative_entity_table_from_dfs(
     return combined
 
 
-def transform(raw_eip_dfs: Dict[str, pd.DataFrame]) -> None:
+def transform(raw_eip_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
+    """Apply all transforms to raw EIP data.
+
+    Args:
+        raw_eip_dfs (Dict[str, pd.DataFrame]): raw EIP data
+
+    Returns:
+        Dict[str, pd.DataFrame]: transfomed EIP data for the warehouse
+    """
     fac = facilities_transform(raw_eip_dfs["eip_facilities"])
     proj = projects_transform(raw_eip_dfs["eip_projects"])
-    air = air_constr_transform(raw_eip_dfs["eip_air_constr_permits"])
+    air = air_construction_transform(raw_eip_dfs["eip_air_constr_permits"])
     facility_project_association = associative_entity_table_from_dfs(
         df1=fac, idx_col1="facility_id", df2=proj, idx_col2="project_id"
     )
