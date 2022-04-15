@@ -151,9 +151,9 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
         'carbon_monoxide_co': 'carbon_monoxide_co_tpy',
         'greenhouse_gases_co2e': 'greenhouse_gases_co2e_tpy',
         'hazardous_air_pollutants_haps': 'hazardous_air_pollutants_haps_tpy',
-        'nitrogen_oxides_nox': 'raw_nitrogen_oxides_nox',
-        'particulate_matter_pm2.5': 'raw_particulate_matter_pm2.5',
-        'volatile_organic_compounds_voc': 'raw_volatile_organic_compounds_voc',
+        'nitrogen_oxides_nox': 'nitrogen_oxides_nox_tpy',
+        'particulate_matter_pm2.5': 'particulate_matter_pm2.5_tpy',
+        'volatile_organic_compounds_voc': 'volatile_organic_compounds_voc_tpy',
     }
     proj.rename(columns=rename_dict, inplace=True)
 
