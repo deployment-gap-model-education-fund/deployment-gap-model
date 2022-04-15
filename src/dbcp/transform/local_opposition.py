@@ -1,9 +1,9 @@
 from typing import Dict
+
 import pandas as pd
 
-from pudl.helpers import add_fips_ids as _add_fips_ids
-
 from dbcp.transform.helpers import add_county_fips_with_backup_geocoding
+from pudl.helpers import add_fips_ids as _add_fips_ids
 
 
 def _extract_years(ser: pd.Series) -> pd.Series:
@@ -77,7 +77,8 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
 
     year_summaries = _extract_years(local['ordinance'])
     local = pd.concat([with_fips, year_summaries], axis=1)
-    local.rename(columns={'locality': 'raw_locality_name', 'state': 'raw_state_name'}, inplace=True)
+    local.rename(columns={'locality': 'raw_locality_name',
+                 'state': 'raw_state_name'}, inplace=True)
 
     return local
 

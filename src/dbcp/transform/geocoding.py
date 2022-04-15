@@ -1,8 +1,9 @@
-from typing import Optional, List, Dict
-import googlemaps
 import os
-from logging import getLogger
 from functools import lru_cache
+from logging import getLogger
+from typing import Dict, List, Optional
+
+import googlemaps
 
 logger = getLogger('__name__')
 
@@ -39,11 +40,12 @@ class GoogleGeocoder(object):
         self._name = name
         self._state = state
         self._country = country
-        self._response = _get_geocode_response(client=self.client, name=name, state=state, country=country)
-        if not self._response: # empty dict
+        self._response = _get_geocode_response(
+            client=self.client, name=name, state=state, country=country)
+        if not self._response:  # empty dict
             logger.info(
-            f"Address not found: {self._name}, {self._state}, {self._country}")
-        
+                f"Address not found: {self._name}, {self._state}, {self._country}")
+
         return
 
     def get_county(self) -> str:
@@ -85,11 +87,12 @@ class GoogleGeocoder(object):
         containing_county = self.get_county()
         return [object_name, object_type, containing_county]
 
+
 @lru_cache(maxsize=512)
 def _get_geocode_response(*, client: googlemaps.Client, name: str, state: str, country: str) -> Dict:
     """Get Google Maps Platform's interpretation of which place a name belongs to.
-    
-    This pure function with hashable inputs is factored out of the GoogleGeocoder class 
+
+    This pure function with hashable inputs is factored out of the GoogleGeocoder class
     to enable memoization of API calls.
 
     Args:
