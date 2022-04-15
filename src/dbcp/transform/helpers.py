@@ -1,14 +1,13 @@
 """Common transform operations."""
-from typing import Optional, List, Dict, Any
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from joblib import Memory
 
-from pudl.helpers import add_fips_ids as _add_fips_ids
-
-from dbcp.transform.geocoding import GoogleGeocoder
 from dbcp.constants import FIPS_CODE_VINTAGE
+from dbcp.transform.geocoding import GoogleGeocoder
+from pudl.helpers import add_fips_ids as _add_fips_ids
 
 UNIX_EPOCH_ORIGIN = pd.Timestamp('01/01/1970')
 # Excel parser is simplified and will be one day off for dates < 1900/03/01
@@ -256,7 +255,8 @@ def _geocode_locality(state_locality_df: pd.DataFrame, state_col='state', locali
     geocoder = GoogleGeocoder()
     new_cols = state_locality_df.apply(
         _geocode_row, axis=1, result_type='expand', client=geocoder, state_col=state_col, locality_col=locality_col)
-    new_cols.columns = ['geocoded_locality_name', 'geocoded_locality_type', 'geocoded_containing_county']
+    new_cols.columns = ['geocoded_locality_name',
+                        'geocoded_locality_type', 'geocoded_containing_county']
     return new_cols
 
 
@@ -274,7 +274,8 @@ def add_county_fips_with_backup_geocoding(state_locality_df: pd.DataFrame, state
     Returns:
         pd.DataFrame: copy of state_locality_df with new columns 'geocoded_locality_name', 'geocoded_locality_type', 'geocoded_containing_county'
     """
-    filled_state_locality = state_locality_df.loc[:, [state_col, locality_col]].fillna('')  # copy
+    filled_state_locality = state_locality_df.loc[:, [
+        state_col, locality_col]].fillna('')  # copy
     # first try a simple FIPS lookup and split by valid/invalid fips codes
     # The only purpose of this step is to save API calls on the easy ones (most of them)
     with_fips = _add_fips_ids(
@@ -310,7 +311,8 @@ def add_county_fips_with_backup_geocoding(state_locality_df: pd.DataFrame, state
     # recombine and restore row order
     cols_to_keep = ['state_id_fips', 'county_id_fips',
                     'geocoded_locality_name', 'geocoded_locality_type', 'geocoded_containing_county', ]
-    recombined = pd.concat([good_fips, filled_fips], axis=0).loc[state_locality_df.index, cols_to_keep]
+    recombined = pd.concat([good_fips, filled_fips],
+                           axis=0).loc[state_locality_df.index, cols_to_keep]
 
     # attach to original df
     out = pd.concat([state_locality_df, recombined], axis=1)
