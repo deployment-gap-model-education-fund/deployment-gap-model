@@ -8,6 +8,7 @@ import coloredlogs
 import dbcp
 from dbcp.transform.helpers import GEOCODER_CACHE
 
+
 def parse_command_line():
     """
     Parse script command line arguments. See the -h option.

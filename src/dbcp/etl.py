@@ -11,8 +11,8 @@ import sqlalchemy as sa
 import dbcp
 from dbcp.constants import FIPS_CODE_VINTAGE, WORKING_PARTITIONS
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
-from dbcp.transform.helpers import GEOCODER_CACHE
 from dbcp.schemas import TABLE_SCHEMAS
+from dbcp.transform.helpers import GEOCODER_CACHE
 from dbcp.workspace.datastore import DBCPDatastore
 from pudl.helpers import add_fips_ids as _add_fips_ids
 from pudl.output.pudltabl import PudlTabl
