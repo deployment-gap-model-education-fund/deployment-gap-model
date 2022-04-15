@@ -1,11 +1,9 @@
-"""DBC ETL logic."""
+"""The ETL module create the data warehouse tables."""
 import logging
 from pathlib import Path
 from typing import Dict
 
 import pandas as pd
-import pandas_gbq
-import pydata_google_auth
 import sqlalchemy as sa
 
 import dbcp
@@ -23,12 +21,11 @@ logger = logging.getLogger(__name__)
 def etl_eip_infrastructure() -> Dict[str, pd.DataFrame]:
     """EIP Infrastructure ETL."""
     # Extract
-    source_path = Path('/app/data/raw/2022.03.22OGW.xlsx')
+    source_path = Path("/app/data/raw/2022.03.22OGW.xlsx")
     eip_raw_dfs = dbcp.extract.eip_infrastructure.extract(source_path)
 
     # Transform
-    eip_transformed_dfs = dbcp.transform.eip_infrastructure.transform(
-        eip_raw_dfs)
+    eip_transformed_dfs = dbcp.transform.eip_infrastructure.transform(eip_raw_dfs)
 
     return eip_transformed_dfs
 
@@ -38,7 +35,8 @@ def etl_lbnlisoqueues() -> Dict[str, pd.DataFrame]:
     # Extract
     ds = DBCPDatastore(sandbox=True, local_cache_path="/app/data/data_cache")
     lbnl_raw_dfs = dbcp.extract.lbnlisoqueues.Extractor(ds).extract(
-        update_date=WORKING_PARTITIONS["lbnlisoqueues"]["update_date"])
+        update_date=WORKING_PARTITIONS["lbnlisoqueues"]["update_date"]
+    )
 
     # Transform
     lbnl_transformed_dfs = dbcp.transform.lbnlisoqueues.transform(lbnl_raw_dfs)
@@ -49,7 +47,7 @@ def etl_lbnlisoqueues() -> Dict[str, pd.DataFrame]:
 def etl_columbia_local_opp() -> Dict[str, pd.DataFrame]:
     """Columbia Local Opposition ETL."""
     # Extract
-    source_path = Path('/app/data/raw/RELDI report updated 9.10.21 (1).docx')
+    source_path = Path("/app/data/raw/RELDI report updated 9.10.21 (1).docx")
     extractor = dbcp.extract.local_opposition.ColumbiaDocxParser()
     extractor.load_docx(source_path)
     raw_dfs = extractor.extract()
@@ -67,12 +65,13 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
     pudl_tables = {}
 
     pudl_engine = sa.create_engine(
-        f"sqlite:////{pudl_data_path}/pudl_data/sqlite/pudl.sqlite")
+        f"sqlite:////{pudl_data_path}/pudl_data/sqlite/pudl.sqlite"
+    )
     pudl_out = PudlTabl(
         pudl_engine,
-        start_date='2020-01-01',
-        end_date='2020-12-31',
-        freq='AS',
+        start_date="2020-01-01",
+        end_date="2020-12-31",
+        freq="AS",
         fill_fuel_cost=False,
         roll_fuel_cost=True,
         fill_net_gen=True,
@@ -80,10 +79,11 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
 
     mcoe = pudl_out.mcoe(all_gens=True)
     # add FIPS
-    filled_location = mcoe.loc[:, ['state', 'county']].fillna('')
+    filled_location = mcoe.loc[:, ["state", "county"]].fillna("")
     fips = _add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
-    mcoe = pd.concat([mcoe, fips[['state_id_fips', 'county_id_fips']]],
-                     axis=1, copy=False)
+    mcoe = pd.concat(
+        [mcoe, fips[["state_id_fips", "county_id_fips"]]], axis=1, copy=False
+    )
     mcoe = TABLE_SCHEMAS["mcoe"].validate(mcoe)
     pudl_tables["mcoe"] = mcoe
 
@@ -92,7 +92,7 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
 
 def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
     """NCSL State Permitting for Wind ETL."""
-    source_path = Path('/app/data/raw/ncsl_state_permitting_wind.csv')
+    source_path = Path("/app/data/raw/ncsl_state_permitting_wind.csv")
     if not source_path.exists():
         NCSLScraper().scrape_and_save_to_disk(source_path)
     raw_df = dbcp.extract.ncsl_state_permitting.extract(source_path)
@@ -115,7 +115,7 @@ def etl(args):
     # Setup postgres
     engine = dbcp.helpers.get_sql_engine()
     with engine.connect() as con:
-        engine.execute("CREATE SCHEMA IF NOT EXISTS dbcp")
+        engine.execute("CREATE SCHEMA IF NOT EXISTS data_warehouse")
 
     # Reduce size of geocoder cache if necessary
     GEOCODER_CACHE.reduce_size()
@@ -126,7 +126,7 @@ def etl(args):
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
         "columbia_local_opp": etl_columbia_local_opp,
-        "fips_tables": etl_fips_tables
+        "fips_tables": etl_fips_tables,
     }
 
     # Extract and transform the data sets
@@ -139,47 +139,23 @@ def etl(args):
     with engine.connect() as con:
         for table_name, df in transformed_dfs.items():
             logger.info(f"Load {table_name} to postgres.")
-            df.to_sql(name=table_name, con=con, if_exists="replace",
-                      index=False, schema="dbcp")
+            df.to_sql(
+                name=table_name,
+                con=con,
+                if_exists="replace",
+                index=False,
+                schema="data_warehouse",
+            )
 
     # TODO: Writing to CSVs is a temporary solution for getting data into Tableau
     # This should be removed once we have cloudsql setup.
     if args.csv:
-        logger.info('Writing tables to CSVs.')
+        logger.info("Writing tables to CSVs.")
         output_path = Path("/app/data/output/")
         for table_name, df in transformed_dfs.items():
             df.to_csv(output_path / f"{table_name}.csv", index=False)
 
     if args.upload_to_bigquery:
-        logger.info('Loading tables to BigQuery.')
-
-        # read tables from dbcp schema in a dictionary of dfs
-        loaded_tables = {}
-        with engine.connect() as con:
-            query = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'dbcp';"
-            table_names = list(pd.read_sql(query, con)["table_name"])
-
-            for table_name in table_names:
-                table = pd.read_sql_table(table_name, con, schema="dbcp")
-                # Validate the schemas again
-                if TABLE_SCHEMAS.get(table_name):
-                    loaded_tables[table_name] = TABLE_SCHEMAS[table_name].validate(
-                        table)
-                else:
-                    loaded_tables[table_name] = table
-
-        # load to big query
-        SCOPES = [
-            'https://www.googleapis.com/auth/cloud-platform',
-        ]
-
-        credentials = pydata_google_auth.get_user_credentials(
-            SCOPES)
-
-        for table_name, df in loaded_tables.items():
-            logger.info(f"Loading: {table_name}")
-            pandas_gbq.to_gbq(
-                df, f"dbcp_data.{table_name}", project_id="dbcp-dev", if_exists="replace", credentials=credentials)
-            logger.info(f"Finished: {table_name}")
+        dbcp.helpers.upload_schema_to_bigquery("data_warehouse")
 
     logger.info("Sucessfully finished ETL.")

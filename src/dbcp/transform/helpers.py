@@ -9,12 +9,12 @@ from dbcp.constants import FIPS_CODE_VINTAGE
 from dbcp.transform.geocoding import GoogleGeocoder
 from pudl.helpers import add_fips_ids as _add_fips_ids
 
-UNIX_EPOCH_ORIGIN = pd.Timestamp('01/01/1970')
+UNIX_EPOCH_ORIGIN = pd.Timestamp("01/01/1970")
 # Excel parser is simplified and will be one day off for dates < 1900/03/01
 # The origin is actually 12/31/1899, but because Excel mistakenly thinks
 # 1900 was a leap year, I cancel out that error by setting the origin to 12/30/1899.
 # See xlrd.xldate.py:xldate_as_datetime for complete implementation.
-EXCEL_EPOCH_ORIGIN = pd.Timestamp('12/30/1899')
+EXCEL_EPOCH_ORIGIN = pd.Timestamp("12/30/1899")
 
 try:  # docker path
     # 3 directories above current module
@@ -22,8 +22,7 @@ try:  # docker path
     assert geocoder_local_cache.exists()
 except AssertionError:  # local path
     # 4 directories above current module
-    geocoder_local_cache = Path(
-        __file__).resolve().parents[3] / "data/geocoder_cache"
+    geocoder_local_cache = Path(__file__).resolve().parents[3] / "data/geocoder_cache"
     assert geocoder_local_cache.exists()
 # cache needs to be accessed outside this module to call .clear()
 # limit cache size to 100 KB, keeps most recently accessed first
@@ -35,7 +34,7 @@ def normalize_multicolumns_to_rows(
     attribute_columns_dict: Dict[str, List[str]],
     index_cols: Optional[List[str]] = None,
     preserve_original_names=True,
-    dropna=True
+    dropna=True,
 ) -> pd.DataFrame:
     """Convert a denormalized one-to-many relationship encoded as multiple columns to a row-based table.
 
@@ -92,17 +91,19 @@ def normalize_multicolumns_to_rows(
         if preserve_original_names:
             # Assumes associated columns can be identified by a single member.
             # For example, (type_1, value_1), (type_2, value_2) share a numbering schema
-            chunk['original_group'] = linked_columns[0]
+            chunk["original_group"] = linked_columns[0]
         chunks.append(chunk)
 
     output: pd.DataFrame = pd.concat(chunks)
     if dropna:
-        output.dropna(subset=list(new_names), how='all', inplace=True)
+        output.dropna(subset=list(new_names), how="all", inplace=True)
 
     return output.sort_index().reset_index()
 
 
-def multiformat_string_date_parser(dates: pd.Series, numeric_origin=EXCEL_EPOCH_ORIGIN) -> pd.Series:
+def multiformat_string_date_parser(
+    dates: pd.Series, numeric_origin=EXCEL_EPOCH_ORIGIN
+) -> pd.Series:
     """Iteratively parse a column of date strings with heterogeneous formatting.
 
     The LBNL ISO Queue contains a variety of date formats. I couldn't get
@@ -126,12 +127,14 @@ def multiformat_string_date_parser(dates: pd.Series, numeric_origin=EXCEL_EPOCH_
 
     # parse strings
     parsed_dates = pd.to_datetime(
-        date_strings, infer_datetime_format=True, errors='coerce')
+        date_strings, infer_datetime_format=True, errors="coerce"
+    )
     remaining_nan = parsed_dates.isna().sum()
     while True:
         nans = parsed_dates.isna()
         nan_to_dates = pd.to_datetime(
-            date_strings[nans], infer_datetime_format=True, errors='coerce')
+            date_strings[nans], infer_datetime_format=True, errors="coerce"
+        )
         parsed_dates = parsed_dates.fillna(nan_to_dates)
         new_remaining_nan = nans.sum()
         if new_remaining_nan == remaining_nan:  # no improvement
@@ -140,18 +143,22 @@ def multiformat_string_date_parser(dates: pd.Series, numeric_origin=EXCEL_EPOCH_
             remaining_nan = new_remaining_nan
 
     # handle numeric encodings
-    numbers = pd.to_numeric(dates.loc[is_numeric_string], errors='coerce')
+    numbers = pd.to_numeric(dates.loc[is_numeric_string], errors="coerce")
     encoded_dates = numeric_offset_date_encoder(numbers, origin=numeric_origin)
 
     # recombine
-    new_dates = pd.concat([parsed_dates, encoded_dates],
-                          copy=False).loc[dates.index]
+    new_dates = pd.concat([parsed_dates, encoded_dates], copy=False).loc[dates.index]
     pd.testing.assert_index_equal(new_dates.index, dates.index)
 
     return new_dates
 
 
-def numeric_offset_date_encoder(series: pd.Series, origin=EXCEL_EPOCH_ORIGIN, unit='d', roundoff: Optional[str] = None) -> pd.Series:
+def numeric_offset_date_encoder(
+    series: pd.Series,
+    origin=EXCEL_EPOCH_ORIGIN,
+    unit="d",
+    roundoff: Optional[str] = None,
+) -> pd.Series:
     """Convert column of numeric date offsets (like 45059) to pd.Timestamp.
 
     Warning: validation is left to the user! Check for unexpected dates.
@@ -171,7 +178,7 @@ def numeric_offset_date_encoder(series: pd.Series, origin=EXCEL_EPOCH_ORIGIN, un
     if len(series) == 0:  # accept empty series
         return series
     if not pd.api.types.is_numeric_dtype(series):
-        raise ValueError(f'Series is not numeric. Given {series.dtype}')
+        raise ValueError(f"Series is not numeric. Given {series.dtype}")
     offsets = pd.to_timedelta(series, unit=unit)
     date = offsets + origin
     if roundoff:
@@ -181,7 +188,7 @@ def numeric_offset_date_encoder(series: pd.Series, origin=EXCEL_EPOCH_ORIGIN, un
 
 
 def parse_dates(series: pd.Series, expected_mean_year=2020) -> pd.Series:
-    """convert a column to pd.Datetime using one of several parsing strategies.
+    """Convert a column to pd.Datetime using one of several parsing strategies.
 
     Numeric columns are interpreted as either Unix or Excel datetime encoding.
     The choice of epoch is determined by which encoding produces dates closer
@@ -200,12 +207,10 @@ def parse_dates(series: pd.Series, expected_mean_year=2020) -> pd.Series:
         pd.Series: new column of pd.Datetime
     """
     if pd.api.types.is_numeric_dtype(series):
-        unix_dates = numeric_offset_date_encoder(
-            series, origin=UNIX_EPOCH_ORIGIN)
-        excel_dates = numeric_offset_date_encoder(
-            series, origin=EXCEL_EPOCH_ORIGIN)
-        unix_diff = (expected_mean_year - unix_dates.dt.year.mean())
-        excel_diff = (expected_mean_year - excel_dates.dt.year.mean())
+        unix_dates = numeric_offset_date_encoder(series, origin=UNIX_EPOCH_ORIGIN)
+        excel_dates = numeric_offset_date_encoder(series, origin=EXCEL_EPOCH_ORIGIN)
+        unix_diff = expected_mean_year - unix_dates.dt.year.mean()
+        excel_diff = expected_mean_year - excel_dates.dt.year.mean()
         if abs(unix_diff) < abs(excel_diff):
             return unix_dates
         else:
@@ -215,8 +220,10 @@ def parse_dates(series: pd.Series, expected_mean_year=2020) -> pd.Series:
         return multiformat_string_date_parser(series)
 
 
-def _geocode_row(ser: pd.Series, client: GoogleGeocoder, state_col='state', locality_col='county') -> List[str]:
-    """function to pass into pandas df.apply() to geocode state/locality pairs
+def _geocode_row(
+    ser: pd.Series, client: GoogleGeocoder, state_col="state", locality_col="county"
+) -> List[str]:
+    """Function to pass into pandas df.apply() to geocode state/locality pairs.
 
     Args:
         ser (pd.Series): a row of a larger dataframe to geocode
@@ -232,7 +239,9 @@ def _geocode_row(ser: pd.Series, client: GoogleGeocoder, state_col='state', loca
 
 
 @GEOCODER_CACHE.cache()
-def _geocode_locality(state_locality_df: pd.DataFrame, state_col='state', locality_col='county') -> pd.DataFrame:
+def _geocode_locality(
+    state_locality_df: pd.DataFrame, state_col="state", locality_col="county"
+) -> pd.DataFrame:
     """Use Google Maps Platform API to look up information about state/locality pairs in a dataframe.
 
     Args:
@@ -254,13 +263,24 @@ def _geocode_locality(state_locality_df: pd.DataFrame, state_col='state', locali
     # this function. That allows other, unrelated columns to change but still use the geocode cache.
     geocoder = GoogleGeocoder()
     new_cols = state_locality_df.apply(
-        _geocode_row, axis=1, result_type='expand', client=geocoder, state_col=state_col, locality_col=locality_col)
-    new_cols.columns = ['geocoded_locality_name',
-                        'geocoded_locality_type', 'geocoded_containing_county']
+        _geocode_row,
+        axis=1,
+        result_type="expand",
+        client=geocoder,
+        state_col=state_col,
+        locality_col=locality_col,
+    )
+    new_cols.columns = [
+        "geocoded_locality_name",
+        "geocoded_locality_type",
+        "geocoded_containing_county",
+    ]
     return new_cols
 
 
-def add_county_fips_with_backup_geocoding(state_locality_df: pd.DataFrame, state_col='state', locality_col='county') -> pd.DataFrame:
+def add_county_fips_with_backup_geocoding(
+    state_locality_df: pd.DataFrame, state_col="state", locality_col="county"
+) -> pd.DataFrame:
     """Add state and county FIPS codes to a DataFrame with state and locality columns.
 
     This function is tolerant of mis-spellings and heterogeneous town/city/county types
@@ -274,25 +294,30 @@ def add_county_fips_with_backup_geocoding(state_locality_df: pd.DataFrame, state
     Returns:
         pd.DataFrame: copy of state_locality_df with new columns 'geocoded_locality_name', 'geocoded_locality_type', 'geocoded_containing_county'
     """
-    filled_state_locality = state_locality_df.loc[:, [
-        state_col, locality_col]].fillna('')  # copy
+    filled_state_locality = state_locality_df.loc[:, [state_col, locality_col]].fillna(
+        ""
+    )  # copy
     # first try a simple FIPS lookup and split by valid/invalid fips codes
     # The only purpose of this step is to save API calls on the easy ones (most of them)
     with_fips = _add_fips_ids(
-        filled_state_locality, state_col=state_col, county_col=locality_col, vintage=FIPS_CODE_VINTAGE)
-    fips_is_nan = with_fips.loc[:, 'county_id_fips'].isna()
+        filled_state_locality,
+        state_col=state_col,
+        county_col=locality_col,
+        vintage=FIPS_CODE_VINTAGE,
+    )
+    fips_is_nan = with_fips.loc[:, "county_id_fips"].isna()
     if not fips_is_nan.any():
         # standardize output columns
-        with_fips['geocoded_locality_name'] = with_fips[locality_col]
-        with_fips['geocoded_locality_type'] = 'county'
-        with_fips['geocoded_containing_county'] = with_fips[locality_col]
+        with_fips["geocoded_locality_name"] = with_fips[locality_col]
+        with_fips["geocoded_locality_type"] = "county"
+        with_fips["geocoded_containing_county"] = with_fips[locality_col]
         return with_fips
 
     good_fips = with_fips.loc[~fips_is_nan, :].copy()
     # standardize output columns
-    good_fips['geocoded_locality_name'] = good_fips[locality_col]
-    good_fips['geocoded_locality_type'] = 'county'
-    good_fips['geocoded_containing_county'] = good_fips[locality_col]
+    good_fips["geocoded_locality_name"] = good_fips[locality_col]
+    good_fips["geocoded_locality_type"] = "county"
+    good_fips["geocoded_containing_county"] = good_fips[locality_col]
 
     # geocode the lookup failures - they are often city/town names (instead of counties) or simply mis-spelled
     nan_fips = with_fips.loc[fips_is_nan, :].copy()
@@ -301,18 +326,28 @@ def add_county_fips_with_backup_geocoding(state_locality_df: pd.DataFrame, state
         # pass subset to _geocode_locality to maximize chance of a cache hit
         # (this way other columns can change but caching still works)
         state_col=state_col,
-        locality_col=locality_col
+        locality_col=locality_col,
     )
     nan_fips = pd.concat([nan_fips, geocoded], axis=1)
     # add fips using geocoded names
-    filled_fips = _add_fips_ids(nan_fips, state_col=state_col,
-                                county_col='geocoded_containing_county', vintage=FIPS_CODE_VINTAGE)
+    filled_fips = _add_fips_ids(
+        nan_fips,
+        state_col=state_col,
+        county_col="geocoded_containing_county",
+        vintage=FIPS_CODE_VINTAGE,
+    )
 
     # recombine and restore row order
-    cols_to_keep = ['state_id_fips', 'county_id_fips',
-                    'geocoded_locality_name', 'geocoded_locality_type', 'geocoded_containing_county', ]
-    recombined = pd.concat([good_fips, filled_fips],
-                           axis=0).loc[state_locality_df.index, cols_to_keep]
+    cols_to_keep = [
+        "state_id_fips",
+        "county_id_fips",
+        "geocoded_locality_name",
+        "geocoded_locality_type",
+        "geocoded_containing_county",
+    ]
+    recombined = pd.concat([good_fips, filled_fips], axis=0).loc[
+        state_locality_df.index, cols_to_keep
+    ]
 
     # attach to original df
     out = pd.concat([state_locality_df, recombined], axis=1)
@@ -320,7 +355,13 @@ def add_county_fips_with_backup_geocoding(state_locality_df: pd.DataFrame, state
     return out
 
 
-def replace_value_with_count_validation(df: pd.DataFrame, col: str, val_to_replace: Any, replacement: Any, expected_count: int) -> None:
+def replace_value_with_count_validation(
+    df: pd.DataFrame,
+    col: str,
+    val_to_replace: Any,
+    replacement: Any,
+    expected_count: int,
+) -> None:
     """Manually replace values, but with a minimal form of validation to guard against future changes.
 
     Args:
