@@ -51,6 +51,6 @@ RESOURCE_METADATA: Dict[str, Dict[str, Any]] = {
                 "operating_status_last_updated",
             ],
         },
-        "sources": ["eip_infrastructure"]
+        "sources": ["eip_infrastructure"],
     }
 }
