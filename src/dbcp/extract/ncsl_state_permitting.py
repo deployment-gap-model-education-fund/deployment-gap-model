@@ -1,9 +1,9 @@
-from typing import Dict, List, Optional
 from pathlib import Path
+from typing import Dict, List, Optional
 
-import requests
 import bs4
 import pandas as pd
+import requests
 from requests.models import HTTPError
 
 
