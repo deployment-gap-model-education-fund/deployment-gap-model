@@ -22,5 +22,4 @@ def extract(vintage: int = FIPS_CODE_VINTAGE) -> Dict[str, pd.DataFrame]:
     state_csv_path = data_dir_path / addfips.addfips.STATES
     counties = pd.read_csv(county_csv_path, dtype=str)
     states = pd.read_csv(state_csv_path, dtype=str)
-    return {'county_fips': counties,
-            'state_fips': states}
+    return {"county_fips": counties, "state_fips": states}
