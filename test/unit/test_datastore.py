@@ -9,4 +9,4 @@ class TestDBCPZenodoFetcher:
     def test_correct_doi(self):
         """Test eip_infrastructure is available in the ZenodoFetcher."""
         zf = DBCPZenodoFetcher(sandbox=True)
-        zf.get_doi("eip_infrastructure")
+        zf.get_doi("eipinfrastructure")
