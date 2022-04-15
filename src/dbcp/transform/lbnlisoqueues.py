@@ -313,10 +313,12 @@ def _normalize_location(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
 
         project_df = lbnl_df.drop(columns=county_cols + ['raw_state_name'])
     else:
-        location_df = lbnl_df.loc[:, ['raw_state_name', 'raw_county_name']].reset_index()
+        location_df = lbnl_df.loc[:, [
+            'raw_state_name', 'raw_county_name']].reset_index()
         project_df = lbnl_df.drop(columns=['raw_state_name', 'raw_county_name'])
 
-    location_df.dropna(subset=['raw_state_name', 'raw_county_name'], how='all', inplace=True)
+    location_df.dropna(
+        subset=['raw_state_name', 'raw_county_name'], how='all', inplace=True)
     return {'location_df': location_df, 'project_df': project_df}
 
 
@@ -586,7 +588,8 @@ def add_co2e_estimate(df: pd.DataFrame,
 
     # Put it all together
     hours_per_year = 8766  # extra 6 hours to average in leap years
-    gas_df['MWh'] = gas_df['capacity_mw'] * gas_df['capacity_factor_estimated'] * hours_per_year
+    gas_df['MWh'] = gas_df['capacity_mw'] * \
+        gas_df['capacity_factor_estimated'] * hours_per_year
     kwh_per_mwh = 1000
     tons_per_kg = 1 / 1000
     # put in units of tons per year to match EIP data
@@ -631,7 +634,8 @@ def _fix_independent_city_fips(location_df: pd.DataFrame) -> pd.DataFrame:
         lambda x: x.group(1) + ' city',
         regex=True
     )
-    nan_fips = _add_fips_ids(nan_fips, state_col='raw_state_name', county_col='raw_county_name')
+    nan_fips = _add_fips_ids(nan_fips, state_col='raw_state_name',
+                             county_col='raw_county_name')
 
     locs = location_df.copy()
     locs.loc[:, 'county_id_fips'].fillna(
@@ -671,8 +675,11 @@ def _manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
     locs = location_df.copy()
     locs.loc[:, 'raw_county_name'] = locs.loc[:, 'raw_county_name'].str.lower()
     locs.loc[:, 'raw_state_name'] = locs.loc[:, 'raw_state_name'].str.lower()
-    locs = locs.merge(manual_county_state_name_fixes, how='left', on=['raw_county_name', 'raw_state_name'])
-    locs.loc[:, 'raw_county_name'] = locs.loc[:, 'clean_county'].fillna(locs.loc[:, 'raw_county_name'])
-    locs.loc[:, 'raw_state_name'] = locs.loc[:, 'clean_state'].fillna(locs.loc[:, 'raw_state_name'])
+    locs = locs.merge(manual_county_state_name_fixes, how='left',
+                      on=['raw_county_name', 'raw_state_name'])
+    locs.loc[:, 'raw_county_name'] = locs.loc[:, 'clean_county'].fillna(
+        locs.loc[:, 'raw_county_name'])
+    locs.loc[:, 'raw_state_name'] = locs.loc[:, 'clean_state'].fillna(
+        locs.loc[:, 'raw_state_name'])
     locs = locs.drop(['clean_county', 'clean_state'], axis=1)
     return locs

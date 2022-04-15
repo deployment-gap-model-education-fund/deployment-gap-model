@@ -6,7 +6,8 @@ from typing import Dict, List, Sequence
 import pandas as pd
 
 from dbcp.schemas import TABLE_SCHEMAS
-from dbcp.transform.helpers import add_county_fips_with_backup_geocoding, replace_value_with_count_validation
+from dbcp.transform.helpers import (add_county_fips_with_backup_geocoding,
+                                    replace_value_with_count_validation)
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +90,8 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
     # standardize null values (only 2)
     fac['county'].replace('TDB', pd.NA, inplace=True)
 
-    fac = add_county_fips_with_backup_geocoding(fac, state_col='state', locality_col='county')
+    fac = add_county_fips_with_backup_geocoding(
+        fac, state_col='state', locality_col='county')
     fac.drop(columns=['state', 'county'], inplace=True)  # drop intermediates
 
     coords = fac.loc[:, 'raw_location'].str.split(',', n=1, expand=True)
@@ -100,7 +102,8 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
     assert coords.iloc[:, -1].min() > 0  # USA latitudes
     fac[['longitude', 'latitude']] = coords
 
-    fac['date_modified'] = pd.to_datetime(fac.loc[:, 'raw_modified_on'], infer_datetime_format=True)
+    fac['date_modified'] = pd.to_datetime(
+        fac.loc[:, 'raw_modified_on'], infer_datetime_format=True)
 
     duplicative_columns = [  # these are raw names
         # These columns are just a concatenation of the names and IDs corresponding to the ID columns
@@ -158,9 +161,12 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
     proj.rename(columns=rename_dict, inplace=True)
 
     # transform columns
-    proj['sulfur_dioxide_so2_tpy'] = _fix_erroneous_array_items(proj.loc[:, 'raw_sulfur_dioxide_so2'])
-    proj['cost_millions'] = _fix_erroneous_array_items(proj.loc[:, 'raw_project_cost_million_$'])
-    proj['date_modified'] = pd.to_datetime(proj.loc[:, 'raw_modified_on'], infer_datetime_format=True)
+    proj['sulfur_dioxide_so2_tpy'] = _fix_erroneous_array_items(
+        proj.loc[:, 'raw_sulfur_dioxide_so2'])
+    proj['cost_millions'] = _fix_erroneous_array_items(
+        proj.loc[:, 'raw_project_cost_million_$'])
+    proj['date_modified'] = pd.to_datetime(
+        proj.loc[:, 'raw_modified_on'], infer_datetime_format=True)
     proj['operating_status'] = proj.loc[:, 'raw_operating_status'].copy()
     replace_value_with_count_validation(  # in place
         df=proj,
@@ -216,7 +222,8 @@ def air_constr_transform(raw_air_constr_df: pd.DataFrame) -> pd.DataFrame:
     air.rename(columns=rename_dict, inplace=True)
 
     # transform columns
-    air['date_modified'] = pd.to_datetime(air.loc[:, 'raw_modified_on'], infer_datetime_format=True)
+    air['date_modified'] = pd.to_datetime(
+        air.loc[:, 'raw_modified_on'], infer_datetime_format=True)
     air['permit_status'] = air.loc[:, 'raw_permit_status'].copy()
     replace_value_with_count_validation(  # in place
         df=air,
@@ -247,10 +254,13 @@ def _generate_associative_entity_table(*, df: pd.DataFrame, idx_col: str, id_col
 
 
 def associative_entity_table_from_dfs(*, df1: pd.DataFrame, idx_col1: str, df2: pd.DataFrame, idx_col2: str) -> pd.DataFrame:
-    assoc1 = _generate_associative_entity_table(df=df1, idx_col=idx_col1, id_col=f"raw_{idx_col2}")
-    assoc2 = _generate_associative_entity_table(df=df2, idx_col=idx_col2, id_col=f"raw_{idx_col1}")
+    assoc1 = _generate_associative_entity_table(
+        df=df1, idx_col=idx_col1, id_col=f"raw_{idx_col2}")
+    assoc2 = _generate_associative_entity_table(
+        df=df2, idx_col=idx_col2, id_col=f"raw_{idx_col1}")
 
-    combined = pd.concat([assoc1, assoc2], axis=0, copy=False, ignore_index=True).drop_duplicates()
+    combined = pd.concat([assoc1, assoc2], axis=0, copy=False,
+                         ignore_index=True).drop_duplicates()
     return combined
 
 
