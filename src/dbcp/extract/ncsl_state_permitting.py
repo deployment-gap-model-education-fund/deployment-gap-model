@@ -1,3 +1,4 @@
+"""Extract and logic for NCSL data."""
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -9,22 +10,26 @@ from requests.models import HTTPError
 
 class NCSLScraper(object):
     """Scrape NCSL website for wind energy permitting regulations."""
+
     SOURCE_URL = "https://www.ncsl.org/research/energy/state-wind-energy-siting.aspx"
 
     def __init__(self) -> None:
+        """Initialize NCSLScraper object."""
         self.soup: Optional[bs4.BeautifulSoup] = None
         return
 
     def _get_page(self) -> None:
-        """submit GET request and pass into beautifulsoup."""
+        """Submit GET request and pass into beautifulsoup."""
         page = requests.get(NCSLScraper.SOURCE_URL)
         if page.status_code != 200:
-            raise HTTPError(
-                f'Bad response from NCSL. Status code: {page.status_code}')
-        self.soup = bs4.BeautifulSoup(page.content, 'html.parser')
+            raise HTTPError(f"Bad response from NCSL. Status code: {page.status_code}")
+        self.soup = bs4.BeautifulSoup(page.content, "html.parser")
         return
 
-    def _parse_state_div(self, div: bs4.element.Tag, ) -> Dict[str, str]:
+    def _parse_state_div(
+        self,
+        div: bs4.element.Tag,
+    ) -> Dict[str, str]:
         """Parse html <div>s corresponding to each state and extract relevant information.
 
         Args:
@@ -35,38 +40,37 @@ class NCSLScraper(object):
         """
         try:
             # State names have H2 headers
-            state_name = div.select('h2')[0].text.strip()
+            state_name = div.select("h2")[0].text.strip()
         except IndexError:
             # second choice due to no spaces between words (ex. 'NewYork')
-            state_name = div.attrs['id']
-        tags = div.find_all('p')
+            state_name = div.attrs["id"]
+        tags = div.find_all("p")
 
         for tag in tags:
             # state flag image
-            if tag.contents[0].text == '':
+            if tag.contents[0].text == "":
                 continue
             # Statute link
-            elif tag.contents[0].text == 'Statute':
+            elif tag.contents[0].text == "Statute":
                 try:
-                    statute_link = tag.select('a')[0].attrs['href']
+                    statute_link = tag.select("a")[0].attrs["href"]
                 except IndexError:  # N/A values have no links
-                    statute_link = ''
+                    statute_link = ""
             # statute summary
-            elif tag.contents[0].text == 'Summary':
+            elif tag.contents[0].text == "Summary":
                 description = tag.contents[2].strip()
 
             # statute type
-            elif tag.contents[0].text == 'Authority':
+            elif tag.contents[0].text == "Authority":
                 permitting_type = tag.contents[2].strip()
             else:
-                raise ValueError(
-                    f"Unexpected content title: {tag.contents[0].text}")
+                raise ValueError(f"Unexpected content title: {tag.contents[0].text}")
 
         output = {
-            'state': state_name,
-            'permitting_type': permitting_type,
-            'description': description,
-            'link': statute_link,
+            "state": state_name,
+            "permitting_type": permitting_type,
+            "description": description,
+            "link": statute_link,
         }
         return output
 
@@ -80,19 +84,17 @@ class NCSLScraper(object):
             self._get_page()
 
         scraped: Dict[str, List[str]] = {
-            'state': [],
-            'permitting_type': [],
-            'description': [],
-            'link': [],
+            "state": [],
+            "permitting_type": [],
+            "description": [],
+            "link": [],
         }
-        for state_div in self.soup.find_all('div',  # type: ignore
-                                            class_="panel notshowing"):
+        for state_div in self.soup.find_all("div", class_="panel notshowing"):  # type: ignore
             state_entry = self._parse_state_div(state_div)
             for attr, value in state_entry.items():
                 scraped[attr].append(value)
 
-        output = pd.DataFrame(scraped).sort_values(
-            'state').reset_index(drop=True)
+        output = pd.DataFrame(scraped).sort_values("state").reset_index(drop=True)
         return output
 
     def scrape_and_save_to_disk(self, destination_path: Path) -> None:
@@ -107,7 +109,8 @@ class NCSLScraper(object):
 
 
 def extract(csv) -> Dict[str, pd.DataFrame]:
+    """Extract ncsl permitting data."""
     # TODO: use datastore
     out = pd.read_csv(csv)
     # set categorical dtypes in transform stage, after cleaning up categories.
-    return {'ncsl_state_permitting': out}
+    return {"ncsl_state_permitting": out}
