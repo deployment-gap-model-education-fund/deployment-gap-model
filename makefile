@@ -4,14 +4,23 @@ build:
 shell:
 	docker compose run --rm app /bin/bash
 
-run_etl:
-	docker compose run --rm app python -m dbcp.cli
+etl_local:
+	docker compose run --rm app python -m dbcp.cli --etl
 
-run_etl_csv:
-	docker compose run --rm app python -m dbcp.cli --csv
+etl_bq:
+	docker compose run --rm app python -m dbcp.cli --etl --upload-to-bigquery
 
-run_etl_bq:
-	docker compose run --rm app python -m dbcp.cli --upload-to-bigquery
+data_mart_local:
+	docker compose run --rm app python -m dbcp.cli --data-mart
+
+data_mart_bq:
+	docker compose run --rm app python -m dbcp.cli --data-mart --upload-to-bigquery
+
+all_local:
+	docker compose run --rm app python -m dbcp.cli --data-mart --etl
+
+all_bq:
+	docker compose run --rm app python -m dbcp.cli --data-mart --etl --upload-to-bigquery
 
 sql_shell:
 	docker compose run --rm postgres bash -c 'psql -U $$POSTGRES_USER -h $$POSTGRES_HOST $$POSTGRES_DB'
