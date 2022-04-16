@@ -12,7 +12,7 @@ for module_info in pkgutil.iter_modules(__path__):
     resources = module.RESOURCE_METADATA
     for key in resources:
         if "group" not in resources[key]:
-            resources[key].update({'group': module_info.name})
+            resources[key].update({"group": module_info.name})
     RESOURCE_METADATA.update(resources)
 
 FOREIGN_KEYS: Dict[str, List[dict]] = build_foreign_keys(RESOURCE_METADATA)
