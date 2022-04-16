@@ -14,6 +14,8 @@ def create_data_marts(args):
     """Collect and load all data mart tables to data warehouse."""
     data_marts = {}
     for module_info in pkgutil.iter_modules(__path__):
+        if module_info.name == "helpers":  # skip
+            continue
         module = importlib.import_module(f"{__name__}.{module_info.name}")
         try:
             data_marts[module_info.name] = module.create_data_mart()
