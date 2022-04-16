@@ -28,7 +28,7 @@ def natural_gas_pipelines(ng_pipes: pd.DataFrame) -> pd.DataFrame:
     date_fields = ng_pipes.filter(regex=(".+_date")).select_dtypes("object").columns
     for field in date_fields:
         ng_pipes[field] = ng_pipes[field].astype("string")
-        ng_pipes[field] = ng_pipes[field].str.replace(r'(Q\d) (\d+)', r'\2-\1')
+        ng_pipes[field] = ng_pipes[field].str.replace(r"(Q\d) (\d+)", r"\2-\1")
         ng_pipes[field] = pd.to_datetime(ng_pipes[field], errors="coerce")
 
     # Remove 'TBD'
@@ -67,14 +67,16 @@ def emissions_increase(projects: pd.DataFrame) -> pd.DataFrame:
     pct_fields = projects.filter(regex=(".+_pct")).columns
     for field in pct_fields:
         projects[field] = projects[field].str.replace("%", "")
-        projects[field] = pd.to_numeric(
-            projects[field], downcast="float", errors="coerce") / 100
+        projects[field] = (
+            pd.to_numeric(projects[field], downcast="float", errors="coerce") / 100
+        )
 
     # Clean tpy fields
     tpy_fields = projects.filter(regex=(".+_tpy")).columns
     for field in tpy_fields:
         projects[field] = pd.to_numeric(
-            projects[field], errors="coerce", downcast="float")
+            projects[field], errors="coerce", downcast="float"
+        )
 
     # Validate schema
     projects = TABLE_SCHEMAS["emissions_increase"].validate(projects)
@@ -97,7 +99,7 @@ def transform(eip_raw_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
 
     eip_transform_functions = {
         "emissions_increase": emissions_increase,
-        "natural_gas_pipelines": natural_gas_pipelines
+        "natural_gas_pipelines": natural_gas_pipelines,
     }
 
     for table_name, transform_func in eip_transform_functions.items():
