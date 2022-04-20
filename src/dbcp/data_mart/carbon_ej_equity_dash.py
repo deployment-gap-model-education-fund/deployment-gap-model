@@ -204,7 +204,9 @@ def _get_proposed_fossil_plants(engine: sa.engine.Engine) -> pd.DataFrame:
     ;
     """
     df = pd.read_sql(query, engine)
-    df["co2e_tonnes_per_year"] = df.loc[:, "capacity_mw"] * 8766 * 0.5 * 8 * 53.06
+    df["co2e_tonnes_per_year"] = (
+        df.loc[:, "capacity_mw"] * 8766 * 0.5 * 8 * 53.06 / 1000
+    )
     df.rename(columns={"project_id": "id"}, inplace=True)
     df["facility_type"] = "proposed_power"
     return df
@@ -226,7 +228,9 @@ def _get_proposed_fossil_infra(engine: sa.engine.Engine) -> pd.DataFrame:
             county_id_fips,
             state_id_fips,
             latitude,
-            longitude
+            longitude,
+            "raw_percent_low-income_within_3_miles" as low_income_pct,
+            raw_percent_people_of_color_within_3_miles as people_of_color_pct
         FROM data_warehouse.eip_facilities
     ),
     association as (
