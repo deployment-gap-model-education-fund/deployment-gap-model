@@ -86,7 +86,7 @@ def _estimate_co2e_from_fuel_burn(df: pd.DataFrame) -> None:
 
 def _estimate_co2e_from_net_generation(df: pd.DataFrame) -> None:
     # https://www.eia.gov/electricity/annual/html/epa_08_02.html
-    heat_rates = {
+    heat_rates = {  # noqa: F841
         "coal_st": 9997.0,
         "gas_st": 10368.0,
         "gas_gt": 11069.0,
@@ -290,7 +290,85 @@ def _get_proposed_fossil_infra(engine: sa.engine.Engine) -> pd.DataFrame:
     return df
 
 
+def _get_proposed_renewables(engine: sa.engine.Engine) -> pd.DataFrame:
+    # see last SELECT statement for output columns
+    query = """
+    WITH
+    active_loc as (
+        select
+            proj.project_id,
+            loc.county_id_fips
+        from data_warehouse.iso_projects as proj
+        left join data_warehouse.iso_locations as loc
+            on loc.project_id = proj.project_id
+        where proj.queue_status = 'active'
+    ),
+    projects as (
+        select
+            loc.project_id,
+            loc.county_id_fips,
+            res.capacity_mw,
+            res.resource_clean as resource
+        from active_loc as loc
+        left join data_warehouse.iso_resource_capacity as res
+            on res.project_id = loc.project_id
+        where res.capacity_mw is not NULL
+        and res.resource_clean in ('Onshore Wind', 'Offshore Wind', 'Solar')
+    ),
+    w_county_names as (
+    select
+        cfip.county_name as county,
+        cfip.state_id_fips,
+        proj.*
+    from projects as proj
+    left join data_warehouse.county_fips as cfip
+        on proj.county_id_fips = cfip.county_id_fips
+    ),
+    w_names as (
+        SELECT
+            sfip.state_name as state,
+            proj.*
+        from w_county_names as proj
+        left join data_warehouse.state_fips as sfip
+            on proj.state_id_fips = sfip.state_id_fips
+    )
+    select
+        ncsl.permitting_type,
+        proj.*
+    from w_names as proj
+    left join data_warehouse.ncsl_state_permitting as ncsl
+        on proj.state_id_fips = ncsl.state_id_fips
+    ;
+    """
+    df = pd.read_sql(query, engine)
+    cap_factor = {
+        "Onshore Wind": 0.35,
+        "Offshore Wind": 0.45,
+        "Solar": 0.25,
+    }
+    df["cap_factor"] = df["resource"].map(cap_factor)
+    gas_ccgt_co2_intensity = 8 * 53.06 / 1000  # mmbtu/MWh * kgCO2/mmbtu * tonnes/kg
+    df["co2e_tonnes_avoided_per_year"] = (
+        df.loc[:, "capacity_mw"]
+        * 8766
+        * df.loc[:, "cap_factor"]
+        * gas_ccgt_co2_intensity
+    )
+    df.rename(columns={"project_id": "id"}, inplace=True)
+    df.drop(columns=["cap_factor"], inplace=True)
+    df["facility_type"] = "proposed_power"
+    return df
+
+
 def create_data_mart(engine: Optional[sa.engine.Engine] = None) -> pd.DataFrame:
+    """Create final output table.
+
+    Args:
+        engine (Optional[sa.engine.Engine], optional): sqlalchemy engine. Defaults to None.
+
+    Returns:
+        pd.DataFrame: table for data mart
+    """
     if engine is None:
         engine = get_sql_engine()
     tables = [
