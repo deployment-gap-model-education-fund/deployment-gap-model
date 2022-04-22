@@ -13,12 +13,7 @@ from dbcp.helpers import download_pudl_data, get_sql_engine
 from dbcp.transform.helpers import add_county_fips_with_backup_geocoding
 
 
-def _get_existing_plant_fuel_data() -> pd.DataFrame:
-    pudl_data_path = download_pudl_data()
-    pudl_engine = sa.create_engine(
-        f"sqlite:////{pudl_data_path}/pudl_data/sqlite/pudl.sqlite"
-    )
-
+def _get_existing_plant_fuel_data(pudl_engine: sa.engine.Engine) -> pd.DataFrame:
     query = """
     select
         plant_id_eia,
@@ -91,7 +86,7 @@ def _co2_from_mwh(
 ) -> None:
     # https://www.eia.gov/electricity/annual/html/epa_08_02.html
     heat_rates_mmbtu_per_mwh = {
-        "coal_CC": 9.997,  # not a standard prime mover code!
+        "coal_CC": 9.997,  # CC = my made up prime mover code!
         "coal_GT": 9.997,
         "coal_IC": 9.997,
         "coal_OT": 9.997,
@@ -101,10 +96,10 @@ def _co2_from_mwh(
         "gas_IC": 8.832,
         "gas_GT": 11.069,
         "gas_FC": 7.604,
-        "gas_CC": 7.604,  # not a standard prime mover code!
+        "gas_CC": 7.604,  # CC = my made up prime mover code!
         "gas_CS": 7.604,
         "gas_CE": 7.604,
-        "oil_CC": 9.208,  # not a standard prime mover code!
+        "oil_CC": 9.208,  # CC = my made up prime mover code!
         "oil_CS": 9.208,
         "oil_GT": 13.223,
         "oil_IC": 10.334,
@@ -150,8 +145,6 @@ def _get_plant_location_data(pudl_engine: sa.engine.Engine) -> pd.DataFrame:
         state,
         county
     from plants_entity_eia
-    where report_date >= date('2020-01-01') -- this is monthly data
-    AND fuel_type_code_pudl in ('coal', 'gas', 'oil')
     ;
     """
     df = pd.read_sql(query, pudl_engine)
@@ -192,31 +185,28 @@ def _transfrom_plant_location_data(
     return plant_locations
 
 
-def make_existing_co2_table(
-    postgres_engine: sa.engine.Engine, pudl_engine: sa.engine.Engine
+def _get_existing_fossil_plants(
+    postgres_engine: sa.engine.Engine,
+    pudl_engine: sa.engine.Engine,
 ) -> pd.DataFrame:
-    gen_fuel_923 = _get_existing_plant_fuel_data()
+    gen_fuel_923 = _get_existing_plant_fuel_data(pudl_engine)
     plant_co2e = _estimate_existing_co2e(gen_fuel_923)
     states = _get_state_fips_df(postgres_engine)
     counties = _get_county_fips_df(postgres_engine)
-    plant_locations = _get_plant_location_data()
+    plant_locations = _get_plant_location_data(pudl_engine)
     plant_locations = _transfrom_plant_location_data(
         plant_locations, state_table=states, county_table=counties
     )
 
+    plant_data = plant_locations.merge(
+        plant_co2e, on="plant_id_eia", how="right", copy=False
+    )
     plant_data["facility_type"] = "existing_power"
     plant_data.rename(
-        columns={"plant_id_eia": "id", "fuel_type_code_pudl": "resource"},
+        columns={"plant_id_eia": "id"},
         inplace=True,
     )
 
-    plant_data.drop(
-        columns=[
-            "total_mmbtu",
-            "net_generation_mwh",
-        ],
-        inplace=True,
-    )
     return plant_data
 
 
@@ -427,7 +417,10 @@ def _get_proposed_renewables(engine: sa.engine.Engine) -> pd.DataFrame:
     return df
 
 
-def create_data_mart(engine: Optional[sa.engine.Engine] = None) -> pd.DataFrame:
+def create_data_mart(
+    postgres_engine: Optional[sa.engine.Engine] = None,
+    pudl_engine: Optional[sa.engine.Engine] = None,
+) -> pd.DataFrame:
     """Create final output table.
 
     Args:
@@ -436,15 +429,25 @@ def create_data_mart(engine: Optional[sa.engine.Engine] = None) -> pd.DataFrame:
     Returns:
         pd.DataFrame: table for data mart
     """
-    if engine is None:
-        engine = get_sql_engine()
+    if postgres_engine is None:
+        postgres_engine = get_sql_engine()
+    if pudl_engine is None:
+        pudl_data_path = download_pudl_data()
+        pudl_engine = sa.create_engine(
+            f"sqlite:////{pudl_data_path}/pudl_data/sqlite/pudl.sqlite"
+        )
+
     tables = [
-        func(engine=engine)
+        func(engine=postgres_engine)
         for func in (
-            _dummy_existing_co2_table,
             _get_proposed_fossil_plants,
             _get_proposed_fossil_infra,
         )
     ]
+    tables.append(
+        _get_existing_fossil_plants(
+            postgres_engine=postgres_engine, pudl_engine=pudl_engine
+        )
+    )
     df = pd.concat(tables, axis=0, ignore_index=True, copy=False)
     return df
