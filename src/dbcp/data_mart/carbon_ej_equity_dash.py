@@ -52,7 +52,9 @@ def _combine_cc_parts(gen_fuel_923: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _add_emissions_factors(gen_fuel_923: pd.DataFrame) -> None:
+def _add_emissions_factors(
+    gen_fuel_923: pd.DataFrame, fuel_type_col: str = "fuel_type_code_pudl"
+) -> None:
     # https://www.ecfr.gov/current/title-40/chapter-I/subchapter-C/part-98/subpart-C/appendix-Table%20C-1%20to%20Subpart%20C%20of%20Part%2098
     # from EPA 40 CFR 98. I divide by 1000 to convert kg_CO2e/mmbtu to metric tonnes
     epa_emissions_factors = {
@@ -60,9 +62,9 @@ def _add_emissions_factors(gen_fuel_923: pd.DataFrame) -> None:
         "coal": 95.52 / 1000,  # power sector average
         "oil": 73.96 / 1000,  # DFO #2
     }
-    gen_fuel_923["tonnes_co2_per_mmbtu"] = gen_fuel_923.loc[
-        :, "fuel_type_code_pudl"
-    ].map(epa_emissions_factors)
+    gen_fuel_923["tonnes_co2_per_mmbtu"] = gen_fuel_923.loc[:, fuel_type_col].map(
+        epa_emissions_factors
+    )
 
 
 def _co2_from_mmbtu(
@@ -253,12 +255,85 @@ def _get_proposed_fossil_plants(engine: sa.engine.Engine) -> pd.DataFrame:
     ;
     """
     df = pd.read_sql(query, engine)
-    df["co2e_tonnes_per_year"] = (
-        df.loc[:, "capacity_mw"] * 8766 * 0.5 * 8 * 53.06 / 1000
-    )
+    _estimate_proposed_power_co2e(df)
     df.rename(columns={"project_id": "id"}, inplace=True)
     df["facility_type"] = "proposed_power"
     return df
+
+
+def _estimate_proposed_power_co2e(
+    df: pd.DataFrame,
+) -> None:
+    """
+    Estimate CO2e tons per year from capacity and fuel type.
+
+    This is essentially a manual decision tree. Capacity factors were simple mean
+    values derived from recent gas plants. See notebooks/12-tpb-revisit_co2_estimates.ipynb
+    heat rate source: https://www.eia.gov/electricity/annual/html/epa_08_02.html
+    emissions factor source: https://github.com/grgmiller/emission-factors (EPA Mandatory Reporting of Greenhouse Gases Rule)
+
+    Args:
+        df (pd.DataFrame): denormalized iso queue
+
+    Returns:
+        pd.DataFrame: copy of input dataframe with new column 'co2e_tonnes_per_year'
+    """
+    gas_turbine_mmbtu_per_mwh = 11.069
+    combined_cycle_mmbtu_per_mwh = 7.604
+    coal_steam_turbine_mmbtu_per_mwh = 9.997
+
+    cc_gt_capacity_mw_split = 450.0
+    gt_sub_split = 110
+
+    cc_cap_factor = 0.622
+    gt_large_cap_factor = 0.107
+    gt_small_cap_factor = 0.608
+    coal_cap_factor = 0.6
+
+    df["mod_resource"] = df["resource"].map(
+        {"Natural Gas": "gas", "Coal": "coal", "Oil": "oil"}
+    )
+    _add_emissions_factors(df, fuel_type_col="mod_resource")
+
+    assert set(df.loc[:, "mod_resource"].unique()) == {"coal", "gas"}
+    df["mmbtu_per_mwh"] = gas_turbine_mmbtu_per_mwh
+    is_cc = df.loc[:, "capacity_mw"].gt(cc_gt_capacity_mw_split)
+    is_coal = df.loc[:, "mod_resource"] == "coal"
+    df.loc[:, "mmbtu_per_mwh"].where(
+        is_cc, other=combined_cycle_mmbtu_per_mwh, inplace=True
+    )
+    df.loc[:, "mmbtu_per_mwh"].where(
+        is_coal, other=coal_steam_turbine_mmbtu_per_mwh, inplace=True
+    )
+
+    df["estimated_capacity_factor"] = gt_small_cap_factor
+    df.loc[:, "estimated_capacity_factor"].where(
+        ~is_cc & df.loc[:, "capacity_mw"].gt(gt_sub_split),
+        other=gt_large_cap_factor,
+        inplace=True,
+    )
+    df.loc[:, "estimated_capacity_factor"].where(
+        is_cc, other=cc_cap_factor, inplace=True
+    )
+    df.loc[:, "estimated_capacity_factor"].where(
+        is_coal, other=coal_cap_factor, inplace=True
+    )
+
+    # Put it all together
+    hours_per_year = 8766  # extra 6 hours to average in leap years
+    df["mwh"] = df["capacity_mw"] * df["estimated_capacity_factor"] * hours_per_year
+    df["co2e_tonnes_per_year"] = (
+        df["mwh"] * df["mmbtu_per_mwh"] * df["tonnes_co2_per_mmbtu"]
+    )
+    intermediates = [
+        "tonnes_co2_per_mmbtu",
+        "mmbtu_per_mwh",
+        "mwh",
+        "mod_resource",
+        "estimated_capacity_factor",
+    ]
+    df.drop(columns=intermediates, inplace=True)
+    return
 
 
 def _get_proposed_fossil_infra(engine: sa.engine.Engine) -> pd.DataFrame:
