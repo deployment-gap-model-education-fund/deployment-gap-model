@@ -258,6 +258,7 @@ def _get_proposed_fossil_plants(engine: sa.engine.Engine) -> pd.DataFrame:
     _estimate_proposed_power_co2e(df)
     df.rename(columns={"project_id": "id"}, inplace=True)
     df["facility_type"] = "proposed_power"
+    df.drop(columns=["capacity_mw", "resource"], inplace=True)
     return df
 
 
