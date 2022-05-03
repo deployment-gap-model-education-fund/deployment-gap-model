@@ -1,15 +1,17 @@
 """Functions to transform EIP Infrastructure tables."""
 
 import logging
-from typing import Any, Dict, List
+from typing import Dict, List
 
 import pandas as pd
+import numpy as np
 
 from dbcp.schemas import TABLE_SCHEMAS
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     normalize_multicolumns_to_rows,
     parse_dates,
+    replace_value_with_count_validation,
 )
 from pudl.helpers import add_fips_ids as _add_fips_ids
 
@@ -89,6 +91,15 @@ RESOURCE_DICT = {
 }
 
 
+def _fix_negative_and_zero_capacity_values_inplace(iso_df: pd.DataFrame) -> None:
+    capacity_cols = [col for col in iso_df.columns if col.startswith('capacity_mw_resource_')]
+    # Fix negative capacity values. Some still don't look right but most are plausible.
+    # Only 11 values in 'active' as of 2020 data.
+    # Zero capacity obviously means missing. 146 values in active in 2020 data
+    iso_df.loc[:, capacity_cols] = iso_df.loc[:, capacity_cols].abs().replace(0, np.nan)
+    return
+
+
 def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform active iso queue data."""
     rename_dict = {
@@ -96,6 +107,7 @@ def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
         "county": "raw_county_name",
     }
     active_projects = active_projects.rename(columns=rename_dict)  # copy
+    _fix_negative_and_zero_capacity_values_inplace(active_projects)
     active_projects = remove_duplicates(active_projects)
     parse_date_columns(active_projects)
     replace_value_with_count_validation(
@@ -115,6 +127,7 @@ def completed_iso_queue_projects(completed_projects: pd.DataFrame) -> pd.DataFra
         "county": "raw_county_name",
     }
     completed_projects = completed_projects.rename(columns=rename_dict)  # copy
+    _fix_negative_and_zero_capacity_values_inplace(completed_projects)
     completed_projects = remove_duplicates(completed_projects)
     parse_date_columns(completed_projects)
     # standardize columns between queues
@@ -129,6 +142,7 @@ def withdrawn_iso_queue_projects(withdrawn_projects: pd.DataFrame) -> pd.DataFra
         "county": "raw_county_name",
     }
     withdrawn_projects = withdrawn_projects.rename(columns=rename_dict)  # copy
+    _fix_negative_and_zero_capacity_values_inplace(withdrawn_projects)
     withdrawn_projects = remove_duplicates(withdrawn_projects)
     parse_date_columns(withdrawn_projects)
     replace_value_with_count_validation(
@@ -259,37 +273,6 @@ def parse_date_columns(queue: pd.DataFrame) -> None:
         bad = new_dates.dt.year.isin({1899, 1900})
         new_dates.loc[bad] = pd.NaT
         queue.loc[:, date_col] = new_dates
-    return
-
-
-def replace_value_with_count_validation(
-    df: pd.DataFrame,
-    col: str,
-    val_to_replace: Any,
-    replacement: Any,
-    expected_count: int,
-) -> None:
-    """Manually replace values, but with a minimal form of validation to guard against future changes.
-
-    Args:
-        df (pd.DataFrame): the source dataframe
-        col (str): the name of the column containing values to replace
-        val_to_replace (Any): value to replace
-        replacement (Any): replacement value
-        expected_count (int): known number of replacements to make
-
-    Raises:
-        ValueError: if expected count of replacements does not match observed count
-    """
-    matches = df.loc[:, col] == val_to_replace
-    observed_count = matches.sum()
-    if observed_count != expected_count:
-        raise ValueError(
-            f"Expected count ({expected_count}) of {val_to_replace} "
-            f"does not match observed count ({observed_count})"
-        )
-
-    df.loc[matches, col] = replacement
     return
 
 
