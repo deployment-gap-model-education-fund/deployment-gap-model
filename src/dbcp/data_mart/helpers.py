@@ -18,14 +18,14 @@ def _subset_db_columns(
 
 def _get_county_fips_df(engine: sa.engine.Engine) -> pd.DataFrame:
     cols = ["*"]
-    db = "dbcp.county_fips"
+    db = "data_warehouse.county_fips"
     df = _subset_db_columns(cols, db, engine)
     return df
 
 
 def _get_state_fips_df(engine: sa.engine.Engine) -> pd.DataFrame:
     cols = ["*"]
-    db = "dbcp.state_fips"
+    db = "data_warehouse.state_fips"
     df = _subset_db_columns(cols, db, engine)
     return df
 
@@ -67,7 +67,7 @@ class CountyOpposition(object):
             # 'raw_state_name',  # drop raw name in favor of canonical one
             # 'state_id_fips',  # will join on 5-digit county FIPS, which includes state
         ]
-        db = "dbcp.local_ordinance"
+        db = "data_warehouse.local_ordinance"
         df = _subset_db_columns(cols, db, self._engine)
         return df
 
@@ -80,7 +80,7 @@ class CountyOpposition(object):
             # 'raw_state_name',  # drop raw name in favor of canonical one
             "state_id_fips",
         ]
-        table = "dbcp.state_policy"
+        table = "data_warehouse.state_policy"
         states_to_exclude = (
             "23",  # Maine (repealed)
             "36",  # New York (pro-renewables policy)
