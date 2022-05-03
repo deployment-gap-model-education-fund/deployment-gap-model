@@ -1,9 +1,10 @@
 """Modules to create tables in the 'data mart' for direct use by users."""
 
-# for each module in data_mart, collect
 import importlib
 import logging
 import pkgutil
+
+import pandas as pd
 
 import dbcp
 
@@ -16,11 +17,25 @@ def create_data_marts(args):
     for module_info in pkgutil.iter_modules(__path__):
         module = importlib.import_module(f"{__name__}.{module_info.name}")
         try:
-            data_marts[module_info.name] = module.create_data_mart()
+            data = module.create_data_mart()
         except AttributeError:
             raise AttributeError(
                 f"{module_info.name} has no attribute 'create_data_mart'."
                 "Make sure the data mart module implements create_data_mart function."
+            )
+        if isinstance(data, pd.DataFrame):
+            assert (
+                module_info.name not in data_marts.keys()
+            ), f"Key {module_info.name} already exists in data mart"
+            data_marts[module_info.name] = data
+        elif isinstance(data, dict):
+            assert (
+                len([key for key in data.keys() if key in data_marts.keys()]) == 0
+            ), f"Dict key from {module_info.name} already exists"
+            data_marts.update(data)
+        else:
+            raise TypeError(
+                f"Expecting pd.DataFrame or dict of dataframes. Got {type(data)}"
             )
 
     # Setup postgres
