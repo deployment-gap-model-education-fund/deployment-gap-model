@@ -18,7 +18,7 @@ MockDocument = namedtuple("MockDocument", ["paragraphs"])
 
 
 def mock_parser_factory(mock_document: MockDocument):
-    """Create a moc ColumbiaDocxParser for testing."""
+    """Create a mock ColumbiaDocxParser for testing."""
     output = ColumbiaDocxParser()
     output.doc = mock_document
     return output
