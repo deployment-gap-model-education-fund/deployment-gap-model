@@ -89,9 +89,7 @@ class NCSLScraper(object):
             "description": [],
             "link": [],
         }
-        for state_div in self.soup.find_all(
-            "div", class_="panel notshowing"  # type: ignore
-        ):
+        for state_div in self.soup.find_all("div", class_="panel notshowing"):  # type: ignore
             state_entry = self._parse_state_div(state_div)
             for attr, value in state_entry.items():
                 scraped[attr].append(value)
