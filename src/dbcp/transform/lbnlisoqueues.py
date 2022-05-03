@@ -4,6 +4,7 @@ import logging
 from typing import Any, Dict, List
 
 import pandas as pd
+import numpy as np
 
 from dbcp.schemas import TABLE_SCHEMAS
 from dbcp.transform.helpers import (
@@ -89,6 +90,15 @@ RESOURCE_DICT = {
 }
 
 
+def _fix_negative_and_zero_capacity_values_inplace(iso_df: pd.DataFrame) -> None:
+    capacity_cols = [col for col in iso_df.columns if col.startswith('capacity_mw_resource_')]
+    # Fix negative capacity values. Some still don't look right but most are plausible.
+    # Only 11 values in 'active' as of 2020 data.
+    # Zero capacity obviously means missing. 146 values in active in 2020 data
+    iso_df.loc[:, capacity_cols] = iso_df.loc[:, capacity_cols].abs().replace(0, np.nan)
+    return
+
+
 def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform active iso queue data."""
     rename_dict = {
@@ -96,6 +106,7 @@ def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
         "county": "raw_county_name",
     }
     active_projects = active_projects.rename(columns=rename_dict)  # copy
+    _fix_negative_and_zero_capacity_values_inplace(active_projects)
     active_projects = remove_duplicates(active_projects)
     parse_date_columns(active_projects)
     replace_value_with_count_validation(
@@ -115,6 +126,7 @@ def completed_iso_queue_projects(completed_projects: pd.DataFrame) -> pd.DataFra
         "county": "raw_county_name",
     }
     completed_projects = completed_projects.rename(columns=rename_dict)  # copy
+    _fix_negative_and_zero_capacity_values_inplace(completed_projects)
     completed_projects = remove_duplicates(completed_projects)
     parse_date_columns(completed_projects)
     # standardize columns between queues
@@ -129,6 +141,7 @@ def withdrawn_iso_queue_projects(withdrawn_projects: pd.DataFrame) -> pd.DataFra
         "county": "raw_county_name",
     }
     withdrawn_projects = withdrawn_projects.rename(columns=rename_dict)  # copy
+    _fix_negative_and_zero_capacity_values_inplace(withdrawn_projects)
     withdrawn_projects = remove_duplicates(withdrawn_projects)
     parse_date_columns(withdrawn_projects)
     replace_value_with_count_validation(
