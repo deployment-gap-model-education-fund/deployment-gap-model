@@ -406,17 +406,19 @@ def _get_proposed_fossil_infra(engine: sa.engine.Engine) -> pd.DataFrame:
 
 
 def create_data_mart(
-    postgres_engine: Optional[sa.engine.Engine] = None,
+    engine: Optional[sa.engine.Engine] = None,
     pudl_engine: Optional[sa.engine.Engine] = None,
 ) -> pd.DataFrame:
     """Create final output table.
 
     Args:
-        engine (Optional[sa.engine.Engine], optional): sqlalchemy engine. Defaults to None.
+        engine (Optional[sa.engine.Engine], optional): postgres engine. Defaults to None.
+        pudl_engine (Optional[sa.engine.Engine], optional): pudl's sqlite engine. Defaults to None.
 
     Returns:
         pd.DataFrame: table for data mart
     """
+    postgres_engine = engine
     if postgres_engine is None:
         postgres_engine = get_sql_engine()
     if pudl_engine is None:
