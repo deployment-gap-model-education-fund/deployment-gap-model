@@ -13,13 +13,14 @@ logger = logging.getLogger(__name__)
 
 def create_data_marts(args):
     """Collect and load all data mart tables to data warehouse."""
+    engine = dbcp.helpers.get_sql_engine()
     data_marts = {}
     for module_info in pkgutil.iter_modules(__path__):
         if module_info.name == "helpers":  # skip
             continue
         module = importlib.import_module(f"{__name__}.{module_info.name}")
         try:
-            data = module.create_data_mart()
+            data = module.create_data_mart(engine=engine)
         except AttributeError:
             raise AttributeError(
                 f"{module_info.name} has no attribute 'create_data_mart'."
@@ -41,7 +42,6 @@ def create_data_marts(args):
             )
 
     # Setup postgres
-    engine = dbcp.helpers.get_sql_engine()
     with engine.connect() as con:
         engine.execute("CREATE SCHEMA IF NOT EXISTS data_mart")
 
