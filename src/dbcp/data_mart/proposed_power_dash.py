@@ -83,7 +83,7 @@ def _get_existing_plants(engine: sa.engine.Engine) -> pd.DataFrame:
         END
         ) as resource,
         sum(capacity_mw) as capacity_mw
-        FROM dbcp.mcoe
+        FROM data_warehouse.mcoe
         WHERE operational_status = 'existing'
         GROUP BY 1, 2
         ORDER BY 1, 2
@@ -96,7 +96,7 @@ def _get_existing_plants(engine: sa.engine.Engine) -> pd.DataFrame:
         agg.resource,
         agg.capacity_mw
     from county_aggs as agg
-    left join dbcp.county_fips as cfip
+    left join data_warehouse.county_fips as cfip
         on agg.county_id_fips = cfip.county_id_fips
     ),
     w_names as (
@@ -108,7 +108,7 @@ def _get_existing_plants(engine: sa.engine.Engine) -> pd.DataFrame:
             agg.resource,
             agg.capacity_mw
         from w_county_names as agg
-        left join dbcp.state_fips as sfip
+        left join data_warehouse.state_fips as sfip
             on agg.state_id_fips = sfip.state_id_fips
     )
     select
@@ -120,7 +120,7 @@ def _get_existing_plants(engine: sa.engine.Engine) -> pd.DataFrame:
         agg.capacity_mw,
         ncsl.permitting_type
     from w_names as agg
-    left join dbcp.ncsl_state_permitting as ncsl
+    left join data_warehouse.ncsl_state_permitting as ncsl
         on agg.state_id_fips = ncsl.state_id_fips
     ;
     """
@@ -158,8 +158,8 @@ def _get_proposed_plants(engine: sa.engine.Engine) -> pd.DataFrame:
         select
             proj.project_id,
             loc.county_id_fips
-        from dbcp.iso_projects as proj
-        left join dbcp.iso_locations as loc
+        from data_warehouse.iso_projects as proj
+        left join data_warehouse.iso_locations as loc
             on loc.project_id = proj.project_id
         where proj.queue_status = 'active'
     ),
@@ -177,7 +177,7 @@ def _get_proposed_plants(engine: sa.engine.Engine) -> pd.DataFrame:
             sum(res.capacity_mw) as capacity_mw,
             count(loc.project_id) as project_count
         from active_loc as loc
-        left join dbcp.iso_resource_capacity as res
+        left join data_warehouse.iso_resource_capacity as res
             on res.project_id = loc.project_id
         where capacity_mw is not NULL
         group by 1, 2
@@ -192,7 +192,7 @@ def _get_proposed_plants(engine: sa.engine.Engine) -> pd.DataFrame:
         agg.capacity_mw,
         agg.project_count
     from county_aggs as agg
-    left join dbcp.county_fips as cfip
+    left join data_warehouse.county_fips as cfip
         on agg.county_id_fips = cfip.county_id_fips
     ),
     w_names as (
@@ -205,7 +205,7 @@ def _get_proposed_plants(engine: sa.engine.Engine) -> pd.DataFrame:
             agg.capacity_mw,
             agg.project_count
         from w_county_names as agg
-        left join dbcp.state_fips as sfip
+        left join data_warehouse.state_fips as sfip
             on agg.state_id_fips = sfip.state_id_fips
     )
     select
@@ -218,7 +218,7 @@ def _get_proposed_plants(engine: sa.engine.Engine) -> pd.DataFrame:
         agg.project_count,
         ncsl.permitting_type
     from w_names as agg
-    left join dbcp.ncsl_state_permitting as ncsl
+    left join data_warehouse.ncsl_state_permitting as ncsl
         on agg.state_id_fips = ncsl.state_id_fips
     ;
     """
@@ -262,7 +262,9 @@ def _add_permitting_type_column(
         pd.DataFrame: local_opp plus a new column
     """
     permit_df = _subset_db_columns(
-        ["state_id_fips", "permitting_type"], "dbcp.ncsl_state_permitting", engine
+        ["state_id_fips", "permitting_type"],
+        "data_warehouse.ncsl_state_permitting",
+        engine,
     )
     out = local_opp.merge(
         permit_df, how="left", on="state_id_fips", copy=False, validate="m:1"
@@ -270,7 +272,7 @@ def _add_permitting_type_column(
     return out
 
 
-def make_dashboard_tables(
+def create_data_mart(
     engine: Optional[sa.engine.Engine] = None,
 ) -> Dict[str, pd.DataFrame]:
     """API function to create the 3 tables used in the existing vs proposed power dashboard.
@@ -284,14 +286,19 @@ def make_dashboard_tables(
     if engine is None:
         engine = get_sql_engine()
     dfs = {
-        "local_opp": local_opposition(engine=engine),
-        "existing_plants": _get_existing_plants(engine),
-        "proposed_plants": _get_proposed_plants(engine),
+        "proposed_power_dash_local_opp": local_opposition(engine=engine),
+        "proposed_power_dash_existing_plants": _get_existing_plants(engine),
+        "proposed_power_dash_proposed_plants": _get_proposed_plants(engine),
     }
-    for key in ["existing_plants", "proposed_plants"]:
+    for key in [
+        "proposed_power_dash_existing_plants",
+        "proposed_power_dash_proposed_plants",
+    ]:
         dfs[key] = _add_has_ordinance_column(
-            county_df=dfs[key], local_opp=dfs["local_opp"]
+            county_df=dfs[key], local_opp=dfs["proposed_power_dash_local_opp"]
         )
-    dfs["local_opp"] = _add_permitting_type_column(dfs["local_opp"], engine=engine)
+    dfs["proposed_power_dash_local_opp"] = _add_permitting_type_column(
+        dfs["proposed_power_dash_local_opp"], engine=engine
+    )
 
     return dfs
