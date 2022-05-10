@@ -8,6 +8,9 @@ import coloredlogs
 import dbcp
 from dbcp.transform.helpers import GEOCODER_CACHE
 
+logger = logging.getLogger(__name__)
+
+
 def parse_command_line():
     """
     Parse script command line arguments. See the -h option.
@@ -19,16 +22,30 @@ def parse_command_line():
     parser = argparse.ArgumentParser(description=__doc__)
 
     parser.add_argument(
-        '-c',
-        '--csv',
-        action='store_true',
+        "-dm",
+        "--data-mart",
+        action="store_true",
+        default=False,
+        help="Build the data marts.",
+    )
+    parser.add_argument(
+        "-e",
+        "--etl",
+        action="store_true",
+        default=False,
+        help="Run the etl to produce the data warehouse.",
+    )
+    parser.add_argument(
+        "-c",
+        "--csv",
+        action="store_true",
         default=False,
         help="Write tables to csvs. This will overwrite existing csvs.",
     )
     parser.add_argument(
-        '-bq',
-        '--upload-to-bigquery',
-        action='store_true',
+        "-bq",
+        "--upload-to-bigquery",
+        action="store_true",
         default=False,
         help="Loads tables to BigQuery.",
     )
@@ -38,9 +55,9 @@ def parse_command_line():
         default="INFO",
     )
     parser.add_argument(
-        '-clr',
-        '--clear-geocoder-cache',
-        action='store_true',
+        "-clr",
+        "--clear-geocoder-cache",
+        action="store_true",
         default=False,
         help="Delete saved geocoder results, forcing fresh API calls.",
     )
@@ -54,12 +71,16 @@ def main():
 
     # Display logged output from the PUDL package:
     dbcp_logger = logging.getLogger()
-    log_format = '%(asctime)s [%(levelname)8s] %(name)s:%(lineno)s %(message)s'
+    log_format = "%(asctime)s [%(levelname)8s] %(name)s:%(lineno)s %(message)s"
     coloredlogs.install(fmt=log_format, level=args.loglevel, logger=dbcp_logger)
 
     if args.clear_geocoder_cache or args.upload_to_bigquery:
         GEOCODER_CACHE.clear()
-    dbcp.etl.etl(args)
+
+    if args.etl:
+        dbcp.etl.etl(args)
+    if args.data_mart:
+        dbcp.data_mart.create_data_marts(args)
 
 
 if __name__ == "__main__":
