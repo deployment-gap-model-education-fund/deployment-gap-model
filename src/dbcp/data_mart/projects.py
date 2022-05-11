@@ -17,82 +17,76 @@ def _subset_db_columns(
     return df
 
 
-def _get_iso_location_df(engine: sa.engine.Engine) -> pd.DataFrame:
-    cols = [
-        "project_id",
-        # 'county',  # drop raw name in favor of canonical FIPS name
-        # 'state',  # drop raw name in favor of canonical FIPS name
-        "state_id_fips",
-        "county_id_fips",
-        # 'geocoded_locality_name',  # drop detailed location info for simplicity
-        # 'geocoded_locality_type',  # drop detailed location info for simplicity
-        # 'geocoded_containing_county',  # drop geocoded name in favor of canonical FIPS name
-    ]
-    db = "data_warehouse.iso_locations"
-
-    simple_location_df = _subset_db_columns(cols, db, engine)
-    # If multiple counties, just pick the first one. This is simplistic but there are only 26/13259 (0.2%)
-    simple_location_df = simple_location_df.groupby("project_id", as_index=False).nth(0)
-    return simple_location_df
-
-
-def _get_iso_resource_df(engine: sa.engine.Engine) -> pd.DataFrame:
-    cols = [
-        "capacity_mw",
-        # 'project_class',  # will model this according to client wants
-        "project_id",
-        # 'resource',  # drop raw name in favor of resource_clean
-        # 'resource_class',  # will model this according to client wants
-        "resource_clean",
-    ]
-    db = "data_warehouse.iso_resource_capacity"
-    df = _subset_db_columns(cols, db, engine)
-    return df
-
-
-def _get_iso_project_df(engine: sa.engine.Engine) -> pd.DataFrame:
-    cols = [
-        "date_operational",
-        "date_proposed",
-        # 'date_proposed_raw',  # drop raw date in favor of parsed date_proposed
-        "date_withdrawn",
-        # 'date_withdrawn_raw',  # drop raw date in favor of parsed date_withdrawn
-        "days_in_queue",
-        "developer",
-        "entity",
-        "interconnection_status_lbnl",
-        # 'interconnection_status_raw',  # drop raw status in favor of interconnection_status_lbnl
-        "point_of_interconnection",
-        "project_id",
-        "project_name",
-        "queue_date",
-        # 'queue_date_raw',  # drop raw date in favor of parsed queue_date
-        # 'queue_id',  # not a candidate key due to hundreds of missing NYISO withdrawn IDs
-        "queue_status",
-        # 'queue_year',   # year info is contained in queue_date
-        "region",
-        # 'resource_type_lbnl',  # just use clean types for simplicity
-        "utility",
-        "withdrawl_reason",
-        # 'year_operational',  # year info is contained in date_operational
-        # 'year_proposed',  # year info is contained in date_proposed
-        # 'year_withdrawn',  # year info is contained in date_withdrawn
-    ]
-    db = "data_warehouse.iso_projects"
-    df = _subset_db_columns(cols, db, engine)
-    return df
-
-
-def _get_ncsl_wind_permitting_df(engine: sa.engine.Engine) -> pd.DataFrame:
-    cols = [
-        "description",
-        # 'link',  # too detailed?
-        "permitting_type",
-        # 'raw_state_name',  # drop raw name in favor of canonical one
-        "state_id_fips",
-    ]
-    db = "data_warehouse.ncsl_state_permitting"
-    df = _subset_db_columns(cols, db, engine)
+def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
+    query = """
+    WITH
+    proj_res as (
+        SELECT
+            proj.project_id,
+            proj.date_operational,
+            proj.date_proposed as date_proposed_online,
+            proj.date_withdrawn,
+            proj.days_in_queue,
+            proj.developer,
+            proj.entity,
+            proj.interconnection_status_lbnl as interconnection_status,
+            proj.point_of_interconnection,
+            proj.project_name,
+            proj.queue_date as date_entered_queue,
+            proj.queue_status,
+            proj.region as iso_region,
+            proj.utility,
+            proj.withdrawl_reason,
+            res.capacity_mw,
+            res.resource_clean
+        FROM data_warehouse.iso_projects as proj
+        INNER JOIN data_warehouse.iso_resource_capacity as res
+        ON proj.project_id = res.project_id
+    ),
+    loc as (
+        -- this query simplifies the 1:m relationship
+        -- by taking only the first result, making it 1:1.
+        -- Only 26 / 13259 rows are dropped.
+        SELECT DISTINCT ON (project_id)
+            project_id,
+            state_id_fips,
+            county_id_fips
+        FROM data_warehouse.iso_locations
+    ),
+    iso as (
+        SELECT
+            proj_res.*,
+            loc.state_id_fips,
+            loc.county_id_fips
+        from proj_res
+        LEFT JOIN loc
+        ON proj_res.project_id = loc.project_id
+    ),
+    w_county_names as (
+        select
+            cfip.county_name as county,
+            iso.*
+        from iso
+        left join data_warehouse.county_fips as cfip
+            on iso.county_id_fips = cfip.county_id_fips
+    ),
+    w_names as (
+        SELECT
+            sfip.state_name as state,
+            iso.*
+        from w_county_names as iso
+        left join data_warehouse.state_fips as sfip
+            on iso.state_id_fips = sfip.state_id_fips
+    )
+    select
+        iso.*,
+        ncsl.permitting_type as state_permitting_type
+    from w_names as iso
+    left join data_warehouse.ncsl_state_permitting as ncsl
+        on iso.state_id_fips = ncsl.state_id_fips
+    ;
+    """
+    df = pd.read_sql(query, engine)
     return df
 
 
@@ -250,16 +244,14 @@ def _agg_local_ordinances_to_counties(ordinances: pd.DataFrame) -> pd.DataFrame:
     return recombined
 
 
-def _convert_resource_df_long_to_wide(resource_df: pd.DataFrame) -> pd.DataFrame:
-    res_df = resource_df.copy()
+def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
+    long = long_format.copy()
     # separate generation from storage
-    is_storage = res_df.loc[:, "resource_clean"].str.contains(
-        "storage", flags=IGNORECASE
-    )
-    res_df["storage_type"] = res_df.loc[:, "resource_clean"].where(is_storage)
-    res_df["generation_type"] = res_df.loc[:, "resource_clean"].where(~is_storage)
-    gen = res_df.loc[~is_storage, :]
-    storage = res_df.loc[is_storage, :]
+    is_storage = long.loc[:, "resource_clean"].str.contains("storage", flags=IGNORECASE)
+    long["storage_type"] = long.loc[:, "resource_clean"].where(is_storage)
+    long["generation_type"] = long.loc[:, "resource_clean"].where(~is_storage)
+    gen = long.loc[~is_storage, :]
+    storage = long.loc[is_storage, :]
 
     group = gen.groupby("project_id")[["generation_type", "capacity_mw"]]
     # first generation source
@@ -276,44 +268,44 @@ def _convert_resource_df_long_to_wide(resource_df: pd.DataFrame) -> pd.DataFrame
     gen_2 = group.nth(1).rename(columns=rename_dict)
     # shouldn't be any with 3 generation types
     assert group.nth(2).shape[0] == 0
+    gen = pd.concat([gen_1, gen_2], axis=1, copy=False)
 
     # storage
     assert storage.duplicated("project_id").sum() == 0  # no multi-storage projects
-    storage = storage.set_index("project_id")[["storage_type", "capacity_mw"]].rename(
+    storage = storage.set_index("project_id")[["capacity_mw"]].rename(
         columns={"capacity_mw": "storage_capacity_mw"}
     )
 
     # combine
-    output = gen_1.join([gen_2, storage], how="outer", sort=True)
+    gen_stor = gen.join(storage, how="outer")
     assert (
-        len(output) == res_df.loc[:, "project_id"].nunique()
+        len(gen_stor) == long.loc[:, "project_id"].nunique()
     )  # all projects accounted for and 1:1
-    return output
-
-
-def _get_and_join_iso_tables(engine: Optional[sa.engine.Engine] = None) -> pd.DataFrame:
-    if engine is None:
-        engine = get_sql_engine()
-    project_df = _get_iso_project_df(engine)
-    location_df = _get_iso_location_df(engine)
-    resource_df = _get_iso_resource_df(engine)
-    resource_df = _convert_resource_df_long_to_wide(resource_df)
-
-    n_total_projects = project_df.loc[:, "project_id"].nunique()
-    combined = resource_df.join(
-        [project_df.set_index("project_id"), location_df.set_index("project_id")],
-        how="outer",
+    other_cols = (
+        long.drop(columns=["generation_type", "capacity_mw", "resource_clean"])
+        .groupby("project_id")
+        .nth(0)
     )
-    assert len(combined) == n_total_projects
-    return combined.reset_index()
+    wide = pd.concat([gen_stor, other_cols], axis=1, copy=False)
+    wide.sort_index(inplace=True)
+    wide.reset_index(inplace=True)
+    return wide
 
 
-def _add_derived_columns(mart: pd.DataFrame) -> pd.DataFrame:
-    out = mart.copy()
-    out["has_ordinance"] = out["ordinance"].notna()
-    out["is_hybrid"] = out[["generation_type_1", "storage_type"]].notna().all(axis=1)
+def _add_derived_columns(mart: pd.DataFrame) -> None:
+    mart["has_ordinance"] = mart["ordinance"].notna()
+    # This categorizes projects with multiple generation types, but
+    # no storage, as 'hybrid'
+    mart["is_hybrid"] = mart.duplicated("project_id", keep=False)
 
     resource_map = {
+        "Battery Storage": "storage",
+        "Pumped Storage": "storage",
+        "Other Storage": "storage",
+        "Solar; Storage": "renewable",
+        "Wind; Storage": "renewable",
+        "Natural Gas; Other; Storage; Solar": "fossil",
+        "Natural Gas; Storage": "fossil",
         "Onshore Wind": "renewable",
         "Solar": "renewable",
         "Natural Gas": "fossil",
@@ -332,17 +324,16 @@ def _add_derived_columns(mart: pd.DataFrame) -> pd.DataFrame:
         "Combustion Turbine": "fossil",
         "Oil; Biomass": "fossil",
         "Municipal Solid Waste": "fossil",
-        "Fuel Cell": "renewable",
+        "Fuel Cell": "other",
         "Steam": np.nan,
         "Solar; Biomass": "renewable",
         "Methane; Solar": "other",
-        np.nan: np.nan,
     }
     # note that this classifies pure storage facilities as np.nan
-    assert set(out["generation_type_1"].unique()) == set(resource_map.keys())
-    out["resource_class"] = out["generation_type_1"].map(resource_map)
+    assert set(mart["resource_clean"].unique()) == set(resource_map.keys())
+    mart["resource_class"] = mart["resource_clean"].map(resource_map)
 
-    return out
+    return mart
 
 
 def create_data_mart(engine: Optional[sa.engine.Engine] = None) -> pd.DataFrame:
@@ -350,7 +341,6 @@ def create_data_mart(engine: Optional[sa.engine.Engine] = None) -> pd.DataFrame:
     if engine is None:
         engine = get_sql_engine()
     iso = _get_and_join_iso_tables(engine)
-    ncsl = _get_ncsl_wind_permitting_df(engine)
     local_opp = _get_local_opposition_df(engine)
     state_opp = _get_state_opposition_df(engine)
     all_counties = _get_county_fips_df(engine)
@@ -363,44 +353,19 @@ def create_data_mart(engine: Optional[sa.engine.Engine] = None) -> pd.DataFrame:
     )
     combined_opp = pd.concat([local_opp, states_to_counties], axis=0)
     combined_opp = _agg_local_ordinances_to_counties(combined_opp)
-
-    # use canonical state and county names
-    iso = iso.merge(
-        all_states[["state_abbrev", "state_id_fips"]],
-        on="state_id_fips",
-        how="left",
-        validate="m:1",
-    )
-    iso = iso.merge(
-        all_counties[["county_name", "county_id_fips"]],
-        on="county_id_fips",
-        how="left",
-        validate="m:1",
-    )
-
-    combined = iso.merge(ncsl, on="state_id_fips", how="left", validate="m:1")
-    combined = combined.merge(
-        combined_opp, on="county_id_fips", how="left", validate="m:1"
-    )
-
-    combined = _add_derived_columns(combined)
-
     rename_dict = {
-        "date_proposed": "date_proposed_online",
-        "interconnection_status_lbnl": "interconnection_status",
-        "queue_date": "date_entered_queue",
-        "region": "iso_region",
         "geocoded_locality_name": "ordinance_jurisdiction_name",
         "geocoded_locality_type": "ordinance_jurisdiction_type",
         "earliest_year_mentioned": "ordinance_earliest_year_mentioned",
-        "description": "state_permitting_text",
-        "permitting_type": "state_permitting_type",
-        "state_abbrev": "state",
-        "county_name": "county",
     }
-    combined = combined.rename(columns=rename_dict)
+    combined_opp.rename(columns=rename_dict, inplace=True)
 
-    col_order = [
+    long_format = iso.merge(
+        combined_opp, on="county_id_fips", how="left", validate="m:1"
+    )
+    _add_derived_columns(long_format)
+
+    wide_col_order = [
         "project_id",
         "project_name",
         "iso_region",
@@ -434,6 +399,10 @@ def create_data_mart(engine: Optional[sa.engine.Engine] = None) -> pd.DataFrame:
         "ordinance_earliest_year_mentioned",
         "ordinance",
         "state_permitting_type",
-        "state_permitting_text",
     ]
-    return combined[col_order]
+    wide_format = _convert_long_to_wide(long_format).loc[:, wide_col_order]
+
+    return {
+        "iso_projects_long_format": long_format,
+        "iso_projects_wide_format": wide_format,
+    }
