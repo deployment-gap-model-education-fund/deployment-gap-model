@@ -301,23 +301,23 @@ def _estimate_proposed_power_co2e(
     is_cc = df.loc[:, "capacity_mw"].gt(cc_gt_capacity_mw_split)
     is_coal = df.loc[:, "mod_resource"] == "coal"
     df.loc[:, "mmbtu_per_mwh"].where(
-        is_cc, other=combined_cycle_mmbtu_per_mwh, inplace=True
+        ~is_cc, other=combined_cycle_mmbtu_per_mwh, inplace=True
     )
     df.loc[:, "mmbtu_per_mwh"].where(
-        is_coal, other=coal_steam_turbine_mmbtu_per_mwh, inplace=True
+        ~is_coal, other=coal_steam_turbine_mmbtu_per_mwh, inplace=True
     )
 
     df["estimated_capacity_factor"] = gt_small_cap_factor
     df.loc[:, "estimated_capacity_factor"].where(
-        ~is_cc & df.loc[:, "capacity_mw"].gt(gt_sub_split),
+        ~is_cc & df.loc[:, "capacity_mw"].le(gt_sub_split),
         other=gt_large_cap_factor,
         inplace=True,
     )
     df.loc[:, "estimated_capacity_factor"].where(
-        is_cc, other=cc_cap_factor, inplace=True
+        ~is_cc, other=cc_cap_factor, inplace=True
     )
     df.loc[:, "estimated_capacity_factor"].where(
-        is_coal, other=coal_cap_factor, inplace=True
+        ~is_coal, other=coal_cap_factor, inplace=True
     )
 
     # Put it all together
