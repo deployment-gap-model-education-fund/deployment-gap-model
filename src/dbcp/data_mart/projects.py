@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import sqlalchemy as sa
 
+from dbcp.data_mart.helpers import _estimate_proposed_power_co2e
 from dbcp.helpers import get_sql_engine
 
 
@@ -87,6 +88,7 @@ def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
     ;
     """
     df = pd.read_sql(query, engine)
+    _estimate_proposed_power_co2e(df)
     return df
 
 
@@ -281,12 +283,20 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     assert (
         len(gen_stor) == long.loc[:, "project_id"].nunique()
     )  # all projects accounted for and 1:1
+    co2e = long.groupby("project_id")["co2e_tonnes_per_year"].sum()
     other_cols = (
-        long.drop(columns=["generation_type", "capacity_mw", "resource_clean"])
+        long.drop(
+            columns=[
+                "generation_type",
+                "capacity_mw",
+                "resource_clean",
+                "co2e_tonnes_per_year",
+            ]
+        )
         .groupby("project_id")
         .nth(0)
     )
-    wide = pd.concat([gen_stor, other_cols], axis=1, copy=False)
+    wide = pd.concat([gen_stor, other_cols, co2e], axis=1, copy=False)
     wide.sort_index(inplace=True)
     wide.reset_index(inplace=True)
     return wide
@@ -331,9 +341,8 @@ def _add_derived_columns(mart: pd.DataFrame) -> None:
     }
     # note that this classifies pure storage facilities as np.nan
     assert set(mart["resource_clean"].unique()) == set(resource_map.keys())
-    mart["resource_class"] = mart["resource_clean"].map(resource_map)
-
-    return mart
+    mart["resource_class"] = mart.loc[:, "resource_clean"].map(resource_map)
+    return
 
 
 def create_data_mart(engine: Optional[sa.engine.Engine] = None) -> pd.DataFrame:
@@ -384,6 +393,7 @@ def create_data_mart(engine: Optional[sa.engine.Engine] = None) -> pd.DataFrame:
         "generation_capacity_mw_2",
         "storage_type",
         "storage_capacity_mw",
+        "co2e_tonnes_per_year",
         "date_entered_queue",
         "date_operational",
         "date_proposed_online",
