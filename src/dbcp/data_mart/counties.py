@@ -5,6 +5,9 @@ import pandas as pd
 import sqlalchemy as sa
 
 from dbcp.constants import PUDL_LATEST_YEAR
+from dbcp.data_mart.fossil_infrastructure_projects import (
+    create_data_mart as create_fossil_infra_data_mart,
+)
 from dbcp.helpers import get_sql_engine
 
 
@@ -212,6 +215,57 @@ def _get_pudl_df(engine: sa.engine.Engine) -> pd.DataFrame:
     where operational_status = 'existing'
     and report_date = date('{PUDL_LATEST_YEAR}-01-01')"""
     df = pd.read_sql(query, engine)
+    return df
+
+
+def _get_fossil_infrastructure_df(engine: sa.engine.Engine) -> pd.DataFrame:
+    # Avoid db dependency order by recreating the df.
+    # Could also make an orchestration script.
+    infra = create_fossil_infra_data_mart(engine)
+
+    # equivalent SQL query that I translated to pandas to avoid dependency
+    # on the data_mart schema (which doesn't yet exist when this function runs)
+    """
+    SELECT
+        county_id_fips,
+        sum(co2e_tonnes_per_year) as infra_co2e_tonnes_per_year,
+        sum(pm2_5_tonnes_per_year) as infra_pm2_5_tonnes_per_year,
+        sum(nox_tonnes_per_year) as infra_nox_tonnes_per_year,
+        count(project_id) as infra_count_projects,
+        string_agg(distinct industry_sector, ', ') as infra_sector_list,
+        max(raw_percent_low_income_within_3_miles) as infra_max_pct_low_income,
+        max(raw_percent_people_of_color_within_3_miles) as infra_max_pct_people_of_color
+    from data_mart.fossil_infrastructure_projects
+    group by 1
+    ;
+    """
+    grp = infra.groupby("county_id_fips")
+    normal_aggs = grp.agg(
+        {
+            "co2e_tonnes_per_year": "sum",
+            "pm2_5_tonnes_per_year": "sum",
+            "nox_tonnes_per_year": "sum",
+            "project_id": "count",
+            "raw_percent_low_income_within_3_miles": "max",
+            "raw_percent_people_of_color_within_3_miles": "max",
+        }
+    )
+    normal_aggs.rename(
+        columns={
+            "co2e_tonnes_per_year": "infra_co2e_tonnes_per_year",
+            "pm2_5_tonnes_per_year": "infra_pm2_5_tonnes_per_year",
+            "nox_tonnes_per_year": "infra_nox_tonnes_per_year",
+            "project_id": "infra_count_projects",
+            "raw_percent_low_income_within_3_miles": "infra_max_pct_low_income",
+            "raw_percent_people_of_color_within_3_miles": "infra_max_pct_people_of_color",
+        },
+        inplace=True,
+    )
+    string_concat_agg = grp["industry_sector"].apply(
+        lambda x: ", ".join(sorted([item for item in x.unique()]))
+    )
+    string_concat_agg.rename("infra_sector_list", inplace=True)
+    df = pd.concat([normal_aggs, string_concat_agg], axis=1, copy=False).reset_index()
     return df
 
 
@@ -539,6 +593,7 @@ def create_data_mart(engine: Optional[sa.engine.Engine] = None) -> pd.DataFrame:
     state_opp = _get_state_opposition_df(engine)
     all_counties = _get_county_fips_df(engine)
     all_states = _get_state_fips_df(engine)
+    infra = _get_fossil_infrastructure_df(engine)
 
     # model local opposition
     filtered_state_opp = _filter_state_opposition(state_opp)
@@ -563,7 +618,10 @@ def create_data_mart(engine: Optional[sa.engine.Engine] = None) -> pd.DataFrame:
 
     # join it all
     out = pd.concat([iso_aggs, existing_aggs, recent_aggs], axis=1)
-    out = out.join(combined_opp.set_index("county_id_fips"), how="left")
+    out = out.join(
+        [combined_opp.set_index("county_id_fips"), infra.set_index("county_id_fips")],
+        how="left",
+    )
     out = out.reset_index()
     out["state_id_fips"] = out["county_id_fips"].str[:2]
     out = out.merge(ncsl, on="state_id_fips", how="left", validate="m:1")
@@ -649,5 +707,12 @@ def create_data_mart(engine: Optional[sa.engine.Engine] = None) -> pd.DataFrame:
         "ordinance_earliest_year_mentioned",
         "state_permitting_type",
         "state_permitting_text",
+        "infra_co2e_tonnes_per_year",
+        "infra_pm2_5_tonnes_per_year",
+        "infra_nox_tonnes_per_year",
+        "infra_count_projects",
+        "infra_sector_list",
+        "infra_max_pct_low_income",
+        "infra_max_pct_people_of_color",
     ]
     return out[col_order]
