@@ -175,11 +175,10 @@ def _get_proposed_plants(engine: sa.engine.Engine) -> pd.DataFrame:
             END
             ) as resource,
             sum(res.capacity_mw) as capacity_mw,
-            count(loc.project_id) as project_count
+            count(distinct loc.project_id) as project_count
         from active_loc as loc
         left join data_warehouse.iso_resource_capacity as res
             on res.project_id = loc.project_id
-        where capacity_mw is not NULL
         group by 1, 2
         order by 1, 2
     ),
