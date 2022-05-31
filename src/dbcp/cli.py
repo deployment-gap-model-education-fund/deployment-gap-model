@@ -74,7 +74,7 @@ def main():
     log_format = "%(asctime)s [%(levelname)8s] %(name)s:%(lineno)s %(message)s"
     coloredlogs.install(fmt=log_format, level=args.loglevel, logger=dbcp_logger)
 
-    if args.clear_geocoder_cache or args.upload_to_bigquery:
+    if args.clear_geocoder_cache:
         GEOCODER_CACHE.clear()
 
     if args.etl:
