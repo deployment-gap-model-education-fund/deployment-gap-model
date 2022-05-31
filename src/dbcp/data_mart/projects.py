@@ -24,10 +24,7 @@ def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
     proj_res as (
         SELECT
             proj.project_id,
-            proj.date_operational,
             proj.date_proposed as date_proposed_online,
-            proj.date_withdrawn,
-            proj.days_in_queue,
             proj.developer,
             proj.entity,
             proj.interconnection_status_lbnl as interconnection_status,
@@ -37,11 +34,10 @@ def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
             proj.queue_status,
             proj.region as iso_region,
             proj.utility,
-            proj.withdrawl_reason,
             res.capacity_mw,
             res.resource_clean
-        FROM data_warehouse.iso_projects as proj
-        INNER JOIN data_warehouse.iso_resource_capacity as res
+        FROM data_warehouse.iso_projects_2021 as proj
+        INNER JOIN data_warehouse.iso_resource_capacity_2021 as res
         ON proj.project_id = res.project_id
     ),
     loc as (
@@ -52,7 +48,7 @@ def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
             project_id,
             state_id_fips,
             county_id_fips
-        FROM data_warehouse.iso_locations
+        FROM data_warehouse.iso_locations_2021
     ),
     iso as (
         SELECT
@@ -310,39 +306,45 @@ def _add_derived_columns(mart: pd.DataFrame) -> None:
 
     resource_map = {
         "Battery Storage": "storage",
-        "Pumped Storage": "storage",
-        "Other Storage": "storage",
-        "Solar; Storage": "renewable",
-        "Wind; Storage": "renewable",
-        "Natural Gas; Other; Storage; Solar": "fossil",
-        "Natural Gas; Storage": "fossil",
-        "Onshore Wind": "renewable",
-        "Solar": "renewable",
-        "Natural Gas": "fossil",
-        "Other": "fossil",
-        "Hydro": "renewable",
-        "Geothermal": "renewable",
-        "Offshore Wind": "renewable",
-        "Nuclear": "other",
-        "Coal": "fossil",
-        "Waste Heat": "fossil",
         "Biofuel": "renewable",
         "Biomass": "renewable",
-        "Landfill Gas": "fossil",
-        "Oil": "fossil",
-        "Unknown": np.nan,
+        "Coal": "fossil",
         "Combustion Turbine": "fossil",
-        "Oil; Biomass": "fossil",
-        "Municipal Solid Waste": "fossil",
-        "Fuel Cell": "other",
-        "Steam": np.nan,
-        "Solar; Biomass": "renewable",
+        "CSP": "renewable",
+        "Fuel Cell": "renewable",
+        "Geothermal": "renewable",
+        "Hydro": "renewable",
+        "Landfill Gas": "fossil",
         "Methane; Solar": "other",
+        "Municipal Solid Waste": "fossil",
+        "Natural Gas; Other; Storage; Solar": "fossil",
+        "Natural Gas; Storage": "fossil",
+        "Natural Gas": "fossil",
+        "Nuclear": "other",
+        "Offshore Wind": "renewable",
+        "Oil; Biomass": "fossil",
+        "Oil": "fossil",
+        "Onshore Wind": "renewable",
+        "Other Storage": "storage",
+        "Other": "fossil",
+        "Pumped Storage": "storage",
+        "Solar; Biomass": "renewable",
+        "Solar; Storage": "renewable",
+        "Solar": "renewable",
+        "Steam": np.nan,
+        "Unknown": np.nan,
+        "Waste Heat": "fossil",
+        "Wind; Storage": "renewable",
+        np.nan: np.nan,
     }
     # note that this classifies pure storage facilities as np.nan
-    assert set(mart["resource_clean"].unique()) == set(resource_map.keys())
-    mart["resource_class"] = mart.loc[:, "resource_clean"].map(resource_map)
-    return
+    resources_in_data = set(mart["resource_clean"].unique())
+    mapped_resources = set(resource_map.keys())
+    not_mapped = resources_in_data.difference(mapped_resources)
+    assert len(not_mapped) == 0, f"Unmapped resource type(s): {not_mapped}"
+    mart["resource_class"] = mart["resource_clean"].map(resource_map)
+
+    return mart
 
 
 def create_data_mart(engine: Optional[sa.engine.Engine] = None) -> pd.DataFrame:
@@ -395,14 +397,10 @@ def create_data_mart(engine: Optional[sa.engine.Engine] = None) -> pd.DataFrame:
         "storage_capacity_mw",
         "co2e_tonnes_per_year",
         "date_entered_queue",
-        "date_operational",
         "date_proposed_online",
-        "date_withdrawn",
-        "days_in_queue",
         "interconnection_status",
         "point_of_interconnection",
         "queue_status",
-        "withdrawl_reason",
         "has_ordinance",
         "ordinance_jurisdiction_name",
         "ordinance_jurisdiction_type",
