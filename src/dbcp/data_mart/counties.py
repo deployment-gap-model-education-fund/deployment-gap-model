@@ -27,7 +27,7 @@ def _get_iso_location_df(engine: sa.engine.Engine) -> pd.DataFrame:
         # 'geocoded_locality_type',  # drop detailed location info for simplicity
         # 'geocoded_containing_county',  # drop geocoded name in favor of canonical FIPS name
     ]
-    db = "data_warehouse.iso_locations"
+    db = "data_warehouse.iso_locations_2021"
 
     simple_location_df = _subset_db_columns(cols, db, engine)
     # If multiple counties, just pick the first one. This is simplistic but there are only 26/13259 (0.2%)
@@ -44,7 +44,7 @@ def _get_iso_resource_df(engine: sa.engine.Engine) -> pd.DataFrame:
         # 'resource_class',  # will model this according to client wants
         "resource_clean",
     ]
-    db = "data_warehouse.iso_resource_capacity"
+    db = "data_warehouse.iso_resource_capacity_2021"
     df = _subset_db_columns(cols, db, engine)
     return df
 
@@ -77,7 +77,7 @@ def _get_iso_project_df(engine: sa.engine.Engine) -> pd.DataFrame:
         # 'year_proposed',  # year info is contained in date_proposed
         # 'year_withdrawn',  # year info is contained in date_withdrawn
     ]
-    db = "data_warehouse.iso_projects"
+    db = "data_warehouse.iso_projects_2021"
     df = _subset_db_columns(cols, db, engine)
     return df
 
