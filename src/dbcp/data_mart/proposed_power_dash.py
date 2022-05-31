@@ -158,8 +158,8 @@ def _get_proposed_plants(engine: sa.engine.Engine) -> pd.DataFrame:
         select
             proj.project_id,
             loc.county_id_fips
-        from data_warehouse.iso_projects as proj
-        left join data_warehouse.iso_locations as loc
+        from data_warehouse.iso_projects_2021 as proj
+        left join data_warehouse.iso_locations_2021 as loc
             on loc.project_id = proj.project_id
         where proj.queue_status = 'active'
     ),
@@ -177,7 +177,7 @@ def _get_proposed_plants(engine: sa.engine.Engine) -> pd.DataFrame:
             sum(res.capacity_mw) as capacity_mw,
             count(distinct loc.project_id) as project_count
         from active_loc as loc
-        left join data_warehouse.iso_resource_capacity as res
+        left join data_warehouse.iso_resource_capacity_2021 as res
             on res.project_id = loc.project_id
         group by 1, 2
         order by 1, 2
