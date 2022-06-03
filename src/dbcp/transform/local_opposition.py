@@ -20,7 +20,7 @@ def _extract_years(ser: pd.Series) -> pd.Series:
     Returns:
         pd.Series: summary dataframe ready to pd.concat() with input series
     """
-    years = ser.str.extractall(r"(?P<year>199\d|2[01][012]\d)").squeeze()
+    years = ser.str.extractall(r"(?P<year>199\d|20[012]\d)").squeeze()
     years = pd.to_numeric(years)  # convert string years to ints
 
     summarized = years.groupby(level=0).agg(["min", "max", "count"])
@@ -69,12 +69,22 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
         pd.DataFrame: dataframe of local ordinances with additional columns
     """
     local = local_ord_df.copy()
-    for col in local.columns:
+    string_cols = [
+        col for col in local.columns if pd.api.types.is_object_dtype(local.loc[:, col])
+    ]
+    for col in string_cols:
         local.loc[:, col] = local.loc[:, col].str.strip()
     # remove straggling words in county names
     local.loc[:, "locality"] = local.loc[:, "locality"].str.replace(
         " Solar$| Wind$| Zoning Ordinance$", "", regex=True
     )
+    # manual error correction
+    filter_ = local.loc[:, "ordinance"].str.startswith(
+        "In November 2021, the Boone County Commission"
+    )
+    assert filter_.sum() == 1
+    local.loc[filter_, "state"] = "MO"  # Was "MS", but should be Missouri
+
     # add fips codes to counties (but many names are cities)
     with_fips = add_county_fips_with_backup_geocoding(local, locality_col="locality")
 
@@ -97,6 +107,7 @@ def _transform_contested_projects(project_df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: dataframe of contested projects with additional columns
     """
+    # this should really use geocoding, but we don't use this data so I didn't bother.
     proj = _add_fips_ids(project_df, county_col="description").drop(
         columns="county_id_fips"
     )
@@ -115,3 +126,52 @@ def transform(raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     }
     transformed = {key: transform_funcs[key](raw_dfs[key]) for key in raw_dfs.keys()}
     return transformed
+
+
+def _combine_updates(
+    docx_dfs: Dict[str, pd.DataFrame], march_2022_dfs: Dict[str, pd.DataFrame]
+) -> Dict[str, pd.DataFrame]:
+    """Adjust schemas for compatibility."""
+    combine_funcs = {
+        "state_policy": _combine_state_dfs,
+        "local_ordinance": _combine_local_dfs,
+        "contested_project": _combine_project_dfs,
+    }
+    combined = {
+        key: func(docx_dfs[key], march_2022_dfs[key])
+        for key, func in combine_funcs.items()
+    }
+    return combined
+
+
+def _combine_state_dfs(docx_df: pd.DataFrame, update_df: pd.DataFrame) -> pd.DataFrame:
+    update_df = update_df.drop(
+        columns=[
+            "locality",
+            "opposition_type",
+        ]
+    )
+    combined = pd.concat([docx_df, update_df], axis=0, ignore_index=True)
+    return combined
+
+
+def _combine_local_dfs(docx_df: pd.DataFrame, update_df: pd.DataFrame) -> pd.DataFrame:
+    update_df = update_df.drop(
+        columns=[
+            "opposition_type",
+        ]
+    )
+    combined = pd.concat([docx_df, update_df], axis=0, ignore_index=True)
+    return combined
+
+
+def _combine_project_dfs(
+    docx_df: pd.DataFrame, update_df: pd.DataFrame
+) -> pd.DataFrame:
+    update_df = update_df.drop(
+        columns=[
+            "opposition_type",
+        ]
+    )
+    combined = pd.concat([docx_df, update_df], axis=0, ignore_index=True)
+    return combined
