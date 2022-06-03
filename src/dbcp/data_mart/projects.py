@@ -28,7 +28,7 @@ def _get_iso_location_df(engine: sa.engine.Engine) -> pd.DataFrame:
         # 'geocoded_locality_type',  # drop detailed location info for simplicity
         # 'geocoded_containing_county',  # drop geocoded name in favor of canonical FIPS name
     ]
-    db = "data_warehouse.iso_locations"
+    db = "data_warehouse.iso_locations_2021"
 
     simple_location_df = _subset_db_columns(cols, db, engine)
     # If multiple counties, just pick the first one. This is simplistic but there are only 26/13259 (0.2%)
@@ -45,19 +45,15 @@ def _get_iso_resource_df(engine: sa.engine.Engine) -> pd.DataFrame:
         # 'resource_class',  # will model this according to client wants
         "resource_clean",
     ]
-    db = "data_warehouse.iso_resource_capacity"
+    db = "data_warehouse.iso_resource_capacity_2021"
     df = _subset_db_columns(cols, db, engine)
     return df
 
 
 def _get_iso_project_df(engine: sa.engine.Engine) -> pd.DataFrame:
     cols = [
-        "date_operational",
         "date_proposed",
         # 'date_proposed_raw',  # drop raw date in favor of parsed date_proposed
-        "date_withdrawn",
-        # 'date_withdrawn_raw',  # drop raw date in favor of parsed date_withdrawn
-        "days_in_queue",
         "developer",
         "entity",
         "interconnection_status_lbnl",
@@ -67,18 +63,15 @@ def _get_iso_project_df(engine: sa.engine.Engine) -> pd.DataFrame:
         "project_name",
         "queue_date",
         # 'queue_date_raw',  # drop raw date in favor of parsed queue_date
-        # 'queue_id',  # not a candidate key due to hundreds of missing NYISO withdrawn IDs
+        # 'queue_id',  # not a candidate key
         "queue_status",
         # 'queue_year',   # year info is contained in queue_date
         "region",
         # 'resource_type_lbnl',  # just use clean types for simplicity
         "utility",
-        "withdrawl_reason",
-        # 'year_operational',  # year info is contained in date_operational
         # 'year_proposed',  # year info is contained in date_proposed
-        # 'year_withdrawn',  # year info is contained in date_withdrawn
     ]
-    db = "data_warehouse.iso_projects"
+    db = "data_warehouse.iso_projects_2021"
     df = _subset_db_columns(cols, db, engine)
     return df
 
@@ -314,32 +307,36 @@ def _add_derived_columns(mart: pd.DataFrame) -> pd.DataFrame:
     out["is_hybrid"] = out[["generation_type_1", "storage_type"]].notna().all(axis=1)
 
     resource_map = {
-        "Onshore Wind": "renewable",
-        "Solar": "renewable",
-        "Natural Gas": "fossil",
-        "Other": "fossil",
-        "Hydro": "renewable",
-        "Geothermal": "renewable",
-        "Offshore Wind": "renewable",
-        "Nuclear": "other",
-        "Coal": "fossil",
-        "Waste Heat": "fossil",
         "Biofuel": "renewable",
         "Biomass": "renewable",
-        "Landfill Gas": "fossil",
-        "Oil": "fossil",
-        "Unknown": np.nan,
+        "CSP": "renewable",
+        "Coal": "fossil",
         "Combustion Turbine": "fossil",
-        "Oil; Biomass": "fossil",
-        "Municipal Solid Waste": "fossil",
         "Fuel Cell": "renewable",
-        "Steam": np.nan,
-        "Solar; Biomass": "renewable",
+        "Geothermal": "renewable",
+        "Hydro": "renewable",
+        "Landfill Gas": "fossil",
         "Methane; Solar": "other",
+        "Municipal Solid Waste": "fossil",
+        "Natural Gas": "fossil",
+        "Nuclear": "other",
+        "Offshore Wind": "renewable",
+        "Oil; Biomass": "fossil",
+        "Oil": "fossil",
+        "Onshore Wind": "renewable",
+        "Other": "fossil",
+        "Solar; Biomass": "renewable",
+        "Solar": "renewable",
+        "Steam": np.nan,
+        "Unknown": np.nan,
+        "Waste Heat": "fossil",
         np.nan: np.nan,
     }
     # note that this classifies pure storage facilities as np.nan
-    assert set(out["generation_type_1"].unique()) == set(resource_map.keys())
+    resources_in_data = set(out["generation_type_1"].unique())
+    mapped_resources = set(resource_map.keys())
+    not_mapped = resources_in_data.difference(mapped_resources)
+    assert len(not_mapped) == 0, f"Unmapped resource type(s): {not_mapped}"
     out["resource_class"] = out["generation_type_1"].map(resource_map)
 
     return out
@@ -420,14 +417,10 @@ def create_data_mart(engine: Optional[sa.engine.Engine] = None) -> pd.DataFrame:
         "storage_type",
         "storage_capacity_mw",
         "date_entered_queue",
-        "date_operational",
         "date_proposed_online",
-        "date_withdrawn",
-        "days_in_queue",
         "interconnection_status",
         "point_of_interconnection",
         "queue_status",
-        "withdrawl_reason",
         "has_ordinance",
         "ordinance_jurisdiction_name",
         "ordinance_jurisdiction_type",
