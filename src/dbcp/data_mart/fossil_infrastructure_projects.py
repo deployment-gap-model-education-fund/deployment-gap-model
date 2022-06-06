@@ -31,7 +31,7 @@ def _get_proposed_infra_projects(engine: sa.engine.Engine) -> pd.DataFrame:
             sulfur_dioxide_so2_tpy * 0.907185 * 0.85 as so2_tonnes_per_year,
             nitrogen_oxides_nox_tpy * 0.907185 * 0.85 as nox_tonnes_per_year,
             carbon_monoxide_co_tpy * 0.907185 * 0.85 as co_tonnes_per_year,
-            "particulate_matter_pm2_5_tpy" * 0.907185 * 0.85 as pm2_5_tonnes_per_year,
+            particulate_matter_pm2_5_tpy * 0.907185 * 0.85 as pm2_5_tonnes_per_year,
             total_wetlands_affected_permanently_acres,
             total_wetlands_affected_temporarily_acres,
             is_ally_target,
