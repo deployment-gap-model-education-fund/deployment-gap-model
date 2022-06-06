@@ -188,3 +188,119 @@ class CountyOpposition(object):
         aggregated = self._agg_local_ordinances_to_counties(opposition)
         aggregated["has_ordinance"] = True
         return aggregated
+
+
+def _add_emissions_factors(
+    fuel_df: pd.DataFrame, fuel_type_col: str = "fuel_type_code_pudl"
+) -> None:
+    # https://www.ecfr.gov/current/title-40/chapter-I/subchapter-C/part-98/subpart-C/appendix-Table%20C-1%20to%20Subpart%20C%20of%20Part%2098
+    # from EPA 40 CFR 98. I divide by 1000 to convert kg_CO2e/mmbtu to metric tonnes
+    epa_emissions_factors = {
+        "gas": 53.06 / 1000,
+        "coal": 95.52 / 1000,  # power sector average
+        "oil": 73.96 / 1000,  # DFO #2
+    }
+    fuel_df["tonnes_co2_per_mmbtu"] = fuel_df.loc[:, fuel_type_col].map(
+        epa_emissions_factors
+    )
+    return
+
+
+def _estimate_proposed_power_co2e(
+    iso_projects: pd.DataFrame,
+) -> None:
+    """
+    Estimate CO2e tons per year from capacity and fuel type. Currently for fossil plants only.
+
+    This is essentially a manual decision tree. Capacity factors were simple mean
+    values derived from recent gas plants. See notebooks/12-tpb-revisit_co2_estimates.ipynb
+    heat rate source: https://www.eia.gov/electricity/annual/html/epa_08_02.html
+    emissions factor source: https://github.com/grgmiller/emission-factors (EPA Mandatory Reporting of Greenhouse Gases Rule)
+
+    Args:
+        iso_projects (pd.DataFrame): denormalized iso queue
+
+    Returns:
+        pd.DataFrame: copy of input dataframe with new column 'co2e_tonnes_per_year'
+    """
+    gas_turbine_mmbtu_per_mwh = 11.069
+    combined_cycle_mmbtu_per_mwh = 7.604
+    coal_steam_turbine_mmbtu_per_mwh = 9.997
+    oil_internal_combustion_mmbtu_per_mwh = 10.334
+
+    cc_gt_capacity_mw_split = 450.0
+    gt_sub_split = 110.0
+
+    cc_cap_factor = 0.622
+    gt_large_cap_factor = 0.107
+    gt_small_cap_factor = 0.608
+    coal_cap_factor = 0.6  # unverified because very few proposed plants
+    oil_cap_factor = 0.1  # unverified because zero proposed plants
+
+    fuel_equivalents = {
+        # minor categories like Waste Heat are mapped to rough guesses for equivalents
+        "Natural Gas; Other; Storage; Solar": "gas",
+        "Natural Gas; Storage": "gas",
+        "Waste Heat": "gas",
+        "Landfill Gas": "gas",
+        "Combustion Turbine": "gas",
+        "Oil; Biomass": "oil",
+        "Municipal Solid Waste": "coal",
+        "Natural Gas": "gas",
+        "Coal": "coal",
+        "Oil": "oil",
+    }
+    iso_projects["mod_resource"] = iso_projects["resource_clean"].map(fuel_equivalents)
+    _add_emissions_factors(iso_projects, fuel_type_col="mod_resource")
+
+    iso_projects["mmbtu_per_mwh"] = gas_turbine_mmbtu_per_mwh
+    is_cc = iso_projects.loc[:, "capacity_mw"].gt(cc_gt_capacity_mw_split)
+    is_coal = iso_projects.loc[:, "mod_resource"] == "coal"
+    iso_projects.loc[:, "mmbtu_per_mwh"].where(
+        ~is_cc, other=combined_cycle_mmbtu_per_mwh, inplace=True
+    )
+    iso_projects.loc[:, "mmbtu_per_mwh"].where(
+        ~is_coal, other=coal_steam_turbine_mmbtu_per_mwh, inplace=True
+    )
+    is_oil = iso_projects.loc[:, "mod_resource"] == "oil"
+    iso_projects.loc[:, "mmbtu_per_mwh"].where(
+        ~is_oil, other=oil_internal_combustion_mmbtu_per_mwh, inplace=True
+    )
+
+    iso_projects["estimated_capacity_factor"] = gt_small_cap_factor
+    iso_projects.loc[:, "estimated_capacity_factor"].where(
+        ~is_cc & iso_projects.loc[:, "capacity_mw"].le(gt_sub_split),
+        other=gt_large_cap_factor,
+        inplace=True,
+    )
+    iso_projects.loc[:, "estimated_capacity_factor"].where(
+        ~is_cc, other=cc_cap_factor, inplace=True
+    )
+    iso_projects.loc[:, "estimated_capacity_factor"].where(
+        ~is_coal, other=coal_cap_factor, inplace=True
+    )
+    iso_projects.loc[:, "estimated_capacity_factor"].where(
+        ~is_oil, other=oil_cap_factor, inplace=True
+    )
+
+    # Put it all together
+    hours_per_year = 8766  # extra 6 hours to average in leap years
+    iso_projects["mwh"] = (
+        iso_projects["capacity_mw"]
+        * iso_projects["estimated_capacity_factor"]
+        * hours_per_year
+    )
+    iso_projects["co2e_tonnes_per_year"] = (
+        iso_projects["mwh"]
+        * iso_projects["mmbtu_per_mwh"]
+        * iso_projects["tonnes_co2_per_mmbtu"]
+    )
+    intermediates = [
+        "tonnes_co2_per_mmbtu",
+        "mmbtu_per_mwh",
+        "mwh",
+        "mod_resource",
+        "estimated_capacity_factor",
+    ]
+    iso_projects.drop(columns=intermediates, inplace=True)
+    return
