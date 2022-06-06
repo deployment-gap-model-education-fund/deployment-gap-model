@@ -59,10 +59,16 @@ def etl_columbia_local_opp() -> Dict[str, pd.DataFrame]:
     source_path = Path("/app/data/raw/RELDI report updated 9.10.21 (1).docx")
     extractor = dbcp.extract.local_opposition.ColumbiaDocxParser()
     extractor.load_docx(source_path)
-    raw_dfs = extractor.extract()
+    docx_dfs = extractor.extract()
+
+    source_path_update = Path("./data/raw/RELDI_local_opposition_2022-03-24.csv")
+    update_dfs = dbcp.extract.local_opposition._extract_march_2022_update(
+        source_path_update
+    )
 
     # Transform
-    transformed_dfs = dbcp.transform.local_opposition.transform(raw_dfs)
+    combined = dbcp.transform.local_opposition._combine_updates(docx_dfs, update_dfs)
+    transformed_dfs = dbcp.transform.local_opposition.transform(combined)
 
     return transformed_dfs
 

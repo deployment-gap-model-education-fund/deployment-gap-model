@@ -180,3 +180,42 @@ class ColumbiaDocxParser(object):
         )
         output["local_ordinance"].drop(index=indices_to_delete, inplace=True)
         return output
+
+
+def _extract_march_2022_update(
+    source_path=Path("/app/data/raw/RELDI_local_opposition_2022-03-24.csv"),
+) -> Dict[str, pd.DataFrame]:
+    """Read the update file and rename the columns to be backwards compatible.
+
+    Args:
+        source_path (pathlib.Path, optional): path to csv. Defaults to Path("/app/data/raw/RELDI_local_opposition_2022-03-24.csv").
+
+    Returns:
+        Dict[str, pd.DataFrame]: dictionary of dataframes with keys that match the ColumbiaDocxParser
+    """
+    df = pd.read_csv(source_path)
+    rename_dict = {
+        "Jurisdiction": "locality",
+        "State": "state",
+        "Type": "opposition_type",
+        "Year": "year_enacted",
+        # "Description": "", different for each type
+        "Energy type": "energy_type",
+        "Source": "source",
+        "Date entered": "date_entered",
+    }
+    df.rename(columns=rename_dict, inplace=True)
+    df.drop(columns="date_entered", inplace=True)
+    # the following string equality checks are reliable because the source google sheet uses a dropdown Enum
+    output = {
+        "state_policy": df.query("opposition_type == 'State Law'").rename(
+            columns={"Description": "policy"}
+        ),
+        "local_ordinance": df.query("opposition_type == 'Local Ordinance'").rename(
+            columns={"Description": "ordinance"}
+        ),
+        "contested_project": df.query("opposition_type == 'Contested project'").rename(
+            columns={"Description": "description"}
+        ),
+    }
+    return output
