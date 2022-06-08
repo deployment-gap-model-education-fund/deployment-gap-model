@@ -76,24 +76,25 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         "associated_facilities_id": "raw_associated_facilities_id",
         "pipelines_id": "raw_pipelines_id",
         "air_operating_id": "raw_air_operating_id",
-        "cwa-npdes_id": "raw_cwa-npdes_id",
+        "cwa-npdes_id": "raw_cwa_npdes_id",
         "cwa_wetland_id": "raw_cwa_wetland_id",
         "other_permits_id": "raw_other_permits_id",
         "congressional_representatives": "raw_congressional_representatives",
         "estimated_population_within_3_miles": "raw_estimated_population_within_3_miles",
         "percent_people_of_color_within_3_miles": "raw_percent_people_of_color_within_3_miles",
-        "percent_low-income_within_3_miles": "raw_percent_low-income_within_3_miles",
+        "percent_low-income_within_3_miles": "raw_percent_low_income_within_3_miles",
         "percent_under_5_years_old_within_3_miles": "raw_percent_under_5_years_old_within_3_miles",
         "percent_people_over_64_years_old_within_3_miles": "raw_percent_people_over_64_years_old_within_3_miles",
         "air_toxics_cancer_risk_nata_cancer_risk": "raw_air_toxics_cancer_risk_nata_cancer_risk",
         "respiratory_hazard_index": "raw_respiratory_hazard_index",
-        "pm2.5_ug/m3": "raw_pm2.5_ug/m3",
+        "pm2.5_ug/m3": "raw_pm2_5_ug_per_m3",
         "o3_ppb": "raw_o3_ppb",
         "wastewater_discharge_indicator": "raw_wastewater_discharge_indicator",
         "location": "raw_location",
         "facility_footprint": "raw_facility_footprint",
         "epa_frs_id": "raw_epa_frs_id",
         "facility_id": "unknown_id",
+        "ccs/ccus": "ccs_ccus",
     }
     fac.rename(columns=rename_dict, inplace=True)
 
@@ -171,7 +172,7 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
         "construction_status_last_updated": "raw_construction_status_last_updated",
         "operating_status": "raw_operating_status",
         "actual_or_expected_completion_year": "raw_actual_or_expected_completion_year",
-        "project_cost_million_$": "raw_project_cost_million_$",
+        "project_cost_million_$": "raw_project_cost_millions",
         "number_of_jobs_promised": "raw_number_of_jobs_promised",
         "bloomberg_target_list": "is_ally_target",
         "bloomberg_secondary_target_list": "is_ally_secondary_target",
@@ -181,7 +182,7 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
         "greenhouse_gases_co2e": "greenhouse_gases_co2e_tpy",
         "hazardous_air_pollutants_haps": "hazardous_air_pollutants_haps_tpy",
         "nitrogen_oxides_nox": "nitrogen_oxides_nox_tpy",
-        "particulate_matter_pm2.5": "particulate_matter_pm2.5_tpy",
+        "particulate_matter_pm2.5": "particulate_matter_pm2_5_tpy",
         "volatile_organic_compounds_voc": "volatile_organic_compounds_voc_tpy",
     }
     proj.rename(columns=rename_dict, inplace=True)
@@ -191,7 +192,7 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
         proj.loc[:, "raw_sulfur_dioxide_so2"]
     )
     proj["cost_millions"] = _fix_erroneous_array_items(
-        proj.loc[:, "raw_project_cost_million_$"]
+        proj.loc[:, "raw_project_cost_millions"]
     )
     proj["date_modified"] = pd.to_datetime(
         proj.loc[:, "raw_modified_on"], infer_datetime_format=True
