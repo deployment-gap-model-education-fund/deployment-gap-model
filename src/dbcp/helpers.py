@@ -92,6 +92,8 @@ def upload_schema_to_bigquery(schema: str) -> None:
                 loaded_tables[table_name] = table
 
     # load to big query
+    GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
+
     SCOPES = [
         "https://www.googleapis.com/auth/cloud-platform",
     ]
@@ -103,7 +105,7 @@ def upload_schema_to_bigquery(schema: str) -> None:
         pandas_gbq.to_gbq(
             df,
             f"{schema}.{table_name}",
-            project_id="dbcp-dev",
+            project_id=GCP_PROJECT_ID,
             if_exists="replace",
             credentials=credentials,
         )
