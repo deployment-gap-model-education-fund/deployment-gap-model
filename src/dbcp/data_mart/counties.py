@@ -8,81 +8,9 @@ from dbcp.constants import PUDL_LATEST_YEAR
 from dbcp.data_mart.fossil_infrastructure_projects import (
     create_data_mart as create_fossil_infra_data_mart,
 )
+from dbcp.data_mart.projects import create_data_mart as create_iso_data_mart
 from dbcp.helpers import get_sql_engine
-
-
-def _subset_db_columns(
-    columns: Sequence[str], table: str, engine: sa.engine.Engine
-) -> pd.DataFrame:
-    query = f"SELECT {', '.join(columns)} FROM {table}"
-    df = pd.read_sql(query, engine)
-    return df
-
-
-def _get_iso_location_df(engine: sa.engine.Engine) -> pd.DataFrame:
-    cols = [
-        "project_id",
-        # 'county',  # drop raw name in favor of canonical FIPS name
-        # 'state',  # drop raw state in favor of canonical FIPS name
-        # 'state_id_fips',
-        "county_id_fips",
-        # 'geocoded_locality_name',  # drop detailed location info for simplicity
-        # 'geocoded_locality_type',  # drop detailed location info for simplicity
-        # 'geocoded_containing_county',  # drop geocoded name in favor of canonical FIPS name
-    ]
-    db = "data_warehouse.iso_locations_2021"
-
-    simple_location_df = _subset_db_columns(cols, db, engine)
-    # If multiple counties, just pick the first one. This is simplistic but there are only 26/13259 (0.2%)
-    simple_location_df = simple_location_df.groupby("project_id", as_index=False).nth(0)
-    return simple_location_df
-
-
-def _get_iso_resource_df(engine: sa.engine.Engine) -> pd.DataFrame:
-    cols = [
-        "capacity_mw",
-        # 'project_class',  # will model this according to client wants
-        "project_id",
-        # 'resource',  # drop raw name in favor of resource_clean
-        # 'resource_class',  # will model this according to client wants
-        "resource_clean",
-    ]
-    db = "data_warehouse.iso_resource_capacity_2021"
-    df = _subset_db_columns(cols, db, engine)
-    return df
-
-
-def _get_iso_project_df(engine: sa.engine.Engine) -> pd.DataFrame:
-    cols = [
-        # 'date_operational',  # not needed for higher level aggregates
-        # 'date_proposed',  # not needed for higher level aggregates
-        # 'date_proposed_raw',  # not needed for higher level aggregates
-        # 'date_withdrawn',  # not needed for higher level aggregates
-        # 'date_withdrawn_raw',  # not needed for higher level aggregates
-        # 'days_in_queue',  # not needed for higher level aggregates
-        # 'developer',  # not needed for higher level aggregates
-        # 'entity',  # not needed for higher level aggregates
-        # 'interconnection_status_lbnl',  # not needed for higher level aggregates
-        # 'interconnection_status_raw',  # not needed for higher level aggregates
-        # 'point_of_interconnection',  # not needed for higher level aggregates
-        "project_id",
-        # 'project_name',  # not needed for higher level aggregates
-        "queue_date",  # needed for filtering
-        # 'queue_date_raw',  # not needed for higher level aggregates
-        # 'queue_id',  # not needed for higher level aggregates
-        "queue_status",  # needed for filtering
-        # 'queue_year',  # year info is containted in queue_date
-        "region",
-        # 'resource_type_lbnl',  # just use clean types for simplicity
-        # 'utility',  # not needed for higher level aggregates
-        # 'withdrawl_reason',  # not needed for higher level aggregates
-        # 'year_operational',  # year info is contained in date_operational
-        # 'year_proposed',  # year info is contained in date_proposed
-        # 'year_withdrawn',  # year info is contained in date_withdrawn
-    ]
-    db = "data_warehouse.iso_projects_2021"
-    df = _subset_db_columns(cols, db, engine)
-    return df
+from dbcp.data_mart.helpers import CountyOpposition, _get_county_fips_df, _get_state_fips_df, _subset_db_columns
 
 
 def _get_pudl_df(engine: sa.engine.Engine) -> pd.DataFrame:
@@ -218,7 +146,7 @@ def _get_pudl_df(engine: sa.engine.Engine) -> pd.DataFrame:
     return df
 
 
-def _get_fossil_infrastructure_df(engine: sa.engine.Engine) -> pd.DataFrame:
+def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     # Avoid db dependency order by recreating the df.
     # Could also make an orchestration script.
     infra = create_fossil_infra_data_mart(engine)
@@ -228,45 +156,78 @@ def _get_fossil_infrastructure_df(engine: sa.engine.Engine) -> pd.DataFrame:
     """
     SELECT
         county_id_fips,
-        sum(co2e_tonnes_per_year) as infra_co2e_tonnes_per_year,
-        sum(pm2_5_tonnes_per_year) as infra_pm2_5_tonnes_per_year,
-        sum(nox_tonnes_per_year) as infra_nox_tonnes_per_year,
-        count(project_id) as infra_count_projects,
-        string_agg(distinct industry_sector, ', ') as infra_sector_list,
-        max(raw_percent_low_income_within_3_miles) as infra_max_pct_low_income,
-        max(raw_percent_people_of_color_within_3_miles) as infra_max_pct_people_of_color
+        industry_sector as resource_or_sector,
+        count(project_id) as facility_count,
+        sum(co2e_tonnes_per_year) as co2e_tonnes_per_year,
+        sum(pm2_5_tonnes_per_year) as pm2_5_tonnes_per_year,
+        sum(nox_tonnes_per_year) as nox_tonnes_per_year,
+        'power plant' as facility_type,
+        'proposed' as status
     from data_mart.fossil_infrastructure_projects
-    group by 1
+    group by 1, 2
     ;
     """
-    grp = infra.groupby("county_id_fips")
-    normal_aggs = grp.agg(
+    grp = infra.groupby(["county_id_fips", 'industry_sector'])
+    aggs = grp.agg(
         {
             "co2e_tonnes_per_year": "sum",
             "pm2_5_tonnes_per_year": "sum",
             "nox_tonnes_per_year": "sum",
             "project_id": "count",
-            "raw_percent_low_income_within_3_miles": "max",
-            "raw_percent_people_of_color_within_3_miles": "max",
         }
     )
-    normal_aggs.rename(
+    aggs['facility_type'] = 'fossil infrastructure'
+    aggs['status'] = 'proposed'
+    aggs.reset_index(inplace=True)
+    aggs.rename(
         columns={
-            "co2e_tonnes_per_year": "infra_co2e_tonnes_per_year",
-            "pm2_5_tonnes_per_year": "infra_pm2_5_tonnes_per_year",
-            "nox_tonnes_per_year": "infra_nox_tonnes_per_year",
-            "project_id": "infra_count_projects",
-            "raw_percent_low_income_within_3_miles": "infra_max_pct_low_income",
-            "raw_percent_people_of_color_within_3_miles": "infra_max_pct_people_of_color",
+            "project_id": "facility_count",
+            "industry_sector": "resource_or_sector",
         },
         inplace=True,
     )
-    string_concat_agg = grp["industry_sector"].apply(
-        lambda x: ", ".join(sorted([item for item in x.unique()]))
+    return aggs
+
+
+def _iso_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
+    # Avoid db dependency order by recreating the df.
+    # Could also make an orchestration script.
+    iso = create_iso_data_mart(engine)['iso_projects_long_format']
+
+    # equivalent SQL query that I translated to pandas to avoid dependency
+    # on the data_mart schema (which doesn't yet exist when this function runs)
+    """
+    SELECT
+        county_id_fips,
+        resource_clean as resource_or_sector,
+        count(project_id) as facility_count,
+        sum(co2e_tonnes_per_year) as co2e_tonnes_per_year,
+        sum(capacity_mw) as capacity_mw,
+        'power plant' as facility_type,
+        'proposed' as status
+    from data_mart.iso_projects_long_format
+    group by 1, 2
+    ;
+    """
+    grp = iso.groupby(["county_id_fips", 'resource_clean'])
+    aggs = grp.agg(
+        {
+            "co2e_tonnes_per_year": "sum",
+            "capacity_mw": "sum",
+            "project_id": "count",
+        }
     )
-    string_concat_agg.rename("infra_sector_list", inplace=True)
-    df = pd.concat([normal_aggs, string_concat_agg], axis=1, copy=False).reset_index()
-    return df
+    aggs['facility_type'] = 'power plant'
+    aggs['status'] = 'proposed'
+    aggs.reset_index(inplace=True)
+    aggs.rename(
+        columns={
+            "project_id": "facility_count",
+            "resource_clean": "resource_or_sector",
+        },
+        inplace=True,
+    )
+    return aggs
 
 
 def _get_ncsl_wind_permitting_df(engine: sa.engine.Engine) -> pd.DataFrame:
@@ -280,173 +241,6 @@ def _get_ncsl_wind_permitting_df(engine: sa.engine.Engine) -> pd.DataFrame:
     db = "data_warehouse.ncsl_state_permitting"
     df = _subset_db_columns(cols, db, engine)
     return df
-
-
-def _get_local_opposition_df(engine: sa.engine.Engine) -> pd.DataFrame:
-    cols = [
-        # 'geocoded_containing_county',  # only need FIPS, names come from elsewhere
-        "county_id_fips",
-        "earliest_year_mentioned",
-        # 'latest_year_mentioned',  # for simplicity, only include one year metric (earliest_year_mentioned)
-        "geocoded_locality_name",
-        "geocoded_locality_type",
-        # 'n_years_mentioned',  # for simplicity, only include one year metric (earliest_year_mentioned)
-        "ordinance",
-        # 'raw_locality_name',  # drop raw name in favor of canonical one
-        # 'raw_state_name',  # drop raw name in favor of canonical one
-        # 'state_id_fips',  # will join on 5-digit county FIPS, which includes state
-    ]
-    db = "data_warehouse.local_ordinance"
-    df = _subset_db_columns(cols, db, engine)
-    return df
-
-
-def _get_state_opposition_df(engine: sa.engine.Engine) -> pd.DataFrame:
-    cols = [
-        "earliest_year_mentioned",
-        # 'latest_year_mentioned',  # for simplicity, only include one year metric (earliest_year_mentioned)
-        # 'n_years_mentioned',  # for simplicity, only include one year metric (earliest_year_mentioned)
-        "policy",
-        # 'raw_state_name',  # drop raw name in favor of canonical one
-        "state_id_fips",
-    ]
-    db = "data_warehouse.state_policy"
-    df = _subset_db_columns(cols, db, engine)
-    return df
-
-
-def _get_county_fips_df(engine: sa.engine.Engine) -> pd.DataFrame:
-    cols = ["*"]
-    db = "data_warehouse.county_fips"
-    df = _subset_db_columns(cols, db, engine)
-    return df
-
-
-def _get_state_fips_df(engine: sa.engine.Engine) -> pd.DataFrame:
-    cols = ["*"]
-    db = "data_warehouse.state_fips"
-    df = _subset_db_columns(cols, db, engine)
-    return df
-
-
-def _filter_state_opposition(state_df: pd.DataFrame) -> pd.DataFrame:
-    """Drop states that repealed their policies or whose policy was pro-renewables instead of anti-renewables.
-
-    Args:
-        state_df (pd.DataFrame): state policy dataframe
-
-    Returns:
-        pd.DataFrame: filtered copy of the input state policy dataframe
-    """
-    fips_codes_to_drop = {"23", "36"}  # Maine (repealed), New York (pro-RE)
-    not_dropped = ~state_df.loc[:, "state_id_fips"].isin(fips_codes_to_drop)
-    filtered_state_df = state_df.loc[not_dropped, :].copy()
-    return filtered_state_df
-
-
-def _represent_state_opposition_as_counties(
-    state_df: pd.DataFrame, county_fips_df: pd.DataFrame, state_fips_df: pd.DataFrame
-) -> pd.DataFrame:
-    """Downscale state policies to look like county-level ordinances at each county in the respective state.
-
-    To make concatenation easier, the output dataframe imitates the columns of the local ordinance table.
-
-    Args:
-        state_df (pd.DataFrame): state opposition dataframe
-        county_fips_df (pd.DataFrame): master table of all counties
-        state_fips_df (pd.DataFrame): master table of all states
-
-    Returns:
-        pd.DataFrame: fanned out state policy dataframe
-    """
-    # fan out
-    states_as_counties = state_df.merge(
-        county_fips_df.loc[:, ["county_id_fips", "state_id_fips"]],
-        on="state_id_fips",
-        how="left",
-    )
-
-    # replicate local opposition columns
-    # geocoded_locality_name
-    states_as_counties = states_as_counties.merge(
-        state_fips_df.loc[:, ["state_name", "state_id_fips"]],
-        on="state_id_fips",
-        how="left",
-    )
-    # geocoded_locality_type
-    states_as_counties["geocoded_locality_type"] = "state"
-    rename_dict = {
-        "state_name": "geocoded_locality_name",
-        "policy": "ordinance",
-    }
-    states_as_counties = states_as_counties.rename(columns=rename_dict).drop(
-        columns=["state_id_fips"]
-    )
-    return states_as_counties
-
-
-def _agg_local_ordinances_to_counties(ordinances: pd.DataFrame) -> pd.DataFrame:
-    r"""Force the local ordinance table to have 1 row = 1 county. Only 8/92 counties have multiple ordinances.
-
-    This is necessary for joining into the ISO project table. ISO projects are only located by county.
-    Aggregation method:
-    * take min of earliest_year_mentioned
-    * if only one geocoded_locality_name, use it. Otherwise replace with "multiple"
-    * same with 'locality type'
-    * concatenate the rdinances, each with geocoded_locality_name prefix, eg "Great County: <ordinance>\nSmall Town: <ordinance>"
-
-    Value Counts of # ordinances per county (as of 3/14/2022):
-    1 ord    84 counties
-    2 ord     6 counties
-    3 ord     1 county
-    4 ord     1 county
-
-    Args:
-        ordinances (pd.DataFrame): local ordinance dataframe
-
-    Returns:
-        pd.DataFrame: aggregated local ordinance dataframe
-    """
-    dupe_counties = ordinances.duplicated(subset="county_id_fips", keep=False)
-    dupes = ordinances.loc[dupe_counties, :].copy()
-    not_dupes = ordinances.loc[~dupe_counties, :].copy()
-
-    dupes["ordinance"] = (
-        dupes["geocoded_locality_name"] + ": " + dupes["ordinance"] + "\n"
-    )
-    grp = dupes.groupby("county_id_fips")
-
-    years = grp["earliest_year_mentioned"].min()
-
-    n_unique = grp[["geocoded_locality_name", "geocoded_locality_type"]].nunique()
-    localities = (
-        grp[["geocoded_locality_name", "geocoded_locality_type"]]
-        .nth(0)
-        .mask(n_unique > 1, other="multiple")
-    )
-
-    descriptions = grp["ordinance"].sum().str.strip()
-
-    agg_dupes = pd.concat([years, localities, descriptions], axis=1).reset_index()
-    recombined = pd.concat(
-        [not_dupes, agg_dupes], axis=0, ignore_index=True
-    ).sort_values("county_id_fips")
-    assert not recombined.duplicated(subset="county_id_fips").any()
-
-    return recombined
-
-
-def _get_and_join_iso_tables(engine: Optional[sa.engine.Engine] = None) -> pd.DataFrame:
-    if engine is None:
-        engine = get_sql_engine()
-    project_df = _get_iso_project_df(engine)
-    location_df = _get_iso_location_df(engine)
-    resource_df = _get_iso_resource_df(engine)
-
-    combined = resource_df.merge(project_df, on="project_id", how="outer").merge(
-        location_df, on="project_id", how="outer"
-    )
-    return combined.reset_index(drop=True)
 
 
 def _agg_iso_projects_to_counties(iso_df: pd.DataFrame) -> pd.DataFrame:
@@ -584,24 +378,20 @@ def create_data_mart(engine: Optional[sa.engine.Engine] = None) -> pd.DataFrame:
     """Create the counties datamart dataframe."""
     if engine is None:
         engine = get_sql_engine()
-    iso = _get_and_join_iso_tables(engine)
     pudl = _get_pudl_df(
         engine
     )  # already filtered on operational_status and report_date
     ncsl = _get_ncsl_wind_permitting_df(engine)
-    local_opp = _get_local_opposition_df(engine)
-    state_opp = _get_state_opposition_df(engine)
     all_counties = _get_county_fips_df(engine)
     all_states = _get_state_fips_df(engine)
-    infra = _get_fossil_infrastructure_df(engine)
+    iso = _iso_projects_counties(engine)
+    infra = _fossil_infrastructure_counties(engine)
 
     # model local opposition
-    filtered_state_opp = _filter_state_opposition(state_opp)
-    states_to_counties = _represent_state_opposition_as_counties(
-        filtered_state_opp, county_fips_df=all_counties, state_fips_df=all_states
+    aggregator = CountyOpposition(
+        engine=engine, county_fips_df=all_counties, state_fips_df=all_states
     )
-    combined_opp = pd.concat([local_opp, states_to_counties], axis=0)
-    combined_opp = _agg_local_ordinances_to_counties(combined_opp)
+    combined_opp = aggregator.agg_to_counties(include_state_policies=True)
 
     # aggregate
     iso_aggs = _agg_iso_projects_to_counties(iso)
