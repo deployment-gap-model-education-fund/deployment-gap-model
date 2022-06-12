@@ -218,7 +218,7 @@ def _agg_local_ordinances_to_counties(ordinances: pd.DataFrame) -> pd.DataFrame:
     not_dupes = ordinances.loc[~dupe_counties, :].copy()
 
     dupes["ordinance"] = (
-        dupes["geocoded_locality_name"] + ": " + dupes["ordinance"] + "\n"
+        dupes["geocoded_locality_name"] + ": " + dupes["ordinance"] + r"\n"
     )
     grp = dupes.groupby("county_id_fips")
 
