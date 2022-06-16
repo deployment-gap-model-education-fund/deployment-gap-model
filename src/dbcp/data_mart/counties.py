@@ -1,149 +1,173 @@
 """Module to create a county-level table for DBCP to use in spreadsheet tools."""
 from typing import Optional, Sequence
 
+import numpy as np
 import pandas as pd
 import sqlalchemy as sa
 
 from dbcp.constants import PUDL_LATEST_YEAR
+from dbcp.data_mart.co2_dashboard import (
+    _estimate_existing_co2e,
+    _get_existing_plant_fuel_data,
+    _get_plant_location_data,
+    _transfrom_plant_location_data,
+)
 from dbcp.data_mart.fossil_infrastructure_projects import (
     create_data_mart as create_fossil_infra_data_mart,
 )
+from dbcp.data_mart.helpers import (
+    CountyOpposition,
+    _get_county_fips_df,
+    _get_state_fips_df,
+    _subset_db_columns,
+)
 from dbcp.data_mart.projects import create_data_mart as create_iso_data_mart
-from dbcp.helpers import get_sql_engine
-from dbcp.data_mart.helpers import CountyOpposition, _get_county_fips_df, _get_state_fips_df, _subset_db_columns
+from dbcp.helpers import download_pudl_data, get_sql_engine
 
 
-def _get_pudl_df(engine: sa.engine.Engine) -> pd.DataFrame:
-    cols = [
-        # 'associated_combined_heat_power',
-        # 'balancing_authority_code_eia',
-        # 'balancing_authority_name_eia',
-        # 'bga_source',
-        # 'bypass_heat_recovery',
-        # 'capacity_factor',
-        "capacity_mw",
-        # 'carbon_capture',
-        # 'city',
-        # 'cofire_fuels',
-        # 'county',
-        "county_id_fips",
-        # 'current_planned_operating_date',
-        # 'data_source',
-        # 'deliver_power_transgrid',
-        # 'distributed_generation',
-        # 'duct_burners',
-        # 'energy_source_1_transport_1',
-        # 'energy_source_1_transport_2',
-        # 'energy_source_1_transport_3',
-        # 'energy_source_2_transport_1',
-        # 'energy_source_2_transport_2',
-        # 'energy_source_2_transport_3',
-        # 'energy_source_code_1',
-        # 'energy_source_code_2',
-        # 'energy_source_code_3',
-        # 'energy_source_code_4',
-        # 'energy_source_code_5',
-        # 'energy_source_code_6',
-        # 'ferc_cogen_status',
-        # 'ferc_exempt_wholesale_generator',
-        # 'ferc_small_power_producer',
-        # 'fluidized_bed_tech',
-        # 'fuel_cost_from_eiaapi',
-        # 'fuel_cost_per_mmbtu',
-        # 'fuel_cost_per_mwh',
-        "fuel_type_code_pudl",
-        # 'fuel_type_count',
-        # 'generator_id',
-        # 'grid_voltage_2_kv',
-        # 'grid_voltage_3_kv',
-        # 'grid_voltage_kv',
-        # 'heat_rate_mmbtu_mwh',
-        # 'iso_rto_code',
-        # 'latitude',
-        # 'longitude',
-        # 'minimum_load_mw',
-        # 'multiple_fuels',
-        # 'nameplate_power_factor',
-        # 'net_generation_mwh',
-        "operating_date",
-        # 'operating_switch',
-        # 'operational_status',
-        # 'operational_status_code',
-        # 'original_planned_operating_date',
-        # 'other_combustion_tech',
-        # 'other_modifications_date',
-        # 'other_planned_modifications',
-        # 'owned_by_non_utility',
-        # 'ownership_code',
-        # 'planned_derate_date',
-        # 'planned_energy_source_code_1',
-        # 'planned_modifications',
-        # 'planned_net_summer_capacity_derate_mw',
-        # 'planned_net_summer_capacity_uprate_mw',
-        # 'planned_net_winter_capacity_derate_mw',
-        # 'planned_net_winter_capacity_uprate_mw',
-        # 'planned_new_capacity_mw',
-        # 'planned_new_prime_mover_code',
-        # 'planned_repower_date',
-        # 'planned_retirement_date',
-        # 'planned_uprate_date',
-        # 'plant_id_eia',
-        # 'plant_id_pudl',
-        # 'plant_name_eia',
-        # 'previously_canceled',
-        # 'primary_purpose_id_naics',
-        # 'prime_mover_code',
-        # 'pulverized_coal_tech',
-        # 'reactive_power_output_mvar',
-        # 'report_date',
-        # 'retirement_date',
-        # 'rto_iso_lmp_node_id',
-        # 'rto_iso_location_wholesale_reporting_id',
-        # 'sector_id_eia',
-        # 'sector_name_eia',
-        # 'solid_fuel_gasification',
-        # 'startup_source_code_1',
-        # 'startup_source_code_2',
-        # 'startup_source_code_3',
-        # 'startup_source_code_4',
-        # 'state',
-        # 'state_id_fips',
-        # 'stoker_tech',
-        # 'street_address',
-        # 'subcritical_tech',
-        # 'summer_capacity_estimate',
-        # 'summer_capacity_mw',
-        # 'summer_estimated_capability_mw',
-        # 'supercritical_tech',
-        # 'switch_oil_gas',
-        # 'syncronized_transmission_grid',
-        "technology_description",  # needed for energy storage
-        # 'time_cold_shutdown_full_load_code',
-        # 'timezone',
-        # 'topping_bottoming_code',
-        # 'total_fuel_cost',
-        # 'total_mmbtu',
-        # 'turbines_inverters_hydrokinetics',
-        # 'turbines_num',
-        # 'ultrasupercritical_tech',
-        # 'unit_id_pudl',
-        # 'uprate_derate_completed_date',
-        # 'uprate_derate_during_year',
-        # 'utility_id_eia',
-        # 'utility_id_pudl',
-        # 'utility_name_eia',
-        # 'winter_capacity_estimate',
-        # 'winter_capacity_mw',
-        # 'winter_estimated_capability_mw',
-        # 'zip_code',
-    ]
-    db = "data_warehouse.mcoe"
-    # I don't use _subset_db_columns because of extra filtering requirements
-    query = f"""select {', '.join(cols)} from {db}
-    where operational_status = 'existing'
-    and report_date = date('{PUDL_LATEST_YEAR}-01-01')"""
+def _get_existing_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
+    # get plant_id, fuel_type, capacity_mw
+    query = """
+    WITH
+    plant_fuel_aggs as (
+        SELECT
+            plant_id_eia,
+            (CASE
+                WHEN technology_description = 'Batteries' THEN 'Battery Storage'
+                WHEN technology_description = 'Offshore Wind Turbine' THEN 'Offshore Wind'
+                WHEN fuel_type_code_pudl = 'waste' THEN 'other'
+                ELSE fuel_type_code_pudl
+            END
+            ) as resource,
+            sum(net_generation_mwh) as net_gen_by_fuel,
+            sum(capacity_mw) as capacity_by_fuel,
+            max(operating_date) as max_operating_date
+        from data_warehouse.mcoe
+        where operational_status = 'existing'
+        group by 1, 2
+    ),
+    plant_capacity as (
+        SELECT
+            plant_id_eia,
+            sum(capacity_by_fuel) as capacity_mw
+        from plant_fuel_aggs
+        group by 1
+    ),
+    all_aggs as (
+        SELECT
+            *
+        from plant_fuel_aggs as pfuel
+        LEFT JOIN plant_capacity as pcap
+        USING (plant_id_eia)
+    )
+    -- select fuel type with the largest generation (with capacity as tiebreaker)
+    -- https://stackoverflow.com/questions/3800551/select-first-row-in-each-group-by-group/7630564
+    -- NOTE: this is not appropriate for fields that require aggregation, hence CTEs above
+    SELECT DISTINCT ON (plant_id_eia)
+        plant_id_eia,
+        resource,
+        -- net_gen_by_fuel for debugging
+        max_operating_date,
+        capacity_mw
+    from all_aggs
+    ORDER BY plant_id_eia, net_gen_by_fuel DESC NULLS LAST, capacity_by_fuel DESC NULLS LAST
+    ;
+    """
     df = pd.read_sql(query, engine)
+    resource_map = {
+        "gas": "Natural Gas",
+        "wind": "Onshore Wind",
+        "hydro": "Hydro",
+        "oil": "Oil",
+        "nuclear": "Nuclear",
+        "coal": "Coal",
+        "other": "Other",
+        "solar": "Solar",
+        "Battery Storage": "Battery Storage",
+        "Offshore Wind": "Offshore Wind",
+    }
+    df.loc[:, "resource"] = df.loc[:, "resource"].map(resource_map)
     return df
+
+
+def _get_existing_fossil_plant_co2e_estimates(
+    pudl_engine: sa.engine.Engine,
+) -> pd.DataFrame:
+    gen_fuel_923 = _get_existing_plant_fuel_data(pudl_engine)
+    plant_co2e = _estimate_existing_co2e(gen_fuel_923)
+    return plant_co2e
+
+
+def _get_existing_plant_locations(
+    pudl_engine: sa.engine.Engine,
+    postgres_engine: sa.engine.Engine,
+    state_fips_table: Optional[pd.DataFrame] = None,
+    county_fips_table: Optional[pd.DataFrame] = None,
+):
+    if state_fips_table is None:
+        state_fips_table = _get_state_fips_df(postgres_engine)
+    if county_fips_table is None:
+        county_fips_table = _get_county_fips_df(postgres_engine)
+    plant_locations = _get_plant_location_data(pudl_engine)
+    plant_locations = _transfrom_plant_location_data(
+        plant_locations, state_table=state_fips_table, county_table=county_fips_table
+    )
+    return plant_locations
+
+
+def _get_existing_plants(
+    pudl_engine: sa.engine.Engine,
+    postgres_engine: sa.engine.Engine,
+    state_fips_table: Optional[pd.DataFrame] = None,
+    county_fips_table: Optional[pd.DataFrame] = None,
+) -> pd.DataFrame:
+    plants = _get_existing_plant_attributes(engine=postgres_engine)
+    co2e = _get_existing_fossil_plant_co2e_estimates(pudl_engine=pudl_engine)
+    locations = _get_existing_plant_locations(
+        pudl_engine=pudl_engine,
+        postgres_engine=postgres_engine,
+        state_fips_table=state_fips_table,
+        county_fips_table=county_fips_table,
+    )
+    plants = plants.merge(co2e, how="left", on="plant_id_eia", copy=False)
+    plants = plants.merge(locations, how="left", on="plant_id_eia", copy=False)
+    return plants
+
+
+def _existing_plants_counties(
+    pudl_engine: sa.engine.Engine,
+    postgres_engine: sa.engine.Engine,
+    state_fips_table: Optional[pd.DataFrame] = None,
+    county_fips_table: Optional[pd.DataFrame] = None,
+) -> pd.DataFrame:
+    plants = _get_existing_plants(
+        pudl_engine=pudl_engine,
+        postgres_engine=postgres_engine,
+        state_fips_table=state_fips_table,
+        county_fips_table=county_fips_table,
+    )
+    grp = plants.groupby(["county_id_fips", "resource"])
+    aggs = grp.agg(
+        {
+            "co2e_tonnes_per_year": "sum",
+            "capacity_mw": "sum",
+            "plant_id_eia": "count",
+        }
+    )
+    aggs.loc[:, "co2e_tonnes_per_year"].replace(
+        0, np.nan, inplace=True
+    )  # sums of 0 are simply unmodeled
+    aggs["facility_type"] = "power plant"
+    aggs["status"] = "existing"
+    aggs.reset_index(inplace=True)
+    aggs.rename(
+        columns={
+            "plant_id_eia": "facility_count",
+            "resource": "resource_or_sector",
+        },
+        inplace=True,
+    )
+    return aggs
 
 
 def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
@@ -167,7 +191,7 @@ def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     group by 1, 2
     ;
     """
-    grp = infra.groupby(["county_id_fips", 'industry_sector'])
+    grp = infra.groupby(["county_id_fips", "industry_sector"])
     aggs = grp.agg(
         {
             "co2e_tonnes_per_year": "sum",
@@ -176,8 +200,11 @@ def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
             "project_id": "count",
         }
     )
-    aggs['facility_type'] = 'fossil infrastructure'
-    aggs['status'] = 'proposed'
+    aggs.loc[:, "co2e_tonnes_per_year"].replace(
+        0, np.nan, inplace=True
+    )  # sums of 0 are simply unmodeled
+    aggs["facility_type"] = "fossil infrastructure"
+    aggs["status"] = "proposed"
     aggs.reset_index(inplace=True)
     aggs.rename(
         columns={
@@ -192,7 +219,7 @@ def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
 def _iso_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     # Avoid db dependency order by recreating the df.
     # Could also make an orchestration script.
-    iso = create_iso_data_mart(engine)['iso_projects_long_format']
+    iso = create_iso_data_mart(engine)["iso_projects_long_format"]
 
     # equivalent SQL query that I translated to pandas to avoid dependency
     # on the data_mart schema (which doesn't yet exist when this function runs)
@@ -209,7 +236,7 @@ def _iso_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     group by 1, 2
     ;
     """
-    grp = iso.groupby(["county_id_fips", 'resource_clean'])
+    grp = iso.groupby(["county_id_fips", "resource_clean"])
     aggs = grp.agg(
         {
             "co2e_tonnes_per_year": "sum",
@@ -217,8 +244,11 @@ def _iso_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
             "project_id": "count",
         }
     )
-    aggs['facility_type'] = 'power plant'
-    aggs['status'] = 'proposed'
+    aggs.loc[:, "co2e_tonnes_per_year"].replace(
+        0, np.nan, inplace=True
+    )  # sums of 0 are simply unmodeled
+    aggs["facility_type"] = "power plant"
+    aggs["status"] = "proposed"
     aggs.reset_index(inplace=True)
     aggs.rename(
         columns={
@@ -374,74 +404,7 @@ def _flatten_multiindex(multi_index: pd.MultiIndex, prefix: str) -> pd.Index:
     return pd.Index(flattened)
 
 
-def create_data_mart(engine: Optional[sa.engine.Engine] = None) -> pd.DataFrame:
-    """Create the counties datamart dataframe."""
-    if engine is None:
-        engine = get_sql_engine()
-    pudl = _get_pudl_df(
-        engine
-    )  # already filtered on operational_status and report_date
-    ncsl = _get_ncsl_wind_permitting_df(engine)
-    all_counties = _get_county_fips_df(engine)
-    all_states = _get_state_fips_df(engine)
-    iso = _iso_projects_counties(engine)
-    infra = _fossil_infrastructure_counties(engine)
-
-    # model local opposition
-    aggregator = CountyOpposition(
-        engine=engine, county_fips_df=all_counties, state_fips_df=all_states
-    )
-    combined_opp = aggregator.agg_to_counties(include_state_policies=True)
-
-    # aggregate
-    iso_aggs = _agg_iso_projects_to_counties(iso)
-    iso_aggs.columns = _flatten_multiindex(iso_aggs.columns, prefix="proposed")
-    existing_aggs = _agg_pudl_to_counties(pudl)
-    existing_aggs.columns = _flatten_multiindex(
-        existing_aggs.columns, prefix="existing"
-    )
-    recent_build = pudl.query(f'operating_date >= "{PUDL_LATEST_YEAR}-01-01"')
-    recent_aggs = _agg_pudl_to_counties(recent_build)
-    recent_aggs.columns = _flatten_multiindex(
-        recent_aggs.columns, prefix=f"built_in_{PUDL_LATEST_YEAR}"
-    )
-
-    # join it all
-    out = pd.concat([iso_aggs, existing_aggs, recent_aggs], axis=1)
-    out = out.join(
-        [combined_opp.set_index("county_id_fips"), infra.set_index("county_id_fips")],
-        how="left",
-    )
-    out = out.reset_index()
-    out["state_id_fips"] = out["county_id_fips"].str[:2]
-    out = out.merge(ncsl, on="state_id_fips", how="left", validate="m:1")
-    # use canonical state and county names
-    out = out.merge(
-        all_states[["state_abbrev", "state_id_fips"]],
-        on="state_id_fips",
-        how="left",
-        validate="m:1",
-    )
-    out = out.merge(
-        all_counties[["county_name", "county_id_fips"]],
-        on="county_id_fips",
-        how="left",
-        validate="m:1",
-    )
-
-    out = _add_derived_columns(out)
-
-    assert len(out) <= len(all_counties)
-    rename_dict = {
-        "geocoded_locality_name": "ordinance_jurisdiction_name",
-        "geocoded_locality_type": "ordinance_jurisdiction_type",
-        "earliest_year_mentioned": "ordinance_earliest_year_mentioned",
-        "description": "state_permitting_text",
-        "permitting_type": "state_permitting_type",
-        "state_abbrev": "state",
-        "county_name": "county",
-    }
-    out = out.rename(columns=rename_dict)
+def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
 
     col_order = [
         "state_id_fips",
@@ -505,4 +468,90 @@ def create_data_mart(engine: Optional[sa.engine.Engine] = None) -> pd.DataFrame:
         "infra_max_pct_low_income",
         "infra_max_pct_people_of_color",
     ]
-    return out[col_order]
+    #return out[col_order]
+
+
+def create_data_mart(
+    engine: Optional[sa.engine.Engine] = None,
+    pudl_engine: Optional[sa.engine.Engine] = None,
+) -> pd.DataFrame:
+    """Create the counties datamart dataframe."""
+    postgres_engine = engine
+    if postgres_engine is None:
+        postgres_engine = get_sql_engine()
+    if pudl_engine is None:
+        pudl_data_path = download_pudl_data()
+        pudl_engine = sa.create_engine(
+            f"sqlite:////{pudl_data_path}/pudl_data/sqlite/pudl.sqlite"
+        )
+
+    ncsl = _get_ncsl_wind_permitting_df(postgres_engine)
+    all_counties = _get_county_fips_df(postgres_engine)
+    all_states = _get_state_fips_df(postgres_engine)
+    iso = _iso_projects_counties(postgres_engine)
+    infra = _fossil_infrastructure_counties(postgres_engine)
+    existing = _existing_plants_counties(
+        pudl_engine=pudl_engine,
+        postgres_engine=postgres_engine,
+        state_fips_table=all_states,
+        county_fips_table=all_counties,
+    )
+
+    # model local opposition
+    aggregator = CountyOpposition(
+        engine=postgres_engine, county_fips_df=all_counties, state_fips_df=all_states
+    )
+    combined_opp = aggregator.agg_to_counties(include_state_policies=True)
+
+    # join it all
+    out = pd.concat([iso, existing, infra], axis=0, ignore_index=True)
+    out = out.merge(combined_opp, on="county_id_fips", how="left")
+    out["state_id_fips"] = out["county_id_fips"].str[:2]
+    out = out.merge(ncsl, on="state_id_fips", how="left", validate="m:1")
+    # use canonical state and county names
+    out = out.merge(
+        all_states[["state_name", "state_id_fips"]],
+        on="state_id_fips",
+        how="left",
+        validate="m:1",
+    )
+    out = out.merge(
+        all_counties[["county_name", "county_id_fips"]],
+        on="county_id_fips",
+        how="left",
+        validate="m:1",
+    )
+
+    out = _add_derived_columns(out)
+    rename_dict = {
+        "geocoded_locality_name": "ordinance_jurisdiction_name",
+        "geocoded_locality_type": "ordinance_jurisdiction_type",
+        "earliest_year_mentioned": "ordinance_earliest_year_mentioned",
+        "description": "state_permitting_text",
+        "permitting_type": "state_permitting_type",
+        "state_name": "state",
+        "county_name": "county",
+    }
+    out = out.rename(columns=rename_dict)
+    col_order = [
+        "state_id_fips",
+        "county_id_fips",
+        "state",
+        "county",
+        "facility_type",
+        "resource_or_sector",
+        "status",
+        "facility_count",
+        "capacity_mw",
+        "co2e_tonnes_per_year",
+        "pm2_5_tonnes_per_year",
+        "nox_tonnes_per_year",
+        "has_ordinance",
+        "ordinance_jurisdiction_name",
+        "ordinance_jurisdiction_type",
+        "ordinance",
+        "ordinance_earliest_year_mentioned",
+        "state_permitting_type",
+        "state_permitting_text",
+    ]
+    return out.loc[:, col_order]
