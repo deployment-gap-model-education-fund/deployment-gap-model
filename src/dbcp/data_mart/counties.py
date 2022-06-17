@@ -1,11 +1,10 @@
 """Module to create a county-level table for DBCP to use in spreadsheet tools."""
-from typing import Optional, Sequence
+from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
 import sqlalchemy as sa
 
-from dbcp.constants import PUDL_LATEST_YEAR
 from dbcp.data_mart.co2_dashboard import (
     _estimate_existing_co2e,
     _get_existing_plant_fuel_data,
@@ -405,54 +404,59 @@ def _flatten_multiindex(multi_index: pd.MultiIndex, prefix: str) -> pd.Index:
 
 
 def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
+    long = long_format.copy()
+    resources_to_drop = {
+        # "Battery Storage",
+        # "Solar",
+        # "Natural Gas",
+        "Nuclear",
+        # "Onshore Wind",
+        "CSP",
+        "Other",
+        "Unknown",
+        "Geothermal",
+        "Other Storage",
+        # "Offshore Wind",
+        "Hydro",
+        "Pumped Storage",
+        # "Coal",
+        # "Oil",
+        # "Liquefied Natural Gas",
+        # "Synthetic Fertilizers",
+        # "Petrochemicals and Plastics",
+    }
+    to_drop = long["resource_or_sector"].isin(resources_to_drop)
+    long = long.loc[~to_drop, :]
 
-    col_order = [
+    # prep values that will become part of column names after pivoting
+    long.loc[:, "facility_type"] = long.loc[:, "facility_type"].map(
+        {"fossil infrastructure": "infra", "power plant": ""}
+    )
+    long.loc[:, "resource_or_sector"] = long.loc[:, "resource_or_sector"].replace(
+        {"Natural Gas": "gas", "Liquefied Natural Gas": "lng"}
+    )
+    long.loc[:, "resource_or_sector"] = (
+        long.loc[:, "resource_or_sector"].str.lower().str.replace(" ", "_", regex=False)
+    )
+
+    # pivot
+    idx_cols = ["county_id_fips"]
+    col_cols = [
+        "facility_type",
+        "resource_or_sector",
+        "status",
+    ]
+    val_cols = [
+        "facility_count",
+        "capacity_mw",
+        "co2e_tonnes_per_year",
+        "pm2_5_tonnes_per_year",
+        "nox_tonnes_per_year",
+    ]
+    county_level_cols = [  # not part of pivot
         "state_id_fips",
-        "county_id_fips",
         "state",
         "county",
-        "fossil_built_in_2020_capacity_mw",
-        "fossil_built_in_2020_count_plants",
-        "fossil_existing_capacity_mw",
-        "fossil_existing_count_plants",
-        "fossil_proposed_capacity_mw",
-        "fossil_proposed_count_plants",
-        "renewable_built_in_2020_capacity_mw",
-        "renewable_built_in_2020_count_plants",
-        "renewable_existing_capacity_mw",
-        "renewable_existing_count_plants",
-        "renewable_proposed_capacity_mw",
-        "renewable_proposed_count_plants",
-        "battery_storage_built_in_2020_capacity_mw",
-        "battery_storage_built_in_2020_count_plants",
-        "battery_storage_existing_capacity_mw",
-        "battery_storage_existing_count_plants",
-        "battery_storage_proposed_capacity_mw",
-        "battery_storage_proposed_count_plants",
-        # 'coal_built_in_2020_capacity_mw',  # drop
-        # 'coal_built_in_2020_count_plants',  # drop
-        "coal_existing_capacity_mw",
-        "coal_existing_count_plants",
-        "gas_built_in_2020_capacity_mw",
-        "gas_built_in_2020_count_plants",
-        "gas_existing_capacity_mw",
-        "gas_existing_count_plants",
-        "gas_proposed_capacity_mw",
-        "gas_proposed_count_plants",
-        "solar_built_in_2020_capacity_mw",
-        "solar_built_in_2020_count_plants",
-        "solar_existing_capacity_mw",
-        "solar_existing_count_plants",
-        "solar_proposed_capacity_mw",
-        "solar_proposed_count_plants",
-        "onshore_wind_built_in_2020_capacity_mw",
-        "onshore_wind_built_in_2020_count_plants",
-        "onshore_wind_existing_capacity_mw",
-        "onshore_wind_existing_count_plants",
-        "onshore_wind_proposed_capacity_mw",
-        "onshore_wind_proposed_count_plants",
-        "offshore_wind_proposed_capacity_mw",
-        "offshore_wind_proposed_count_plants",
         "has_ordinance",
         "ordinance_jurisdiction_name",
         "ordinance_jurisdiction_type",
@@ -460,31 +464,137 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "ordinance_earliest_year_mentioned",
         "state_permitting_type",
         "state_permitting_text",
-        "infra_co2e_tonnes_per_year",
-        "infra_pm2_5_tonnes_per_year",
-        "infra_nox_tonnes_per_year",
-        "infra_count_projects",
-        "infra_sector_list",
-        "infra_max_pct_low_income",
-        "infra_max_pct_people_of_color",
     ]
-    #return out[col_order]
+    wide = long.pivot(index=idx_cols, columns=col_cols, values=val_cols)
+
+    wide.columns = wide.columns.rename(
+        {None: "measures"}
+    )  # value columns: capacity, count, etc
+    wide.columns = wide.columns.reorder_levels(col_cols + ["measures"])
+    wide.columns = [
+        "_".join(col).strip("_") for col in wide.columns
+    ]  # flatten multiindex
+
+    county_stuff = long.groupby("county_id_fips")[county_level_cols].first()
+    wide = wide.join(county_stuff).reset_index()
+
+    renewables = ["solar", "offshore_wind", "onshore_wind"]
+    fossils = ["coal", "oil", "gas"]
+    measures = [
+        "existing_capacity_mw",
+        "existing_co2e_tonnes_per_year",
+        "existing_facility_count",
+        "proposed_capacity_mw",
+        "proposed_co2e_tonnes_per_year",
+        "proposed_facility_count",
+    ]
+    for measure in measures:
+        renewable_cols_to_sum = [
+            "_".join([renewable, measure])
+            for renewable in renewables
+            if "_".join([renewable, measure]) in wide.columns
+        ]
+        fossil_cols_to_sum = [
+            "_".join([fossil, measure])
+            for fossil in fossils
+            if "_".join([fossil, measure]) in wide.columns
+        ]
+        wide[f"renewable_{measure}"] = wide.loc[:, renewable_cols_to_sum].sum(axis=1)
+        wide[f"fossil_{measure}"] = wide.loc[:, fossil_cols_to_sum].sum(axis=1)
+
+    wide.dropna(axis=1, how="all", inplace=True)
+    cols_to_drop = [
+        # A handful of hybrid facilities with co-located diesel generators.
+        # They produce tiny amounts of CO2 but large amounts of confusion.
+        "onshore_wind_existing_co2e_tonnes_per_year",
+        "battery_storage_existing_co2e_tonnes_per_year",
+    ]
+    wide.drop(columns=cols_to_drop, inplace=True)
+
+    col_order = [
+        "state_id_fips",
+        "county_id_fips",
+        "state",
+        "county",
+        "has_ordinance",
+        "state_permitting_type",
+        "fossil_existing_capacity_mw",
+        "fossil_existing_co2e_tonnes_per_year",
+        "fossil_existing_facility_count",
+        "fossil_proposed_capacity_mw",
+        "fossil_proposed_co2e_tonnes_per_year",
+        "fossil_proposed_facility_count",
+        "renewable_existing_capacity_mw",
+        "renewable_existing_co2e_tonnes_per_year",  # left in because of hybrid plants like solar thermal
+        "renewable_existing_facility_count",
+        "renewable_proposed_capacity_mw",
+        "renewable_proposed_facility_count",
+        "battery_storage_existing_capacity_mw",
+        "battery_storage_existing_facility_count",
+        "battery_storage_proposed_capacity_mw",
+        "battery_storage_proposed_facility_count",
+        "coal_existing_capacity_mw",
+        "coal_existing_co2e_tonnes_per_year",
+        "coal_existing_facility_count",
+        "coal_proposed_capacity_mw",
+        "coal_proposed_co2e_tonnes_per_year",
+        "coal_proposed_facility_count",
+        "gas_existing_capacity_mw",
+        "gas_existing_co2e_tonnes_per_year",
+        "gas_existing_facility_count",
+        "gas_proposed_capacity_mw",
+        "gas_proposed_co2e_tonnes_per_year",
+        "gas_proposed_facility_count",
+        "offshore_wind_existing_capacity_mw",
+        "offshore_wind_existing_facility_count",
+        "offshore_wind_proposed_capacity_mw",
+        "offshore_wind_proposed_facility_count",
+        "oil_existing_capacity_mw",
+        "oil_existing_co2e_tonnes_per_year",
+        "oil_existing_facility_count",
+        "onshore_wind_existing_capacity_mw",
+        "onshore_wind_existing_facility_count",
+        "onshore_wind_proposed_capacity_mw",
+        "onshore_wind_proposed_facility_count",
+        "solar_existing_capacity_mw",
+        "solar_existing_co2e_tonnes_per_year",
+        "solar_existing_facility_count",
+        "solar_proposed_capacity_mw",
+        "solar_proposed_facility_count",
+        "infra_gas_proposed_co2e_tonnes_per_year",
+        "infra_gas_proposed_facility_count",
+        "infra_gas_proposed_nox_tonnes_per_year",
+        "infra_gas_proposed_pm2_5_tonnes_per_year",
+        "infra_lng_proposed_co2e_tonnes_per_year",
+        "infra_lng_proposed_facility_count",
+        "infra_lng_proposed_nox_tonnes_per_year",
+        "infra_lng_proposed_pm2_5_tonnes_per_year",
+        "infra_oil_proposed_co2e_tonnes_per_year",
+        "infra_oil_proposed_facility_count",
+        "infra_oil_proposed_nox_tonnes_per_year",
+        "infra_oil_proposed_pm2_5_tonnes_per_year",
+        "infra_petrochemicals_and_plastics_proposed_co2e_tonnes_per_year",
+        "infra_petrochemicals_and_plastics_proposed_facility_count",
+        "infra_petrochemicals_and_plastics_proposed_nox_tonnes_per_year",
+        "infra_petrochemicals_and_plastics_proposed_pm2_5_tonnes_per_year",
+        "infra_synthetic_fertilizers_proposed_co2e_tonnes_per_year",
+        "infra_synthetic_fertilizers_proposed_facility_count",
+        "infra_synthetic_fertilizers_proposed_nox_tonnes_per_year",
+        "infra_synthetic_fertilizers_proposed_pm2_5_tonnes_per_year",
+        "ordinance",
+        "ordinance_earliest_year_mentioned",
+        "ordinance_jurisdiction_name",
+        "ordinance_jurisdiction_type",
+        "state_permitting_text",
+    ]
+    return wide.loc[:, col_order].copy()
 
 
-def create_data_mart(
-    engine: Optional[sa.engine.Engine] = None,
+def create_long_format(
+    postgres_engine: Optional[sa.engine.Engine] = None,
     pudl_engine: Optional[sa.engine.Engine] = None,
 ) -> pd.DataFrame:
-    """Create the counties datamart dataframe."""
-    postgres_engine = engine
-    if postgres_engine is None:
-        postgres_engine = get_sql_engine()
-    if pudl_engine is None:
-        pudl_data_path = download_pudl_data()
-        pudl_engine = sa.create_engine(
-            f"sqlite:////{pudl_data_path}/pudl_data/sqlite/pudl.sqlite"
-        )
-
+    """Create the long format county datamart dataframe."""
     ncsl = _get_ncsl_wind_permitting_df(postgres_engine)
     all_counties = _get_county_fips_df(postgres_engine)
     all_states = _get_state_fips_df(postgres_engine)
@@ -555,3 +665,37 @@ def create_data_mart(
         "state_permitting_text",
     ]
     return out.loc[:, col_order]
+
+
+def create_data_mart(
+    engine: Optional[sa.engine.Engine] = None,
+    pudl_engine: Optional[sa.engine.Engine] = None,
+) -> Dict[str, pd.DataFrame]:
+    """Create county data marts.
+
+    Args:
+        engine (Optional[sa.engine.Engine], optional): postgres engine. Defaults to None.
+        pudl_engine (Optional[sa.engine.Engine], optional): sqlite engine. Defaults to None.
+
+    Returns:
+        Dict[str, pd.DataFrame]: county tables in both wide and long format
+    """
+    postgres_engine = engine
+    if postgres_engine is None:
+        postgres_engine = get_sql_engine()
+    if pudl_engine is None:
+        pudl_data_path = download_pudl_data()
+        pudl_engine = sa.create_engine(
+            f"sqlite:////{pudl_data_path}/pudl_data/sqlite/pudl.sqlite"
+        )
+
+    long_format = create_long_format(
+        postgres_engine=postgres_engine, pudl_engine=pudl_engine
+    )
+    wide_format = _convert_long_to_wide(long_format)
+
+    out = {
+        "counties_long_format": long_format,
+        "counties_wide_format": wide_format,
+    }
+    return out
