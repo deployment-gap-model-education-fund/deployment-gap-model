@@ -42,7 +42,7 @@ def local_opposition(
     aggregator = CountyOpposition(
         engine=engine, county_fips_df=county_fips_df, state_fips_df=state_fips_df
     )
-    county_opp = aggregator.agg_to_counties(include_state_policies=True)
+    county_opp = aggregator.agg_to_counties(include_state_policies=False)
 
     # bring in county names and state_id_fips
     county_opp = county_opp.merge(county_fips_df, on="county_id_fips", copy=False)
