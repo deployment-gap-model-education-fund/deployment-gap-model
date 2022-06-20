@@ -478,6 +478,15 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     county_stuff = long.groupby("county_id_fips")[county_level_cols].first()
     wide = wide.join(county_stuff).reset_index()
 
+    # co2e total
+    co2e_cols_to_sum = [
+        col for col in wide.columns if col.endswith("co2e_tonnes_per_year")
+    ]
+    wide["county_total_co2e_tonnes_per_year"] = wide.loc[:, co2e_cols_to_sum].sum(
+        axis=1
+    )
+
+    # fossil and renewable category totals
     renewables = ["solar", "offshore_wind", "onshore_wind"]
     fossils = ["coal", "oil", "gas"]
     measures = [
@@ -502,6 +511,24 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         wide[f"renewable_{measure}"] = wide.loc[:, renewable_cols_to_sum].sum(axis=1)
         wide[f"fossil_{measure}"] = wide.loc[:, fossil_cols_to_sum].sum(axis=1)
 
+    # infrastructure category totals
+    measures = [
+        "proposed_co2e_tonnes_per_year",
+        "proposed_facility_count",
+        "proposed_nox_tonnes_per_year",
+        "proposed_pm2_5_tonnes_per_year",
+    ]
+    sectors = [
+        "gas",
+        "lng",
+        "oil",
+        "petrochemicals_and_plastics",
+        "synthetic_fertilizers",
+    ]
+    for measure in measures:
+        infra_cols_to_sum = [f"infra_{sector}_{measure}" for sector in sectors]
+        wide[f"infra_total_{measure}"] = wide.loc[:, infra_cols_to_sum].sum(axis=1)
+
     wide.dropna(axis=1, how="all", inplace=True)
     cols_to_drop = [
         # A handful of hybrid facilities with co-located diesel generators.
@@ -518,6 +545,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "county",
         "has_ordinance",
         "state_permitting_type",
+        "county_total_co2e_tonnes_per_year",
         "fossil_existing_capacity_mw",
         "fossil_existing_co2e_tonnes_per_year",
         "fossil_existing_facility_count",
@@ -529,6 +557,10 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "renewable_existing_facility_count",
         "renewable_proposed_capacity_mw",
         "renewable_proposed_facility_count",
+        "infra_total_proposed_co2e_tonnes_per_year",
+        "infra_total_proposed_facility_count",
+        "infra_total_proposed_nox_tonnes_per_year",
+        "infra_total_proposed_pm2_5_tonnes_per_year",
         "battery_storage_existing_capacity_mw",
         "battery_storage_existing_facility_count",
         "battery_storage_proposed_capacity_mw",
