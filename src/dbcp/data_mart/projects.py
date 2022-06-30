@@ -225,6 +225,14 @@ def _add_derived_columns(mart: pd.DataFrame) -> None:
 
 
 def create_long_format(engine: sa.engine.Engine) -> pd.DataFrame:
+    """Create table of ISO projects in long format.
+
+    Args:
+        engine (sa.engine.Engine): postgres database engine
+
+    Returns:
+        pd.DataFrame: long format table of ISO projects
+    """
     iso = _get_and_join_iso_tables(engine)
     all_counties = _get_county_fips_df(engine)
     all_states = _get_state_fips_df(engine)
@@ -233,7 +241,7 @@ def create_long_format(engine: sa.engine.Engine) -> pd.DataFrame:
     aggregator = CountyOpposition(
         engine=engine, county_fips_df=all_counties, state_fips_df=all_states
     )
-    combined_opp = aggregator.agg_to_counties(include_state_policies=True)
+    combined_opp = aggregator.agg_to_counties(include_state_policies=False)
     rename_dict = {
         "geocoded_locality_name": "ordinance_jurisdiction_name",
         "geocoded_locality_type": "ordinance_jurisdiction_type",
