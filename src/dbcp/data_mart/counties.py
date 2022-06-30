@@ -643,7 +643,7 @@ def create_long_format(
     aggregator = CountyOpposition(
         engine=postgres_engine, county_fips_df=all_counties, state_fips_df=all_states
     )
-    combined_opp = aggregator.agg_to_counties(include_state_policies=True)
+    combined_opp = aggregator.agg_to_counties(include_state_policies=False)
 
     # join it all
     out = pd.concat([iso, existing, infra], axis=0, ignore_index=True)
