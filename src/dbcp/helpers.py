@@ -26,6 +26,15 @@ def get_sql_engine() -> sa.engine.Engine:
     return sa.create_engine(f"postgresql://{user}:{password}@{db}:5432")
 
 
+def get_pudl_engine() -> sa.engine.Engine:
+    """Create a sql alchemy engine for the pudl database."""
+    pudl_data_path = download_pudl_data()
+    pudl_engine = sa.create_engine(
+        f"sqlite:////{pudl_data_path}/pudl_data/sqlite/pudl.sqlite"
+    )
+    return pudl_engine
+
+
 def download_pudl_data() -> Path:
     """Download pudl data from Zenodo."""
     # TODO(bendnorman): Adjust the datastore and zenodo fetcher so we can pull down PUDL
