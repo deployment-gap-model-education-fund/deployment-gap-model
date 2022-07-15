@@ -93,8 +93,9 @@ references/eip_api_reverse_eng/*
 # Mypy cache
 .mypy_cache/
 
-# file for testing
-scratchpad.py
+# temp files for debugging and testing
+scratchpad/*
+**/scratchpad*.py
 
 # from PUDL .gitignore
 *.log
