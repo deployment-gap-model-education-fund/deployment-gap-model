@@ -21,7 +21,7 @@ from dbcp.data_mart.helpers import (
     _subset_db_columns,
 )
 from dbcp.data_mart.projects import create_data_mart as create_iso_data_mart
-from dbcp.helpers import download_pudl_data, get_sql_engine
+from dbcp.helpers import get_pudl_engine, get_sql_engine
 
 
 def _get_existing_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
@@ -716,10 +716,7 @@ def create_data_mart(
     if postgres_engine is None:
         postgres_engine = get_sql_engine()
     if pudl_engine is None:
-        pudl_data_path = download_pudl_data()
-        pudl_engine = sa.create_engine(
-            f"sqlite:////{pudl_data_path}/pudl_data/sqlite/pudl.sqlite"
-        )
+        pudl_engine = get_pudl_engine()
 
     long_format = create_long_format(
         postgres_engine=postgres_engine, pudl_engine=pudl_engine
