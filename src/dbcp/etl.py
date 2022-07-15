@@ -44,16 +44,31 @@ def etl_lbnlisoqueues() -> Dict[str, pd.DataFrame]:
     return lbnl_transformed_dfs
 
 
+def etl_lbnl_iso_queue_2021() -> Dict[str, pd.DataFrame]:
+    """LBNL ISO Queues 2021 ETL."""
+    source_path = Path("/app/data/raw/queues_2021_clean_data.xlsx")
+    lbnl_raw_dfs = dbcp.extract.lbnl_iso_queue_2021.extract(source_path)
+    lbnl_transformed_dfs = dbcp.transform.lbnl_iso_queue_2021.transform(lbnl_raw_dfs)
+
+    return lbnl_transformed_dfs
+
+
 def etl_columbia_local_opp() -> Dict[str, pd.DataFrame]:
     """Columbia Local Opposition ETL."""
     # Extract
     source_path = Path("/app/data/raw/RELDI report updated 9.10.21 (1).docx")
     extractor = dbcp.extract.local_opposition.ColumbiaDocxParser()
     extractor.load_docx(source_path)
-    raw_dfs = extractor.extract()
+    docx_dfs = extractor.extract()
+
+    source_path_update = Path("./data/raw/RELDI_local_opposition_2022-03-24.csv")
+    update_dfs = dbcp.extract.local_opposition._extract_march_2022_update(
+        source_path_update
+    )
 
     # Transform
-    transformed_dfs = dbcp.transform.local_opposition.transform(raw_dfs)
+    combined = dbcp.transform.local_opposition._combine_updates(docx_dfs, update_dfs)
+    transformed_dfs = dbcp.transform.local_opposition.transform(combined)
 
     return transformed_dfs
 
@@ -123,6 +138,7 @@ def etl(args):
     etl_funcs = {
         "eip_infrastructure": etl_eip_infrastructure,
         "lbnlisoqueues": etl_lbnlisoqueues,
+        "lbnl_iso_queue_2021": etl_lbnl_iso_queue_2021,
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
         "columbia_local_opp": etl_columbia_local_opp,

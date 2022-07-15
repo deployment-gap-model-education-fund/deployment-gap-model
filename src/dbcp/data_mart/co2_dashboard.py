@@ -220,8 +220,8 @@ def _get_proposed_fossil_plants(engine: sa.engine.Engine) -> pd.DataFrame:
         select
             proj.project_id,
             loc.county_id_fips
-        from data_warehouse.iso_projects as proj
-        left join data_warehouse.iso_locations as loc
+        from data_warehouse.iso_projects_2021 as proj
+        left join data_warehouse.iso_locations_2021 as loc
             on loc.project_id = proj.project_id
         where proj.queue_status = 'active'
     ),
@@ -232,7 +232,7 @@ def _get_proposed_fossil_plants(engine: sa.engine.Engine) -> pd.DataFrame:
             res.capacity_mw,
             res.resource_clean as resource
         from active_loc as loc
-        left join data_warehouse.iso_resource_capacity as res
+        left join data_warehouse.iso_resource_capacity_2021 as res
             on res.project_id = loc.project_id
         where res.capacity_mw is not NULL
         and res.resource_clean in ('Natural Gas', 'Coal', 'Oil')
@@ -301,23 +301,23 @@ def _estimate_proposed_power_co2e(
     is_cc = df.loc[:, "capacity_mw"].gt(cc_gt_capacity_mw_split)
     is_coal = df.loc[:, "mod_resource"] == "coal"
     df.loc[:, "mmbtu_per_mwh"].where(
-        is_cc, other=combined_cycle_mmbtu_per_mwh, inplace=True
+        ~is_cc, other=combined_cycle_mmbtu_per_mwh, inplace=True
     )
     df.loc[:, "mmbtu_per_mwh"].where(
-        is_coal, other=coal_steam_turbine_mmbtu_per_mwh, inplace=True
+        ~is_coal, other=coal_steam_turbine_mmbtu_per_mwh, inplace=True
     )
 
     df["estimated_capacity_factor"] = gt_small_cap_factor
     df.loc[:, "estimated_capacity_factor"].where(
-        ~is_cc & df.loc[:, "capacity_mw"].gt(gt_sub_split),
+        ~is_cc & df.loc[:, "capacity_mw"].le(gt_sub_split),
         other=gt_large_cap_factor,
         inplace=True,
     )
     df.loc[:, "estimated_capacity_factor"].where(
-        is_cc, other=cc_cap_factor, inplace=True
+        ~is_cc, other=cc_cap_factor, inplace=True
     )
     df.loc[:, "estimated_capacity_factor"].where(
-        is_coal, other=coal_cap_factor, inplace=True
+        ~is_coal, other=coal_cap_factor, inplace=True
     )
 
     # Put it all together
