@@ -7,11 +7,10 @@ import pandas as pd
 import sqlalchemy as sa
 
 import dbcp
-from dbcp.constants import FIPS_CODE_VINTAGE, WORKING_PARTITIONS
+from dbcp.constants import FIPS_CODE_VINTAGE
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.schemas import TABLE_SCHEMAS
 from dbcp.transform.helpers import GEOCODER_CACHE
-from dbcp.workspace.datastore import DBCPDatastore
 from pudl.helpers import add_fips_ids as _add_fips_ids
 from pudl.output.pudltabl import PudlTabl
 
@@ -33,10 +32,8 @@ def etl_eip_infrastructure() -> Dict[str, pd.DataFrame]:
 def etl_lbnlisoqueues() -> Dict[str, pd.DataFrame]:
     """LBNL ISO Queues ETL."""
     # Extract
-    ds = DBCPDatastore(sandbox=True, local_cache_path="/app/data/data_cache")
-    lbnl_raw_dfs = dbcp.extract.lbnlisoqueues.Extractor(ds).extract(
-        update_date=WORKING_PARTITIONS["lbnlisoqueues"]["update_date"]
-    )
+    source_path = Path("/app/data/raw/lbnlisoqueues_2020.xlsx")
+    lbnl_raw_dfs = dbcp.extract.lbnl_iso_queue_2020.extract(source_path)
 
     # Transform
     lbnl_transformed_dfs = dbcp.transform.lbnlisoqueues.transform(lbnl_raw_dfs)
