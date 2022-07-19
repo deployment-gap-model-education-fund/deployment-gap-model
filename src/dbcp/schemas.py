@@ -241,11 +241,7 @@ TABLE_SCHEMAS = {
             "name": pa.Column(pd.StringDtype, nullable=True),
             "nitrogen_oxides_nox_tpy": pa.Column(float, nullable=True),
             "operating_status": pa.Column(pd.StringDtype, nullable=True),
-            "operating_status_source_documents": pa.Column(
-                pd.StringDtype, nullable=True
-            ),
             "particulate_matter_pm2_5_tpy": pa.Column(float, nullable=True),
-            "private": pa.Column(pd.BooleanDtype, nullable=True),
             "product_type": pa.Column(pd.StringDtype, nullable=True),
             "project_description": pa.Column(pd.StringDtype, nullable=True),
             "project_id": pa.Column(pd.StringDtype, nullable=False),
@@ -309,14 +305,6 @@ TABLE_SCHEMAS = {
             ),
             "raw_modified_on": pa.Column(
                 dtype=pd.StringDtype,
-                nullable=False,
-                unique=False,
-                coerce=False,
-                required=True,
-                regex=False,
-            ),
-            "private": pa.Column(
-                dtype=pd.BooleanDtype,
                 nullable=False,
                 unique=False,
                 coerce=False,
