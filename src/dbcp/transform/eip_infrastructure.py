@@ -136,10 +136,7 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         "Other Permits",
     ]
     duplicative_columns = _format_column_names(duplicative_columns)
-    # EIP website internals -- not interesting
-    other_cols_to_drop = [col for col in fac.columns if col.startswith("featured")]
-    assert len(other_cols_to_drop) == 3
-    fac.drop(columns=duplicative_columns + other_cols_to_drop, inplace=True)
+    fac.drop(columns=duplicative_columns, inplace=True)
 
     return fac
 
