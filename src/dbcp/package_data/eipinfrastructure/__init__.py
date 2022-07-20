@@ -1,1 +1,0 @@
-"""EIP Infrastructure package data."""

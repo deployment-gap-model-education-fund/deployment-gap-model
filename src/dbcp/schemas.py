@@ -231,28 +231,17 @@ TABLE_SCHEMAS = {
             "carbon_monoxide_co_tpy": pa.Column(float, nullable=True),
             "classification": pa.Column(pd.StringDtype, nullable=True),
             "cost_millions": pa.Column(float, nullable=True),
-            "created_by": pa.Column(pd.StringDtype, nullable=True),
             "date_modified": pa.Column(pd.Timestamp, nullable=True),
             "detailed_permitting_history": pa.Column(pd.StringDtype, nullable=True),
-            "emission_accounting_notes": pa.Column(pd.StringDtype, nullable=True),
             "greenhouse_gases_co2e_tpy": pa.Column(float, nullable=True),
             "hazardous_air_pollutants_haps_tpy": pa.Column(float, nullable=True),
             "industry_sector": pa.Column(pd.StringDtype, nullable=True),
             "is_ally_secondary_target": pa.Column(pd.BooleanDtype, nullable=True),
             "is_ally_target": pa.Column(pd.BooleanDtype, nullable=True),
-            "modified_by": pa.Column(pd.StringDtype, nullable=True),
             "name": pa.Column(pd.StringDtype, nullable=True),
             "nitrogen_oxides_nox_tpy": pa.Column(float, nullable=True),
             "operating_status": pa.Column(pd.StringDtype, nullable=True),
-            "operating_status_notes": pa.Column(pd.StringDtype, nullable=True),
-            "operating_status_source_documents": pa.Column(
-                pd.StringDtype, nullable=True
-            ),
-            "operating_status_sources_and_notes": pa.Column(
-                pd.StringDtype, nullable=True
-            ),
             "particulate_matter_pm2_5_tpy": pa.Column(float, nullable=True),
-            "private": pa.Column(pd.BooleanDtype, nullable=True),
             "product_type": pa.Column(pd.StringDtype, nullable=True),
             "project_description": pa.Column(pd.StringDtype, nullable=True),
             "project_id": pa.Column(pd.StringDtype, nullable=False),
@@ -276,7 +265,6 @@ TABLE_SCHEMAS = {
             "raw_project_cost_millions": pa.Column(pd.StringDtype, nullable=True),
             "raw_project_type": pa.Column(pd.StringDtype, nullable=True),
             "raw_sulfur_dioxide_so2": pa.Column(pd.StringDtype, nullable=True),
-            "research_notes": pa.Column(pd.StringDtype, nullable=True),
             "sulfur_dioxide_so2_tpy": pa.Column(float, nullable=True),
             "total_wetlands_affected_permanently_acres": pa.Column(
                 float, nullable=True
@@ -307,23 +295,7 @@ TABLE_SCHEMAS = {
                 required=True,
                 regex=False,
             ),
-            "created_by": pa.Column(
-                dtype=pd.StringDtype,
-                nullable=False,
-                unique=False,
-                coerce=False,
-                required=True,
-                regex=False,
-            ),
             "raw_created_on": pa.Column(
-                dtype=pd.StringDtype,
-                nullable=False,
-                unique=False,
-                coerce=False,
-                required=True,
-                regex=False,
-            ),
-            "modified_by": pa.Column(
                 dtype=pd.StringDtype,
                 nullable=False,
                 unique=False,
@@ -333,14 +305,6 @@ TABLE_SCHEMAS = {
             ),
             "raw_modified_on": pa.Column(
                 dtype=pd.StringDtype,
-                nullable=False,
-                unique=False,
-                coerce=False,
-                required=True,
-                regex=False,
-            ),
-            "private": pa.Column(
-                dtype=pd.BooleanDtype,
                 nullable=False,
                 unique=False,
                 coerce=False,
@@ -374,14 +338,6 @@ TABLE_SCHEMAS = {
             "raw_state": pa.Column(
                 dtype=pd.StringDtype,
                 nullable=False,
-                unique=False,
-                coerce=False,
-                required=True,
-                regex=False,
-            ),
-            "completeness_review_notes": pa.Column(
-                dtype=pd.StringDtype,
-                nullable=True,
                 unique=False,
                 coerce=False,
                 required=True,
@@ -484,14 +440,6 @@ TABLE_SCHEMAS = {
                 regex=False,
             ),
             "raw_county_or_parish": pa.Column(
-                dtype=pd.StringDtype,
-                nullable=True,
-                unique=False,
-                coerce=False,
-                required=True,
-                regex=False,
-            ),
-            "research_notes": pa.Column(
                 dtype=pd.StringDtype,
                 nullable=True,
                 unique=False,
