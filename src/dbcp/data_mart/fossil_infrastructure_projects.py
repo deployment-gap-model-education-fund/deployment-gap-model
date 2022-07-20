@@ -17,9 +17,7 @@ def _get_proposed_infra_projects(engine: sa.engine.Engine) -> pd.DataFrame:
             classification as project_classification,
             cost_millions,
             date_modified,
-            emission_accounting_notes,
             industry_sector,
-            operating_status_notes,
             product_type,
             project_description,
             raw_project_type,
@@ -194,9 +192,7 @@ def _get_proposed_infra_projects(engine: sa.engine.Engine) -> pd.DataFrame:
         raw_relative_cancer_risk_per_million_within_3_miles,
         raw_wastewater_discharge_indicator,
         is_ally_target,
-        is_ally_secondary_target,
-        emission_accounting_notes,
-        operating_status_notes
+        is_ally_secondary_target
     FROM final
     ORDER BY 2, 1
     ;
