@@ -136,10 +136,7 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         "Other Permits",
     ]
     duplicative_columns = _format_column_names(duplicative_columns)
-    # EIP website internals -- not interesting
-    other_cols_to_drop = [col for col in fac.columns if col.startswith("featured")]
-    assert len(other_cols_to_drop) == 3
-    fac.drop(columns=duplicative_columns + other_cols_to_drop, inplace=True)
+    fac.drop(columns=duplicative_columns, inplace=True)
 
     return fac
 
@@ -174,9 +171,9 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
         "actual_or_expected_completion_year": "raw_actual_or_expected_completion_year",
         "project_cost_million_$": "raw_project_cost_millions",
         "number_of_jobs_promised": "raw_number_of_jobs_promised",
-        "***REMOVED***_target_list": "is_ally_target",
-        "***REMOVED***_secondary_target_list": "is_ally_secondary_target",
-        "***REMOVED***_flag": "ally_flag",
+        "target_list": "is_ally_target",
+        "secondary_target_list": "is_ally_secondary_target",
+        "flag": "ally_flag",
         # add tons per year units
         "carbon_monoxide_co": "carbon_monoxide_co_tpy",
         "greenhouse_gases_co2e": "greenhouse_gases_co2e_tpy",
