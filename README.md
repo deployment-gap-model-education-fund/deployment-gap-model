@@ -19,6 +19,9 @@ There is no stated license for this repository's data input and output data beca
 
 All other code and assets are published under the [MIT License](https://opensource.org/licenses/MIT).
 
+## Data Access
+To access the processed data, add the `dbcp-dev-350818` project to your Big Query instance. To do this, select Add Data > Pin project > Enter Project Name. There should be two datasets named `data_warehouse` and `data_mart`.
+
 # Setup
 
 ## Conda Environment
