@@ -487,7 +487,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     )
 
     # fossil and renewable category totals
-    renewables = ["solar", "offshore_wind", "onshore_wind"]
+    renewables = ["solar", "offshore_wind", "onshore_wind", "battery_storage"]
     fossils = ["coal", "oil", "gas"]
     measures = [
         "existing_capacity_mw",
@@ -508,7 +508,9 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
             for fossil in fossils
             if "_".join([fossil, measure]) in wide.columns
         ]
-        wide[f"renewable_{measure}"] = wide.loc[:, renewable_cols_to_sum].sum(axis=1)
+        wide[f"renewable_and_battery_{measure}"] = wide.loc[
+            :, renewable_cols_to_sum
+        ].sum(axis=1)
         wide[f"fossil_{measure}"] = wide.loc[:, fossil_cols_to_sum].sum(axis=1)
 
     # infrastructure category totals
@@ -552,11 +554,11 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "fossil_proposed_capacity_mw",
         "fossil_proposed_co2e_tonnes_per_year",
         "fossil_proposed_facility_count",
-        "renewable_existing_capacity_mw",
-        "renewable_existing_co2e_tonnes_per_year",  # left in because of hybrid plants like solar thermal
-        "renewable_existing_facility_count",
-        "renewable_proposed_capacity_mw",
-        "renewable_proposed_facility_count",
+        "renewable_and_battery_existing_capacity_mw",
+        "renewable_and_battery_existing_co2e_tonnes_per_year",  # left in because of hybrid plants like solar thermal
+        "renewable_and_battery_existing_facility_count",
+        "renewable_and_battery_proposed_capacity_mw",
+        "renewable_and_battery_proposed_facility_count",
         "infra_total_proposed_co2e_tonnes_per_year",
         "infra_total_proposed_facility_count",
         "infra_total_proposed_nox_tonnes_per_year",
