@@ -1,25 +1,23 @@
-# Table: iso_projects_long_format
+# iso\_projects\_long\_format
 
-This table gives insight into proposed ISO projects by type. Each row represents a combination of project_id/resource_clean with other information joined on for convenience (county, ordinance, and project information).
-The data source is primarily the LBNL compiled ISO queues, plus local ordinances (via Columbia), state wind permitting types (via NCSL), and standard state/county IDs (from the Census).
-The last sheet of the raw ISO data contains a list of columns and their definitions for comparison to this table.
+This table gives insight into proposed ISO projects by type. Each row represents a combination of project\_id/resource\_clean with other information joined on for convenience (county, ordinance, and project information). The data source is primarily the LBNL compiled ISO queues, plus local ordinances (via Columbia), state wind permitting types (via NCSL), and standard state/county IDs (from the Census). The last sheet of the raw ISO data contains a list of columns and their definitions for comparison to this table.
 
 ## Modeling Decisions
 
 ### Definition of “Hybrid”
 
-Currently any project with more than one resource_clean is classified as “hybrid”, even if the second resource is a second source of generation rather than storage. So a combined wind/solar plant, or solar/gas plant, as well as solar/battery plant, will all have values of True in the is_hybrid column.
+Currently any project with more than one resource\_clean is classified as “hybrid”, even if the second resource is a second source of generation rather than storage. So a combined wind/solar plant, or solar/gas plant, as well as solar/battery plant, will all have values of True in the is\_hybrid column.
 
 ### Omitted Columns
 
 The following raw ISO columns were not included in this table:
 
-* queue_id – it is not quite unique and all NYISO withdrawn projects (several hundred) are missing this value
-* queue_year – it already exists in queue_date, which is included
-* proposed_on_year – it already exists in date_proposed, which is included
-* ia_status_raw – interconnection_status_lbnl (called ia_status_clean in the raw data) is standardized and easier to interpret
-* withdrawn_year – it already exists in withdrawn_date, which is included
-* on_year – it already exists in date_operational, which is included
+* queue\_id – it is not quite unique and all NYISO withdrawn projects (several hundred) are missing this value
+* queue\_year – it already exists in queue\_date, which is included
+* proposed\_on\_year – it already exists in date\_proposed, which is included
+* ia\_status\_raw – interconnection\_status\_lbnl (called ia\_status\_clean in the raw data) is standardized and easier to interpret
+* withdrawn\_year – it already exists in withdrawn\_date, which is included
+* on\_year – it already exists in date\_operational, which is included
 
 NCSL columns:
 
@@ -27,8 +25,8 @@ NCSL columns:
 
 Columbia Local Opposition:
 
-* latest_year_mentioned – an additional metric to help estimate the year an ordinance was enacted. I thought one metric plus the actual description was enough
-* n_years_mentioned – an additional metric to help estimate the year an ordinance was enacted. I thought one metric plus the actual description was enough
+* latest\_year\_mentioned – an additional metric to help estimate the year an ordinance was enacted. I thought one metric plus the actual description was enough
+* n\_years\_mentioned – an additional metric to help estimate the year an ordinance was enacted. I thought one metric plus the actual description was enough
 
 ### Multiple Project Counties
 
@@ -36,8 +34,7 @@ A few (26 out of 5283, 0.5% as of the 2020 data) active ISO projects are associa
 
 ### Hybrid Projects with a Single Capacity Value
 
-Half (442 out of 868, 51% as of the 2020 data) of hybrid projects in the active ISO queue report only a single capacity value. So far we have not made any attempt to model the missing values, so the empty value remains empty and does not contribute to any aggregates for its resource type.
-I don’t know if the single capacity value is supposed to be a combined capacity, the larger of the two capacities, only generation capacity, or something else. The dominant hybrid configuration (91%) is solar + battery.
+Half (442 out of 868, 51% as of the 2020 data) of hybrid projects in the active ISO queue report only a single capacity value. So far we have not made any attempt to model the missing values, so the empty value remains empty and does not contribute to any aggregates for its resource type. I don’t know if the single capacity value is supposed to be a combined capacity, the larger of the two capacities, only generation capacity, or something else. The dominant hybrid configuration (91%) is solar + battery.
 
 ### Local Ordinance Resolution Mismatch
 
@@ -50,4 +47,7 @@ Furthermore, there are 6 state-level laws affecting RE siting in some capacity, 
 ### CO2e Estimates
 
 We estimated annual CO2e production for proposed gas and coal plants. See the page on CO2 estimation for details:
-{% page-ref page="co2-esimation.md" %}
+
+{% content-ref url="../co2-estimation.md" %}
+[co2-estimation.md](../co2-estimation.md)
+{% endcontent-ref %}
