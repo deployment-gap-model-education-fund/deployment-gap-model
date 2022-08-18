@@ -10,6 +10,5 @@
   * [existing\_plants](data-mart/existing\_plants.md)
   * [co2\_dashboard](data-mart/co2\_dashboard.md)
   * [proposed\_power\_dash\_xxx](data-mart/proposed\_power\_dash\_xxx.md)
-* [Data Warehouse](data-warehouse/README.md)
-  * [Table: eip\_facilities](data-warehouse/eip\_facilities.md)
 * [CO2 Estimation](co2-estimation.md)
+* [Data Sources](sources/README.md)
