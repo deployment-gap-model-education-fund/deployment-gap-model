@@ -11,7 +11,11 @@ A few (21/439, 4.8% as of March 2022) emissions potentials have negative values.
 ### Utilization Adjustment on Emissions
 
 The emissions estimates reported to regulators (and collected by EIP) assume 100% facility utilization. This is  certainly an overestimation of utilization, but in terms of emissions, it is possible that lax enforcement or overly conservative reporting offset this error. We applied a blanket 15% reduction to account for more realistic utilization based on typical refinery and petrochemical utilization figures. See the CO2 Estimation page for more details:
-{% page-ref page="co2-estimation.md" %}
+
+{% content-ref url="../co2-estimation.md" %}
+[co2-estimation.md](../co2-estimation.md)
+{% endcontent-ref %}
+
 
 ### Project - Facility Relationships
 
