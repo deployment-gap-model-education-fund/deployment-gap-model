@@ -14,7 +14,7 @@ There are several possible sources of bias in these estimates:
 
 ## Estimating Power Plant Emissions
 
-Our approach to estimating CO2e is to first estimate the primary fuel consumption at each power plant then multiply that by the EPA’s fuel emissions factors (CO2e per unit) to yield CO2e.
+Our approach to estimating CO2e is to first estimate the primary fuel consumption at each power plant then multiply that by the [EPA’s fuel emissions factors](https://www.ecfr.gov/current/title-40/chapter-I/subchapter-C/part-98#ap40.23.98_138.1) (CO2e per unit) to yield CO2e.
 
 ### Existing Power Plants
 
@@ -27,13 +27,15 @@ Proposed plants lack information about hypothetical fuel consumption, so we have
 The chain of estimation is as follows:
 
 1. Classify the plant technology based on capacity and fuel type (combustion turbine or combined cycle)
-1. Estimate capacity factor based on recent (2015+) existing plants of similar capacity and technology type.
+1. Estimate capacity factor based on recent (2015+) existing plants of similar capacity and technology type (data from the EIA via [Catalyst Cooperative's PUDL database](https://catalyst.coop/pudl/)).
 1. Estimate electrical production by multiplying reported capacity with this estimated capacity factor
 1. Estimate input fuel consumption by combining electrical production estimates with technology-specific combustion efficiency [(“heat rates”) from the EIA](https://www.eia.gov/electricity/annual/html/epa_08_02.html).
+1. Estimate CO2e emissions by multiplying fuel consumption by the EPA emissions factor.
 
 #### Uncertainty
 
-Each step of this process introduces error, but thankfully the largest emitters happen to be the most common and the most certain.
-The largest source of relative error is infrequent. Erroneously confusing a “peaker” combustion turbine with a combined cycle plant will result in a whopping 3.9x difference in estimated CO2e (due to large differences in capacity factor). 24/242 (10%) of 2020 ISO gas plants are in an ambiguous capacity range (100 - 180 MW) where technology type is not clear. BUT only 4% of total capacity is in that range.
-Small gas plants (<40 MW) have huge range in capacity factors, but they are small so that uncertainty has less impact. The 2020 ISO queues have 78/242 (32%) small gas plants by count, but only 1/65 GW (1.5%) by capacity.
-Large plants (>180 MW) are more numerous (88/242, 36%), more important (57/65 GW, 87% of capacity), and more certain (can only be combined cycle, narrower range of capacity factor) than smaller ones.
+Each step of this process introduces error, but thankfully (for this analysis) the largest emitters happen to be the most common and the most certain. Large plants (>180 MW) are more numerous (88/242, 36%), more important (57/65 GW, 87% of capacity), and more certain (can only be combined cycle, narrower range of capacity factor) than smaller ones.
+
+The largest single source of relative error is caused by erroneously classifying a “peaker” combustion turbine as a combined cycle plant or vice versa. This will produce a whopping 3.9x difference in estimated CO2e due to large differences in capacity factor. But this error is small in absolute terms -- though 24/242 (10%) of 2020 proposed gas plants are in an ambiguous capacity range (100 - 180 MW) where technology type is not clear, those plants represent only 4% of total capacity.
+
+Separately, small gas plants (<40 MW) have huge range in capacity factors, but they are so small that this uncertainty has less impact. The 2020 ISO queues have 78/242 (32%) small gas plants by count, but only 1/65 GW (1.5%) by capacity.
