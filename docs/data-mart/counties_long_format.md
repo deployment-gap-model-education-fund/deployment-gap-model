@@ -9,7 +9,13 @@ Almost all the decisions from the ISO and fossil infrastructure project level ta
 
 ### Local Ordinance Resolution Mismatch
 
-See the description in the iso_projects_long_format section for details. When aggregating to the county level, 8 out of 92 (9%) counties (as of January 2022) have multiple associated ordinances. In those cases, the ordinance descriptions have been concatenated together.
+See the description in the iso\_projects\_long\_format section for details.
+
+{% content-ref url="../iso\_projects\_long\_format.md" %}
+[iso\_projects\_long\_format.md](../iso\_projects\_long\_format.md)
+{% endcontent-ref %}
+
+When aggregating to the county level, 8 out of 92 (9%) counties (as of January 2022) have multiple associated ordinances. In those cases, the ordinance descriptions have been concatenated together.
 
 ### EIP Emissions Aggregates
 
