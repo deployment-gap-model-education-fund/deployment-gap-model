@@ -475,6 +475,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "_".join(col).strip("_") for col in wide.columns
     ]  # flatten multiindex
 
+    # this is equivalent to left joining _get_county_properties()
     county_stuff = long.groupby("county_id_fips")[county_level_cols].first()
     wide = wide.join(county_stuff).reset_index()
 
@@ -629,9 +630,9 @@ def create_long_format(
     pudl_engine: Optional[sa.engine.Engine] = None,
 ) -> pd.DataFrame:
     """Create the long format county datamart dataframe."""
-    ncsl = _get_ncsl_wind_permitting_df(postgres_engine)
     all_counties = _get_county_fips_df(postgres_engine)
     all_states = _get_state_fips_df(postgres_engine)
+    county_properties = _get_county_properties(postgres_engine=postgres_engine)
     iso = _iso_projects_counties(postgres_engine)
     infra = _fossil_infrastructure_counties(postgres_engine)
     existing = _existing_plants_counties(
@@ -641,42 +642,10 @@ def create_long_format(
         county_fips_table=all_counties,
     )
 
-    # model local opposition
-    aggregator = CountyOpposition(
-        engine=postgres_engine, county_fips_df=all_counties, state_fips_df=all_states
-    )
-    combined_opp = aggregator.agg_to_counties(include_state_policies=False)
-
     # join it all
     out = pd.concat([iso, existing, infra], axis=0, ignore_index=True)
-    out = out.merge(combined_opp, on="county_id_fips", how="left")
-    out["state_id_fips"] = out["county_id_fips"].str[:2]
-    out = out.merge(ncsl, on="state_id_fips", how="left", validate="m:1")
-    # use canonical state and county names
-    out = out.merge(
-        all_states[["state_name", "state_id_fips"]],
-        on="state_id_fips",
-        how="left",
-        validate="m:1",
-    )
-    out = out.merge(
-        all_counties[["county_name", "county_id_fips"]],
-        on="county_id_fips",
-        how="left",
-        validate="m:1",
-    )
-
+    out = out.merge(county_properties, on="county_id_fips", how="left")
     out = _add_derived_columns(out)
-    rename_dict = {
-        "geocoded_locality_name": "ordinance_jurisdiction_name",
-        "geocoded_locality_type": "ordinance_jurisdiction_type",
-        "earliest_year_mentioned": "ordinance_earliest_year_mentioned",
-        "description": "state_permitting_text",
-        "permitting_type": "state_permitting_type",
-        "state_name": "state",
-        "county_name": "county",
-    }
-    out = out.rename(columns=rename_dict)
     col_order = [
         "state_id_fips",
         "county_id_fips",
@@ -699,6 +668,78 @@ def create_long_format(
         "state_permitting_text",
     ]
     return out.loc[:, col_order]
+
+
+def _get_county_properties(
+    postgres_engine: sa.engine.Engine,
+    include_state_policies=False,
+    rename_dict: Optional[Dict[str, str]] = None,
+):
+    if rename_dict is None:
+        rename_dict = {
+            "geocoded_locality_name": "ordinance_jurisdiction_name",
+            "geocoded_locality_type": "ordinance_jurisdiction_type",
+            "earliest_year_mentioned": "ordinance_earliest_year_mentioned",
+            "description": "state_permitting_text",
+            "permitting_type": "state_permitting_type",
+            "state_name": "state",
+            "county_name": "county",
+        }
+    ncsl = _get_ncsl_wind_permitting_df(postgres_engine)
+    all_counties = _get_county_fips_df(postgres_engine)
+    all_states = _get_state_fips_df(postgres_engine)
+    # model local opposition
+    aggregator = CountyOpposition(
+        engine=postgres_engine, county_fips_df=all_counties, state_fips_df=all_states
+    )
+    combined_opp = aggregator.agg_to_counties(
+        include_state_policies=include_state_policies
+    )
+
+    county_properties = all_counties[["county_name", "county_id_fips"]].merge(
+        combined_opp, on="county_id_fips", how="left"
+    )
+    county_properties["state_id_fips"] = county_properties["county_id_fips"].str[:2]
+    county_properties = county_properties.merge(
+        ncsl, on="state_id_fips", how="left", validate="m:1"
+    )
+    county_properties = county_properties.merge(
+        all_states[["state_name", "state_id_fips"]],
+        on="state_id_fips",
+        how="left",
+        validate="m:1",
+    )
+
+    county_properties = county_properties.rename(columns=rename_dict)
+    return county_properties
+
+
+def _join_all_counties_to_wide_format(
+    wide_format: pd.DataFrame, county_properties: pd.DataFrame
+):
+    county_properties = _add_derived_columns(county_properties)
+    wide_format_column_order = wide_format.columns.copy()
+
+    wide_format_subset = wide_format.drop(
+        columns=[
+            "state_id_fips",
+            "state",
+            "county",
+            "has_ordinance",
+            "state_permitting_type",
+            "ordinance",
+            "ordinance_earliest_year_mentioned",
+            "ordinance_jurisdiction_name",
+            "ordinance_jurisdiction_type",
+            "state_permitting_text",
+        ]
+    )
+    county_properties = county_properties.merge(
+        wide_format_subset,
+        on="county_id_fips",
+        how="left",
+    )
+    return county_properties[wide_format_column_order]
 
 
 def create_data_mart(
@@ -724,6 +765,9 @@ def create_data_mart(
         postgres_engine=postgres_engine, pudl_engine=pudl_engine
     )
     wide_format = _convert_long_to_wide(long_format)
+    # client requested joining all counties onto wide format table, even if all values are NULL
+    county_properties = _get_county_properties(postgres_engine)
+    wide_format = _join_all_counties_to_wide_format(wide_format, county_properties)
 
     out = {
         "counties_long_format": long_format,
