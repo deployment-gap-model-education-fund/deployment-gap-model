@@ -1,6 +1,6 @@
 # county_long_format
 
-This table provides county-level aggregates by facility type: existing power, proposed power, or proposed fossil infrastructure. Each row represents a county-facility_type combination. Local ordinance and state wind permitting information has been joined on for convenience.
+This table provides county-level aggregates by facility type: existing power, proposed power, or proposed fossil infrastructure. Each row represents a unique combination of county, facility_type, status, and resource_or_sector. Local ordinance and state wind permitting information has been joined on for convenience.
 The data sources are the LBNL compiled ISO queues, EIP fossil infrastructure, PUDL power plant data, plus Columbia local opposition and NCSL state wind permitting types.
 
 ## Modeling Decisions
