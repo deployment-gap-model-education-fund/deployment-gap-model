@@ -16,9 +16,7 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 
 "renewable_and_battery" aggregates include solar and wind power plants **and** battery storage facilities.
 
-
-
-|Subject|`Column`|Description|Source|Notes|
+|Subject|Column|Description|Source|Notes|
 |----|----|----|----|----|
 |Identifiers|`county_id_fips`|County FIPS ID|Census||
 |Location|`county`|County name|Census||
