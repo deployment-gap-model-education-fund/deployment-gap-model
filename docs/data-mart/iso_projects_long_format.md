@@ -2,6 +2,40 @@
 
 This table gives insight into proposed ISO projects by type. Each row represents a combination of project\_id/resource\_clean with other information joined on for convenience (county, ordinance, and project information). The data source is primarily the LBNL compiled ISO queues, plus local ordinances (via Columbia), state wind permitting types (via NCSL), and standard state/county IDs (from the Census). The last sheet of the raw ISO data contains a list of columns and their definitions for comparison to this table.
 
+## Column Descriptions
+
+**Unique Key Column(s):** (`project_id`, `resource_clean`)
+
+|Subject|Column|Description|Source|Notes|
+|----|----|----|----|----|
+|Identifiers|`project_id`|A unique ID assigned to each project.|derived||
+||`resource_clean`|Fuel type|LBNL||
+|Location|`state`|US State name|Census||
+||`county`|County name|Census||
+||`state_id_fips`|State FIPS ID|Census||
+||`county_id_fips`|County FIPS ID|Census||
+|Properties|`project_name`|Name of the project|LBNL||
+||`is_hybrid`|True/False indicator of whether the project has both generation and storage|derived from LBNL||
+||`resource_class`|Renewable, fossil, or storage|derived from LBNL||
+||`iso_region`|Name of the ISO region containing the project. Non-ISO projects are categorized as either Northwest or Southeast by LBNL|LBNL||
+||`entity`|Similar to iso_region, but non-ISO projects are identified by utility|LBNL||
+||`utility`|The utility within which the project will operate.|LBNL||
+||`interconnection_status`|LBNL's status category for the interconnection agreement ("not started", "in progress", "IA executed")|LBNL||
+||`point_of_interconnection`|The name of the substation where the plant connects to the grid|LBNL||
+||`developer`|The name of the project developer.|LBNL|mostly missing|
+||`queue_status`|These project have already been filtered to proposed projects, so this column is all "active".|LBNL||
+|Dates|`date_proposed_online`|The date the developer expects the project to be completed.|LBNL||
+||`date_entered_queue`|The date the project entered the ISO queue.|LBNL||
+|Technical|`capacity_mw`|Export capacity of the generator or storage facility, in megawatts|LBNL||
+||`co2e_tonnes_per_year`|Estimate of annual equivalent CO2 emissions of proposed gas plants, in metric tonnes.|derived from LBNL||
+|Regulatory|`ordinance`|Summary text of the local ordinances in the given county, if any.|RELDI||
+||`has_ordinance`|True/false indicator of the presence of any local ordinances in the county.|derived from RELDI||
+||`ordinance_earliest_year_mentioned`|Approximate year the local ordinance was enacted. This was automatically extracted from the ordinance text so is not perfectly accurate.|derived from RELDI||
+||`ordinance_jurisdiction_name`|Name of the jurisdiction with a local ordinance. This is usually a county or town within that county. "multiple" if more than one jurisdiction within the county has an ordinance.|RELDI||
+||`ordinance_jurisdiction_type`|Category of jurisdiction: county, town, or city. "multiple" if more than one jurisdiction type within the county has an ordinance.|derived from RELDI||
+||`state_permitting_text`|Summary text of the wind permitting rules of the given state.|NCSL||
+||`state_permitting_type`|Category of the state's wind permitting jurisdiction: state, local, or hybrid.|NCSL||
+
 ## Modeling Decisions
 
 ### Definition of “Hybrid”

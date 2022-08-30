@@ -1,6 +1,6 @@
 # co2_dashboard
 
-This table exists to support a Tableau dashboard. It is not intended to be used for other analysis. Instead, use one of the counties, iso_projects, or fossil_intrastructure tables from which this table was derived.
+This table exists to support a Tableau dashboard and is not intended to be used for other analysis. Instead, use one of the counties, iso_projects, or fossil_intrastructure tables from which this table was derived.
 
 ## Modeling Decisions
 

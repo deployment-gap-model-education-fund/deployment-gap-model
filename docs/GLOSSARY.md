@@ -17,3 +17,11 @@ Energy Information Administration
 ## FERC
 
 Federal Energy Regulatory Commission
+
+## ISO
+
+Independent System Operator
+
+## FIPS
+
+Federal Information Processing Standards
