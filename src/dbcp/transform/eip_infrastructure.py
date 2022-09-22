@@ -42,6 +42,8 @@ def _fix_erroneous_array_items(ser: pd.Series) -> pd.Series:
     Returns:
         pd.Series: fixed series
     """
+    if pd.api.types.is_numeric_dtype(ser):
+        return ser
     first_values = ser.str.split(",", n=1).str[0]
     out = pd.to_numeric(first_values, errors="raise")
     return out
@@ -141,6 +143,98 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
     return fac
 
 
+def _manual_sector_assignments(project_df: pd.DataFrame) -> None:
+    """Manually assign, in place, a single industry_sector to projects that have multiple values."""
+    assignments = [
+        {
+            "index": 545,
+            "sector": "Oil",
+            "validation_str": "refinery",
+        },
+        {
+            "index": 569,
+            "sector": "Petrochemicals and Plastics",
+            "validation_str": "liquid products",
+        },
+        {
+            "index": 597,
+            "sector": "Petrochemicals and Plastics",
+            "validation_str": "alkylation",
+        },
+        {
+            "index": 598,
+            "sector": "Petrochemicals and Plastics",
+            "validation_str": "syngas",
+        },
+        {
+            "index": 614,
+            "sector": "Oil",
+            "validation_str": "carbon dioxide",
+        },
+        {
+            "index": 625,
+            "sector": "Synthetic Fertilizers",
+            "validation_str": "anhydrous ammonia",
+        },
+        {
+            "index": 637,
+            "sector": "Liquefied Natural Gas",
+            "validation_str": "export terminal",
+        },
+        {
+            "index": 663,
+            "sector": "Petrochemicals and Plastics",
+            "validation_str": "methanol-to-gasoline",
+        },
+        {
+            "index": 665,
+            "sector": "Petrochemicals and Plastics",
+            "validation_str": "hydrogen and ammonia",
+        },
+        {
+            "index": 717,
+            "sector": "Oil",
+            "validation_str": "refinery",
+        },
+        {
+            "index": 724,
+            "sector": "Petrochemicals and Plastics",
+            "validation_str": "Blue Bayou Ammonia",
+        },
+        {
+            "index": 725,
+            "sector": "Petrochemicals and Plastics",
+            "validation_str": "Blue Bayou Ammonia",
+        },
+        {
+            "index": 726,
+            "sector": "Petrochemicals and Plastics",
+            "validation_str": "Blue Bayou Ammonia",
+        },
+        {
+            "index": 727,
+            "sector": "Petrochemicals and Plastics",
+            "validation_str": "Blue Bayou Ammonia",
+        },
+        {
+            "index": 767,
+            "sector": "Natural Gas",
+            "validation_str": "Junction Compressor",
+        },
+    ]
+    for assignment in assignments:
+        idx = assignment["index"]
+        expected_description = assignment["validation_str"]
+        assigned_sector = assignment["sector"]
+        if expected_description in project_df.at[idx, "project_description"]:
+            project_df.at[idx, "industry_sector"] = assigned_sector
+        else:
+            raise ValueError(
+                f"Manual sector assignment for index {idx} failed: expected description related to {expected_description}"
+            )
+    return
+
+
 def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
     """Transform the projects table from the EIP Excel database.
 
@@ -159,7 +253,6 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
         "facility_id": "raw_facility_id",
         "industry_sector": "raw_industry_sector",
         "project_type": "raw_project_type",
-        "product_type_private,_as": "product_type",
         "air_construction_id": "raw_air_construction_id",
         "air_operating_id": "raw_air_operating_id",
         "nga_id": "raw_nga_id",
@@ -172,7 +265,6 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
         "project_cost_million_$": "raw_project_cost_millions",
         "number_of_jobs_promised": "raw_number_of_jobs_promised",
         "target_list": "is_ally_target",
-        "secondary_target_list": "is_ally_secondary_target",
         "flag": "ally_flag",
         # add tons per year units
         "carbon_monoxide_co": "carbon_monoxide_co_tpy",
@@ -200,16 +292,10 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
         col="operating_status",
         val_to_replace="Unknown",
         replacement=pd.NA,
-        expected_count=1,
+        expected_count=2,
     )
     proj["industry_sector"] = proj.loc[:, "raw_industry_sector"].copy()
-    replace_value_with_count_validation(  # in place
-        df=proj,
-        col="industry_sector",
-        val_to_replace="Petrochemicals and Plastics, Other",
-        replacement="Petrochemicals and Plastics",
-        expected_count=1,
-    )
+    _manual_sector_assignments(proj)  # in place
 
     duplicative_columns = [  # these are raw names
         # These columns are just a concatenation of the names and IDs corresponding to the ID columns
@@ -245,7 +331,6 @@ def air_construction_transform(raw_air_constr_df: pd.DataFrame) -> pd.DataFrame:
         "date_last_checked": "raw_date_last_checked",
         "project_id": "raw_project_id",
         "statute": "raw_statute",
-        "permit_type": "raw_permit_type",
         "permitting_action": "raw_permitting_action",
         "permit_status": "raw_permit_status",
         "application_date": "raw_application_date",

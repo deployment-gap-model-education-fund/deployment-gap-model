@@ -18,7 +18,6 @@ def _get_proposed_infra_projects(engine: sa.engine.Engine) -> pd.DataFrame:
             cost_millions,
             date_modified,
             industry_sector,
-            product_type,
             project_description,
             raw_project_type,
             raw_number_of_jobs_promised,
@@ -32,8 +31,7 @@ def _get_proposed_infra_projects(engine: sa.engine.Engine) -> pd.DataFrame:
             particulate_matter_pm2_5_tpy * 0.907185 * 0.85 as pm2_5_tonnes_per_year,
             total_wetlands_affected_permanently_acres,
             total_wetlands_affected_temporarily_acres,
-            is_ally_target,
-            is_ally_secondary_target
+            is_ally_target
         FROM data_warehouse.eip_projects
         WHERE operating_status not in ('Operating', 'Under construction', 'Canceled')
     ),
@@ -59,8 +57,7 @@ def _get_proposed_infra_projects(engine: sa.engine.Engine) -> pd.DataFrame:
     permits as (
         SELECT
             air_construction_id,
-            description_or_purpose as permit_description,
-            raw_permit_type
+            description_or_purpose as permit_description
             -- The following would be good additions BUT I'd need to
             -- fix the 1:m project:permit association first.
             -- Need to take only the most recent permit.
@@ -130,8 +127,7 @@ def _get_proposed_infra_projects(engine: sa.engine.Engine) -> pd.DataFrame:
         SELECT
             proj.*,
             -- everything except perm.air_construction_id (duplicated with proj.air_construction_id)
-            perm.permit_description,
-            perm.raw_permit_type
+            perm.permit_description
         FROM proj_fac_permit_id as proj
         LEFT JOIN permits as perm
         ON proj.air_construction_id = perm.air_construction_id
@@ -168,9 +164,7 @@ def _get_proposed_infra_projects(engine: sa.engine.Engine) -> pd.DataFrame:
         facility_name,
         project_classification,
         industry_sector,
-        product_type,
         raw_project_type,
-        raw_permit_type,
         project_description,
         facility_description,
         permit_description,
@@ -191,8 +185,7 @@ def _get_proposed_infra_projects(engine: sa.engine.Engine) -> pd.DataFrame:
         raw_respiratory_hazard_index_within_3_miles,
         raw_relative_cancer_risk_per_million_within_3_miles,
         raw_wastewater_discharge_indicator,
-        is_ally_target,
-        is_ally_secondary_target
+        is_ally_target
     FROM final
     ORDER BY 2, 1
     ;
@@ -200,9 +193,6 @@ def _get_proposed_infra_projects(engine: sa.engine.Engine) -> pd.DataFrame:
     df = pd.read_sql(query, engine)
     # fix columns with mixed dtypes that break pyarrow and parquet (via pandas_gbq)
     df.loc[:, "is_ally_target"] = df.loc[:, "is_ally_target"].astype(str)
-    df.loc[:, "is_ally_secondary_target"] = df.loc[
-        :, "is_ally_secondary_target"
-    ].astype(str)
     return df
 
 

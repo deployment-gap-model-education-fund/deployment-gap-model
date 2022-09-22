@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 def etl_eip_infrastructure() -> Dict[str, pd.DataFrame]:
     """EIP Infrastructure ETL."""
     # Extract
-    source_path = Path("/app/data/raw/2022.03.22OGW.xlsx")
+    source_path = Path("/app/data/raw/fossil_infrastructure.xlsx")
     eip_raw_dfs = dbcp.extract.eip_infrastructure.extract(source_path)
 
     # Transform

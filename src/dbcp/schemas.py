@@ -236,13 +236,11 @@ TABLE_SCHEMAS = {
             "greenhouse_gases_co2e_tpy": pa.Column(float, nullable=True),
             "hazardous_air_pollutants_haps_tpy": pa.Column(float, nullable=True),
             "industry_sector": pa.Column(pd.StringDtype, nullable=True),
-            "is_ally_secondary_target": pa.Column(pd.BooleanDtype, nullable=True),
             "is_ally_target": pa.Column(pd.BooleanDtype, nullable=True),
             "name": pa.Column(pd.StringDtype, nullable=True),
             "nitrogen_oxides_nox_tpy": pa.Column(float, nullable=True),
             "operating_status": pa.Column(pd.StringDtype, nullable=True),
             "particulate_matter_pm2_5_tpy": pa.Column(float, nullable=True),
-            "product_type": pa.Column(pd.StringDtype, nullable=True),
             "project_description": pa.Column(pd.StringDtype, nullable=True),
             "project_id": pa.Column(pd.StringDtype, nullable=False),
             "raw_actual_or_expected_completion_year": pa.Column(
