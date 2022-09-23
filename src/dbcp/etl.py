@@ -96,7 +96,7 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
     mcoe = pd.concat(
         [mcoe, fips[["state_id_fips", "county_id_fips"]]], axis=1, copy=False
     )
-    mcoe = TABLE_SCHEMAS["mcoe"].validate(mcoe)
+    mcoe = TABLE_SCHEMAS["mcoe"].validate(mcoe, lazy=True)
     pudl_tables["mcoe"] = mcoe
 
     return pudl_tables

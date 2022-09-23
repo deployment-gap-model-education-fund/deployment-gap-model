@@ -32,7 +32,7 @@ def county_fips(counties: pd.DataFrame) -> pd.DataFrame:
     counties = counties.rename(columns=rename_dict).drop(columns="countyfp")
 
     # Validate schema
-    counties = TABLE_SCHEMAS["county_fips"].validate(counties)
+    counties = TABLE_SCHEMAS["county_fips"].validate(counties, lazy=True)
     assert "object" not in counties.dtypes
 
     return counties
@@ -64,7 +64,7 @@ def state_fips(states: pd.DataFrame) -> pd.DataFrame:
     states = states.rename(columns=rename_dict)
 
     # Validate schema
-    states = TABLE_SCHEMAS["state_fips"].validate(states)
+    states = TABLE_SCHEMAS["state_fips"].validate(states, lazy=True)
     assert "object" not in states.dtypes
 
     return states

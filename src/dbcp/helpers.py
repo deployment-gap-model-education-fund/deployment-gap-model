@@ -96,7 +96,9 @@ def upload_schema_to_bigquery(schema: str) -> None:
             table = pd.read_sql_table(table_name, con, schema=schema)
             # Validate the schemas again
             if TABLE_SCHEMAS.get(table_name):
-                loaded_tables[table_name] = TABLE_SCHEMAS[table_name].validate(table)
+                loaded_tables[table_name] = TABLE_SCHEMAS[table_name].validate(
+                    table, lazy=True
+                )
             else:
                 loaded_tables[table_name] = table
 

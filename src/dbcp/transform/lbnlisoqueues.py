@@ -3,8 +3,8 @@
 import logging
 from typing import Dict, List
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 from dbcp.schemas import TABLE_SCHEMAS
 from dbcp.transform.helpers import (
@@ -92,7 +92,9 @@ RESOURCE_DICT = {
 
 
 def _fix_negative_and_zero_capacity_values_inplace(iso_df: pd.DataFrame) -> None:
-    capacity_cols = [col for col in iso_df.columns if col.startswith('capacity_mw_resource_')]
+    capacity_cols = [
+        col for col in iso_df.columns if col.startswith("capacity_mw_resource_")
+    ]
     # Fix negative capacity values. Some still don't look right but most are plausible.
     # Only 11 values in 'active' as of 2020 data.
     # Zero capacity obviously means missing. 146 values in active in 2020 data
@@ -223,7 +225,7 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
 
     # Validate schema
     for name, df in lbnl_normalized_dfs.items():
-        lbnl_normalized_dfs[name] = TABLE_SCHEMAS[name].validate(df)
+        lbnl_normalized_dfs[name] = TABLE_SCHEMAS[name].validate(df, lazy=True)
 
     return lbnl_normalized_dfs
 
