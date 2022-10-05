@@ -373,19 +373,25 @@ TABLE_SCHEMAS = {
             "raw_modified_on": pa.Column(pd.StringDtype, nullable=True),
             "raw_permit_status": pa.Column(pd.StringDtype, nullable=True),
             "raw_project_id": pa.Column(pd.StringDtype, nullable=True),
-        }
+        },
+        strict=True,
+        coerce=True,
     ),
     "eip_facility_project_association": pa.DataFrameSchema(
         {
             "facility_id": pa.Column(pd.Int32Dtype, nullable=False),
             "project_id": pa.Column(pd.Int32Dtype, nullable=False),
-        }
+        },
+        strict=True,
+        coerce=True,
     ),
     "eip_project_permit_association": pa.DataFrameSchema(
         {
             "air_construction_id": pa.Column(pd.Int32Dtype, nullable=False),
             "project_id": pa.Column(pd.Int32Dtype, nullable=False),
-        }
+        },
+        strict=True,
+        coerce=True,
     ),
 }
 
