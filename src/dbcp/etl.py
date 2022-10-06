@@ -9,6 +9,7 @@ import sqlalchemy as sa
 import dbcp
 from dbcp.constants import FIPS_CODE_VINTAGE
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
+from dbcp.models import metadata
 from dbcp.schemas import TABLE_SCHEMAS
 from dbcp.transform.helpers import GEOCODER_CACHE
 from pudl.helpers import add_fips_ids as _add_fips_ids
@@ -148,14 +149,18 @@ def etl(args):
         logger.info(f"Processing: {dataset}")
         transformed_dfs.update(etl_func())
 
+    # Delete any existing tables, and create them anew:
+    metadata.drop_all(engine)
+    metadata.create_all(engine)
+
     # Load table into postgres
     with engine.connect() as con:
-        for table_name, df in transformed_dfs.items():
-            logger.info(f"Load {table_name} to postgres.")
-            df.to_sql(
-                name=table_name,
+        for table in metadata.sorted_tables:
+            logger.info(f"Load {table.name} to postgres.")
+            transformed_dfs[table.name].to_sql(
+                name=table.name,
                 con=con,
-                if_exists="replace",
+                if_exists="append",
                 index=False,
                 schema="data_warehouse",
             )
