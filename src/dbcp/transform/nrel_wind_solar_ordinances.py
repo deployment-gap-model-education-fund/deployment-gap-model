@@ -88,7 +88,7 @@ def _replace_multivalued_with_worst_case(
         ],
         axis=0,
     )
-    values.update(replacements)
+    values.update(replacements.astype(values.dtype))
     return
 
 
@@ -121,7 +121,7 @@ def _replace_linear_definitions_with_constants(
     err_msg = "Assumption violation: expected all linear setbacks to be defined in terms of max tip height."
     assert value_types.loc[is_linear].eq("max tip height multiplier").all(), err_msg
     replacements = _convert_linear_expr_to_constant(values.loc[is_linear])
-    values.update(replacements)
+    values.update(replacements.astype(values.dtype))
     return
 
 
@@ -283,8 +283,11 @@ def local_wind_transform(raw_local_wind: pd.DataFrame) -> pd.DataFrame:
     _manual_local_wind_corrections(wind)
     wind["ordinance_type"] = _simplify_wind_ordinance_types(wind["raw_ordinance_type"])
     wind["units"] = _simplify_wind_units(wind["raw_units"])
-    wind["value"] = wind.loc[:, "raw_value"].str.replace(
-        "or less$", "", regex=True
+    # convert dtype because the native (mixed) types don't work with .str.replace()
+    wind["value"] = (
+        wind.loc[:, "raw_value"]
+        .astype(pd.StringDtype())
+        .str.replace("or less$", "", regex=True)
     )  # copy
     _replace_multivalued_with_worst_case(wind.loc[:, "value"], wind.loc[:, "units"])
     _replace_linear_definitions_with_constants(

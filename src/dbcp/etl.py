@@ -122,6 +122,25 @@ def etl_fips_tables() -> Dict[str, pd.DataFrame]:
     return out
 
 
+def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
+    """ETL NREL state and local ordinances for wind and solar."""
+    wind_source_path = Path("/app/data/raw/NREL_Wind_Ordinances.xlsx")
+    solar_source_path = Path("/app/data/raw/NREL_Solar_Ordinances.xlsx")
+    wind_raw_dfs = dbcp.extract.nrel_wind_solar_ordinances.extract(
+        wind_source_path, wind_or_solar="wind"
+    )
+    solar_raw_dfs = dbcp.extract.nrel_wind_solar_ordinances.extract(
+        solar_source_path, wind_or_solar="solar"
+    )
+    nrel_raw_dfs = wind_raw_dfs | solar_raw_dfs
+
+    nrel_transformed_dfs = dbcp.transform.nrel_wind_solar_ordinances.transform(
+        nrel_raw_dfs
+    )
+
+    return nrel_transformed_dfs
+
+
 def etl(args):
     """Run dbc ETL."""
     # Setup postgres
@@ -133,6 +152,7 @@ def etl(args):
     GEOCODER_CACHE.reduce_size()
 
     etl_funcs = {
+        "nrel_wind_solar_ordinances": etl_nrel_ordinances,
         "eip_infrastructure": etl_eip_infrastructure,
         "lbnlisoqueues": etl_lbnlisoqueues,
         "lbnl_iso_queue_2021": etl_lbnl_iso_queue_2021,
