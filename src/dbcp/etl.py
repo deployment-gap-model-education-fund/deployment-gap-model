@@ -9,7 +9,7 @@ import sqlalchemy as sa
 import dbcp
 from dbcp.constants import FIPS_CODE_VINTAGE
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
-from dbcp.models import metadata
+from dbcp.models.data_warehouse import metadata
 from dbcp.schemas import TABLE_SCHEMAS
 from dbcp.transform.helpers import GEOCODER_CACHE
 from pudl.helpers import add_fips_ids as _add_fips_ids

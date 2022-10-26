@@ -11,6 +11,7 @@ from sqlalchemy import (
 )
 
 metadata = MetaData()
+schema = "data_warehouse"
 
 ###################
 # ISO Queues 2020 #
@@ -43,7 +44,7 @@ iso_projects = Table(
     Column("withdrawl_reason", String, nullable=True),
     Column("year_withdrawn", Integer, nullable=True),
     Column("date_withdrawn", DateTime, nullable=True),
-    schema="data_warehouse",
+    schema=schema,
 )
 
 iso_locations = Table(
@@ -67,7 +68,7 @@ iso_locations = Table(
     Column("geocoded_locality_name", String, nullable=True),
     Column("geocoded_locality_type", String, nullable=True),
     Column("geocoded_containing_county", String, nullable=True),
-    schema="data_warehouse",
+    schema=schema,
 )
 
 iso_resource_capacity = Table(
@@ -79,7 +80,7 @@ iso_resource_capacity = Table(
     Column("resource_class", String, nullable=True),
     Column("project_class", String, nullable=True),
     Column("capacity_mw", Float, nullable=True),
-    schema="data_warehouse",
+    schema=schema,
 )
 ###############################
 # State and County Fips Codes #
@@ -91,7 +92,7 @@ county_fips = (
         Column("county_id_fips", String, nullable=False, primary_key=True),
         Column("state_id_fips", String, nullable=False),
         Column("county_name", String, nullable=False),
-        schema="data_warehouse",
+        schema=schema,
     ),
 )
 state_fips = (
@@ -101,7 +102,7 @@ state_fips = (
         Column("state_id_fips", String, nullable=False, primary_key=True),
         Column("state_name", String, nullable=False),
         Column("state_abbrev", String, nullable=False),
-        schema="data_warehouse",
+        schema=schema,
     ),
 )
 
@@ -132,7 +133,7 @@ iso_projects_2021 = Table(
     Column("interconnection_date_raw", String, nullable=True),
     Column("interconnection_service_type", String, nullable=True),
     Column("queue_date_raw", String, nullable=True),
-    schema="data_warehouse",
+    schema=schema,
 )
 
 iso_locations_2021 = Table(
@@ -158,7 +159,7 @@ iso_locations_2021 = Table(
     Column("geocoded_locality_name", String, nullable=True),
     Column("geocoded_locality_type", String, nullable=True),
     Column("geocoded_containing_county", String, nullable=True),
-    schema="data_warehouse",
+    schema=schema,
 )
 
 iso_resource_capacity_2021 = Table(
@@ -170,7 +171,7 @@ iso_resource_capacity_2021 = Table(
     Column("resource", String, nullable=True),
     Column("resource_clean", String, nullable=True),
     Column("capacity_mw", Float, nullable=True),
-    schema="data_warehouse",
+    schema=schema,
 )
 
 ######################
@@ -217,7 +218,7 @@ eip_projects = Table(
     Column("date_modified", DateTime),
     Column("operating_status", String, nullable=True),
     Column("industry_sector", String, nullable=True),
-    schema="data_warehouse",
+    schema=schema,
 )
 eip_facilities = Table(
     "eip_facilities",
@@ -283,7 +284,7 @@ eip_facilities = Table(
     Column("longitude", Float, nullable=True),
     Column("latitude", Float, nullable=True),
     Column("date_modified", DateTime),
-    schema="data_warehouse",
+    schema=schema,
 )
 
 eip_facility_project_association = Table(
@@ -295,7 +296,7 @@ eip_facility_project_association = Table(
     Column(
         "project_id", Integer
     ),  # TODO: This should have a fk with eip_projects.project_id. There are currently 5 ids not in eip_projects.
-    schema="data_warehouse",
+    schema=schema,
 )
 
 eip_air_constr_permits = Table(
@@ -318,7 +319,7 @@ eip_air_constr_permits = Table(
     Column("document_url", String, nullable=True),
     Column("date_modified", DateTime),
     Column("permit_status", String, nullable=True),
-    schema="data_warehouse",
+    schema=schema,
 )
 
 eip_project_permit_association = Table(
@@ -330,7 +331,7 @@ eip_project_permit_association = Table(
     Column(
         "project_id", Integer
     ),  # TODO: This field contains project_ids not present in eip_projects.project_id
-    schema="data_warehouse",
+    schema=schema,
 )
 
 ##########################
@@ -353,7 +354,7 @@ contested_project = Table(
     Column("earliest_year_mentioned", Integer, nullable=True),
     Column("latest_year_mentioned", Integer, nullable=True),
     Column("n_years_mentioned", Integer),
-    schema="data_warehouse",
+    schema=schema,
 )
 
 local_ordinance = Table(
@@ -380,7 +381,7 @@ local_ordinance = Table(
     Column("earliest_year_mentioned", Integer, nullable=True),
     Column("latest_year_mentioned", Integer, nullable=True),
     Column("n_years_mentioned", Integer),
-    schema="data_warehouse",
+    schema=schema,
 )
 
 state_policy = Table(
@@ -397,7 +398,7 @@ state_policy = Table(
     Column("earliest_year_mentioned", Integer),
     Column("latest_year_mentioned", Integer, nullable=True),
     Column("n_years_mentioned", Integer),
-    schema="data_warehouse",
+    schema=schema,
 )
 
 #########################
@@ -417,7 +418,7 @@ ncsl_state_permitting = Table(
     Column("permitting_type", String, nullable=True),
     Column("description", String),
     Column("link", String, nullable=True),
-    schema="data_warehouse",
+    schema=schema,
 )
 
 ########
@@ -548,5 +549,5 @@ mcoe = Table(
     Column("zip_code", Float, nullable=True),
     Column("state_id_fips", String, nullable=True),
     Column("county_id_fips", String, nullable=True),
-    schema="data_warehouse",
+    schema=schema,
 )
