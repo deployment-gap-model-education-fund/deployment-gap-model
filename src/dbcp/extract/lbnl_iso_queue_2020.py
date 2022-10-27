@@ -101,7 +101,7 @@ def extract(source_path: Path) -> dict[str, pd.DataFrame]:
     """
     raw_dfs = {}
     for table_name, page_index in PAGE_MAP.items():
-        df = pd.read_excel(source_path, sheet_name=page_index)
+        df = pd.read_excel(source_path, sheet_name=page_index, na_values=["#VALUE!"])
         df = df.rename(columns=COLUMN_MAP[table_name])
         raw_dfs[table_name] = df
     return raw_dfs

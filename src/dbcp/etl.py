@@ -10,7 +10,6 @@ import dbcp
 from dbcp.constants import FIPS_CODE_VINTAGE
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.models.data_warehouse import metadata
-from dbcp.schemas import TABLE_SCHEMAS
 from dbcp.transform.helpers import GEOCODER_CACHE
 from pudl.helpers import add_fips_ids as _add_fips_ids
 from pudl.output.pudltabl import PudlTabl
@@ -97,7 +96,7 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
     mcoe = pd.concat(
         [mcoe, fips[["state_id_fips", "county_id_fips"]]], axis=1, copy=False
     )
-    mcoe = TABLE_SCHEMAS["mcoe"].validate(mcoe)
+    mcoe = mcoe.convert_dtypes()
     pudl_tables["mcoe"] = mcoe
 
     return pudl_tables
