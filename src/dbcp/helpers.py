@@ -4,7 +4,6 @@ import logging
 import os
 import tarfile
 from pathlib import Path
-from typing import List
 
 import pandas as pd
 import pandas_gbq
@@ -17,13 +16,6 @@ import dbcp
 
 logger = logging.getLogger(__name__)
 
-SA_TO_PD_TYPES = {
-    "VARCHAR": "string",
-    "INTEGER": "Int64",
-    "FLOAT": "float",
-    "BOOLEAN": "bool",
-}
-
 SA_TO_BQ_TYPES = {
     "VARCHAR": "STRING",
     "INTEGER": "INTEGER",
@@ -34,15 +26,35 @@ SA_TO_BQ_TYPES = {
 SA_TO_BQ_MODES = {True: "NULLABLE", False: "REQUIRED"}
 
 
-def get_bq_schema_from_metadata(table_name: str, schema: str):
-    """Create a BigQuery schema from SQL Alchemy metadata."""
-    table_name = f"{schema}.{table_name}"
+def get_schema_sql_alchemy_metadata(schema: str) -> sa.MetaData:
+    """
+    Get SQL Alchemy metadata object for a particular schema.
+
+    Args:
+        schema: the name of the database schema.
+    Returns:
+        metadata: the SQL alchemy metadata associated with the db schema.
+    """
     if schema == "data_mart":
-        metadata = dbcp.models.data_mart.metadata
+        return dbcp.models.data_mart.metadata
     elif schema == "data_warehouse":
-        metadata = dbcp.models.data_warehouse.metadata
+        return dbcp.models.data_warehouse.metadata
     else:
-        raise RuntimeError(f"{schema} is not a valid schema.")
+        raise ValueError(f"{schema} is not a valid schema.")
+
+
+def get_bq_schema_from_metadata(table_name: str, schema: str) -> list[dict[str, str]]:
+    """
+    Create a BigQuery schema from SQL Alchemy metadata.
+
+    Args:
+        table_name: the name of the table.
+        schema: the name of the database schema.
+    Returns:
+        bq_schema: a bigquery schema description.
+    """
+    table_name = f"{schema}.{table_name}"
+    metadata = get_schema_sql_alchemy_metadata(schema)
     bq_schema = []
     for column in metadata.tables[table_name].columns:
         col_schema = {}
@@ -104,25 +116,25 @@ def track_tar_progress(members):
         yield member
 
 
-def get_db_schema_tables(engine: sa.engine.Engine, schema: str) -> List:
-    """Get table names of database schema."""
+def get_db_schema_tables(engine: sa.engine.Engine, schema: str) -> list[str]:
+    """
+    Get table names of database schema.
+
+    Args:
+        engine: sqlalchemy connection engine.
+        schema: the name of the database schema.
+    Return:
+        table_names: the table names in the db schema.
+    """
     inspector = sa.inspect(engine)
-    return inspector.get_table_names(schema=schema)
+    table_names = inspector.get_table_names(schema=schema)
 
+    if not table_names:
+        raise ValueError(
+            f"{schema} schema either doesn't exist or doesn't contain any tables. Try rerunning the etl and data mart pipelines."
+        )
 
-def get_pandas_dtypes_from_metadata(table_name, schema):
-    """Create a mapping of sql alchemy types to pandas types for a table."""
-    if schema == "data_mart":
-        metadata = dbcp.models.data_mart.metadata
-    elif schema == "data_warehouse":
-        metadata = dbcp.models.data_warehouse.metadata
-    else:
-        raise RuntimeError(f"{schema} is not a valid schema.")
-    table_name = f"{schema}.{table_name}"
-    return {
-        column.name: SA_TO_PD_TYPES[str(column.type)]
-        for column in metadata.tables[table_name].columns
-    }
+    return table_names
 
 
 def upload_schema_to_bigquery(schema: str) -> None:
@@ -132,11 +144,6 @@ def upload_schema_to_bigquery(schema: str) -> None:
     # Get the schema table names
     engine = get_sql_engine()
     table_names = get_db_schema_tables(engine, schema)
-
-    if not table_names:
-        raise ValueError(
-            f"{schema} schema either doesn't exist or doesn't contain any tables. Try rerunning the etl and data mart pipelines."
-        )
 
     # read tables from dbcp schema in a dictionary of dfs
     loaded_tables = {}
