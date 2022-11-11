@@ -122,6 +122,14 @@ def etl_fips_tables() -> Dict[str, pd.DataFrame]:
     return out
 
 
+def etl_justice40() -> dict[str, pd.DataFrame]:
+    """ETL white house environmental justice dataset."""
+    source_path = Path("/app/data/raw/communities-2022-05-31-1915GMT.zip")
+    raw = dbcp.extract.justice40.extract(source_path)
+    out = dbcp.transform.justice40.transform(raw)
+    return out
+
+
 def etl(args):
     """Run dbc ETL."""
     # Setup postgres
@@ -133,6 +141,7 @@ def etl(args):
     GEOCODER_CACHE.reduce_size()
 
     etl_funcs = {
+        "justice40_tracts": etl_justice40,
         "eip_infrastructure": etl_eip_infrastructure,
         "lbnlisoqueues": etl_lbnlisoqueues,
         "lbnl_iso_queue_2021": etl_lbnl_iso_queue_2021,
