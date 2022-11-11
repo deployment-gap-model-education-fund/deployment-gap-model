@@ -24,6 +24,40 @@ from dbcp.data_mart.projects import create_data_mart as create_iso_data_mart
 from dbcp.helpers import get_pudl_engine, get_sql_engine
 
 
+def _get_env_justice_df(engine: sa.engine.Engine) -> pd.DataFrame:
+    query = """
+    SELECT
+        SUBSTRING("tract_id_fips", 1, 5) as county_id_fips,
+        COUNT("tract_id_fips") as total_tracts,
+        SUM("is_disadvantaged"::INTEGER) as n_tracts_disadvantaged,
+        SUM("all_of_expected_agriculture_loss_and_low_income_and_not_student"::INTEGER) as n_tracts_agriculture_loss_low_income,
+        SUM("all_of_expected_building_loss_and_low_income_and_not_students"::INTEGER) as n_tracts_building_loss_low_income,
+        SUM("all_of_expected_population_loss_and_low_income_and_not_students"::INTEGER) as n_tracts_population_loss_low_income,
+        SUM("all_of_diesel_particulates_and_low_income_and_not_students"::INTEGER) as n_tracts_diesel_particulates_low_income,
+        SUM("all_of_energy_burden_and_low_income_and_not_students"::INTEGER) as n_tracts_energy_burden_low_income,
+        SUM("all_of_pm2_5_and_low_income_and_not_students"::INTEGER) as n_tracts_pm2_5_low_income,
+        SUM("all_of_traffic_and_low_income_and_not_students"::INTEGER) as n_tracts_traffic_low_income,
+        SUM("all_of_lead_paint_houses_and_median_home_price_and_low_income_a"::INTEGER) as n_tracts_lead_paint_houses_and_median_home_price_low_income,
+        SUM("all_of_housing_burden_and_low_income_and_not_students"::INTEGER) as n_tracts_housing_burden_low_income,
+        SUM("all_of_risk_management_plan_proximity_and_low_income_and_not_st"::INTEGER) as n_tracts_risk_management_plan_proximity_low_income,
+        SUM("all_of_superfund_proximity_and_low_income_and_not_students"::INTEGER) as n_tracts_superfund_proximity_low_income,
+        SUM("all_of_wastewater_and_low_income_and_not_students"::INTEGER) as n_tracts_wastewater_low_income,
+        SUM("all_of_asthma_and_low_income_and_not_students"::INTEGER) as n_tracts_asthma_low_income,
+        SUM("all_of_heart_disease_and_low_income_and_not_students"::INTEGER) as n_tracts_heart_disease_low_income,
+        SUM("all_of_diabetes_and_low_income_and_not_students"::INTEGER) as n_tracts_diabetes_low_income,
+        SUM("all_of_local_to_area_income_ratio_and_less_than_high_school_and"::INTEGER) as n_tracts_local_to_area_income_ratio_and_low_high_school,
+        SUM("all_of_linguistic_isolation_and_less_than_high_school_and_not_s"::INTEGER) as n_tracts_linguistic_isolation_and_low_high_school,
+        SUM("all_of_below_poverty_line_and_less_than_high_school_and_not_stu"::INTEGER) as n_tracts_below_poverty_and_low_high_school,
+        SUM("all_of_unemployment_and_less_than_high_school_and_not_students"::INTEGER) as n_tracts_unemployment_and_low_high_school,
+        SUM("all_of_hazardous_waste_proximity_and_low_income_and_not_student"::INTEGER) as n_tracts_hazardous_waste_proximity_low_income,
+        SUM("all_of_life_expectancy_and_low_income_and_not_students"::INTEGER) as n_tracts_life_expectancy_low_income
+    FROM "data_warehouse"."justice40_tracts"
+    GROUP BY 1;
+    """
+    df = pd.read_sql(query, engine)
+    return df
+
+
 def _get_existing_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
     # get plant_id, fuel_type, capacity_mw
     query = """
@@ -464,6 +498,29 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "ordinance_earliest_year_mentioned",
         "state_permitting_type",
         "state_permitting_text",
+        "total_tracts",
+        "n_tracts_disadvantaged",
+        "n_tracts_agriculture_loss_low_income",
+        "n_tracts_building_loss_low_income",
+        "n_tracts_population_loss_low_income",
+        "n_tracts_diesel_particulates_low_income",
+        "n_tracts_energy_burden_low_income",
+        "n_tracts_pm2_5_low_income",
+        "n_tracts_traffic_low_income",
+        "n_tracts_lead_paint_houses_and_median_home_price_low_income",
+        "n_tracts_housing_burden_low_income",
+        "n_tracts_risk_management_plan_proximity_low_income",
+        "n_tracts_superfund_proximity_low_income",
+        "n_tracts_wastewater_low_income",
+        "n_tracts_asthma_low_income",
+        "n_tracts_heart_disease_low_income",
+        "n_tracts_diabetes_low_income",
+        "n_tracts_local_to_area_income_ratio_and_low_high_school",
+        "n_tracts_linguistic_isolation_and_low_high_school",
+        "n_tracts_below_poverty_and_low_high_school",
+        "n_tracts_unemployment_and_low_high_school",
+        "n_tracts_hazardous_waste_proximity_low_income",
+        "n_tracts_life_expectancy_low_income",
     ]
     wide = long.pivot(index=idx_cols, columns=col_cols, values=val_cols)
 
@@ -616,6 +673,29 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "infra_synthetic_fertilizers_proposed_facility_count",
         "infra_synthetic_fertilizers_proposed_nox_tonnes_per_year",
         "infra_synthetic_fertilizers_proposed_pm2_5_tonnes_per_year",
+        "total_tracts",
+        "n_tracts_disadvantaged",
+        "n_tracts_agriculture_loss_low_income",
+        "n_tracts_building_loss_low_income",
+        "n_tracts_population_loss_low_income",
+        "n_tracts_diesel_particulates_low_income",
+        "n_tracts_energy_burden_low_income",
+        "n_tracts_pm2_5_low_income",
+        "n_tracts_traffic_low_income",
+        "n_tracts_lead_paint_houses_and_median_home_price_low_income",
+        "n_tracts_housing_burden_low_income",
+        "n_tracts_risk_management_plan_proximity_low_income",
+        "n_tracts_superfund_proximity_low_income",
+        "n_tracts_wastewater_low_income",
+        "n_tracts_asthma_low_income",
+        "n_tracts_heart_disease_low_income",
+        "n_tracts_diabetes_low_income",
+        "n_tracts_local_to_area_income_ratio_and_low_high_school",
+        "n_tracts_linguistic_isolation_and_low_high_school",
+        "n_tracts_below_poverty_and_low_high_school",
+        "n_tracts_unemployment_and_low_high_school",
+        "n_tracts_hazardous_waste_proximity_low_income",
+        "n_tracts_life_expectancy_low_income",
         "ordinance",
         "ordinance_earliest_year_mentioned",
         "ordinance_jurisdiction_name",
@@ -666,6 +746,29 @@ def create_long_format(
         "ordinance_earliest_year_mentioned",
         "state_permitting_type",
         "state_permitting_text",
+        "total_tracts",
+        "n_tracts_disadvantaged",
+        "n_tracts_agriculture_loss_low_income",
+        "n_tracts_building_loss_low_income",
+        "n_tracts_population_loss_low_income",
+        "n_tracts_diesel_particulates_low_income",
+        "n_tracts_energy_burden_low_income",
+        "n_tracts_pm2_5_low_income",
+        "n_tracts_traffic_low_income",
+        "n_tracts_lead_paint_houses_and_median_home_price_low_income",
+        "n_tracts_housing_burden_low_income",
+        "n_tracts_risk_management_plan_proximity_low_income",
+        "n_tracts_superfund_proximity_low_income",
+        "n_tracts_wastewater_low_income",
+        "n_tracts_asthma_low_income",
+        "n_tracts_heart_disease_low_income",
+        "n_tracts_diabetes_low_income",
+        "n_tracts_local_to_area_income_ratio_and_low_high_school",
+        "n_tracts_linguistic_isolation_and_low_high_school",
+        "n_tracts_below_poverty_and_low_high_school",
+        "n_tracts_unemployment_and_low_high_school",
+        "n_tracts_hazardous_waste_proximity_low_income",
+        "n_tracts_life_expectancy_low_income",
     ]
     return out.loc[:, col_order]
 
@@ -688,6 +791,7 @@ def _get_county_properties(
     ncsl = _get_ncsl_wind_permitting_df(postgres_engine)
     all_counties = _get_county_fips_df(postgres_engine)
     all_states = _get_state_fips_df(postgres_engine)
+    env_justice = _get_env_justice_df(postgres_engine)
     # model local opposition
     aggregator = CountyOpposition(
         engine=postgres_engine, county_fips_df=all_counties, state_fips_df=all_states
@@ -709,6 +813,9 @@ def _get_county_properties(
         how="left",
         validate="m:1",
     )
+    county_properties = county_properties.merge(
+        env_justice, on="county_id_fips", how="left", validate="1:1"
+    )
 
     county_properties = county_properties.rename(columns=rename_dict)
     return county_properties
@@ -720,20 +827,42 @@ def _join_all_counties_to_wide_format(
     county_properties = _add_derived_columns(county_properties)
     wide_format_column_order = wide_format.columns.copy()
 
-    wide_format_subset = wide_format.drop(
-        columns=[
-            "state_id_fips",
-            "state",
-            "county",
-            "has_ordinance",
-            "state_permitting_type",
-            "ordinance",
-            "ordinance_earliest_year_mentioned",
-            "ordinance_jurisdiction_name",
-            "ordinance_jurisdiction_type",
-            "state_permitting_text",
-        ]
-    )
+    county_columns = [
+        "state_id_fips",
+        "state",
+        "county",
+        "has_ordinance",
+        "state_permitting_type",
+        "ordinance",
+        "ordinance_earliest_year_mentioned",
+        "ordinance_jurisdiction_name",
+        "ordinance_jurisdiction_type",
+        "state_permitting_text",
+        "total_tracts",
+        "n_tracts_disadvantaged",
+        "n_tracts_agriculture_loss_low_income",
+        "n_tracts_building_loss_low_income",
+        "n_tracts_population_loss_low_income",
+        "n_tracts_diesel_particulates_low_income",
+        "n_tracts_energy_burden_low_income",
+        "n_tracts_pm2_5_low_income",
+        "n_tracts_traffic_low_income",
+        "n_tracts_lead_paint_houses_and_median_home_price_low_income",
+        "n_tracts_housing_burden_low_income",
+        "n_tracts_risk_management_plan_proximity_low_income",
+        "n_tracts_superfund_proximity_low_income",
+        "n_tracts_wastewater_low_income",
+        "n_tracts_asthma_low_income",
+        "n_tracts_heart_disease_low_income",
+        "n_tracts_diabetes_low_income",
+        "n_tracts_local_to_area_income_ratio_and_low_high_school",
+        "n_tracts_linguistic_isolation_and_low_high_school",
+        "n_tracts_below_poverty_and_low_high_school",
+        "n_tracts_unemployment_and_low_high_school",
+        "n_tracts_hazardous_waste_proximity_low_income",
+        "n_tracts_life_expectancy_low_income",
+    ]
+    wide_format_subset = wide_format.drop(columns=county_columns)
     county_properties = county_properties.merge(
         wide_format_subset,
         on="county_id_fips",
