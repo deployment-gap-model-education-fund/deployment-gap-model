@@ -36,9 +36,9 @@ def get_schema_sql_alchemy_metadata(schema: str) -> sa.MetaData:
         metadata: the SQL alchemy metadata associated with the db schema.
     """
     if schema == "data_mart":
-        return dbcp.models.data_mart.metadata
+        return dbcp.metadata.data_mart.metadata
     elif schema == "data_warehouse":
-        return dbcp.models.data_warehouse.metadata
+        return dbcp.metadata.data_warehouse.metadata
     else:
         raise ValueError(f"{schema} is not a valid schema.")
 

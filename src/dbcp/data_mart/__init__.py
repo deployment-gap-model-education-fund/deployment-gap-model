@@ -7,7 +7,7 @@ import pkgutil
 import pandas as pd
 
 import dbcp
-from dbcp.models.data_mart import metadata
+from dbcp.metadata.data_mart import metadata
 
 logger = logging.getLogger(__name__)
 
