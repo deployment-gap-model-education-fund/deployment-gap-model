@@ -7,6 +7,7 @@ import pkgutil
 import pandas as pd
 
 import dbcp
+from dbcp.metadata.data_mart import metadata
 
 logger = logging.getLogger(__name__)
 
@@ -45,14 +46,18 @@ def create_data_marts(args):
     with engine.connect() as con:
         engine.execute("CREATE SCHEMA IF NOT EXISTS data_mart")
 
+    # Create the schemas
+    metadata.drop_all(engine)
+    metadata.create_all(engine)
+
     # Load table into postgres
     with engine.connect() as con:
-        for table_name, df in data_marts.items():
-            logger.info(f"Load {table_name} to postgres.")
-            df.to_sql(
-                name=table_name,
+        for table in metadata.sorted_tables:
+            logger.info(f"Load {table.name} to postgres.")
+            data_marts[table.name].to_sql(
+                name=table.name,
                 con=con,
-                if_exists="replace",
+                if_exists="append",
                 index=False,
                 schema="data_mart",
             )
