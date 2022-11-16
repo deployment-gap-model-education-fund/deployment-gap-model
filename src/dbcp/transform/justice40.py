@@ -12,8 +12,6 @@ def transform(raw_j40: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         dict[str, pd.DataFrame]: transformed justice40 data
     """
     rename_dict = {  # empty string names will be dropped
-        # Note: I dropped metrics relating to "low HS education in 2009 (island areas)" because
-        # no columns have that data (I think it is mistakenly swapped with unemployment or income)
         "Census tract ID": "tract_id_fips",
         "County Name": "",  # join via FIPS from official sources
         "State/Territory": "",  # join via FIPS from official sources
@@ -21,7 +19,7 @@ def transform(raw_j40: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         "Total categories exceeded": "n_categories_exceeded",
         "Identified as disadvantaged": "is_disadvantaged",
         "Total population": "population",
-        "Is low income and high percent of residents that are not higher ed students?": "",  # easily derived, not requested by client
+        "Is low income and high percent of residents that are not higher ed students?": "low_income_and_not_students",
         "Coronary heart disease among adults aged greater than or equal to 18 years (percentile)": "heart_disease_percentile",
         "Coronary heart disease among adults aged greater than or equal to 18 years": "heart_disease",
         "Current asthma among adults aged greater than or equal to 18 years (percentile)": "asthma_percentile",
@@ -38,30 +36,30 @@ def transform(raw_j40: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         "Expected building loss rate (Natural Hazards Risk Index)": "expected_building_loss",
         "Expected population loss rate (Natural Hazards Risk Index) (percentile)": "expected_population_loss_percentile",
         "Expected population loss rate (Natural Hazards Risk Index)": "expected_population_loss",
-        "Greater than or equal to the 90th percentile for asthma, is low income, and high percent of residents that are not higher ed students?": "all_of_asthma_and_low_income_and_not_students",
-        "Greater than or equal to the 90th percentile for diabetes, is low income, and high percent of residents that are not higher ed students?": "all_of_diabetes_and_low_income_and_not_students",
-        "Greater than or equal to the 90th percentile for diesel particulate matter, is low income, and high percent of residents that are not higher ed students?": "all_of_diesel_particulates_and_low_income_and_not_students",
-        "Greater than or equal to the 90th percentile for energy burden, is low income, and high percent of residents that are not higher ed students?": "all_of_energy_burden_and_low_income_and_not_students",
-        "Greater than or equal to the 90th percentile for expected agriculture loss rate, is low income, and high percent of residents that are not higher ed students?": "all_of_expected_agriculture_loss_and_low_income_and_not_students",
-        "Greater than or equal to the 90th percentile for expected building loss rate, is low income, and high percent of residents that are not higher ed students?": "all_of_expected_building_loss_and_low_income_and_not_students",
-        "Greater than or equal to the 90th percentile for expected population loss rate, is low income, and high percent of residents that are not higher ed students?": "all_of_expected_population_loss_and_low_income_and_not_students",
-        "Greater than or equal to the 90th percentile for heart disease, is low income, and high percent of residents that are not higher ed students?": "all_of_heart_disease_and_low_income_and_not_students",
-        r"Greater than or equal to the 90th percentile for households at or below 100% federal poverty level and has low HS education in 2009 (island areas)?": "",  # see note near assignment line
-        r"Greater than or equal to the 90th percentile for households at or below 100% federal poverty level, has low HS attainment, and high percent of residents that are not higher ed students?": "all_of_below_poverty_line_and_less_than_high_school_and_not_students",
-        "Greater than or equal to the 90th percentile for households in linguistic isolation, has low HS attainment, and high percent of residents that are not higher ed students?": "all_of_linguistic_isolation_and_less_than_high_school_and_not_students",
-        "Greater than or equal to the 90th percentile for housing burden, is low income, and high percent of residents that are not higher ed students?": "all_of_housing_burden_and_low_income_and_not_students",
-        "Greater than or equal to the 90th percentile for lead paint, the median house value is less than 90th percentile, is low income, and high percent of residents that are not higher ed students?": "all_of_lead_paint_houses_and_median_home_price_and_low_income_and_not_students",
-        "Greater than or equal to the 90th percentile for low life expectancy, is low income, and high percent of residents that are not higher ed students?": "all_of_life_expectancy_and_low_income_and_not_students",
-        "Greater than or equal to the 90th percentile for low median household income as a percent of area median income and has low HS education in 2009 (island areas)?": "",  # see note near assignment line
-        "Greater than or equal to the 90th percentile for low median household income as a percent of area median income, has low HS attainment, and high percent of residents that are not higher ed students?": "all_of_local_to_area_income_ratio_and_less_than_high_school_and_not_students",
-        "Greater than or equal to the 90th percentile for PM2.5 exposure, is low income, and high percent of residents that are not higher ed students?": "all_of_pm2_5_and_low_income_and_not_students",
-        "Greater than or equal to the 90th percentile for proximity to hazardous waste facilities, is low income, and high percent of residents that are not higher ed students?": "all_of_hazardous_waste_proximity_and_low_income_and_not_students",
-        "Greater than or equal to the 90th percentile for proximity to RMP sites, is low income, and high percent of residents that are not higher ed students?": "all_of_risk_management_plan_proximity_and_low_income_and_not_students",
-        "Greater than or equal to the 90th percentile for proximity to superfund sites, is low income, and high percent of residents that are not higher ed students?": "all_of_superfund_proximity_and_low_income_and_not_students",
-        "Greater than or equal to the 90th percentile for traffic proximity, is low income, and high percent of residents that are not higher ed students?": "all_of_traffic_and_low_income_and_not_students",
-        "Greater than or equal to the 90th percentile for unemployment and has low HS education in 2009 (island areas)?": "",  # see note near assignment line
-        "Greater than or equal to the 90th percentile for unemployment, has low HS attainment, and high percent of residents that are not higher ed students?": "all_of_unemployment_and_less_than_high_school_and_not_students",
-        "Greater than or equal to the 90th percentile for wastewater discharge, is low income, and high percent of residents that are not higher ed students?": "all_of_wastewater_and_low_income_and_not_students",
+        "Greater than or equal to the 90th percentile for asthma, is low income, and high percent of residents that are not higher ed students?": "asthma_and_low_income_and_not_students",
+        "Greater than or equal to the 90th percentile for diabetes, is low income, and high percent of residents that are not higher ed students?": "diabetes_and_low_income_and_not_students",
+        "Greater than or equal to the 90th percentile for diesel particulate matter, is low income, and high percent of residents that are not higher ed students?": "diesel_particulates_and_low_income_and_not_students",
+        "Greater than or equal to the 90th percentile for energy burden, is low income, and high percent of residents that are not higher ed students?": "energy_burden_and_low_income_and_not_students",
+        "Greater than or equal to the 90th percentile for expected agriculture loss rate, is low income, and high percent of residents that are not higher ed students?": "expected_agriculture_loss_and_low_income_and_not_students",
+        "Greater than or equal to the 90th percentile for expected building loss rate, is low income, and high percent of residents that are not higher ed students?": "expected_building_loss_and_low_income_and_not_students",
+        "Greater than or equal to the 90th percentile for expected population loss rate, is low income, and high percent of residents that are not higher ed students?": "expected_population_loss_and_low_income_and_not_students",
+        "Greater than or equal to the 90th percentile for heart disease, is low income, and high percent of residents that are not higher ed students?": "heart_disease_and_low_income_and_not_students",
+        r"Greater than or equal to the 90th percentile for households at or below 100% federal poverty level and has low HS education in 2009 (island areas)?": "below_poverty_line_and_less_than_high_school_islands",
+        r"Greater than or equal to the 90th percentile for households at or below 100% federal poverty level, has low HS attainment, and high percent of residents that are not higher ed students?": "below_poverty_line_and_less_than_high_school_and_not_students",
+        "Greater than or equal to the 90th percentile for households in linguistic isolation, has low HS attainment, and high percent of residents that are not higher ed students?": "linguistic_isolation_and_less_than_high_school_and_not_students",
+        "Greater than or equal to the 90th percentile for housing burden, is low income, and high percent of residents that are not higher ed students?": "housing_burden_and_low_income_and_not_students",
+        "Greater than or equal to the 90th percentile for lead paint, the median house value is less than 90th percentile, is low income, and high percent of residents that are not higher ed students?": "lead_paint_and_median_home_price_and_low_income_and_not_students",
+        "Greater than or equal to the 90th percentile for low life expectancy, is low income, and high percent of residents that are not higher ed students?": "life_expectancy_and_low_income_and_not_students",
+        "Greater than or equal to the 90th percentile for low median household income as a percent of area median income and has low HS education in 2009 (island areas)?": "local_to_area_income_ratio_and_less_than_high_school_islands",
+        "Greater than or equal to the 90th percentile for low median household income as a percent of area median income, has low HS attainment, and high percent of residents that are not higher ed students?": "local_to_area_income_ratio_and_less_than_high_school_and_not_students",
+        "Greater than or equal to the 90th percentile for PM2.5 exposure, is low income, and high percent of residents that are not higher ed students?": "pm2_5_and_low_income_and_not_students",
+        "Greater than or equal to the 90th percentile for proximity to hazardous waste facilities, is low income, and high percent of residents that are not higher ed students?": "hazardous_waste_proximity_and_low_income_and_not_students",
+        "Greater than or equal to the 90th percentile for proximity to RMP sites, is low income, and high percent of residents that are not higher ed students?": "risk_management_plan_proximity_and_low_income_and_not_students",
+        "Greater than or equal to the 90th percentile for proximity to superfund sites, is low income, and high percent of residents that are not higher ed students?": "superfund_proximity_and_low_income_and_not_students",
+        "Greater than or equal to the 90th percentile for traffic proximity, is low income, and high percent of residents that are not higher ed students?": "traffic_and_low_income_and_not_students",
+        "Greater than or equal to the 90th percentile for unemployment and has low HS education in 2009 (island areas)?": "unemployment_and_less_than_high_school_islands",
+        "Greater than or equal to the 90th percentile for unemployment, has low HS attainment, and high percent of residents that are not higher ed students?": "unemployment_and_less_than_high_school_and_not_students",
+        "Greater than or equal to the 90th percentile for wastewater discharge, is low income, and high percent of residents that are not higher ed students?": "wastewater_and_low_income_and_not_students",
         "Housing burden (percent) (percentile)": "housing_burden_percentile",
         "Housing burden (percent)": "housing_burden_percent",
         "Life expectancy (years)": "life_expectancy",
