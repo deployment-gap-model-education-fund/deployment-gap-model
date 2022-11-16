@@ -123,7 +123,7 @@ def _get_env_justice_df(engine: sa.engine.Engine) -> pd.DataFrame:
         SUM("energy_burden_and_low_income_and_not_students"::INTEGER) as n_tracts_energy_burden_low_income_not_students,
         SUM("pm2_5_and_low_income_and_not_students"::INTEGER) as n_tracts_pm2_5_low_income_not_students,
         SUM("traffic_and_low_income_and_not_students"::INTEGER) as n_tracts_traffic_low_income_not_students,
-        SUM("lead_paint_houses_and_median_home_price_and_low_income_and_not_"::INTEGER) as n_tracts_lead_paint_and_median_home_price_low_income_not_students,
+        SUM("lead_paint_and_median_home_price_and_low_income_and_not_student"::INTEGER) as n_tracts_lead_paint_and_median_home_price_low_income_not_students,
         SUM("housing_burden_and_low_income_and_not_students"::INTEGER) as n_tracts_housing_burden_low_income_not_students,
         SUM("risk_management_plan_proximity_and_low_income_and_not_students"::INTEGER) as n_tracts_risk_management_plan_proximity_low_income_not_students,
         SUM("superfund_proximity_and_low_income_and_not_students"::INTEGER) as n_tracts_superfund_proximity_low_income_not_students,
