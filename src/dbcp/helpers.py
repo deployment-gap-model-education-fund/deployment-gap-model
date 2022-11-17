@@ -4,7 +4,6 @@ import logging
 import os
 import tarfile
 from pathlib import Path
-from typing import List
 
 import pandas as pd
 import pandas_gbq
@@ -13,9 +12,57 @@ import requests
 import sqlalchemy as sa
 from tqdm import tqdm
 
-from dbcp.schemas import TABLE_SCHEMAS
+import dbcp
 
 logger = logging.getLogger(__name__)
+
+SA_TO_BQ_TYPES = {
+    "VARCHAR": "STRING",
+    "INTEGER": "INTEGER",
+    "FLOAT": "FLOAT",
+    "BOOLEAN": "BOOL",
+    "DATETIME": "DATETIME",
+}
+SA_TO_BQ_MODES = {True: "NULLABLE", False: "REQUIRED"}
+
+
+def get_schema_sql_alchemy_metadata(schema: str) -> sa.MetaData:
+    """
+    Get SQL Alchemy metadata object for a particular schema.
+
+    Args:
+        schema: the name of the database schema.
+    Returns:
+        metadata: the SQL alchemy metadata associated with the db schema.
+    """
+    if schema == "data_mart":
+        return dbcp.metadata.data_mart.metadata
+    elif schema == "data_warehouse":
+        return dbcp.metadata.data_warehouse.metadata
+    else:
+        raise ValueError(f"{schema} is not a valid schema.")
+
+
+def get_bq_schema_from_metadata(table_name: str, schema: str) -> list[dict[str, str]]:
+    """
+    Create a BigQuery schema from SQL Alchemy metadata.
+
+    Args:
+        table_name: the name of the table.
+        schema: the name of the database schema.
+    Returns:
+        bq_schema: a bigquery schema description.
+    """
+    table_name = f"{schema}.{table_name}"
+    metadata = get_schema_sql_alchemy_metadata(schema)
+    bq_schema = []
+    for column in metadata.tables[table_name].columns:
+        col_schema = {}
+        col_schema["name"] = column.name
+        col_schema["type"] = SA_TO_BQ_TYPES[str(column.type)]
+        col_schema["mode"] = SA_TO_BQ_MODES[column.nullable]
+        bq_schema.append(col_schema)
+    return bq_schema
 
 
 def get_sql_engine() -> sa.engine.Engine:
@@ -69,10 +116,25 @@ def track_tar_progress(members):
         yield member
 
 
-def get_db_schema_tables(engine: sa.engine.Engine, schema: str) -> List:
-    """Get table names of database schema."""
+def get_db_schema_tables(engine: sa.engine.Engine, schema: str) -> list[str]:
+    """
+    Get table names of database schema.
+
+    Args:
+        engine: sqlalchemy connection engine.
+        schema: the name of the database schema.
+    Return:
+        table_names: the table names in the db schema.
+    """
     inspector = sa.inspect(engine)
-    return inspector.get_table_names(schema=schema)
+    table_names = inspector.get_table_names(schema=schema)
+
+    if not table_names:
+        raise ValueError(
+            f"{schema} schema either doesn't exist or doesn't contain any tables. Try rerunning the etl and data mart pipelines."
+        )
+
+    return table_names
 
 
 def upload_schema_to_bigquery(schema: str) -> None:
@@ -83,24 +145,15 @@ def upload_schema_to_bigquery(schema: str) -> None:
     engine = get_sql_engine()
     table_names = get_db_schema_tables(engine, schema)
 
-    if not table_names:
-        raise ValueError(
-            f"{schema} schema either doesn't exist or doesn't contain any tables. Try rerunning the etl and data mart pipelines."
-        )
-
     # read tables from dbcp schema in a dictionary of dfs
     loaded_tables = {}
     with engine.connect() as con:
-
         for table_name in table_names:
-            table = pd.read_sql_table(table_name, con, schema=schema)
-            # Validate the schemas again
-            if TABLE_SCHEMAS.get(table_name):
-                loaded_tables[table_name] = TABLE_SCHEMAS[table_name].validate(
-                    table, lazy=True
-                )
-            else:
-                loaded_tables[table_name] = table
+            loaded_tables[table_name] = pd.read_sql_table(
+                table_name, con, schema=schema
+            )
+            # Use dtypes that support pd.NA
+            loaded_tables[table_name] = loaded_tables[table_name].convert_dtypes()
 
     # load to big query
     GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
@@ -119,5 +172,6 @@ def upload_schema_to_bigquery(schema: str) -> None:
             project_id=GCP_PROJECT_ID,
             if_exists="replace",
             credentials=credentials,
+            table_schema=get_bq_schema_from_metadata(table_name, schema),
         )
         logger.info(f"Finished: {table_name}")

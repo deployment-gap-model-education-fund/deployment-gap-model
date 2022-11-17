@@ -9,7 +9,7 @@ import sqlalchemy as sa
 import dbcp
 from dbcp.constants import FIPS_CODE_VINTAGE
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
-from dbcp.schemas import TABLE_SCHEMAS
+from dbcp.metadata.data_warehouse import metadata
 from dbcp.transform.helpers import GEOCODER_CACHE
 from pudl.helpers import add_fips_ids as _add_fips_ids
 from pudl.output.pudltabl import PudlTabl
@@ -96,7 +96,7 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
     mcoe = pd.concat(
         [mcoe, fips[["state_id_fips", "county_id_fips"]]], axis=1, copy=False
     )
-    mcoe = TABLE_SCHEMAS["mcoe"].validate(mcoe, lazy=True)
+    mcoe = mcoe.convert_dtypes()
     pudl_tables["mcoe"] = mcoe
 
     return pudl_tables
@@ -130,6 +130,25 @@ def etl_justice40() -> dict[str, pd.DataFrame]:
     return out
 
 
+def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
+    """ETL NREL state and local ordinances for wind and solar."""
+    wind_source_path = Path("/app/data/raw/NREL_Wind_Ordinances.xlsx")
+    solar_source_path = Path("/app/data/raw/NREL_Solar_Ordinances.xlsx")
+    wind_raw_dfs = dbcp.extract.nrel_wind_solar_ordinances.extract(
+        wind_source_path, wind_or_solar="wind"
+    )
+    solar_raw_dfs = dbcp.extract.nrel_wind_solar_ordinances.extract(
+        solar_source_path, wind_or_solar="solar"
+    )
+    nrel_raw_dfs = wind_raw_dfs | solar_raw_dfs
+
+    nrel_transformed_dfs = dbcp.transform.nrel_wind_solar_ordinances.transform(
+        nrel_raw_dfs
+    )
+
+    return nrel_transformed_dfs
+
+
 def etl(args):
     """Run dbc ETL."""
     # Setup postgres
@@ -142,6 +161,7 @@ def etl(args):
 
     etl_funcs = {
         "justice40_tracts": etl_justice40,
+        "nrel_wind_solar_ordinances": etl_nrel_ordinances,
         "eip_infrastructure": etl_eip_infrastructure,
         "lbnlisoqueues": etl_lbnlisoqueues,
         "lbnl_iso_queue_2021": etl_lbnl_iso_queue_2021,
@@ -157,14 +177,18 @@ def etl(args):
         logger.info(f"Processing: {dataset}")
         transformed_dfs.update(etl_func())
 
+    # Delete any existing tables, and create them anew:
+    metadata.drop_all(engine)
+    metadata.create_all(engine)
+
     # Load table into postgres
     with engine.connect() as con:
-        for table_name, df in transformed_dfs.items():
-            logger.info(f"Load {table_name} to postgres.")
-            df.to_sql(
-                name=table_name,
+        for table in metadata.sorted_tables:
+            logger.info(f"Load {table.name} to postgres.")
+            transformed_dfs[table.name].to_sql(
+                name=table.name,
                 con=con,
-                if_exists="replace",
+                if_exists="append",
                 index=False,
                 schema="data_warehouse",
             )
