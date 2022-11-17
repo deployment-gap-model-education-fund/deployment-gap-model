@@ -6,7 +6,6 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 
-from dbcp.schemas import TABLE_SCHEMAS
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     normalize_multicolumns_to_rows,
@@ -225,7 +224,7 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
 
     # Validate schema
     for name, df in lbnl_normalized_dfs.items():
-        lbnl_normalized_dfs[name] = TABLE_SCHEMAS[name].validate(df, lazy=True)
+        lbnl_normalized_dfs[name] = df.convert_dtypes()
 
     return lbnl_normalized_dfs
 

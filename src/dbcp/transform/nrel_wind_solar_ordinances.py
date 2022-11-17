@@ -377,8 +377,4 @@ def transform(nrel_raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         ),
     }
 
-    # Validate schema
-    # for name, df in out.items():
-    #   out[name] = TABLE_SCHEMAS[name].validate(df, lazy=False)
-
     return out
