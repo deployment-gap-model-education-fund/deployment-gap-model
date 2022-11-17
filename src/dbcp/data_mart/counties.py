@@ -1,4 +1,5 @@
 """Module to create a county-level table for DBCP to use in spreadsheet tools."""
+from io import StringIO
 from typing import Dict, Optional
 
 import numpy as np
@@ -22,6 +23,129 @@ from dbcp.data_mart.helpers import (
 )
 from dbcp.data_mart.projects import create_data_mart as create_iso_data_mart
 from dbcp.helpers import get_pudl_engine, get_sql_engine
+
+JUSTICE40_AGGREGATES = pd.read_csv(
+    # This variable exists because of Postgres character limits on column names.
+    # These column names are referenced 5 times in this  module and I don't want to
+    # rely on copy/paste if they change. Changing them is especially awkward because
+    # PostgreSQL has a 64 character limit on column names, so some of the given names
+    # in transform.justice40.py AND in subsequent queries get truncated, meaning the
+    # given names and actual names are different.
+    # The source of these names is the query in _get_env_justice_df + truncation.
+    # I added the categories here (used in _create_dbcp_ej_index) out of convenience.
+    StringIO(
+        """name,category
+total_tracts,
+justice40_dbcp_index,
+n_distinct_qualifying_tracts,
+n_tracts_agriculture_loss_low_income_not_students,climate
+n_tracts_asthma_low_income_not_students,health
+n_tracts_below_poverty_and_low_high_school,workforce
+n_tracts_below_poverty_line_less_than_high_school_islands,workforce
+n_tracts_building_loss_low_income_not_students,climate
+n_tracts_diabetes_low_income_not_students,health
+n_tracts_diesel_particulates_low_income_not_students,transit
+n_tracts_energy_burden_low_income_not_students,energy
+n_tracts_hazardous_waste_proximity_low_income_not_students,pollution
+n_tracts_heart_disease_low_income_not_students,health
+n_tracts_housing_burden_low_income_not_students,housing
+n_tracts_lead_paint_and_median_home_price_low_income_not_studen,housing
+n_tracts_life_expectancy_low_income_not_students,health
+n_tracts_linguistic_isolation_and_low_high_school,workforce
+n_tracts_local_to_area_income_ratio_and_low_high_school,workforce
+n_tracts_local_to_area_income_ratio_less_than_high_school_islan,workforce
+n_tracts_pm2_5_low_income_not_students,energy
+n_tracts_population_loss_low_income_not_students,climate
+n_tracts_risk_management_plan_proximity_low_income_not_students,pollution
+n_tracts_superfund_proximity_low_income_not_students,pollution
+n_tracts_traffic_low_income_not_students,transit
+n_tracts_unemployment_and_low_high_school,workforce
+n_tracts_unemployment_less_than_high_school_islands,workforce
+n_tracts_wastewater_low_income_not_students,water
+"""
+    )
+)
+
+
+def _create_dbcp_ej_index(j40_df: pd.DataFrame) -> pd.Series:
+    """Derive an environmental justice score based on Justice40 data.
+
+    This algorithm was specified by the client as follows:
+    1. By counties: If any of the indicators (within a category) has >1 (meaning at least 1 tract is affected), then it's a YES.
+    2. Each indicator category has a unique weight, so each YES is counted by the weight assigned to that category
+    3. For each county, sum all of the YES indicator categories with its appropriate weight.
+    4. Final number sums all indicator catergories and gives you the Justice 40 DBCP Index.
+    """
+    category_weights = {  # specified by client
+        "climate": 1.0,
+        "energy": 1.0,
+        "transit": 1.0,
+        "pollution": 0.75,
+        "water": 0.75,
+        "housing": 0.5,
+        "health": 0.5,
+        "workforce": 0.5,
+    }
+    mismatched_categories = set(
+        JUSTICE40_AGGREGATES["category"].dropna().unique()
+    ).symmetric_difference(set(category_weights.keys()))
+    err_msg = (
+        f"category_weights.keys() should match categories in JUSTICE40_AGGREGATES. "
+        f"The following do not match: {mismatched_categories}"
+    )
+    assert len(mismatched_categories) == 0, err_msg
+
+    score_components = []
+    for category, weight in category_weights.items():
+        column_subset = JUSTICE40_AGGREGATES.loc[
+            JUSTICE40_AGGREGATES["category"] == category, "name"
+        ].to_list()
+        weighted_indicator = (
+            j40_df[column_subset].sum(axis=1).gt(0).astype(float) * weight
+        )
+        score_components.append(weighted_indicator)
+    score = pd.concat(score_components, axis=1).sum(axis=1)
+    score.name = "justice40_dbcp_index"
+    return score
+
+
+def _get_env_justice_df(engine: sa.engine.Engine) -> pd.DataFrame:
+    """Create county-level aggregates of Justice40 tracts."""
+    query = """
+    SELECT
+        SUBSTRING("tract_id_fips", 1, 5) as county_id_fips,
+        COUNT("tract_id_fips") as total_tracts,
+        SUM("is_disadvantaged"::INTEGER) as n_distinct_qualifying_tracts,
+        SUM("expected_agriculture_loss_and_low_income_and_not_students"::INTEGER) as n_tracts_agriculture_loss_low_income_not_students,
+        SUM("expected_building_loss_and_low_income_and_not_students"::INTEGER) as n_tracts_building_loss_low_income_not_students,
+        SUM("expected_population_loss_and_low_income_and_not_students"::INTEGER) as n_tracts_population_loss_low_income_not_students,
+        SUM("diesel_particulates_and_low_income_and_not_students"::INTEGER) as n_tracts_diesel_particulates_low_income_not_students,
+        SUM("energy_burden_and_low_income_and_not_students"::INTEGER) as n_tracts_energy_burden_low_income_not_students,
+        SUM("pm2_5_and_low_income_and_not_students"::INTEGER) as n_tracts_pm2_5_low_income_not_students,
+        SUM("traffic_and_low_income_and_not_students"::INTEGER) as n_tracts_traffic_low_income_not_students,
+        SUM("lead_paint_and_median_home_price_and_low_income_and_not_student"::INTEGER) as n_tracts_lead_paint_and_median_home_price_low_income_not_students,
+        SUM("housing_burden_and_low_income_and_not_students"::INTEGER) as n_tracts_housing_burden_low_income_not_students,
+        SUM("risk_management_plan_proximity_and_low_income_and_not_students"::INTEGER) as n_tracts_risk_management_plan_proximity_low_income_not_students,
+        SUM("superfund_proximity_and_low_income_and_not_students"::INTEGER) as n_tracts_superfund_proximity_low_income_not_students,
+        SUM("wastewater_and_low_income_and_not_students"::INTEGER) as n_tracts_wastewater_low_income_not_students,
+        SUM("asthma_and_low_income_and_not_students"::INTEGER) as n_tracts_asthma_low_income_not_students,
+        SUM("heart_disease_and_low_income_and_not_students"::INTEGER) as n_tracts_heart_disease_low_income_not_students,
+        SUM("diabetes_and_low_income_and_not_students"::INTEGER) as n_tracts_diabetes_low_income_not_students,
+        SUM("local_to_area_income_ratio_and_less_than_high_school_and_not_st"::INTEGER) as n_tracts_local_to_area_income_ratio_and_low_high_school,
+        SUM("linguistic_isolation_and_less_than_high_school_and_not_students"::INTEGER) as n_tracts_linguistic_isolation_and_low_high_school,
+        SUM("below_poverty_line_and_less_than_high_school_and_not_students"::INTEGER) as n_tracts_below_poverty_and_low_high_school,
+        SUM("unemployment_and_less_than_high_school_and_not_students"::INTEGER) as n_tracts_unemployment_and_low_high_school,
+        SUM("hazardous_waste_proximity_and_low_income_and_not_students"::INTEGER) as n_tracts_hazardous_waste_proximity_low_income_not_students,
+        SUM("unemployment_and_less_than_high_school_islands"::INTEGER) as n_tracts_unemployment_less_than_high_school_islands,
+        SUM("local_to_area_income_ratio_and_less_than_high_school_islands"::INTEGER) as n_tracts_local_to_area_income_ratio_less_than_high_school_islands,
+        SUM("below_poverty_line_and_less_than_high_school_islands"::INTEGER) as n_tracts_below_poverty_line_less_than_high_school_islands,
+        SUM("life_expectancy_and_low_income_and_not_students"::INTEGER) as n_tracts_life_expectancy_low_income_not_students
+    FROM "data_warehouse"."justice40_tracts"
+    GROUP BY 1;
+    """
+    df = pd.read_sql(query, engine)
+    df["justice40_dbcp_index"] = _create_dbcp_ej_index(df)
+    return df
 
 
 def _get_existing_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
@@ -464,7 +588,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "ordinance_earliest_year_mentioned",
         "state_permitting_type",
         "state_permitting_text",
-    ]
+    ] + JUSTICE40_AGGREGATES["name"].to_list()
     wide = long.pivot(index=idx_cols, columns=col_cols, values=val_cols)
 
     wide.columns = wide.columns.rename(
@@ -621,7 +745,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "ordinance_jurisdiction_name",
         "ordinance_jurisdiction_type",
         "state_permitting_text",
-    ]
+    ] + JUSTICE40_AGGREGATES["name"].to_list()
     return wide.loc[:, col_order].copy()
 
 
@@ -666,7 +790,7 @@ def create_long_format(
         "ordinance_earliest_year_mentioned",
         "state_permitting_type",
         "state_permitting_text",
-    ]
+    ] + JUSTICE40_AGGREGATES["name"].to_list()
     return out.loc[:, col_order]
 
 
@@ -688,6 +812,7 @@ def _get_county_properties(
     ncsl = _get_ncsl_wind_permitting_df(postgres_engine)
     all_counties = _get_county_fips_df(postgres_engine)
     all_states = _get_state_fips_df(postgres_engine)
+    env_justice = _get_env_justice_df(postgres_engine)
     # model local opposition
     aggregator = CountyOpposition(
         engine=postgres_engine, county_fips_df=all_counties, state_fips_df=all_states
@@ -709,6 +834,9 @@ def _get_county_properties(
         how="left",
         validate="m:1",
     )
+    county_properties = county_properties.merge(
+        env_justice, on="county_id_fips", how="left", validate="1:1"
+    )
 
     county_properties = county_properties.rename(columns=rename_dict)
     return county_properties
@@ -720,20 +848,19 @@ def _join_all_counties_to_wide_format(
     county_properties = _add_derived_columns(county_properties)
     wide_format_column_order = wide_format.columns.copy()
 
-    wide_format_subset = wide_format.drop(
-        columns=[
-            "state_id_fips",
-            "state",
-            "county",
-            "has_ordinance",
-            "state_permitting_type",
-            "ordinance",
-            "ordinance_earliest_year_mentioned",
-            "ordinance_jurisdiction_name",
-            "ordinance_jurisdiction_type",
-            "state_permitting_text",
-        ]
-    )
+    county_columns = [
+        "state_id_fips",
+        "state",
+        "county",
+        "has_ordinance",
+        "state_permitting_type",
+        "ordinance",
+        "ordinance_earliest_year_mentioned",
+        "ordinance_jurisdiction_name",
+        "ordinance_jurisdiction_type",
+        "state_permitting_text",
+    ] + JUSTICE40_AGGREGATES["name"].to_list()
+    wide_format_subset = wide_format.drop(columns=county_columns)
     county_properties = county_properties.merge(
         wide_format_subset,
         on="county_id_fips",

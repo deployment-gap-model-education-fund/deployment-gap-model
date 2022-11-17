@@ -122,6 +122,14 @@ def etl_fips_tables() -> Dict[str, pd.DataFrame]:
     return out
 
 
+def etl_justice40() -> dict[str, pd.DataFrame]:
+    """ETL white house environmental justice dataset."""
+    source_path = Path("/app/data/raw/communities-2022-05-31-1915GMT.zip")
+    raw = dbcp.extract.justice40.extract(source_path)
+    out = dbcp.transform.justice40.transform(raw)
+    return out
+
+
 def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
     """ETL NREL state and local ordinances for wind and solar."""
     wind_source_path = Path("/app/data/raw/NREL_Wind_Ordinances.xlsx")
@@ -152,6 +160,7 @@ def etl(args):
     GEOCODER_CACHE.reduce_size()
 
     etl_funcs = {
+        "justice40_tracts": etl_justice40,
         "nrel_wind_solar_ordinances": etl_nrel_ordinances,
         "eip_infrastructure": etl_eip_infrastructure,
         "lbnlisoqueues": etl_lbnlisoqueues,
