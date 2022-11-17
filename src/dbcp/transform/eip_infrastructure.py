@@ -5,12 +5,21 @@ from typing import Dict, List, Sequence
 
 import pandas as pd
 
+from dbcp.extract.eip_infrastructure import _downcast_ints
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     replace_value_with_count_validation,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _convert_string_to_boolean(ser: pd.Series) -> pd.Series:
+    if pd.api.types.is_bool_dtype(ser):
+        return ser
+    mapping = {"True": True, "False": False, "": pd.NA}
+    out = ser.map(mapping).astype(pd.BooleanDtype())
+    return out
 
 
 def _format_column_names(cols: Sequence[str]) -> List[str]:
@@ -68,7 +77,6 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         "project_id": "raw_project_id",
         "state": "raw_state",
         "state_facility_id_numbers": "raw_state_facility_id_numbers",
-        "sector": "raw_sector",
         "primary_naics_code": "raw_primary_naics_code",
         "primary_sic_code": "raw_primary_sic_code",
         "street_address": "raw_street_address",
@@ -78,6 +86,7 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         "associated_facilities_id": "raw_associated_facilities_id",
         "pipelines_id": "raw_pipelines_id",
         "air_operating_id": "raw_air_operating_id",
+        "latest_updates": "raw_latest_updates",
         "cwa-npdes_id": "raw_cwa_npdes_id",
         "cwa_wetland_id": "raw_cwa_wetland_id",
         "other_permits_id": "raw_other_permits_id",
@@ -96,12 +105,16 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         "facility_footprint": "raw_facility_footprint",
         "epa_frs_id": "raw_epa_frs_id",
         "facility_id": "unknown_id",
-        "ccs/ccus": "ccs_ccus",
+        "ccs/ccus": "raw_is_ccs",
     }
     fac.rename(columns=rename_dict, inplace=True)
 
+    fac.loc[:, "is_ccs"] = _convert_string_to_boolean(fac.loc[:, "raw_is_ccs"])
+
     # fix 9 (as of 3/22/2022) states that are CSV duplicates like "LA, LA"
     fac["state"] = fac["raw_state"].str.split(",", n=1).str[0]
+    # standardize null values (only 2)
+    fac["state"].replace({"TDB": pd.NA, "": pd.NA}, inplace=True)
 
     # fix 4 counties (as of 3/22/2022) with multiple values as CSV.
     # Simplify by only taking first county
@@ -136,6 +149,7 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         "Air Operating",
         "CWA-NPDES",
         "Other Permits",
+        "CCS",
     ]
     duplicative_columns = _format_column_names(duplicative_columns)
     fac.drop(columns=duplicative_columns, inplace=True)
@@ -247,25 +261,28 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
     proj = raw_proj_df.copy()
     proj.columns = _format_column_names(proj.columns)
     rename_dict = {  # add 'raw_' prefix to columns that need transformation
-        "id": "project_id",
-        "created_on": "raw_created_on",
-        "modified_on": "raw_modified_on",
-        "facility_id": "raw_facility_id",
-        "industry_sector": "raw_industry_sector",
-        "project_type": "raw_project_type",
+        "actual_or_expected_completion_year": "raw_actual_or_expected_completion_year",
         "air_construction_id": "raw_air_construction_id",
         "air_operating_id": "raw_air_operating_id",
-        "nga_id": "raw_nga_id",
-        "marad_id": "raw_marad_id",
-        "other_permits_id": "raw_other_permits_id",
-        "sulfur_dioxide_so2": "raw_sulfur_dioxide_so2",
+        "ccs_id": "raw_ccs_id",
+        "ccs": "raw_is_ccs",
         "construction_status_last_updated": "raw_construction_status_last_updated",
-        "operating_status": "raw_operating_status",
-        "actual_or_expected_completion_year": "raw_actual_or_expected_completion_year",
-        "project_cost_million_$": "raw_project_cost_millions",
+        "created_on": "raw_created_on",
+        "emission_accounting_notes": "raw_emission_accounting_notes",
+        "facility_id": "raw_facility_id",
+        "id": "project_id",
+        "industry_sector": "raw_industry_sector",
+        "marad_id": "raw_marad_id",
+        "modified_on": "raw_modified_on",
+        "nga_id": "raw_nga_id",
         "number_of_jobs_promised": "raw_number_of_jobs_promised",
-        "target_list": "is_ally_target",
-        "flag": "ally_flag",
+        "operating_status": "raw_operating_status",
+        "other_permits_id": "raw_other_permits_id",
+        "project_cost_million_$": "raw_project_cost_millions",
+        "project_type": "raw_project_type",
+        "sulfur_dioxide_so2": "raw_sulfur_dioxide_so2",
+        "target_list": "raw_is_ally_target",
+        "total_wetlands_affected_temporarily_acres": "raw_total_wetlands_affected_temporarily_acres",
         # add tons per year units
         "carbon_monoxide_co": "carbon_monoxide_co_tpy",
         "greenhouse_gases_co2e": "greenhouse_gases_co2e_tpy",
@@ -276,9 +293,17 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
     }
     proj.rename(columns=rename_dict, inplace=True)
 
+    proj.loc[:, "is_ccs"] = _convert_string_to_boolean(proj.loc[:, "raw_is_ccs"])
+    proj.loc[:, "is_ally_target"] = _convert_string_to_boolean(
+        proj.loc[:, "raw_is_ally_target"]
+    )
+
     # transform columns
     proj["sulfur_dioxide_so2_tpy"] = _fix_erroneous_array_items(
         proj.loc[:, "raw_sulfur_dioxide_so2"]
+    )
+    proj["total_wetlands_affected_temporarily_acres"] = _fix_erroneous_array_items(
+        proj.loc[:, "raw_total_wetlands_affected_temporarily_acres"]
     )
     proj["cost_millions"] = _fix_erroneous_array_items(
         proj.loc[:, "raw_project_cost_millions"]
@@ -383,6 +408,7 @@ def _create_associative_entity_table(
     assoc_table = pd.to_numeric(assoc_table, downcast="unsigned", errors="raise")
     assoc_table.name = ids.name.replace("raw_", "")  # preserve ID column name
     assoc_table = assoc_table.reset_index()
+    _downcast_ints(assoc_table)  # convert to pd.Int32
     return assoc_table
 
 
@@ -445,4 +471,5 @@ def transform(raw_eip_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         "eip_facility_project_association": facility_project_association,
         "eip_project_permit_association": project_permit_association,
     }
+
     return out
