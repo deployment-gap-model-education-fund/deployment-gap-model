@@ -128,7 +128,7 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 ## Modeling Decisions
 
 This is a restructured version of counties_long_format. See the entry for that table for more background:
-{% page-ref page="iso_projects_long_format.md" %}
+{% page-ref page="counties_long_format.md" %}
 The following are in addition to, not instead of, those modeling decisions.
 
 ### Definition of "Renewables" includes Battery Storage
