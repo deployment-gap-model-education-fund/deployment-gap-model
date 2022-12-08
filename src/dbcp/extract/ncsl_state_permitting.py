@@ -110,7 +110,6 @@ class NCSLScraper(object):
 
 def extract(csv) -> Dict[str, pd.DataFrame]:
     """Extract ncsl permitting data."""
-    # TODO: use datastore
     out = pd.read_csv(csv)
     # set categorical dtypes in transform stage, after cleaning up categories.
     return {"ncsl_state_permitting": out}

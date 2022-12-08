@@ -84,7 +84,6 @@ def get_pudl_engine() -> sa.engine.Engine:
 
 def download_pudl_data() -> Path:
     """Download pudl data from Zenodo."""
-    # TODO(bendnorman): Adjust the datastore and zenodo fetcher so we can pull down PUDL
     # TODO(bendnorman): Ideally this is replaced with Intake.
     PUDL_VERSION = os.environ["PUDL_VERSION"]
 
