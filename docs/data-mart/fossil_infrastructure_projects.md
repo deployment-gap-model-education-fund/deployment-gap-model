@@ -22,9 +22,7 @@ The purpose of this table is to give information on individual fossil infrastruc
 ||`facility_name`|Facility name|EIP||
 ||`project_classification`|One of new, expansion, conversion, or restart.|EIP||
 ||`industry_sector`|One of oil, gas, LNG, synthetic fertilizer, petrochemicals and plastics, or other.|EIP||
-||`product_type`|More detailed text description of facility outputs|EIP||
 ||`raw_project_type`|More detailed version of project_classification. "raw_" prefix indicates this column has not been quality controlled.|EIP||
-||`raw_permit_type`|Describes which type of permits apply to this project. "raw_" prefix indicates this column has not been quality controlled.|EIP||
 ||`project_description`|Text description of the project.|EIP||
 ||`facility_description`|Text description of the facility.|EIP||
 ||`permit_description`|Text description of the permit.|EIP||
@@ -46,8 +44,6 @@ The purpose of this table is to give information on individual fossil infrastruc
 ||`total_wetlands_affected_permanently_acres`|Acres of permanent wetland loss|EIP||
 ||`total_wetlands_affected_temporarily_acres`|Acres of temporary wetland loss|EIP||
 |Allies Interest|`is_ally_target`|Somebody else thinks this facility is interesting.||true/false, 116 true|
-||`is_ally_secondary_target`|Somebody else thinks this facility is somewhat interesting.||true/false, only 8 true|
-
 
 ## Modeling Decisions
 
@@ -62,7 +58,6 @@ The emissions estimates reported to regulators (and collected by EIP) assume 100
 {% content-ref url="../co2-estimation.md" %}
 [co2-estimation.md](../co2-estimation.md)
 {% endcontent-ref %}
-
 
 ### Project - Facility Relationships
 
