@@ -6,7 +6,6 @@ from typing import Dict, List, Sequence
 import pandas as pd
 
 from dbcp.extract.eip_infrastructure import _downcast_ints
-from dbcp.schemas import TABLE_SCHEMAS
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     replace_value_with_count_validation,
@@ -472,9 +471,5 @@ def transform(raw_eip_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         "eip_facility_project_association": facility_project_association,
         "eip_project_permit_association": project_permit_association,
     }
-
-    # Validate schema
-    for name, df in out.items():
-        out[name] = TABLE_SCHEMAS[name].validate(df, lazy=True)
 
     return out
