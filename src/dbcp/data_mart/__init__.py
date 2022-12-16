@@ -16,8 +16,13 @@ def create_data_marts(args):
     """Collect and load all data mart tables to data warehouse."""
     engine = dbcp.helpers.get_sql_engine()
     data_marts = {}
+    modules_to_skip = {
+        "helpers",  # helper code; no tables
+        "co2_dashboard",  # obsolete but code imported elsewhere
+    }
+
     for module_info in pkgutil.iter_modules(__path__):
-        if module_info.name == "helpers":  # skip
+        if module_info.name in modules_to_skip:
             continue
         module = importlib.import_module(f"{__name__}.{module_info.name}")
         try:
