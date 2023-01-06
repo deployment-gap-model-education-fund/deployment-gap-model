@@ -274,41 +274,6 @@ iso_projects_long_format = Table(
     schema=schema,
 )
 
-proposed_power_dash_existing_plants = Table(
-    "proposed_power_dash_existing_plants",
-    metadata,
-    Column("state", String),
-    Column("county", String),
-    Column("state_id_fips", String),
-    Column(
-        "county_id_fips", String
-    ),  # Should be a part of the primary key, 9 records with missing count info
-    Column("resource", String, nullable=False),  # Should be a part of the primary key
-    Column("capacity_mw", Float, nullable=False),
-    Column("permitting_type", String),
-    Column("has_ordinance", Boolean, nullable=False),
-    schema=schema,
-)
-
-proposed_power_dash_proposed_plants = Table(
-    "proposed_power_dash_proposed_plants",
-    metadata,
-    Column("state", String),
-    Column("county", String),
-    Column("state_id_fips", String),
-    Column(
-        "county_id_fips", String
-    ),  # Should be a part of the primary key, 9 records with missing count info
-    Column(
-        "resource", String
-    ),  # Should be a part of the primary key, 9 records missing resource info
-    Column("capacity_mw", Float),
-    Column("project_count", Integer, nullable=False),
-    Column("permitting_type", String),
-    Column("has_ordinance", Boolean, nullable=False),
-    schema=schema,
-)
-
 proposed_power_dash_local_opp = Table(
     "proposed_power_dash_local_opp",
     metadata,

@@ -29,18 +29,6 @@ def etl_eip_infrastructure() -> Dict[str, pd.DataFrame]:
     return eip_transformed_dfs
 
 
-def etl_lbnlisoqueues() -> Dict[str, pd.DataFrame]:
-    """LBNL ISO Queues ETL."""
-    # Extract
-    source_path = Path("/app/data/raw/lbnlisoqueues_2020.xlsx")
-    lbnl_raw_dfs = dbcp.extract.lbnl_iso_queue_2020.extract(source_path)
-
-    # Transform
-    lbnl_transformed_dfs = dbcp.transform.lbnlisoqueues.transform(lbnl_raw_dfs)
-
-    return lbnl_transformed_dfs
-
-
 def etl_lbnl_iso_queue_2021() -> Dict[str, pd.DataFrame]:
     """LBNL ISO Queues 2021 ETL."""
     source_path = Path("/app/data/raw/queues_2021_clean_data.xlsx")
@@ -163,7 +151,6 @@ def etl(args):
         "justice40_tracts": etl_justice40,
         "nrel_wind_solar_ordinances": etl_nrel_ordinances,
         "eip_infrastructure": etl_eip_infrastructure,
-        "lbnlisoqueues": etl_lbnlisoqueues,
         "lbnl_iso_queue_2021": etl_lbnl_iso_queue_2021,
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
