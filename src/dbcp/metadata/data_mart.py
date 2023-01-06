@@ -291,19 +291,6 @@ proposed_power_dash_local_opp = Table(
     schema=schema,
 )
 
-co2_dashboard = Table(
-    "co2_dashboard",
-    metadata,
-    Column("state", String),
-    Column("county", String),
-    Column("state_id_fips", String),
-    Column("id", Integer),  # Should be a part of the pk but is missing one value :(
-    Column("county_id_fips", String),
-    Column("co2e_tonnes_per_year", Float),
-    Column("facility_type", String, nullable=False),  # Should be a part of the pk
-    schema=schema,
-)
-
 counties_long_format = Table(
     "counties_long_format",
     metadata,
