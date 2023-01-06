@@ -2,6 +2,8 @@
 
 The purpose of this table is to give information on individual fossil infrastructure projects. Each row corresponds to one fossil facility such as a refinery or gas pipeline compressor station. The data source is the Environmental integrity Project (EIP) plus standard state/county names from the Census.
 
+Note: facilities that are already operating, under construction, or cancelled have been excluded from this table. See the `operating_status` column for more details. To see the excluded projects, refer to the data warehouse table `eip_projects`.
+
 ## Column Descriptions
 
 **Unique Key Column(s):** `project_id`
@@ -21,6 +23,7 @@ The purpose of this table is to give information on individual fossil infrastruc
 ||`facility_id`|Facility ID|EIP||
 ||`facility_name`|Facility name|EIP||
 ||`project_classification`|One of new, expansion, conversion, or restart.|EIP||
+||`operating_status`|One of Pre-construction (186 projects), Announced (94), Partially operating (17), On hold (16), or Commissioning (1).|EIP||
 ||`industry_sector`|One of oil, gas, LNG, synthetic fertilizer, petrochemicals and plastics, or other.|EIP||
 ||`raw_project_type`|More detailed version of project_classification. "raw_" prefix indicates this column has not been quality controlled.|EIP||
 ||`project_description`|Text description of the project.|EIP||

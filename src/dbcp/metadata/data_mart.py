@@ -180,6 +180,7 @@ fossil_infrastructure_projects = Table(
     Column("facility_id", Integer),
     Column("facility_name", String),
     Column("project_classification", String),
+    Column("operating_status", String),
     Column("industry_sector", String, nullable=False),
     Column("raw_project_type", String, nullable=False),
     Column("project_description", String),

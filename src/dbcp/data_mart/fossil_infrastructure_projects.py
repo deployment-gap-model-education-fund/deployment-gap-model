@@ -31,7 +31,8 @@ def _get_proposed_infra_projects(engine: sa.engine.Engine) -> pd.DataFrame:
             particulate_matter_pm2_5_tpy * 0.907185 * 0.85 as pm2_5_tonnes_per_year,
             total_wetlands_affected_permanently_acres,
             total_wetlands_affected_temporarily_acres,
-            is_ally_target
+            is_ally_target,
+            operating_status
         FROM data_warehouse.eip_projects
         WHERE operating_status not in ('Operating', 'Under construction', 'Canceled')
     ),
@@ -163,6 +164,7 @@ def _get_proposed_infra_projects(engine: sa.engine.Engine) -> pd.DataFrame:
         facility_id,
         facility_name,
         project_classification,
+        operating_status,
         industry_sector,
         raw_project_type,
         project_description,
