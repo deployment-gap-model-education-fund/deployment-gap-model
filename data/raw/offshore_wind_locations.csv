@@ -1,0 +1,51 @@
+﻿City,State,County,County FIPS,Why of interest?,Priority,Cable landing(s),Assembly/manufacturing,Notes,location_id,Cable project IDs,assembly/manufac project IDs
+Albany,NY,Albany County,36001,Contracted project,,,Beacon Wind,,1,,16
+Atlantic City,NJ,Atlantic County,34001,Contracted project,,Atlantic Shores,Ocean Wind  1 & 2,,2,15,6
+Barnstable,MA,Barnstable County,25001,Contracted project,,"Vineyard Wind,Commonwealth Wind,Park City Wind",,,3,"3, 1, 9",
+Beaumont,TX,Jefferson County,48245,Proposed lease area,,,,,4,,
+Bridgeport,CT,Fairfield County,09001,Contracted project,,,Park City Wind,,5,,9
+Brookhaven,NY, Suffolk County,36103,Contracted project,,Sunrise Wind,,,6,8,
+Brookings,OR,Curry County,41015,Proposed lease area,,,,,7,,
+Brooklyn,NY,Kings County,36047,Contracted project,,Empire Wind 1 & 2,"Empire Wind 1 & 2,Beacon Wind",,8,12,"12, 16"
+Coeymans,NY,Albany County,36001,Contracted project,,,Sunrise Wind,,9,,8
+Coos Bay,OR,Coos County,41011,Proposed lease area,,,,,10,,
+Dagsboro,DE,Sussex County,10005,Contracted project,,"Skipjack Wind 1 & 2,Marwin,Momentum Wind",,,11,"13, 14, 11",
+Dare County,NC,Dare County,37055,Lease area in proximity,,Kitty Hawk Offshore,,,12,2,
+East Hampton,NY, Suffolk County,36103,Contracted project,,South Fork Wind Farm,,,13,4,
+Eureka,CA,Humboldt County,06023,Proposed lease area,,,,,14,,
+Falmouth,MA,Barnstable County,25001,Contracted project,,Mayflower Wind,,,15,7,
+Federalsburg,MD,Caroline County,24011,Contracted project,,,Skipjack Wind 1 & 2,,16,,13
+Forked River,NJ,Ocean County,34029,Contracted project,,Ocean Wind  1 & 2,,,17,6,
+Freeport,TX,Brazoria,48039,Proposed lease area,,,,,18,,
+Galveston,TX,Galveston County,48167,Proposed lease area,,,,,19,,
+Hampton Roads,VA,,,Contracted project,,,Coastal Virginia Offshore Wind ,,20,,10
+Houston,TX,Harris County,48201,Proposed lease area,,,,,21,,
+Kitty Hawk,NC,Dare County,37055,Lease area in proximity,,,,,22,,
+Lake Charles,LA,Calcasieu Parish,22019,Proposed lease area,,,,,23,,
+Lower Alloways Creek,NJ,Salem County,34033,Contracted project,,,"Ocean Wind  1 & 2,Atlantic Shores",,24,,"6, 15"
+Montauk,NY, Suffolk County,36103,Contracted project,,,South Fork Wind Farm,,25,,4
+Morro Bay,CA,San Luis Obispo County ,06079,Proposed lease area,,,,,26,,
+Myrtle Beach,SC,Horry County,45051,Lease area in proximity,,,,,27,,
+New Bedford,MA,Bristol County,25005,Contracted project,,,"Vineyard Wind,Mayflower Wind",,28,,"3, 7"
+New London,CT,New London County,09011,Contracted project,,,"Revolution Wind,South Fork Wind Farm,Sunrise Wind",,29,,"5, 4, 8"
+North Kingstown,RI,Washington County,44009,Contracted project,,Revolution Wind,Revolution Wind,,30,5,5
+Ocean City,NJ,Cape May,34009,Contracted project,,Ocean Wind  1 & 2,,,31,6,
+Ocean City,MD,Worcester,24047,Contracted project,,,"Marwin,Momentum Wind",,32,,"14, 11"
+Oceanside,NY,Nassau County,36059,Contracted project,,Empire Wind 1 & 2,,,33,12,
+Orange,TX,Orange County,48361,Proposed lease area,,,,,34,,
+Paulsboro,NJ,Gloucester County,34015,Contracted project,,,"Ocean Wind  1 & 2,Atlantic Shores",,35,,"6, 15"
+Port Arthur,TX,Jefferson County,48245,Proposed lease area,,,,,36,,
+Port Jefferson,NY, Suffolk County,36103,Contracted project,,,Sunrise Wind,,37,,8
+Portsmouth,VA,Portsmouth City,51740,Proposed lease area,,,,,38,,
+Providence,RI,Providence County,44007,Contracted project,,,Revolution Wind,,39,,5
+Queens,NY,Queens County,36081,Contracted project,,Beacon Wind,,,40,16,
+Rehoboth Beach,DE,Sussex County,10005,Contracted project,,"Skipjack Wind 1 & 2,Marwin,Momentum Wind",,,41,"13, 14, 11",
+Salem,MA,Essex,25009,Contracted project,,,"Vineyard Wind,Commonwealth Wind,Park City Wind",,42,,"3, 1, 9"
+Sea Girt,NJ,Monmouth County,34025,Contracted project,,Atlantic Shores,,,43,15,
+Seaside Park,NJ,Ocean County,34029,Contracted project,,Ocean Wind  1 & 2,,,44,6,
+Somerset,MA,Bristol County,25005,Contracted project,,Mayflower Wind,Commonwealth Wind,,45,7,1
+Sparrows Point,MD,Baltimore County,24005,Contracted project,,,"Skipjack Wind 1 & 2,Marwin,Momentum Wind",,46,,"13, 14, 11"
+Staten Island,NY,Richmond County,36085,Contracted project,,,Empire Wind 1 & 2,,47,,12
+Texas City,TX,Galveston County,48167,Proposed lease area,,,,,48,,
+Virginia Beach,VA,Virginia Beach City,51810,Contracted project,,"Coastal Virginia Offshore Wind ,Kitty Hawk Offshore",,,49,"10, 2",
+Wilmington,NC,New Hanover,37129,Lease area in proximity,,,,,50,,
