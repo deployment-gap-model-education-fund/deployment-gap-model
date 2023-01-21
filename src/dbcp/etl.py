@@ -137,6 +137,18 @@ def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
     return nrel_transformed_dfs
 
 
+def etl_offshore_wind() -> dict[str, pd.DataFrame]:
+    """ETL manually curated offshore wind data."""
+    locations_path = Path("/app/data/raw/offshore_wind_locations.csv")
+    projects_path = Path("/app/data/raw/offshore_wind_projects.csv")
+    raw_offshore_dfs = dbcp.extract.offshore_wind.extract(
+        locations_path=locations_path, projects_path=projects_path
+    )
+    offshore_transformed_dfs = dbcp.transform.offshore_wind.transform(raw_offshore_dfs)
+
+    return offshore_transformed_dfs
+
+
 def etl(args):
     """Run dbc ETL."""
     # Setup postgres
@@ -148,6 +160,7 @@ def etl(args):
     GEOCODER_CACHE.reduce_size()
 
     etl_funcs = {
+        "offshore_wind": etl_offshore_wind,
         "justice40_tracts": etl_justice40,
         "nrel_wind_solar_ordinances": etl_nrel_ordinances,
         "eip_infrastructure": etl_eip_infrastructure,
