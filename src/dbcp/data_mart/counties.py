@@ -383,6 +383,43 @@ def _iso_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     return aggs
 
 
+def _get_curated_offshore_wind_df(engine: sa.engine.Engine) -> pd.DataFrame:
+    """Offshore wind with capacity split by cable landing location then aggregated to county.
+
+    Output matches structure of _iso_projects_counties() so we can easily replace
+    the less certain ISO offshore projects with these.
+    """
+    query = """
+    WITH
+    proj_landings AS (
+        SELECT
+            proj."project_id",
+            cable.location_id,
+            locs.county_id_fips,
+            proj."capacity_mw",
+            COUNT(*) OVER(PARTITION BY proj."project_id") AS n_landings
+        FROM "data_warehouse"."offshore_wind_projects" as proj
+        INNER JOIN data_warehouse.offshore_wind_cable_landing_association as cable
+        USING(project_id)
+        INNER JOIN data_warehouse.offshore_wind_locations as locs
+        USING(location_id)
+    )
+    SELECT
+        county_id_fips,
+        'Offshore Wind' as resource_or_sector,
+        count( distinct (project_id)) as facility_count,
+        NULL as co2e_tonnes_per_year,
+        SUM(capacity_mw / n_landings) as capacity_mw,
+        'power plant' as facility_type,
+        'proposed' as status
+    FROM proj_landings
+    GROUP BY 1
+    ;
+    """
+    df = pd.read_sql(query, engine)
+    return df
+
+
 def _get_ncsl_wind_permitting_df(engine: sa.engine.Engine) -> pd.DataFrame:
     cols = [
         "description",
@@ -396,135 +433,11 @@ def _get_ncsl_wind_permitting_df(engine: sa.engine.Engine) -> pd.DataFrame:
     return df
 
 
-def _agg_iso_projects_to_counties(iso_df: pd.DataFrame) -> pd.DataFrame:
-    # filter for active projects
-    is_active = iso_df.loc[:, "queue_status"] == "active"
-    projects = iso_df.loc[is_active, :].copy()
-
-    # Calulate renewable/fossil aggregates
-    # define categories
-    renewable_fossil_dict = {
-        "Solar": "renewable",
-        # 'Battery Storage': '',
-        "Onshore Wind": "renewable",
-        "Natural Gas": "fossil",
-        "Offshore Wind": "renewable",
-        # 'Other Storage': '',
-        # 'Other': '',
-        # 'Hydro': '',  # remove by client request
-        # 'Nuclear': '',
-        # 'Pumped Storage': '',
-        "Geothermal": "renewable",
-        "Coal": "fossil",
-        # 'Waste Heat': '',
-    }
-
-    projects["renew_fossil"] = projects.loc[:, "resource_clean"].map(
-        renewable_fossil_dict
-    )
-    category_groups = projects.groupby(["county_id_fips", "renew_fossil"])
-    category_aggs = category_groups["capacity_mw"].sum().to_frame()
-    # count ignores missing capacity values, so have to join size() in separately
-    category_aggs = category_aggs.join(
-        category_groups.size().rename("count_plants").to_frame()
-    )
-    category_aggs = category_aggs.unstack()
-
-    # calculate fuel breakout aggregates
-    projects["breakout_fuels"] = projects.loc[:, "resource_clean"].replace(
-        {"Natural Gas": "Gas"}
-    )
-    projects.loc[:, "breakout_fuels"] = projects.loc[:, "breakout_fuels"].str.lower()
-    fuels_to_breakout = {
-        "solar",
-        "onshore wind",
-        "offshore wind",
-        "gas",
-        "battery storage",
-    }
-    to_breakout = projects.loc[:, "breakout_fuels"].isin(fuels_to_breakout)
-    projects = projects.loc[to_breakout, :]
-
-    fuel_groups = projects.groupby(["county_id_fips", "breakout_fuels"])
-    per_fuel_aggs = fuel_groups["capacity_mw"].sum().to_frame()
-    # count ignores missing capacity values, so have to join size() in separately
-    per_fuel_aggs = per_fuel_aggs.join(
-        fuel_groups.size().rename("count_plants").to_frame()
-    )
-    per_fuel_aggs = per_fuel_aggs.unstack()
-
-    output = pd.concat([per_fuel_aggs, category_aggs], axis=1)
-    output.columns = output.columns.swaplevel()
-
-    return output
-
-
-def _agg_pudl_to_counties(pudl_df: pd.DataFrame) -> pd.DataFrame:
-    plants = pudl_df.copy()
-    # Calulate renewable/fossil aggregates
-    # define categories
-    renewable_fossil_dict = {
-        "gas": "fossil",
-        # 'hydro': '',  # remove by client request
-        "oil": "fossil",
-        # 'nuclear': '',
-        "coal": "fossil",
-        # 'other': '',
-        "wind": "renewable",
-        "solar": "renewable",
-        # 'waste': '',
-    }
-
-    plants["renew_fossil"] = plants.loc[:, "fuel_type_code_pudl"].map(
-        renewable_fossil_dict
-    )
-    category_groups = plants.groupby(["county_id_fips", "renew_fossil"])
-    category_aggs = category_groups["capacity_mw"].sum().to_frame()
-    # count ignores missing capacity values, so have to join size() in separately
-    category_aggs = category_aggs.join(
-        category_groups.size().rename("count_plants").to_frame()
-    )
-    category_aggs = category_aggs.unstack()
-
-    # calculate fuel breakout aggregates
-    # relabel battery storage (this ignores pumped hydro)
-    plants["breakout_fuels"] = plants.loc[:, "fuel_type_code_pudl"].replace(
-        {"wind": "onshore wind"}
-    )  # copy
-    is_battery = plants.loc[:, "technology_description"] == "Batteries"
-    plants.loc[is_battery, "breakout_fuels"] = "battery storage"
-
-    fuels_to_breakout = {"solar", "onshore wind", "gas", "battery storage", "coal"}
-    to_breakout = plants.loc[:, "breakout_fuels"].isin(fuels_to_breakout)
-    plants = plants.loc[to_breakout, :]
-
-    fuel_groups = plants.groupby(["county_id_fips", "breakout_fuels"])
-    per_fuel_aggs = fuel_groups["capacity_mw"].sum().to_frame()
-    # count ignores missing capacity values, so have to join size() in separately
-    per_fuel_aggs = per_fuel_aggs.join(
-        fuel_groups.size().rename("count_plants").to_frame()
-    )
-    per_fuel_aggs = per_fuel_aggs.unstack()
-
-    output = pd.concat([per_fuel_aggs, category_aggs], axis=1)
-    output.columns = output.columns.swaplevel()
-
-    return output
-
-
 def _add_derived_columns(mart: pd.DataFrame) -> pd.DataFrame:
     out = mart.copy()
     out["has_ordinance"] = out["ordinance"].notna()
 
     return out
-
-
-def _flatten_multiindex(multi_index: pd.MultiIndex, prefix: str) -> pd.Index:
-    flattened = [
-        "_".join([levels[0], prefix, *levels[1:]]).replace(" ", "_")
-        for levels in multi_index
-    ]
-    return pd.Index(flattened)
 
 
 def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
@@ -758,6 +671,7 @@ def create_long_format(
     all_states = _get_state_fips_df(postgres_engine)
     county_properties = _get_county_properties(postgres_engine=postgres_engine)
     iso = _iso_projects_counties(postgres_engine)
+    curated_offshore = _get_curated_offshore_wind_df(postgres_engine)
     infra = _fossil_infrastructure_counties(postgres_engine)
     existing = _existing_plants_counties(
         pudl_engine=pudl_engine,
@@ -765,6 +679,10 @@ def create_long_format(
         state_fips_table=all_states,
         county_fips_table=all_counties,
     )
+
+    # replace ISO Offshore Wind with curated data
+    iso = iso.loc[iso["resource_or_sector"] != "Offshore Wind", :]
+    iso = pd.concat([iso, curated_offshore], axis=0, ignore_index=True)
 
     # join it all
     out = pd.concat([iso, existing, infra], axis=0, ignore_index=True)
@@ -792,6 +710,52 @@ def create_long_format(
         "state_permitting_text",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
     return out.loc[:, col_order]
+
+
+def _get_offshore_wind_extra_cols(engine: sa.engine.Engine) -> pd.DataFrame:
+    query = """
+    WITH
+    proj_ports AS (
+        SELECT
+            proj."project_id",
+            port.location_id,
+            locs.county_id_fips,
+            proj."capacity_mw"
+        FROM "data_warehouse"."offshore_wind_projects" as proj
+        INNER JOIN data_warehouse.offshore_wind_port_association as port
+        USING(project_id)
+        INNER JOIN data_warehouse.offshore_wind_locations as locs
+        USING(location_id)
+    ),
+    -- select * from proj_ports
+    -- order by project_id, location_id
+    port_aggs AS (
+        SELECT
+            county_id_fips,
+            SUM(capacity_mw) as offshore_wind_capacity_mw_via_ports
+        FROM proj_ports
+        GROUP BY 1
+        order by 1
+    ),
+    interest AS (
+        SELECT
+            county_id_fips,
+            why_of_interest as offshore_wind_interest_type
+        FROM data_warehouse.offshore_wind_locations as locs
+        GROUP BY 1,2
+        ORDER BY 1
+    )
+    SELECT
+        county_id_fips,
+        offshore_wind_capacity_mw_via_ports,
+        offshore_wind_interest_type
+    FROM interest
+    LEFT JOIN port_aggs
+    USING(county_id_fips)
+    where county_id_fips is not NULL;
+    """
+    df = pd.read_sql(query, engine)
+    return df
 
 
 def _get_county_properties(
@@ -895,6 +859,11 @@ def create_data_mart(
     # client requested joining all counties onto wide format table, even if all values are NULL
     county_properties = _get_county_properties(postgres_engine)
     wide_format = _join_all_counties_to_wide_format(wide_format, county_properties)
+    # client requested two additional columns relating to offshore wind
+    offshore_bits = _get_offshore_wind_extra_cols(postgres_engine)
+    wide_format = wide_format.merge(
+        offshore_bits, on="county_id_fips", how="left", copy=False
+    )
 
     out = {
         "counties_long_format": long_format,
