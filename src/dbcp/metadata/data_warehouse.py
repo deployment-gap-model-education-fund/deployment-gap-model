@@ -613,3 +613,54 @@ nrel_local_ordinances = Table(
     Column("geocoded_containing_county", String),
     schema=schema,
 )
+
+
+##########################
+# Offshore Wind Projects #
+##########################
+
+
+offshore_wind_projects = Table(
+    "offshore_wind_projects",
+    metadata,
+    Column("project_id", Integer, primary_key=True),
+    Column("name", String),
+    Column("recipient_state", String),
+    Column("developer", String),
+    Column("status", String),
+    Column("capacity_mw", Float),
+    Column("proposed_completion_year", Integer),
+    Column("notes", String),
+    schema=schema,
+)
+offshore_wind_locations = Table(
+    "offshore_wind_locations",
+    metadata,
+    Column("location_id", Integer, primary_key=True),
+    Column("raw_city", String),
+    Column("raw_state_abbrev", String),
+    Column("raw_county", String),
+    Column("raw_county_fips", String),
+    Column("why_of_interest", String),
+    Column("priority", String),
+    Column("notes", String),
+    Column("county_id_fips", String),
+    Column("geocoded_locality_name", String),
+    Column("geocoded_locality_type", String),
+    Column("geocoded_containing_county", String),
+    schema=schema,
+)
+offshore_wind_cable_landing_association = Table(
+    "offshore_wind_cable_landing_association",
+    metadata,
+    Column("location_id", Integer, primary_key=True),
+    Column("project_id", Integer, primary_key=True),
+    schema=schema,
+)
+offshore_wind_port_association = Table(
+    "offshore_wind_port_association",
+    metadata,
+    Column("location_id", Integer, primary_key=True),
+    Column("project_id", Integer, primary_key=True),
+    schema=schema,
+)

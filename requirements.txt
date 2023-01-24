@@ -1,4 +1,4 @@
-catalystcoop.pudl>=0.5
+catalystcoop.pudl~=0.6.0
 psycopg2~=2.9.3
 pytest~=6.2.5
 tqdm~=4.62.3
