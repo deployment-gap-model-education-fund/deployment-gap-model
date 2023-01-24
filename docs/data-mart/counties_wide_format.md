@@ -56,7 +56,7 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 ||`gas_proposed_facility_count`|Number of proposed gas power plants.|LBNL||
 ||`offshore_wind_existing_capacity_mw`|Generation capacity, in megawatts, of existing offshore wind power plants.|PUDL||
 ||`offshore_wind_existing_facility_count`|Number of existing offshore wind power plants.|PUDL||
-||`offshore_wind_proposed_capacity_mw`|Generation capacity, in megawatts, of propsed offshore wind power plants. When a wind farm has multiple cable landing locations, the capacity is split equally between landing locations.|LBNL||
+||`offshore_wind_proposed_capacity_mw`|Generation capacity, in megawatts, of propsed offshore wind power plants. When a wind farm has multiple cable landing locations, the capacity is split equally between landing locations. Note that this is the only proposed capacity column NOT sourced from LBNL.|original work||
 ||`offshore_wind_proposed_facility_count`|Number of proposed offshore wind power plants.|LBNL||
 ||`offshore_wind_capacity_mw_via_ports`|Total generation capacity, in megawatts, of propsed offshore wind power plants with an assembly/manufacturing port in this county. Capacity has NOT been split between multiple port locations, so the sum of this column is deliberately greater than total proposed offshore wind capacity.|original work||
 ||`offshore_wind_interest_type`|Describes the relationship of this county to offshore wind. One of `Proposed lease area`, `Contracted project`,  `Lease area in proximity`, or NULL.|original work||
@@ -141,6 +141,10 @@ The columns prefixed with `renewables_` contain aggregates of both generation an
 * batteries allow arbitrage against tariffs, enabling higher project values
 * batteries are also additional local economic development (more tax base)
 
-### Offshore Wind Capacity is Split Between Cable Landing Locations
+### Offshore Wind
+#### Capacity is Split Between Cable Landing Locations
 
 Some prospective offshore wind power plants propose to connect to the grid at multiple locations on shore. For these projects, the total project capacity is split equally between landing locations and assigned to their respective counties.
+
+#### Use of original data source -- not LBNL's ISO Queue
+We have compiled proposed offshore wind data from industry insiders that we believe to be more certain than the entries in the ISO queues. Unlike the ISO queues, this dataset does not include highly speculative and occasionally duplicative entries. This causes the total proposed MW to be about 1/3 the size of the total from the ISO queue projects.
