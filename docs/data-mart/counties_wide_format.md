@@ -1,6 +1,6 @@
 # counties_wide_format
 
-This table is simply a restructured version of counties_long_format so that each row represents a whole county.
+This table is mostly a restructured version of counties_long_format so that each row represents a whole county. The only other difference is the addition of two columns `offshore_wind_capacity_mw_via_ports` and `offshore_wind_interest_type`. See below for details.
 
 ## Column Descriptions
 
@@ -56,8 +56,10 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 ||`gas_proposed_facility_count`|Number of proposed gas power plants.|LBNL||
 ||`offshore_wind_existing_capacity_mw`|Generation capacity, in megawatts, of existing offshore wind power plants.|PUDL||
 ||`offshore_wind_existing_facility_count`|Number of existing offshore wind power plants.|PUDL||
-||`offshore_wind_proposed_capacity_mw`|Generation capacity, in megawatts, of propsed offshore wind power plants.|LBNL||
+||`offshore_wind_proposed_capacity_mw`|Generation capacity, in megawatts, of propsed offshore wind power plants. When a wind farm has multiple cable landing locations, the capacity is split equally between landing locations.|LBNL||
 ||`offshore_wind_proposed_facility_count`|Number of proposed offshore wind power plants.|LBNL||
+||`offshore_wind_capacity_mw_via_ports`|Total generation capacity, in megawatts, of propsed offshore wind power plants with an assembly/manufacturing port in this county. Capacity has NOT been split between multiple port locations, so the sum of this column is deliberately greater than total proposed offshore wind capacity.|original work||
+||`offshore_wind_interest_type`|Describes the relationship of this county to offshore wind. One of `Proposed lease area`, `Contracted project`,  `Lease area in proximity`, or NULL.|original work||
 ||`oil_existing_capacity_mw`|Generation capacity, in megawatts, of existing oil and diesel power plants.|PUDL||
 ||`oil_existing_co2e_tonnes_per_year`|Annual CO2 equivalent emissions from existing oil power plants, in metric tonnes.|derived from PUDL||
 ||`oil_existing_facility_count`|Number of existing oil power plants.|PUDL||
@@ -127,7 +129,7 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 
 ## Modeling Decisions
 
-This is a restructured version of counties_long_format. See the entry for that table for more background:
+With the exception of the two columns mentioned above, this is a restructured version of counties_long_format. See the entry for that table for more background:
 {% page-ref page="counties_long_format.md" %}
 The following are in addition to, not instead of, those modeling decisions.
 
@@ -138,3 +140,7 @@ The columns prefixed with `renewables_` contain aggregates of both generation an
 * batteries increase capacity factors of wind & solar plants
 * batteries allow arbitrage against tariffs, enabling higher project values
 * batteries are also additional local economic development (more tax base)
+
+### Offshore Wind Capacity is Split Between Cable Landing Locations
+
+Some prospective offshore wind power plants propose to connect to the grid at multiple locations on shore. For these projects, the total project capacity is split equally between landing locations and assigned to their respective counties.
