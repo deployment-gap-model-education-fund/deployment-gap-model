@@ -140,11 +140,3 @@ The columns prefixed with `renewables_` contain aggregates of both generation an
 * batteries increase capacity factors of wind & solar plants
 * batteries allow arbitrage against tariffs, enabling higher project values
 * batteries are also additional local economic development (more tax base)
-
-### Offshore Wind
-#### Capacity is Split Between Cable Landing Locations
-
-Some prospective offshore wind power plants propose to connect to the grid at multiple locations on shore. For these projects, the total project capacity is split equally between landing locations and assigned to their respective counties.
-
-#### Use of original data source -- not LBNL's ISO Queue
-We have compiled proposed offshore wind data from industry insiders that we believe to be more certain than the entries in the ISO queues. Unlike the ISO queues, this dataset does not include highly speculative and occasionally duplicative entries. This causes the total proposed MW to be about 1/3 the size of the total from the ISO queue projects.
