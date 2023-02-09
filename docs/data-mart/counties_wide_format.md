@@ -57,7 +57,7 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 ||`offshore_wind_existing_capacity_mw`|Generation capacity, in megawatts, of existing offshore wind power plants.|PUDL||
 ||`offshore_wind_existing_facility_count`|Number of existing offshore wind power plants.|PUDL||
 ||`offshore_wind_proposed_capacity_mw`|Generation capacity, in megawatts, of propsed offshore wind power plants. When a wind farm has multiple cable landing locations, the capacity is split equally between landing locations. Note that this is the only proposed capacity column NOT sourced from LBNL.|original work||
-||`offshore_wind_proposed_facility_count`|Number of proposed offshore wind power plants.|LBNL||
+||`offshore_wind_proposed_facility_count`|Number of proposed offshore wind power plants.|original work||
 ||`offshore_wind_capacity_mw_via_ports`|Total generation capacity, in megawatts, of propsed offshore wind power plants with an assembly/manufacturing port in this county. Capacity has NOT been split between multiple port locations, so the sum of this column is deliberately greater than total proposed offshore wind capacity.|original work||
 ||`offshore_wind_interest_type`|Describes the relationship of this county to offshore wind. One of `Proposed lease area`, `Contracted project`,  `Lease area in proximity`, or NULL.|original work||
 ||`oil_existing_capacity_mw`|Generation capacity, in megawatts, of existing oil and diesel power plants.|PUDL||
