@@ -115,13 +115,14 @@ def _convert_linear_expr_to_constant(values: pd.Series, x_meters=151.0) -> pd.Se
 
 
 def _replace_linear_definitions_with_constants(
-    values: pd.Series, value_types: pd.Series
+    values: pd.Series, value_types: pd.Series, new_type="meters"
 ) -> None:
     is_linear = values.str.contains(r"\+", regex=True).fillna(False)
     err_msg = "Assumption violation: expected all linear setbacks to be defined in terms of max tip height."
     assert value_types.loc[is_linear].eq("max tip height multiplier").all(), err_msg
     replacements = _convert_linear_expr_to_constant(values.loc[is_linear])
     values.update(replacements.astype(values.dtype))
+    value_types.loc[is_linear] = new_type
     return
 
 
