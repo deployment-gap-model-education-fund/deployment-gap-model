@@ -34,10 +34,13 @@ by same project developer if project is less than 40 acres in size". It is possi
 make sparse fields for all those conditions but is beyond the scope of this data model.
 """
 
+from functools import partial, reduce
+from operator import or_
 from typing import Sequence
 
 import numpy as np
 import pandas as pd
+from scipy.optimize import root_scalar
 
 # from dbcp.schemas import TABLE_SCHEMAS
 from dbcp.transform.helpers import add_county_fips_with_backup_geocoding
@@ -202,6 +205,7 @@ def _simplify_solar_units(units: pd.Series) -> pd.Series:
             "meter": "meters",
             "megawatt": "megawatts",
             "n/a": np.nan,
+            "maximum structure height": "maximum structure height multiplier",
         },
         inplace=True,
     )
@@ -211,6 +215,21 @@ def _simplify_solar_units(units: pd.Series) -> pd.Series:
 def _manual_local_wind_corrections(local_wind: pd.DataFrame) -> None:
     # Note: this function edits raw_ values
     # It should be called first in the transform order.
+
+    # correct multipliers that are actually setbacks in meters.
+    erroneous_multipliers = local_wind[
+        "raw_units"
+    ].str.lower().str.strip().str.endswith("multiplier") & pd.to_numeric(
+        local_wind["raw_value"], errors="coerce"
+    ).gt(
+        30
+    ).fillna(
+        False
+    )
+    assert (
+        erroneous_multipliers.sum() == 6
+    ), f"Assumption violation: expected 6 erroneous multipliers, got {erroneous_multipliers.sum()}"
+    local_wind.loc[erroneous_multipliers, "raw_units"] = "Meters"
 
     # Completeness
     missing_state = local_wind["raw_state_name"].isna()
@@ -361,21 +380,153 @@ def local_solar_transform(raw_local_solar: pd.DataFrame) -> pd.DataFrame:
     return solar
 
 
+def _convert_sound_to_distance(
+    received_db_target, source_db=106, attenuation_dbm=0.005
+):
+    # Solve this simple sound model: https://www.wkcgroup.com/tools-room/wind-turbine-noise-calculator/
+    def received_db_func(r):
+        return source_db - 10 * np.log10(2 * np.pi * r * r) - attenuation_dbm * r
+
+    def objective_func(r):  # set equal to 0
+        return received_db_func(r) - received_db_target
+
+    # I used derivatives in a newton method but it kept finding the negative roots, which I don't want.
+    # def objective_func_derivative(r):
+    #     return -20 / (r * np.log(10))- attenuation_dbm
+    # def objective_func_2nd_derivative(r):
+    #     return 20 / np.log(10) * np.power(r, -2)
+    distance = root_scalar(
+        objective_func,
+        # fprime=objective_func_derivative,
+        # fprime2=objective_func_2nd_derivative,
+        bracket=(0.1, 1e5),  # look for positive valued root
+        x0=570,  # near 40dB solution
+        xtol=0.01,  # don't need great accuracy
+        method="brentq",
+        maxiter=100,
+    )
+    if not distance.converged:
+        raise ValueError(
+            f"sound model failed to converge with target {received_db_target} dB and source power {source_db} dB"
+        )
+    return distance.root
+
+
+def _standardize_units_to_distances(
+    nrel_df: pd.DataFrame,
+    rotor_diameter=127.0,
+    hub_height=89.0,
+    solar_height=15 * 12 * 2.54 / 100,  # 15 feet to meters
+) -> pd.DataFrame:
+    # NOTE: solar sound limits really apply to inverters, not to panels.
+    # They are not directly comparable and should be treated separately.
+
+    # Constants used to convert multipliers to constant distances.
+    # Based on reference turbine of 127m rotor diameter, 89m hub height, 3 MW
+    reference_map = {
+        "maximum structure height multiplier": solar_height,
+        "hub height multiplier": hub_height,
+        "max tip height multiplier": hub_height + rotor_diameter / 2 - 1,
+        "rotor diameter multiplier": rotor_diameter,
+        "rotor radius multiplier": rotor_diameter / 2,
+    }
+    unit_map = {key: "meters" for key in reference_map.keys()}
+    unit_map["dba"] = "meters"
+
+    constants = nrel_df["units"].map(reference_map).fillna(1.0)
+    standardized_values = nrel_df["value"].mul(constants).rename("standardized_value")
+    standardized_units = nrel_df["units"].replace(unit_map).rename("standardized_units")
+
+    # solar reference: https://rsginc.com/wp-content/uploads/2021/04/Kaliski-et-al-2020-An-overview-of-sound-from-commercial-photovolteic-facilities.pdf
+    # 2 MW inverter w/ cooling fan ~100dB
+    reference_sound_power_db = {"solar": 100, "wind": 106}
+    for energy_type, source_db in reference_sound_power_db.items():
+        sound_estimate = partial(_convert_sound_to_distance, source_db=source_db)
+        noise_filter = nrel_df["energy_type"].eq(energy_type) & nrel_df["units"].eq(
+            "dba"
+        )
+        noise = nrel_df.loc[noise_filter, "value"].apply(sound_estimate)
+        assert noise.gt(
+            0
+        ).all(), (
+            f"Some converted {energy_type} sound -> distance values are not positive."
+        )
+        standardized_values.loc[noise_filter] = noise
+    return pd.concat([standardized_units, standardized_values], axis=1, copy=False)
+
+
+def _define_bans(nrel_standardized: pd.DataFrame) -> pd.Series:
+    feet_to_meters = 12 * 2.54 / 100
+    # These two values come from anti-renewable advocate literature (John Droz)
+    setback_threshold = (
+        5280 * feet_to_meters - 10
+    )  # 1 mile to meters; -10 for rounding errors
+    sound_threshold = 35  # dbA
+    # These two values come from talking to developers
+    wind_height_threshold = 130  # meters. Normal is 152 as of 2022
+    solar_height_threshold = 9 * feet_to_meters  # 9 feet to meters. Bare minimum
+
+    setback_ban = nrel_standardized["standardized_units"].eq(
+        "meters"
+    ) & nrel_standardized["standardized_value"].ge(setback_threshold)
+    sound_ban = nrel_standardized["units"].eq("dba") & nrel_standardized["value"].le(
+        sound_threshold
+    )
+    wind_height_ban = (
+        nrel_standardized["energy_type"].eq("wind")
+        & nrel_standardized["ordinance_type"].eq("height")
+        & nrel_standardized["standardized_value"].le(wind_height_threshold)
+    )
+    solar_height_ban = (
+        nrel_standardized["energy_type"].eq("solar")
+        & nrel_standardized["ordinance_type"].eq("height")
+        & nrel_standardized["standardized_value"].le(solar_height_threshold)
+    )
+    saturation_ban = nrel_standardized["ordinance_type"].eq("total turbines")
+    de_jure_ban = nrel_standardized["ordinance_type"].eq("banned")
+
+    # fix a known false positive
+    idx = nrel_standardized["raw_comment"].eq("Max hub height 80 meters (263')")
+    assert (
+        idx.sum() == 1
+    ), f"False positive check is poorly defined. Should be one, got {idx.sum()}."
+    wind_height_ban.loc[idx] = False
+
+    is_ban = reduce(
+        or_,
+        (
+            setback_ban,
+            sound_ban,
+            wind_height_ban,
+            solar_height_ban,
+            saturation_ban,
+            de_jure_ban,
+        ),
+    )
+    return is_ban.rename("is_ban")
+
+
+def _add_derived_columns(merged_nrel_dfs: pd.DataFrame) -> pd.DataFrame:
+    standardized = _standardize_units_to_distances(merged_nrel_dfs)
+    nrel = pd.concat(
+        [merged_nrel_dfs, standardized], axis=1, copy=False
+    )  # _define_bans() needs both
+    nrel = pd.concat([nrel, _define_bans(nrel)], axis=1, copy=False)
+    return nrel
+
+
 def transform(nrel_raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """Apply all transforms to raw NREL data.
 
     Args:
-        raw_eip_dfs (Dict[str, pd.DataFrame]): raw EIP data
+        nrel_raw_dfs (Dict[str, pd.DataFrame]): raw NREL data
 
     Returns:
-        Dict[str, pd.DataFrame]: transfomed EIP data for the warehouse
+        Dict[str, pd.DataFrame]: transfomed NREL data for the warehouse
     """
     local_wind = local_wind_transform(nrel_raw_dfs["nrel_local_wind_ordinances"])
     local_solar = local_solar_transform(nrel_raw_dfs["nrel_local_solar_ordinances"])
-    out = {
-        "nrel_local_ordinances": pd.concat(
-            [local_wind, local_solar], axis=0, ignore_index=True, copy=False
-        ),
-    }
+    merged = pd.concat([local_wind, local_solar], axis=0, ignore_index=True, copy=False)
+    out = {"nrel_local_ordinances": _add_derived_columns(merged)}
 
     return out
