@@ -462,13 +462,29 @@ def _define_bans(nrel_standardized: pd.DataFrame) -> pd.DataFrame:
         5280 * FEET_TO_METERS - 10
     )  # 1 mile to meters; -10 for rounding errors
     sound_threshold = 35  # dbA
-    # These two values come from talking to developers
+    # These three values come from talking to developers
     wind_height_threshold = 130  # meters. Normal is 152 as of 2022
     solar_height_threshold = 9 * FEET_TO_METERS  # 9 feet to meters. Bare minimum
+    solar_setback_threshold = 750 * FEET_TO_METERS
 
-    setback_ban = nrel_standardized["standardized_units"].eq(
-        "meters"
-    ) & nrel_standardized["standardized_value"].ge(wind_setback_threshold)
+    wind_setback_ban = (
+        nrel_standardized["standardized_units"].eq("meters")
+        & nrel_standardized["standardized_value"].ge(wind_setback_threshold)
+        & nrel_standardized["energy_type"].eq("wind")
+        # exclude lake/river/appalachian because they are targeted to specific places
+        # so even with large setbacks they don't take up enough land to count as a ban
+        & ~nrel_standardized["ordinance_type"].isin({"water", "appalachian trail"})
+    )
+    solar_setback_ban = (
+        nrel_standardized["standardized_units"].eq("meters")
+        & nrel_standardized["standardized_value"].ge(solar_setback_threshold)
+        & nrel_standardized["energy_type"].eq("solar")
+        # exclusion reasons:
+        # sound: impacts inverters, not panels, so is less impactful
+        # density: distances between solar farms. Not common enough (yet) to be a ban
+        # highways: mostly target specific highways so again not common enough
+        & ~nrel_standardized["ordinance_type"].isin({"sound", "density", "highways"})
+    )
     sound_ban = nrel_standardized["units"].eq("dba") & nrel_standardized["value"].le(
         sound_threshold
     )
@@ -499,7 +515,8 @@ def _define_bans(nrel_standardized: pd.DataFrame) -> pd.DataFrame:
     is_ban = reduce(
         or_,
         (
-            setback_ban,
+            wind_setback_ban,
+            solar_setback_ban,
             sound_ban,
             wind_height_ban,
             solar_height_ban,
