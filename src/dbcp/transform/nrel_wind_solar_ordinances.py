@@ -36,7 +36,7 @@ make sparse fields for all those conditions but is beyond the scope of this data
 
 from functools import partial, reduce
 from operator import or_
-from typing import Sequence
+from typing import Sequence, Union
 
 import numpy as np
 import pandas as pd
@@ -45,8 +45,10 @@ from scipy.optimize import root_scalar
 # from dbcp.schemas import TABLE_SCHEMAS
 from dbcp.transform.helpers import add_county_fips_with_backup_geocoding
 
+FEET_TO_METERS = 12 * 2.54 / 100
 
-def _format_column_names(cols: Sequence[str]) -> list[str]:
+
+def _format_column_names(cols: Union[pd.Index, Sequence[str]]) -> list[str]:
     out = [(col.lower().replace(" ", "_").replace("/", "_or_")) for col in cols]
     return out
 
@@ -61,7 +63,7 @@ def _convert_multivalued_to_extreme_value(
         extreme = split.min(axis=1)
     else:
         extreme = split.max(axis=1)
-    return extreme
+    return extreme  # type: ignore
 
 
 def _replace_multivalued_with_worst_case(
@@ -108,10 +110,9 @@ def _convert_linear_expr_to_constant(values: pd.Series, x_meters=151.0) -> pd.Se
     for col in ["multiplier", "offset"]:
         expr_df.loc[:, col] = pd.to_numeric(expr_df.loc[:, col])
     # unit conversion: feet to meters
-    feet_to_meters = 1 * 12 * 2.54 / 100
     expr_df.loc[:, "offset"] = expr_df.loc[:, "offset"].where(
         expr_df.loc[:, "unit"].str.lower().eq("meters"),
-        expr_df.loc[:, "offset"] * feet_to_meters,
+        expr_df.loc[:, "offset"] * FEET_TO_METERS,
     )
     constant = expr_df["multiplier"] * x_meters + expr_df["offset"]
     return constant
@@ -414,9 +415,9 @@ def _convert_sound_to_distance(
 
 def _standardize_units_to_distances(
     nrel_df: pd.DataFrame,
-    rotor_diameter=127.0,
-    hub_height=89.0,
-    solar_height=15 * 12 * 2.54 / 100,  # 15 feet to meters
+    rotor_diameter_meters=127.0,
+    hub_height_meters=89.0,
+    solar_height_meters=15 * FEET_TO_METERS,
 ) -> pd.DataFrame:
     # NOTE: solar sound limits really apply to inverters, not to panels.
     # They are not directly comparable and should be treated separately.
@@ -424,11 +425,11 @@ def _standardize_units_to_distances(
     # Constants used to convert multipliers to constant distances.
     # Based on reference turbine of 127m rotor diameter, 89m hub height, 3 MW
     reference_map = {
-        "maximum structure height multiplier": solar_height,
-        "hub height multiplier": hub_height,
-        "max tip height multiplier": hub_height + rotor_diameter / 2 - 1,
-        "rotor diameter multiplier": rotor_diameter,
-        "rotor radius multiplier": rotor_diameter / 2,
+        "maximum structure height multiplier": solar_height_meters,
+        "hub height multiplier": hub_height_meters,
+        "max tip height multiplier": hub_height_meters + rotor_diameter_meters / 2 - 1,
+        "rotor diameter multiplier": rotor_diameter_meters,
+        "rotor radius multiplier": rotor_diameter_meters / 2,
     }
     unit_map = {key: "meters" for key in reference_map.keys()}
     unit_map["dba"] = "meters"
@@ -455,20 +456,19 @@ def _standardize_units_to_distances(
     return pd.concat([standardized_units, standardized_values], axis=1, copy=False)
 
 
-def _define_bans(nrel_standardized: pd.DataFrame) -> pd.Series:
-    feet_to_meters = 12 * 2.54 / 100
+def _define_bans(nrel_standardized: pd.DataFrame) -> pd.DataFrame:
     # These two values come from anti-renewable advocate literature (John Droz)
-    setback_threshold = (
-        5280 * feet_to_meters - 10
+    wind_setback_threshold = (
+        5280 * FEET_TO_METERS - 10
     )  # 1 mile to meters; -10 for rounding errors
     sound_threshold = 35  # dbA
     # These two values come from talking to developers
     wind_height_threshold = 130  # meters. Normal is 152 as of 2022
-    solar_height_threshold = 9 * feet_to_meters  # 9 feet to meters. Bare minimum
+    solar_height_threshold = 9 * FEET_TO_METERS  # 9 feet to meters. Bare minimum
 
     setback_ban = nrel_standardized["standardized_units"].eq(
         "meters"
-    ) & nrel_standardized["standardized_value"].ge(setback_threshold)
+    ) & nrel_standardized["standardized_value"].ge(wind_setback_threshold)
     sound_ban = nrel_standardized["units"].eq("dba") & nrel_standardized["value"].le(
         sound_threshold
     )
@@ -483,9 +483,13 @@ def _define_bans(nrel_standardized: pd.DataFrame) -> pd.Series:
         & nrel_standardized["standardized_value"].le(solar_height_threshold)
     )
     saturation_ban = nrel_standardized["ordinance_type"].eq("total turbines")
+    assert saturation_ban.sum() == 3, (
+        f"Assumption violation: there used to be 3 counties with total turbine limits and all of them were saturated."
+        f" There are now {saturation_ban.sum()}. Are they still all saturated? Check the raw_comment."
+    )
     de_jure_ban = nrel_standardized["ordinance_type"].eq("banned")
 
-    # fix a known false positive
+    # fix a known false positive: the only height limit defined on hub height instead of total height
     idx = nrel_standardized["raw_comment"].eq("Max hub height 80 meters (263')")
     assert (
         idx.sum() == 1
@@ -502,8 +506,9 @@ def _define_bans(nrel_standardized: pd.DataFrame) -> pd.Series:
             saturation_ban,
             de_jure_ban,
         ),
-    )
-    return is_ban.rename("is_ban")
+    ).rename("is_ban")
+    is_de_facto_ban = (is_ban & ~de_jure_ban).rename("is_de_facto_ban")
+    return pd.concat([is_ban, is_de_facto_ban], axis=1, copy=False)
 
 
 def _add_derived_columns(merged_nrel_dfs: pd.DataFrame) -> pd.DataFrame:
