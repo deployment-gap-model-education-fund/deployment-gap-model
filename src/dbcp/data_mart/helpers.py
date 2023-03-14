@@ -31,7 +31,9 @@ def _get_state_fips_df(engine: sa.engine.Engine) -> pd.DataFrame:
 
 
 class CountyOpposition(object):
-    """Now that I'm writing this docstring I have no idea why this is a class."""
+    """Combine ordinance information from NREL and Columbia at the county level."""
+
+    # I think this is only a class because of some misguided attempt at caching. Future refactor.
 
     def __init__(  # noqa: D107
         self,
@@ -172,7 +174,28 @@ class CountyOpposition(object):
 
         return recombined
 
-    def agg_to_counties(self, include_state_policies=True) -> pd.DataFrame:
+    def _get_nrel_bans(self) -> pd.DataFrame:
+        # As of 3/14/2023:
+        # 43/707 localities in the dataset are smaller than counties, eg towns.
+        # 14/687 counties in the NREL dataset contain more than one jurisdiction with an ordinance.
+        # 7/114 for counties with a ban.
+        query = """
+        SELECT
+            county_id_fips,
+            bool_or(is_ban AND energy_type = 'solar') as has_solar_ban_nrel,
+            bool_or(is_ban AND energy_type = 'wind') as has_wind_ban_nrel,
+            bool_or(is_de_facto_ban) as has_de_facto_ban_nrel
+        FROM "data_warehouse"."nrel_local_ordinances"
+        -- NOTE: this upscales town-level bans to their containing counties to be consistent with the Columbia dataset.
+        -- Use WHERE geocoded_locality_type = 'county' to restrict to whole-county bans.
+        GROUP BY county_id_fips
+        """
+        df = pd.read_sql(query, self._engine)
+        return df
+
+    def agg_to_counties(
+        self, include_state_policies=True, include_nrel_bans=False
+    ) -> pd.DataFrame:
         """Aggregate local policies, and optionally state policies, to the county level.
 
         Args:
@@ -187,6 +210,9 @@ class CountyOpposition(object):
             opposition = pd.concat([opposition, states_as_counties], axis=0)
         aggregated = self._agg_local_ordinances_to_counties(opposition)
         aggregated["has_ordinance"] = True
+        if include_nrel_bans:
+            nrel = self._get_nrel_bans()
+            aggregated = aggregated.merge(nrel, on="county_id_fips", how="outer")
         return aggregated
 
 

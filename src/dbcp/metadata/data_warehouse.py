@@ -614,6 +614,7 @@ nrel_local_ordinances = Table(
     Column("standardized_units", String),
     Column("standardized_value", Float),
     Column("is_ban", Boolean),
+    Column("is_de_facto_ban", Boolean),
     schema=schema,
 )
 

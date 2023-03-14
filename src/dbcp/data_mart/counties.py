@@ -362,7 +362,7 @@ def _iso_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     grp = iso.groupby(["county_id_fips", "resource_clean"])
     aggs = grp.agg(
         {
-            "co2e_tonnes_per_year": "sum",
+            "co2e_tonnes_per_year": "sum",  # type: ignore
             "capacity_mw": "sum",
             "project_id": "count",
         }
@@ -436,6 +436,12 @@ def _get_ncsl_wind_permitting_df(engine: sa.engine.Engine) -> pd.DataFrame:
 def _add_derived_columns(mart: pd.DataFrame) -> pd.DataFrame:
     out = mart.copy()
     out["has_ordinance"] = out["ordinance"].notna()
+    ban_cols = [
+        "has_ordinance",
+        "has_solar_ban_nrel",
+        "has_wind_ban_nrel",
+    ]
+    out["has_ban"] = out[ban_cols].fillna(False).any(axis=1)
 
     return out
 
@@ -501,6 +507,10 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "ordinance_earliest_year_mentioned",
         "state_permitting_type",
         "state_permitting_text",
+        "has_solar_ban_nrel",
+        "has_wind_ban_nrel",
+        "has_de_facto_ban_nrel",
+        "has_ban",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
     wide = long.pivot(index=idx_cols, columns=col_cols, values=val_cols)
 
@@ -512,7 +522,10 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "_".join(col).strip("_") for col in wide.columns
     ]  # flatten multiindex
 
-    # this is equivalent to left joining _get_county_properties()
+    # this is not equivalent to left joining _get_county_properties() because
+    # long does not have data for every county. _get_county_properties() does.
+    # I think we can replace this with _join_all_counties_to_wide_format but
+    # don't want to do that refactor right this second.
     county_stuff = long.groupby("county_id_fips")[county_level_cols].first()
     wide = wide.join(county_stuff).reset_index()
 
@@ -583,7 +596,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "county_id_fips",
         "state",
         "county",
-        "has_ordinance",
+        "has_ban",
         "state_permitting_type",
         "county_total_co2e_tonnes_per_year",
         "fossil_existing_capacity_mw",
@@ -653,18 +666,22 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "infra_synthetic_fertilizers_proposed_facility_count",
         "infra_synthetic_fertilizers_proposed_nox_tonnes_per_year",
         "infra_synthetic_fertilizers_proposed_pm2_5_tonnes_per_year",
+        "has_ordinance",
         "ordinance",
         "ordinance_earliest_year_mentioned",
         "ordinance_jurisdiction_name",
         "ordinance_jurisdiction_type",
         "state_permitting_text",
+        "has_solar_ban_nrel",
+        "has_wind_ban_nrel",
+        "has_de_facto_ban_nrel",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
     return wide.loc[:, col_order].copy()
 
 
 def create_long_format(
-    postgres_engine: Optional[sa.engine.Engine] = None,
-    pudl_engine: Optional[sa.engine.Engine] = None,
+    postgres_engine: sa.engine.Engine,
+    pudl_engine: sa.engine.Engine,
 ) -> pd.DataFrame:
     """Create the long format county datamart dataframe."""
     all_counties = _get_county_fips_df(postgres_engine)
@@ -701,11 +718,15 @@ def create_long_format(
         "co2e_tonnes_per_year",
         "pm2_5_tonnes_per_year",
         "nox_tonnes_per_year",
-        "has_ordinance",
+        "has_ban",
         "ordinance_jurisdiction_name",
         "ordinance_jurisdiction_type",
+        "has_ordinance",
         "ordinance",
         "ordinance_earliest_year_mentioned",
+        "has_solar_ban_nrel",
+        "has_wind_ban_nrel",
+        "has_de_facto_ban_nrel",
         "state_permitting_type",
         "state_permitting_text",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
@@ -782,7 +803,8 @@ def _get_county_properties(
         engine=postgres_engine, county_fips_df=all_counties, state_fips_df=all_states
     )
     combined_opp = aggregator.agg_to_counties(
-        include_state_policies=include_state_policies
+        include_state_policies=include_state_policies,
+        include_nrel_bans=True,
     )
 
     county_properties = all_counties[["county_name", "county_id_fips"]].merge(
@@ -809,6 +831,9 @@ def _get_county_properties(
 def _join_all_counties_to_wide_format(
     wide_format: pd.DataFrame, county_properties: pd.DataFrame
 ):
+    # this exists to create a row for every county, even if it is all nulls.
+    # The long format data does not include rows for all counties, so
+    # _convert_long_to_wide does not produce a row for each county.
     county_properties = _add_derived_columns(county_properties)
     wide_format_column_order = wide_format.columns.copy()
 
@@ -823,6 +848,10 @@ def _join_all_counties_to_wide_format(
         "ordinance_jurisdiction_name",
         "ordinance_jurisdiction_type",
         "state_permitting_text",
+        "has_solar_ban_nrel",
+        "has_wind_ban_nrel",
+        "has_de_facto_ban_nrel",
+        "has_ban",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
     wide_format_subset = wide_format.drop(columns=county_columns)
     county_properties = county_properties.merge(
