@@ -682,7 +682,8 @@ protected_area_by_county = Table(
     Column(
         "county_id_fips",
         String,
-        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        # This FK should hold but addfips is out of date, even with "2020" data
+        #ForeignKey("data_warehouse.county_fips.county_id_fips"),
         nullable=False,
     ),
     # should move these county-level columns to the counties table
