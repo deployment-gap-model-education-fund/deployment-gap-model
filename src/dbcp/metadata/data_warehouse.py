@@ -668,3 +668,40 @@ offshore_wind_port_association = Table(
     Column("project_id", Integer, primary_key=True),
     schema=schema,
 )
+
+
+#################
+# Federal Lands #
+#################
+
+protected_area_by_county = Table(
+    "protected_area_by_county",
+    metadata,
+    # primary key should be (county_id_fips, id_padus) but PAD-US has no key.
+    # TODO: make a surrogate and assign PK
+    Column(
+        "county_id_fips",
+        String,
+        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        nullable=False,
+    ),
+    # should move these county-level columns to the counties table
+    Column("county_land_area_sq_meters", Float),
+    Column("county_water_area_sq_meters", Float),
+    Column("internal_point_latitude", Float),
+    Column("internal_point_longitude", Float),
+    Column("county_area_coast_clipped_km2", Float),
+    # PAD columns
+    Column("protection_mechanism", String),
+    Column("owner_type", String),
+    Column("owner_name", String),
+    Column("manager_type", String),
+    Column("manager_name", String),
+    Column("designation_type_standardized", String),
+    Column("designation_type_local", String),
+    Column("name_padus", String),
+    Column("gap_status", String),
+    # join columns
+    Column("intersection_area_padus_km2", Float),
+    schema=schema,
+)
