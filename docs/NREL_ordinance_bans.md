@@ -65,17 +65,17 @@ We spoke with developers and researched anti-renewable advocacy literature to id
 
 Thresholds for wind bans:
 
-    * outright bans
-    * 1 mile or greater (~1600 meter) setbacks from structures, property lines, roads, or transmission. Water setbacks were deliberately omitted because those setbacks are typically targeted at single features that developers can reasonably avoid. For reference, a "normal" setback from a property line is about 180 meters; from a residence about 500 meters.
-    * 35 dBA sound level or less. For reference the most restrictive part of the Illinois law is about 47 dBA (at 3AM near a hospital).
-    * 130 meter total turbine height or less (normal is 152+)
-    * 3 counties in Iowa limit the total number of turbines allowed in their county, which are already saturated.
+* outright bans
+* 1 mile or greater (~1600 meter) setbacks from structures, property lines, roads, or transmission. Water setbacks were deliberately omitted because those setbacks are typically targeted at single features that developers can reasonably avoid. For reference, a "normal" setback from a property line is about 180 meters; from a residence about 500 meters.
+* 35 dBA sound level or less. For reference the most restrictive part of the Illinois law is about 47 dBA (at 3AM near a hospital).
+* 130 meter total turbine height or less (normal is 152+)
+* 3 counties in Iowa limit the total number of turbines allowed in their county, which are already saturated.
 
 Thresholds for solar bans:
 
-    * outright bans
-    * 9 feet height limit or less
-    * 750 foot (230 meters) setbacks from structures, property lines, roads, or transmission. Highways were deliberately omitted because, like water setbacks for wind farms, they mostly seemed targeted at specific "scenic byways" that could be reasonably avoided.
-    * 35 dBA sound level or less, copying the value for wind. Note that these restrictions mostly apply to centrally located inverters rather than panels, so are less problematic for solar.
+* outright bans
+* 9 feet height limit or less
+* 750 foot (230 meters) setbacks from structures, property lines, roads, or transmission. Highways were deliberately omitted because, like water setbacks for wind farms, they mostly seemed targeted at specific "scenic byways" that could be reasonably avoided.
+* 35 dBA sound level or less, copying the value for wind. Note that these restrictions mostly apply to centrally located inverters rather than panels, so are less problematic for solar.
 
 In total, 107 counties and townships met at least one of the wind ban criteria. 9 counties and townships met at least one of the solar ban criteria.
