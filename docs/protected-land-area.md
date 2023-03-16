@@ -12,9 +12,9 @@ The GAP (Gap Analysis Project) Status Code describes the degree of restriction o
 
 1. Define our relevant owner/manager agency types. We currently use all federal agencies.
 1. Filter out marine areas and major inland bodies of water. This eliminates approximately 226,000 sq. km (2.3% of all land area).
-1. Aggregate remaining land by the combination of county, GAP Status Code, and the relevant agency types from step 1. This retains all the major information if we want to access it later or adjust our definition of “developable” (see “Data Mart” section below).
+1. Aggregate remaining land by the combination of county, GAP Status Code, and the relevant agency types from step 1. This retains all the major information if we want to access it later or adjust our definition of “developable”.
 
 ## Limitations
 
-1. This analysis removes coastal water areas and major bodies of water from consideration. The method used prioritizes speed over accuracy, so approximately 5 particularly coastal counties such as the Florida Keys will have inaccurate area estimates.
+1. This analysis removes coastal water areas and major bodies of water from consideration. The method used prioritizes speed over accuracy, so approximately 5 particularly coastal counties such as the Florida Keys will have inaccurate area estimates. (details: when calculating land area, we clip both the PAD-US geometries and the Census county TIGER geometries to coastlines using lower resolution 1:500k shapefiles. There will be inconsistency between areas computed with the low-resolution clipped areas vs high-resolution pre-computed areas provided in the TIGER shapefiles. The more coastal a county is, the greater that inconsistency.)
 1. The data coverage of PAD-US is not perfect, and their documentation states that the biggest gaps are with the local data. This shouldn’t have much impact on this particular analysis because it focuses on the federal level, but it sets a limit on what we can do with this data as we go down the hierarchy of government.
