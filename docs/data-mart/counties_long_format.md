@@ -27,6 +27,10 @@ This table provides county-level aggregates by facility type: existing power, pr
 | | `ordinance_jurisdiction_type` | Category of jurisdiction: county, town, or city. "multiple" if more than one jurisdiction type within the county has an ordinance. | derived from RELDI | |
 | | `state_permitting_text` | Summary text of the wind permitting rules of the given state. | NCSL | |
 | | `state_permitting_type` | Category of the state's wind permitting jurisdiction: state, local, or hybrid. | NCSL | |
+| | `has_solar_ban_nrel` | True when a county has banned solar development according to NREL's ordinance database. | NREL | See 'NREL Ordinance Interpretation' section below |
+| | `has_wind_ban_nrel` | True when a county has banned wind development according to NREL's ordinance database. | NREL | See 'NREL Ordinance Interpretation' section below |
+| | `has_de_facto_ban_nrel` | True when a wind/solar ban is based on technical criteria like setback distances, as opposed to an outright ban. | NREL | See 'NREL Ordinance Interpretation' section below |
+| | `has_ban` | True when any of `has_solar_ban_nrel`, `has_wind_ban_nrel`, or `has_ordinance` are True | NREL/RELDI | |
 | Environmental Justice | `total_tracts` | Number of Census tracts contained in this county | Justice40 | |
 | | `justice40_dbcp_index` | Proprietary environmental justice score. See Justice40 section below. | Justice40 | |
 | | `n_distinct_qualifying_tracts` | Number of distinct tracts that meet Justice40's criterion for "disadvantaged" within this county | Justice40 | |
@@ -69,6 +73,16 @@ See the description in the iso\_projects\_long\_format section for details.
 
 When aggregating to the county level, 8 out of 92 (9%) counties (as of January 2022) have multiple associated ordinances. In those cases, the ordinance descriptions have been concatenated together.
 
+### NREL Ordinance Interpretation
+
+See the description in the NREL_ordinance section for details.
+
+{% content-ref url="../NREL_ordinance_bans.md" %}
+[NREL_ordinance_bans.md](../NREL_ordinance_bans.md)
+{% endcontent-ref %}
+
+Additionally, as with the RELDI local ordinance dataset above, some ordinances belong to sub-county level jurisdictions such as townships. In those cases, the ban is propagated up to the entire county when represented in this county-level table.
+
 ### EIP Emissions Aggregates
 
 EIP tracks 7 different types of emissions: CO2e, PM2.5, NOx, VOC, SO2, CO, HAPs. For the sake of simplicity, this table contains only:
@@ -108,11 +122,12 @@ The category weights are:
 | Health    | 0.5    |
 | Workforce | 0.5    |
 
-
 ### Offshore Wind
+
 #### Capacity is Split Between Cable Landing Locations
 
 Some prospective offshore wind power plants propose to connect to the grid at multiple locations on shore. For these projects, the total project capacity is split equally between landing locations and assigned to their respective counties.
 
 #### Use of Original Data Source -- Not LBNL's ISO Queue
+
 We have compiled proposed offshore wind data from industry insiders that we believe to be more certain than the entries in the ISO queues. Unlike the ISO queues, this dataset does not include highly speculative and occasionally duplicative entries. This causes the total proposed MW to be about 1/3 the size of the total from the ISO queue projects.
