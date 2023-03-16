@@ -11,4 +11,5 @@
   * [co2\_dashboard](data-mart/co2\_dashboard.md)
   * [proposed\_power\_dash\_xxx](data-mart/proposed\_power\_dash\_xxx.md)
 * [CO2 Estimation](co2-estimation.md)
+* [NREL Ordinance Interpretation](NREL\_ordinance\_bans.md)
 * [Data Sources](sources/README.md)

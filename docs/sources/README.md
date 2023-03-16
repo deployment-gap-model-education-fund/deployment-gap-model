@@ -10,9 +10,11 @@ This work would not be possible without generous support and open data sharing f
 
 Researchers at Lawrence Berkeley National Lab [compile a dataset](https://emp.lbl.gov/queues) of power plants from the interconnection queues of the 7 ISOs plus the 35 largest non-ISO utilities in the United States. In their own words: "Data from these queues ... provide a general indicator for mid-term trends in developer interest."
 
-## Local Opposition to Renewable Energy via RELDI
+## Local Opposition to Renewable Energy via RELDI and NREL
 
 The Renewable Energy Legal Defense Initiative (RELDI) program at Columbia University has compiled a [dataset of local ordinances](https://climate.law.columbia.edu/content/opposition-renewable-energy-facilities-united-states) that restrict development of wind and solar generation throughout the United States. The authors have generously provided us with interim updates in a machine readable format.
+
+NREL has also compiled a detailed, machine-readable [dataset of wind and solar ordinances](https://www.nrel.gov/news/program/2022/nrel-releases-comprehensive-databases-of-local-ordinances-for-siting-wind-solar-energy-projects.html).
 
 ## Fossil Fuel Infrastructure via EIP
 
