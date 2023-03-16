@@ -152,6 +152,9 @@ counties_wide_format = Table(
     Column("has_wind_ban_nrel", Boolean),
     Column("has_de_facto_ban_nrel", Boolean),
     Column("has_ban", Boolean),
+    Column("unprotected_land_area_km2", Float),
+    Column("federal_fraction_unprotected_land", Float),
+    Column("county_land_area_km2", Float),
     schema=schema,
 )
 
@@ -350,5 +353,8 @@ counties_long_format = Table(
     Column("has_wind_ban_nrel", Boolean),
     Column("has_de_facto_ban_nrel", Boolean),
     Column("has_ban", Boolean),
+    Column("unprotected_land_area_km2", Float),
+    Column("federal_fraction_unprotected_land", Float),
+    Column("county_land_area_km2", Float),
     schema=schema,
 )

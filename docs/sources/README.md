@@ -23,3 +23,7 @@ The [Environmental Integrity Project (EIP)](https://environmentalintegrity.org/)
 ## Wind Energy Permitting Jurisdiction via NCSL
 
 The National Conference of State Legislatures (NCSL) compiled a [dataset](https://www.ncsl.org/research/energy/state-wind-energy-siting.aspx) describing which jurisdictions hold siting authority over wind energy projects.
+
+## Federal Land Ownership via USGS
+
+The USGS [Protected Area Database](https://www.usgs.gov/programs/gap-analysis-project/science/protected-areas) (PAD) is America’s official national inventory of U.S. terrestrial and marine protected areas. The database contains a trove of information about each tract of land, including the specific owner, managing agency, and degree of development restriction. The full details are in their [data dictionary](https://d9-wret.s3.us-west-2.amazonaws.com/assets/palladium/production/s3fs-public/media/files/PADUS_Standard_Tables_1.xlsx).

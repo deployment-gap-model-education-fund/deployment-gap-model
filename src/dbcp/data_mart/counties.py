@@ -511,6 +511,9 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "has_wind_ban_nrel",
         "has_de_facto_ban_nrel",
         "has_ban",
+        "unprotected_land_area_km2",
+        "federal_fraction_unprotected_land",
+        "county_land_area_km2",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
     wide = long.pivot(index=idx_cols, columns=col_cols, values=val_cols)
 
@@ -675,6 +678,9 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "has_solar_ban_nrel",
         "has_wind_ban_nrel",
         "has_de_facto_ban_nrel",
+        "unprotected_land_area_km2",
+        "federal_fraction_unprotected_land",
+        "county_land_area_km2",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
     return wide.loc[:, col_order].copy()
 
@@ -729,6 +735,9 @@ def create_long_format(
         "has_de_facto_ban_nrel",
         "state_permitting_type",
         "state_permitting_text",
+        "unprotected_land_area_km2",
+        "federal_fraction_unprotected_land",
+        "county_land_area_km2",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
     return out.loc[:, col_order]
 
@@ -779,6 +788,66 @@ def _get_offshore_wind_extra_cols(engine: sa.engine.Engine) -> pd.DataFrame:
     return df
 
 
+def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
+    query = """
+    select
+        county_id_fips,
+        gap_status,
+        manager_type,
+        intersection_area_padus_km2,
+        county_land_area_sq_meters / 1000000 as county_land_area_km2,
+        county_area_coast_clipped_km2
+    from data_warehouse.protected_area_by_county
+    """
+    pad = pd.read_sql(query, postgres_engine)
+    # county_land_area is the high accuracy value
+    # county_area_coast_clipped is the consistent value (consistent with clipped PAD-US)
+    # I use the consistent value to calculate ratio, then pair that ratio
+    #  with the accurate land area in the data mart
+    county_areas = pad.groupby("county_id_fips")[
+        ["county_land_area_km2", "county_area_coast_clipped_km2"]
+    ].first()
+    is_developable = pad["gap_status"].str.match("^[34]")
+    is_federally_managed = pad["manager_type"] == "Federal"
+
+    federal_developable = (
+        pad.loc[is_developable & is_federally_managed, :]
+        .groupby("county_id_fips")["intersection_area_padus_km2"]
+        .sum()
+        .rename("fed_dev")
+    )
+    un_developable = (
+        pad.loc[~is_developable, :]
+        .groupby("county_id_fips")["intersection_area_padus_km2"]
+        .sum()
+        .rename("protected")
+    )
+    areas = pd.concat(
+        [county_areas, federal_developable, un_developable], axis=1, join="outer"
+    )
+    areas.loc[:, ["fed_dev", "protected"]].fillna(0, inplace=True)
+    areas["unprotected_land_area_km2"] = (
+        areas["county_area_coast_clipped_km2"] - areas["protected"]
+    )
+    areas["federal_fraction_unprotected_land"] = (
+        areas["fed_dev"] / areas["unprotected_land_area_km2"]
+    )
+    out_cols = [
+        "unprotected_land_area_km2",
+        "federal_fraction_unprotected_land",
+        "county_land_area_km2",
+    ]
+    correlated_rounding_errors = areas["federal_fraction_unprotected_land"].gt(1)
+    assert (
+        correlated_rounding_errors.sum() == 1
+    ), f"Expected 1 bad rounding error, got {correlated_rounding_errors.sum()}"
+    areas.loc[
+        correlated_rounding_errors, "federal_fraction_unprotected_land"
+    ] = 1.0  # manually clip
+
+    return areas.loc[:, out_cols].copy()
+
+
 def _get_county_properties(
     postgres_engine: sa.engine.Engine,
     include_state_policies=False,
@@ -798,6 +867,8 @@ def _get_county_properties(
     all_counties = _get_county_fips_df(postgres_engine)
     all_states = _get_state_fips_df(postgres_engine)
     env_justice = _get_env_justice_df(postgres_engine)
+    fed_lands = _get_federal_land_fraction(postgres_engine)
+
     # model local opposition
     aggregator = CountyOpposition(
         engine=postgres_engine, county_fips_df=all_counties, state_fips_df=all_states
@@ -822,6 +893,12 @@ def _get_county_properties(
     )
     county_properties = county_properties.merge(
         env_justice, on="county_id_fips", how="left", validate="1:1"
+    )
+    # NOTE: the federal lands dataset uses 2022 FIPS codes.
+    # Some (02063) are not present in the rest of the datasets.
+    # Non-matching FIPS are currently dropped.
+    county_properties = county_properties.merge(
+        fed_lands, on="county_id_fips", how="left", validate="1:1"
     )
 
     county_properties = county_properties.rename(columns=rename_dict)
@@ -852,6 +929,9 @@ def _join_all_counties_to_wide_format(
         "has_wind_ban_nrel",
         "has_de_facto_ban_nrel",
         "has_ban",
+        "unprotected_land_area_km2",
+        "federal_fraction_unprotected_land",
+        "county_land_area_km2",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
     wide_format_subset = wide_format.drop(columns=county_columns)
     county_properties = county_properties.merge(

@@ -149,6 +149,14 @@ def etl_offshore_wind() -> dict[str, pd.DataFrame]:
     return offshore_transformed_dfs
 
 
+def etl_protected_area_by_county() -> dict[str, pd.DataFrame]:
+    """ETL the PAD-US intersection with TIGER county geometries."""
+    source_path = Path("/app/data/raw/padus_intersect_counties.parquet")
+    raw_df = dbcp.extract.protected_area_by_county.extract(source_path)
+    transformed = dbcp.transform.protected_area_by_county.transform(raw_df)
+    return transformed
+
+
 def etl(args):
     """Run dbc ETL."""
     # Setup postgres
@@ -160,6 +168,7 @@ def etl(args):
     GEOCODER_CACHE.reduce_size()
 
     etl_funcs = {
+        "protected_area_by_county": etl_protected_area_by_county,
         "offshore_wind": etl_offshore_wind,
         "justice40_tracts": etl_justice40,
         "nrel_wind_solar_ordinances": etl_nrel_ordinances,
