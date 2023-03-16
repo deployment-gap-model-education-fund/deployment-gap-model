@@ -611,6 +611,10 @@ nrel_local_ordinances = Table(
     Column("geocoded_locality_name", String),
     Column("geocoded_locality_type", String),
     Column("geocoded_containing_county", String),
+    Column("standardized_units", String),
+    Column("standardized_value", Float),
+    Column("is_ban", Boolean),
+    Column("is_de_facto_ban", Boolean),
     schema=schema,
 )
 

@@ -99,6 +99,10 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 ||`ordinance_jurisdiction_type`|Category of jurisdiction: county, town, or city. "multiple" if more than one jurisdiction type within the county has an ordinance.|derived from RELDI||
 ||`state_permitting_text`|Summary text of the wind permitting rules of the given state.|NCSL||
 ||`state_permitting_type`|Category of the state's wind permitting jurisdiction: state, local, or hybrid.|NCSL||
+||`has_solar_ban_nrel`|True when a county has banned solar development according to NREL's ordinance database.|NREL|See 'NREL Ordinance Interpretation' section below|
+||`has_wind_ban_nrel`|True when a county has banned wind development according to NREL's ordinance database.|NREL|See 'NREL Ordinance Interpretation' section below|
+||`has_de_facto_ban_nrel`|True when a wind/solar ban is based on technical criteria like setback distances, as opposed to an outright ban.|NREL|See 'NREL Ordinance Interpretation' section below|
+||`has_ban`|True when any of `has_solar_ban_nrel`, `has_wind_ban_nrel`, or `has_ordinance` are True|NREL/RELDI||
 |Environmental Justice|`total_tracts`|Number of Census tracts contained in this county|Justice40||
 ||`justice40_dbcp_index`|Proprietary environmental justice score. See Justice40 section below.|Justice40||
 ||`n_distinct_qualifying_tracts`|Number of distinct tracts that meet Justice40's criterion for "disadvantaged" within this county|Justice40||
@@ -129,7 +133,7 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 
 ## Modeling Decisions
 
-With the exception of the two columns mentioned above, this is a restructured version of counties_long_format. See the entry for that table for more background:
+With the exception of the two columns mentioned above, this is a restructured version of counties_long_format. See the entry for that table for description of methodology:
 {% page-ref page="counties_long_format.md" %}
 The following are in addition to, not instead of, those modeling decisions.
 

@@ -148,6 +148,10 @@ counties_wide_format = Table(
     Column("n_tracts_wastewater_low_income_not_students", Integer),
     Column("offshore_wind_capacity_mw_via_ports", Float),
     Column("offshore_wind_interest_type", String),
+    Column("has_solar_ban_nrel", Boolean),
+    Column("has_wind_ban_nrel", Boolean),
+    Column("has_de_facto_ban_nrel", Boolean),
+    Column("has_ban", Boolean),
     schema=schema,
 )
 
@@ -342,5 +346,9 @@ counties_long_format = Table(
     Column("n_tracts_unemployment_and_low_high_school", Integer),
     Column("n_tracts_unemployment_less_than_high_school_islands", Integer),
     Column("n_tracts_wastewater_low_income_not_students", Integer),
+    Column("has_solar_ban_nrel", Boolean),
+    Column("has_wind_ban_nrel", Boolean),
+    Column("has_de_facto_ban_nrel", Boolean),
+    Column("has_ban", Boolean),
     schema=schema,
 )
