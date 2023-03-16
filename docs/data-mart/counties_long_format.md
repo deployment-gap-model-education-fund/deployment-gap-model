@@ -17,6 +17,9 @@ This table provides county-level aggregates by facility type: existing power, pr
 | | `state_id_fips` | State FIPS ID | Census | |
 | | `facility_count` | Total number of facilities of the given type, resource, and status in the given county | LBNL (proposed power), PUDL (existing power) or EIP (infrastructure) | |
 | | `capacity_mw` | Total generation capacity of power plants (in Megawatts). | LBNL (proposed power except offshore wind), original research (offshore wind), PUDL (existing power), EIP (infrastructure) | |
+| | `county_land_area_km2` | Total land area of a county with units of square kilometers. | Census TIGER | |
+| | `unprotected_land_area_km2` | Total county area minus protected area (GAP 1 or 2). See Protected Land Area section below. | USGS PAD | |
+| | `federal_fraction_unprotected_land` | Fraction of unprotected land area managed by Federal agencies. | USGS PAD | |
 | Emissions | `co2e_tonnes_per_year` | Metric tonnes of CO2 equivalent emitted per year (100 year warming potential) | derived from PUDL (power) or EIP (infrastructure) | |
 | | `nox_tonnes_per_year` | Metric tonnes of Nitrous Oxides emitted per year | EIP | |
 | | `pm2_5_tonnes_per_year` | Metric tonnes of Particulate Matter (2.5 micron) emitted per year | EIP | |
@@ -131,3 +134,11 @@ Some prospective offshore wind power plants propose to connect to the grid at mu
 #### Use of Original Data Source -- Not LBNL's ISO Queue
 
 We have compiled proposed offshore wind data from industry insiders that we believe to be more certain than the entries in the ISO queues. Unlike the ISO queues, this dataset does not include highly speculative and occasionally duplicative entries. This causes the total proposed MW to be about 1/3 the size of the total from the ISO queue projects.
+
+### Protected Land Area
+
+See here for details:
+
+{% content-ref url="../protected-land-area.md" %}
+[Protected Land Area](../protected-land-area.md)
+{% endcontent-ref %}
