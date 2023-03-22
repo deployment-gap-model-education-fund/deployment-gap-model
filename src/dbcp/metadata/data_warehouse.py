@@ -683,7 +683,7 @@ protected_area_by_county = Table(
         "county_id_fips",
         String,
         # This FK should hold but addfips is out of date, even with "2020" data
-        #ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        # ForeignKey("data_warehouse.county_fips.county_id_fips"),
         nullable=False,
     ),
     # should move these county-level columns to the counties table
@@ -704,5 +704,33 @@ protected_area_by_county = Table(
     Column("gap_status", String),
     # join columns
     Column("intersection_area_padus_km2", Float),
+    schema=schema,
+)
+
+
+######################
+# Energy Communities #
+######################
+
+energy_communities = Table(
+    "energy_communities_by_county",
+    metadata,
+    Column(
+        "county_id_fips",
+        Float,
+        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        primary_key=True,
+    ),
+    Column("raw_county_id_fips", String),
+    Column("raw_county_name", String),
+    Column("raw_state_name", String),
+    Column("n_brownfields", Integer),
+    Column("brownfield_acreage", Float),
+    Column("brownfield_acreage_mean_fill", Float),
+    Column("brownfield_acreage_median_fill", Float),
+    Column("n_coal_qualifying_tracts", Integer),
+    Column("coal_qualifying_area_fraction", Float),
+    Column("qualifies_by_employment_criteria", Boolean),
+    Column("geocoded_locality_name", String),
     schema=schema,
 )

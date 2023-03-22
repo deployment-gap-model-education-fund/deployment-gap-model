@@ -157,6 +157,14 @@ def etl_protected_area_by_county() -> dict[str, pd.DataFrame]:
     return transformed
 
 
+def etl_energy_communities_by_county() -> dict[str, pd.DataFrame]:
+    """ETL RMI's energy communities analysis."""
+    source_path = Path("/app/data/raw/rmi_energy_communities_counties.parquet")
+    raw_df = dbcp.extract.rmi_energy_communities.extract(source_path)
+    transformed = dbcp.transform.rmi_energy_communities.transform(raw_df)
+    return transformed
+
+
 def etl(args):
     """Run dbc ETL."""
     # Setup postgres
@@ -168,6 +176,7 @@ def etl(args):
     GEOCODER_CACHE.reduce_size()
 
     etl_funcs = {
+        "energy_communities_by_county": etl_energy_communities_by_county,
         "protected_area_by_county": etl_protected_area_by_county,
         "offshore_wind": etl_offshore_wind,
         "justice40_tracts": etl_justice40,
