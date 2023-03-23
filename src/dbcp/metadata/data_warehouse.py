@@ -717,7 +717,7 @@ energy_communities = Table(
     metadata,
     Column(
         "county_id_fips",
-        Float,
+        String,
         ForeignKey("data_warehouse.county_fips.county_id_fips"),
         primary_key=True,
     ),
