@@ -104,7 +104,8 @@ def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
 
 def etl_fips_tables() -> Dict[str, pd.DataFrame]:
     """Master state and county FIPS table ETL."""
-    fips = dbcp.extract.fips_tables.extract(vintage=FIPS_CODE_VINTAGE)
+    source_path = Path("/app/data/data_cache/tl_2021_us_county.zip")
+    fips = dbcp.extract.fips_tables.extract(census_path=source_path)
     out = dbcp.transform.fips_tables.transform(fips)
 
     return out
@@ -168,6 +169,7 @@ def etl(args):
     GEOCODER_CACHE.reduce_size()
 
     etl_funcs = {
+        "fips_tables": etl_fips_tables,
         "protected_area_by_county": etl_protected_area_by_county,
         "offshore_wind": etl_offshore_wind,
         "justice40_tracts": etl_justice40,
@@ -177,7 +179,6 @@ def etl(args):
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
         "columbia_local_opp": etl_columbia_local_opp,
-        "fips_tables": etl_fips_tables,
     }
 
     # Extract and transform the data sets
