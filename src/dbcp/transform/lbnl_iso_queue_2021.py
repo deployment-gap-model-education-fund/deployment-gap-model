@@ -435,6 +435,9 @@ def _manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
         ["logan,menard", "il", "logan", "il"],
         ["new york-nj", "ny", "new york", "ny"],
         ["peneobscot/washington", "me", "penobscot", "me"],
+        # workaround for bug in addfips library.
+        # See https://github.com/fitnr/addfips/issues/8
+        ["bedford", "va", "bedford county", "va"],
     ]
     manual_county_state_name_fixes = pd.DataFrame(
         manual_county_state_name_fixes,

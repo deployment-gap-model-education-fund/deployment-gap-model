@@ -10,7 +10,10 @@ import sqlalchemy as sa
 
 from dbcp.data_mart.helpers import _get_county_fips_df, _get_state_fips_df
 from dbcp.helpers import download_pudl_data, get_sql_engine
-from dbcp.transform.helpers import add_county_fips_with_backup_geocoding
+from dbcp.transform.helpers import (
+    add_county_fips_with_backup_geocoding,
+    bedford_addfips_fix,
+)
 
 
 def _get_existing_plant_fuel_data(pudl_engine: sa.engine.Engine) -> pd.DataFrame:
@@ -124,7 +127,7 @@ def _co2_from_mwh(
     return
 
 
-def _estimate_existing_co2e(gen_fuel_923: pd.DataFrame) -> pd.DataFrame:
+def _estimate_existing_co2e(gen_fuel_923: pd.DataFrame) -> pd.Series:
     co2e = _combine_cc_parts(gen_fuel_923)
     _co2_from_mmbtu(co2e)
     _co2_from_mwh(co2e)
@@ -156,6 +159,7 @@ def _get_plant_location_data(pudl_engine: sa.engine.Engine) -> pd.DataFrame:
 def _transfrom_plant_location_data(
     plant_locations: pd.DataFrame, state_table: pd.DataFrame, county_table: pd.DataFrame
 ) -> pd.DataFrame:
+    bedford_addfips_fix(plant_locations)
     plant_locations = add_county_fips_with_backup_geocoding(
         plant_locations, state_col="state", locality_col="county"
     )

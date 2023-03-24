@@ -24,6 +24,12 @@ county_fips = (
         Column("county_id_fips", String, nullable=False, primary_key=True),
         Column("state_id_fips", String, nullable=False),
         Column("county_name", String, nullable=False),
+        Column("county_name_long", String, nullable=False),
+        Column("functional_status", String, nullable=False),
+        Column("land_area_km2", Float, nullable=False),
+        Column("water_area_km2", Float, nullable=False),
+        Column("centroid_latitude", Float, nullable=False),
+        Column("centroid_longitude", Float, nullable=False),
         schema=schema,
     ),
 )
@@ -483,7 +489,12 @@ mcoe = Table(
     Column("winter_estimated_capability_mw", Float),
     Column("zip_code", Integer),
     Column("state_id_fips", String),
-    Column("county_id_fips", String),
+    Column(
+        "county_id_fips",
+        String,
+        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        nullable=True,
+    ),
     schema=schema,
 )
 
@@ -607,7 +618,12 @@ nrel_local_ordinances = Table(
     Column("value", Float),
     Column("energy_type", String),
     Column("state_id_fips", String),
-    Column("county_id_fips", String),
+    Column(
+        "county_id_fips",
+        String,
+        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        nullable=True,
+    ),
     Column("geocoded_locality_name", String),
     Column("geocoded_locality_type", String),
     Column("geocoded_containing_county", String),
@@ -648,7 +664,12 @@ offshore_wind_locations = Table(
     Column("why_of_interest", String),
     Column("priority", String),
     Column("notes", String),
-    Column("county_id_fips", String),
+    Column(
+        "county_id_fips",
+        String,
+        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        nullable=True,
+    ),
     Column("geocoded_locality_name", String),
     Column("geocoded_locality_type", String),
     Column("geocoded_containing_county", String),
@@ -686,11 +707,6 @@ protected_area_by_county = Table(
         # ForeignKey("data_warehouse.county_fips.county_id_fips"),
         nullable=False,
     ),
-    # should move these county-level columns to the counties table
-    Column("county_land_area_sq_meters", Float),
-    Column("county_water_area_sq_meters", Float),
-    Column("internal_point_latitude", Float),
-    Column("internal_point_longitude", Float),
     Column("county_area_coast_clipped_km2", Float),
     # PAD columns
     Column("protection_mechanism", String),
