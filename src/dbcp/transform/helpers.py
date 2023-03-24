@@ -390,3 +390,16 @@ def replace_value_with_count_validation(
 
     df.loc[matches, col] = replacement
     return
+
+
+def bedford_addfips_fix(df, state_col="state", county_col="county") -> None:
+    """Workaround to fix addfips data problem.
+
+    addfips includes Bedford City, VA in its county database even though it was
+    absorbed by Bedford County, VA in 2013. Its FIPS code no longer exists.
+    """
+    # workaround for addfips Bedford, VA problem
+    is_va = df[state_col].str.lower().isin({"va", "virginia"})
+    is_bedford = df[county_col].str.lower().str.startswith("bedford")
+    df.loc[is_va & is_bedford, county_col] = "Bedford County"
+    return

@@ -10,7 +10,7 @@ import dbcp
 from dbcp.constants import FIPS_CODE_VINTAGE
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.metadata.data_warehouse import metadata
-from dbcp.transform.helpers import GEOCODER_CACHE
+from dbcp.transform.helpers import GEOCODER_CACHE, bedford_addfips_fix
 from pudl.helpers import add_fips_ids as _add_fips_ids
 from pudl.output.pudltabl import PudlTabl
 
@@ -79,7 +79,11 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
 
     mcoe = pudl_out.mcoe(all_gens=True)
     # add FIPS
-    filled_location = mcoe.loc[:, ["state", "county"]].fillna("")
+    # workaround for addfips Bedford, VA problem
+    bedford_addfips_fix(mcoe)
+    filled_location = mcoe.loc[:, ["state", "county"]].fillna(
+        ""
+    )  # copy; don't want to fill actual table
     fips = _add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
     mcoe = pd.concat(
         [mcoe, fips[["state_id_fips", "county_id_fips"]]], axis=1, copy=False

@@ -45,7 +45,14 @@ def local_opposition(
     county_opp = aggregator.agg_to_counties(include_state_policies=False)
 
     # bring in county names and state_id_fips
-    county_opp = county_opp.merge(county_fips_df, on="county_id_fips", copy=False)
+    subset = [
+        "county_id_fips",
+        "state_id_fips",
+        "county_name",
+    ]
+    county_opp = county_opp.merge(
+        county_fips_df[subset], on="county_id_fips", copy=False
+    )
     county_opp = county_opp.merge(
         state_fips_df, on="state_id_fips", copy=False
     )  # bring in state name and abbreviation

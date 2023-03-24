@@ -215,7 +215,7 @@ def _get_existing_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
 
 def _get_existing_fossil_plant_co2e_estimates(
     pudl_engine: sa.engine.Engine,
-) -> pd.DataFrame:
+) -> pd.Series:
     gen_fuel_923 = _get_existing_plant_fuel_data(pudl_engine)
     plant_co2e = _estimate_existing_co2e(gen_fuel_923)
     return plant_co2e
@@ -791,13 +791,15 @@ def _get_offshore_wind_extra_cols(engine: sa.engine.Engine) -> pd.DataFrame:
 def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
     query = """
     select
-        county_id_fips,
+        f.county_id_fips,
         gap_status,
         manager_type,
         intersection_area_padus_km2,
-        county_land_area_sq_meters / 1000000 as county_land_area_km2,
+        f.land_area_km2 as county_land_area_km2,
         county_area_coast_clipped_km2
-    from data_warehouse.protected_area_by_county
+    from data_warehouse.protected_area_by_county as pa
+    LEFT JOIN data_warehouse.county_fips as f
+    USING (county_id_fips)
     """
     pad = pd.read_sql(query, postgres_engine)
     # county_land_area is the high accuracy value
