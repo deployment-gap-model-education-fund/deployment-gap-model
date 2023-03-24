@@ -492,8 +492,7 @@ mcoe = Table(
     Column(
         "county_id_fips",
         String,
-        # Can't constrain foreign key until we fix the addfips Bedford City VA problem (51515)
-        # ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        ForeignKey("data_warehouse.county_fips.county_id_fips"),
         nullable=True,
     ),
     schema=schema,
