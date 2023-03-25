@@ -734,7 +734,8 @@ energy_communities = Table(
     Column(
         "county_id_fips",
         String,
-        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        # should have FK on county_fips but EC currently uses 2010 county geometry
+        # ForeignKey("data_warehouse.county_fips.county_id_fips"),
         primary_key=True,
     ),
     Column("raw_county_id_fips", String),

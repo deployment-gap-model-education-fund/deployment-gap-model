@@ -514,6 +514,10 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",
+        "ec_qualifies_via_brownfield",
+        "ec_qualifies_via_coal_closures",
+        "ec_qualifies_via_employment",
+        "ec_qualifies",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
     wide = long.pivot(index=idx_cols, columns=col_cols, values=val_cols)
 
@@ -681,6 +685,10 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",
+        "ec_qualifies_via_brownfield",
+        "ec_qualifies_via_coal_closures",
+        "ec_qualifies_via_employment",
+        "ec_qualifies",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
     return wide.loc[:, col_order].copy()
 
@@ -738,6 +746,10 @@ def create_long_format(
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",
+        "ec_qualifies_via_brownfield",
+        "ec_qualifies_via_coal_closures",
+        "ec_qualifies_via_employment",
+        "ec_qualifies",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
     return out.loc[:, col_order]
 
@@ -850,6 +862,38 @@ def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
     return areas.loc[:, out_cols].copy()
 
 
+def _get_energy_community_qualification(postgres_engine: sa.engine.Engine):
+    brownfield_threshold_acres = 7000  # ~0.1-0.2 MW solar potential per acre
+    coal_area_threshold_km2 = 7000 / 247.105  # acres to km2
+
+    query = [  # nosec - have to use this dumb list structure to put the "nosec" comment inline
+        f"""
+    WITH
+    ec as (
+        SELECT
+            ec.county_id_fips,
+            brownfield_acreage_mean_fill > {brownfield_threshold_acres} as ec_qualifies_via_brownfield,
+            (coal_qualifying_area_fraction * fips.land_area_km2) > {coal_area_threshold_km2} as ec_qualifies_via_coal_closures,
+            qualifies_by_employment_criteria as ec_qualifies_via_employment
+        FROM data_warehouse.energy_communities_by_county AS ec
+        LEFT JOIN data_warehouse.county_fips AS fips
+        USING (county_id_fips)
+    )
+    SELECT
+        *,
+        (ec_qualifies_via_brownfield OR
+        ec_qualifies_via_coal_closures OR
+        ec_qualifies_via_employment) as ec_qualifies
+    FROM ec
+    """
+    ][
+        0
+    ]
+    ec = pd.read_sql(query, postgres_engine)
+
+    return ec
+
+
 def _get_county_properties(
     postgres_engine: sa.engine.Engine,
     include_state_policies=False,
@@ -870,6 +914,7 @@ def _get_county_properties(
     all_states = _get_state_fips_df(postgres_engine)
     env_justice = _get_env_justice_df(postgres_engine)
     fed_lands = _get_federal_land_fraction(postgres_engine)
+    ec_counties = _get_energy_community_qualification(postgres_engine)
 
     # model local opposition
     aggregator = CountyOpposition(
@@ -880,9 +925,9 @@ def _get_county_properties(
         include_nrel_bans=True,
     )
 
-    county_properties = all_counties[["county_name", "county_id_fips"]].merge(
-        combined_opp, on="county_id_fips", how="left"
-    )
+    county_properties = all_counties[
+        ["county_name", "county_id_fips", "state_id_fips"]
+    ].merge(combined_opp, on="county_id_fips", how="left")
     county_properties["state_id_fips"] = county_properties["county_id_fips"].str[:2]
     county_properties = county_properties.merge(
         ncsl, on="state_id_fips", how="left", validate="m:1"
@@ -901,6 +946,13 @@ def _get_county_properties(
     # Non-matching FIPS are currently dropped.
     county_properties = county_properties.merge(
         fed_lands, on="county_id_fips", how="left", validate="1:1"
+    )
+
+    # NOTE: the ec dataset uses 2010 FIPS codes.
+    # Some (02261) are not present in the rest of the datasets.
+    # Non-matching FIPS are currently dropped.
+    county_properties = county_properties.merge(
+        ec_counties, on="county_id_fips", how="left", validate="1:1"
     )
 
     county_properties = county_properties.rename(columns=rename_dict)
@@ -934,6 +986,10 @@ def _join_all_counties_to_wide_format(
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",
+        "ec_qualifies_via_brownfield",
+        "ec_qualifies_via_coal_closures",
+        "ec_qualifies_via_employment",
+        "ec_qualifies",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
     wide_format_subset = wide_format.drop(columns=county_columns)
     county_properties = county_properties.merge(
