@@ -34,6 +34,9 @@ This table provides county-level aggregates by facility type: existing power, pr
 | | `has_wind_ban_nrel` | True when a county has banned wind development according to NREL's ordinance database. | NREL | See 'NREL Ordinance Interpretation' section below |
 | | `has_de_facto_ban_nrel` | True when a wind/solar ban is based on technical criteria like setback distances, as opposed to an outright ban. | NREL | See 'NREL Ordinance Interpretation' section below |
 | | `has_ban` | True when any of `has_solar_ban_nrel`, `has_wind_ban_nrel`, or `has_ordinance` are True | NREL/RELDI | |
+| | `ec_qualifies` | True if the county qualifies via employment OR the fraction of qualifying area from coal closures is >= 50% | derived from RMI| |
+| | `ec_coal_closures_area_fraction` | Fraction of county land area that qualifies due to coal mine and generator closures. | RMI | |
+| | `ec_qualifies_via_employment` | True if the county is part of a qualifying Statistical Area based on fossil fuel employment. | RMI | |
 | Environmental Justice | `total_tracts` | Number of Census tracts contained in this county | Justice40 | |
 | | `justice40_dbcp_index` | Proprietary environmental justice score. See Justice40 section below. | Justice40 | |
 | | `n_distinct_qualifying_tracts` | Number of distinct tracts that meet Justice40's criterion for "disadvantaged" within this county | Justice40 | |
@@ -142,3 +145,13 @@ See here for details:
 {% content-ref url="../protected-land-area.md" %}
 [Protected Land Area](../protected-land-area.md)
 {% endcontent-ref %}
+
+### Energy Community Qualification
+
+The Inflation Reduction Act tax credit qualifications are defined at three different spatial resolutions, only one of which directly maps to county boundaries. We reconcile that spatial mismatch as follows:
+
+Fossil employment qualification is defined on Metropolitan Statistical Areas, which are sets of counties. There is a direct mapping from MSAs to counties, so there is no modeling ambiguity here.
+
+Coal closure qualification is defined on the Census tract level. Counties are combinations of Census tracts, so many counties will contain qualifying area but may not completely qualify. We reconcile this by arbitrarily defining a threshold at 50% of county area.
+
+Finally, individual brownfield sites are elligible for tax credits. In the future, we plan to aggregate the total area of qualifying sites, but have not yet implemented this. Brownfield qualification does not yet play any role in our current qualification rubric.
