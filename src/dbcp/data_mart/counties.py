@@ -514,8 +514,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",
-        "ec_qualifies_via_brownfield",
-        "ec_qualifies_via_coal_closures",
+        "ec_coal_closures_area_fraction",
         "ec_qualifies_via_employment",
         "ec_qualifies",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
@@ -685,8 +684,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",
-        "ec_qualifies_via_brownfield",
-        "ec_qualifies_via_coal_closures",
+        "ec_coal_closures_area_fraction",
         "ec_qualifies_via_employment",
         "ec_qualifies",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
@@ -746,8 +744,7 @@ def create_long_format(
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",
-        "ec_qualifies_via_brownfield",
-        "ec_qualifies_via_coal_closures",
+        "ec_coal_closures_area_fraction",
         "ec_qualifies_via_employment",
         "ec_qualifies",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
@@ -860,17 +857,14 @@ def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
 
 
 def _get_energy_community_qualification(postgres_engine: sa.engine.Engine):
-    brownfield_threshold_acres = 7000  # ~0.1-0.2 MW solar potential per acre
-    coal_area_threshold_km2 = 7000 / 247.105  # acres to km2
-
-    query = [  # nosec - have to use this dumb list structure to put the "nosec" comment inline
-        f"""
+    # NOTE: this query contains hardcoded parameters for the
+    # energy communities qualification criteria
+    query = """
     WITH
     ec as (
         SELECT
             ec.county_id_fips,
-            brownfield_acreage_mean_fill > {brownfield_threshold_acres} as ec_qualifies_via_brownfield,
-            (coal_qualifying_area_fraction * fips.land_area_km2) > {coal_area_threshold_km2} as ec_qualifies_via_coal_closures,
+            coal_qualifying_area_fraction as ec_coal_closures_area_fraction,
             qualifies_by_employment_criteria as ec_qualifies_via_employment
         FROM data_warehouse.energy_communities_by_county AS ec
         LEFT JOIN data_warehouse.county_fips AS fips
@@ -878,14 +872,10 @@ def _get_energy_community_qualification(postgres_engine: sa.engine.Engine):
     )
     SELECT
         *,
-        (ec_qualifies_via_brownfield OR
-        ec_qualifies_via_coal_closures OR
+        (ec_coal_closures_area_fraction > 0.5 OR
         ec_qualifies_via_employment) as ec_qualifies
     FROM ec
     """
-    ][
-        0
-    ]
     ec = pd.read_sql(query, postgres_engine)
 
     return ec
@@ -951,6 +941,16 @@ def _get_county_properties(
     county_properties = county_properties.merge(
         ec_counties, on="county_id_fips", how="left", validate="1:1"
     )
+    #  EC data currently only includes counties that have qualifying features.
+    #  Fill in nulls for counties that do not qualify.
+    county_properties.fillna(
+        {
+            "ec_coal_closures_area_fraction": 0.0,
+            "ec_qualifies_via_employment": False,
+            "ec_qualifies": False,
+        },
+        inplace=True,
+    )
 
     county_properties = county_properties.rename(columns=rename_dict)
     return county_properties
@@ -983,8 +983,7 @@ def _join_all_counties_to_wide_format(
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",
-        "ec_qualifies_via_brownfield",
-        "ec_qualifies_via_coal_closures",
+        "ec_coal_closures_area_fraction",
         "ec_qualifies_via_employment",
         "ec_qualifies",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
