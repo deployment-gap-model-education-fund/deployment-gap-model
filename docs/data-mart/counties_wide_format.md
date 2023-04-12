@@ -1,6 +1,6 @@
 # counties_wide_format
 
-This table is simply a restructured version of counties_long_format so that each row represents a whole county.
+This table is mostly a restructured version of counties_long_format so that each row represents a whole county. The only other difference is the addition of two columns `offshore_wind_capacity_mw_via_ports` and `offshore_wind_interest_type`. See below for details.
 
 ## Column Descriptions
 
@@ -22,6 +22,9 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 |Location|`county`|County name|Census||
 ||`state_id_fips`|State FIPS ID|Census||
 ||`state`|US State name|Census||
+||`county_land_area_km2`|Total land area of a county with units of square kilometers.|Census TIGER||
+||`unprotected_land_area_km2`|Total county area minus protected area (GAP 1 or 2). See Protected Land Area section below.|USGS PAD||
+||`federal_fraction_unprotected_land`|Fraction of unprotected land area managed by Federal agencies.|USGS PAD||
 |Resource Aggregates|`county_total_co2e_tonnes_per_year`|Total CO2e emissions, across all sources and both proposed and existing, in metric tonnes per year.|PUDL, LBNL, EIP||
 ||`fossil_existing_capacity_mw`|Generation capacity, in megawatts, of existing fossil power plants.|PUDL||
 ||`fossil_existing_co2e_tonnes_per_year`|Annual CO2 equivalent emissions from existing fossil power plants, in metric tonnes.|derived from PUDL||
@@ -56,8 +59,10 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 ||`gas_proposed_facility_count`|Number of proposed gas power plants.|LBNL||
 ||`offshore_wind_existing_capacity_mw`|Generation capacity, in megawatts, of existing offshore wind power plants.|PUDL||
 ||`offshore_wind_existing_facility_count`|Number of existing offshore wind power plants.|PUDL||
-||`offshore_wind_proposed_capacity_mw`|Generation capacity, in megawatts, of propsed offshore wind power plants.|LBNL||
-||`offshore_wind_proposed_facility_count`|Number of proposed offshore wind power plants.|LBNL||
+||`offshore_wind_proposed_capacity_mw`|Generation capacity, in megawatts, of propsed offshore wind power plants. When a wind farm has multiple cable landing locations, the capacity is split equally between landing locations. Note that this is the only proposed capacity column NOT sourced from LBNL.|original work||
+||`offshore_wind_proposed_facility_count`|Number of proposed offshore wind power plants.|original work||
+||`offshore_wind_capacity_mw_via_ports`|Total generation capacity, in megawatts, of propsed offshore wind power plants with an assembly/manufacturing port in this county. Capacity has NOT been split between multiple port locations, so the sum of this column is deliberately greater than total proposed offshore wind capacity.|original work||
+||`offshore_wind_interest_type`|Describes the relationship of this county to offshore wind. One of `Proposed lease area`, `Contracted project`,  `Lease area in proximity`, or NULL.|original work||
 ||`oil_existing_capacity_mw`|Generation capacity, in megawatts, of existing oil and diesel power plants.|PUDL||
 ||`oil_existing_co2e_tonnes_per_year`|Annual CO2 equivalent emissions from existing oil power plants, in metric tonnes.|derived from PUDL||
 ||`oil_existing_facility_count`|Number of existing oil power plants.|PUDL||
@@ -97,6 +102,10 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 ||`ordinance_jurisdiction_type`|Category of jurisdiction: county, town, or city. "multiple" if more than one jurisdiction type within the county has an ordinance.|derived from RELDI||
 ||`state_permitting_text`|Summary text of the wind permitting rules of the given state.|NCSL||
 ||`state_permitting_type`|Category of the state's wind permitting jurisdiction: state, local, or hybrid.|NCSL||
+||`has_solar_ban_nrel`|True when a county has banned solar development according to NREL's ordinance database.|NREL|See 'NREL Ordinance Interpretation' section below|
+||`has_wind_ban_nrel`|True when a county has banned wind development according to NREL's ordinance database.|NREL|See 'NREL Ordinance Interpretation' section below|
+||`has_de_facto_ban_nrel`|True when a wind/solar ban is based on technical criteria like setback distances, as opposed to an outright ban.|NREL|See 'NREL Ordinance Interpretation' section below|
+||`has_ban`|True when any of `has_solar_ban_nrel`, `has_wind_ban_nrel`, or `has_ordinance` are True|NREL/RELDI||
 |Environmental Justice|`total_tracts`|Number of Census tracts contained in this county|Justice40||
 ||`justice40_dbcp_index`|Proprietary environmental justice score. See Justice40 section below.|Justice40||
 ||`n_distinct_qualifying_tracts`|Number of distinct tracts that meet Justice40's criterion for "disadvantaged" within this county|Justice40||
@@ -127,7 +136,7 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 
 ## Modeling Decisions
 
-This is a restructured version of counties_long_format. See the entry for that table for more background:
+With the exception of the two columns mentioned above, this is a restructured version of counties_long_format. See the entry for that table for description of methodology:
 {% page-ref page="counties_long_format.md" %}
 The following are in addition to, not instead of, those modeling decisions.
 

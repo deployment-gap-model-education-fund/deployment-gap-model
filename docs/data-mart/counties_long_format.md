@@ -6,54 +6,61 @@ This table provides county-level aggregates by facility type: existing power, pr
 
 **Unique Key Column(s):** (`county_id_fips`, `resource_or_sector`, `status`, `facility_type`)
 
-| Subject               | Column                                                            | Description                                                                                                                                                                        | Source                                                               | Notes |
-| --------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ----- |
-| Identifiers           | `county_id_fips`                                                  | County FIPS ID                                                                                                                                                                     | Census                                                               |       |
-|                       | `resource_or_sector`                                              | The fuel type (for power plants) or sector category (for fossil infrastructure facilities)                                                                                         | LBNL (proposed power), PUDL (existing power) or EIP (infrastructure) |       |
-|                       | `status`                                                          | Categorizes a facility as proposed or existing                                                                                                                                     | LBNL (proposed power), PUDL (existing power) or EIP (infrastructure) |       |
-|                       | `facility_type`                                                   | Categorizes a facility as a power plant or fossil infrastructure facility                                                                                                          | LBNL (proposed power), PUDL (existing power) or EIP (infrastructure) |       |
-| Properties            | `state`                                                           | US State name                                                                                                                                                                      | Census                                                               |       |
-|                       | `county`                                                          | County name                                                                                                                                                                        | Census                                                               |       |
-|                       | `state_id_fips`                                                   | State FIPS ID                                                                                                                                                                      | Census                                                               |       |
-|                       | `facility_count`                                                  | Total number of facilities of the given type, resource, and status in the given county                                                                                             | LBNL (proposed power), PUDL (existing power) or EIP (infrastructure) |       |
-|                       | `capacity_mw`                                                     | Total generation capacity of power plants (in Megawatts).                                                                                                                          | LBNL (proposed power), PUDL (existing power) or EIP (infrastructure) |       |
-| Emissions             | `co2e_tonnes_per_year`                                            | Metric tonnes of CO2 equivalent emitted per year (100 year warming potential)                                                                                                      | derived from PUDL (power) or EIP (infrastructure)                    |       |
-|                       | `nox_tonnes_per_year`                                             | Metric tonnes of Nitrous Oxides emitted per year                                                                                                                                   | EIP                                                                  |       |
-|                       | `pm2_5_tonnes_per_year`                                           | Metric tonnes of Particulate Matter (2.5 micron) emitted per year                                                                                                                  | EIP                                                                  |       |
-| Regulatory            | `ordinance`                                                       | Summary text of the local ordinances in the given county, if any.                                                                                                                  | RELDI                                                                |       |
-|                       | `has_ordinance`                                                   | True/false indicator of the presence of any local ordinances in the county.                                                                                                        | derived from RELDI                                                   |       |
-|                       | `ordinance_earliest_year_mentioned`                               | Approximate year the local ordinance was enacted. This was automatically extracted from the ordinance text so is not perfectly accurate.                                           | derived from RELDI                                                   |       |
-|                       | `ordinance_jurisdiction_name`                                     | Name of the jurisdiction with a local ordinance. This is usually a county or town within that county. "multiple" if more than one jurisdiction within the county has an ordinance. | RELDI                                                                |       |
-|                       | `ordinance_jurisdiction_type`                                     | Category of jurisdiction: county, town, or city. "multiple" if more than one jurisdiction type within the county has an ordinance.                                                 | derived from RELDI                                                   |       |
-|                       | `state_permitting_text`                                           | Summary text of the wind permitting rules of the given state.                                                                                                                      | NCSL                                                                 |       |
-|                       | `state_permitting_type`                                           | Category of the state's wind permitting jurisdiction: state, local, or hybrid.                                                                                                     | NCSL                                                                 |       |
-| Environmental Justice | `total_tracts`                                                    | Number of Census tracts contained in this county                                                                                                                                   | Justice40                                                            |       |
-|                       | `justice40_dbcp_index`                                            | Proprietary environmental justice score. See Justice40 section below.                                                                                                              | Justice40                                                            |       |
-|                       | `n_distinct_qualifying_tracts`                                    | Number of distinct tracts that meet Justice40's criterion for "disadvantaged" within this county                                                                                   | Justice40                                                            |       |
-|                       | `n_tracts_agriculture_loss_low_income_not_students`               | Number of tracts with high predicted climate-driven agriculture loss and low income (excepting students)                                                                           | Justice40                                                            |       |
-|                       | `n_tracts_asthma_low_income_not_students`                         | Number of tracts with high asthma rates and low income (excepting students)                                                                                                        | Justice40                                                            |       |
-|                       | `n_tracts_below_poverty_and_low_high_school`                      | Number of tracts with high poverty rates and low high school graduation rates                                                                                                      | Justice40                                                            |       |
-|                       | `n_tracts_below_poverty_line_less_than_high_school_islands`       | Number of tracts with high poverty rates and low high school graduation rates (island territories only)                                                                            | Justice40                                                            |       |
-|                       | `n_tracts_building_loss_low_income_not_students`                  | Number of tracts with high predicted climate-driven building loss and low income (excepting students)                                                                              | Justice40                                                            |       |
-|                       | `n_tracts_diabetes_low_income_not_students`                       | Number of tracts with high diabetes rates and low income (excepting students)                                                                                                      | Justice40                                                            |       |
-|                       | `n_tracts_diesel_particulates_low_income_not_students`            | Number of tracts with high diesel emissions and low income (excepting students)                                                                                                    | Justice40                                                            |       |
-|                       | `n_tracts_energy_burden_low_income_not_students`                  | Number of tracts with high energy burden and low income (excepting students)                                                                                                       | Justice40                                                            |       |
-|                       | `n_tracts_hazardous_waste_proximity_low_income_not_students`      | Number of tracts with close proximity to hazardous waste sites and low income (excepting students)                                                                                 | Justice40                                                            |       |
-|                       | `n_tracts_heart_disease_low_income_not_students`                  | Number of tracts with high heart disease rates and low income (excepting students)                                                                                                 | Justice40                                                            |       |
-|                       | `n_tracts_housing_burden_low_income_not_students`                 | Number of tracts with high housing burden and low income (excepting students)                                                                                                      | Justice40                                                            |       |
-|                       | `n_tracts_lead_paint_and_median_home_price_low_income_not_studen` | Number of tracts with high lead paint exposure, high home prices, and low income (excepting students)                                                                              | Justice40                                                            |       |
-|                       | `n_tracts_life_expectancy_low_income_not_students`                | Number of tracts with low life expectancy and low income (excepting students)                                                                                                      | Justice40                                                            |       |
-|                       | `n_tracts_linguistic_isolation_and_low_high_school`               | Number of tracts with high linguistic isolation and low high school graduation rates                                                                                               | Justice40                                                            |       |
-|                       | `n_tracts_local_to_area_income_ratio_and_low_high_school`         | Number of tracts with low ratios of local to regional income and low high school graduation rates                                                                                  | Justice40                                                            |       |
-|                       | `n_tracts_local_to_area_income_ratio_less_than_high_school_islan` | Number of tracts with low ratios of local to regional income and low high school graduation rates (island territories only)                                                        | Justice40                                                            |       |
-|                       | `n_tracts_pm2_5_low_income_not_students`                          | Number of tracts with high particulate matter pollution and low income (excepting students)                                                                                        | Justice40                                                            |       |
-|                       | `n_tracts_population_loss_low_income_not_students`                | Number of tracts with high predicted climate-driven population loss and low income (excepting students)                                                                            | Justice40                                                            |       |
-|                       | `n_tracts_risk_management_plan_proximity_low_income_not_students` | Number of tracts with close proximity to RMP sites and low income (excepting students)                                                                                             | Justice40                                                            |       |
-|                       | `n_tracts_superfund_proximity_low_income_not_students`            | Number of tracts with close proximity to superfund sites and low income (excepting students)                                                                                       | Justice40                                                            |       |
-|                       | `n_tracts_traffic_low_income_not_students`                        | Number of tracts with high traffic exposure and low income (excepting students)                                                                                                    | Justice40                                                            |       |
-|                       | `n_tracts_unemployment_and_low_high_school`                       | Number of tracts with high unemployment and low high school graduation rates                                                                                                       | Justice40                                                            |       |
-|                       | `n_tracts_unemployment_less_than_high_school_islands`             | Number of tracts with high unemployment and low high school graduation rates (island territories only)                                                                             | Justice40                                                            |       |
-|                       | `n_tracts_wastewater_low_income_not_students`                     | Number of tracts with high wastewater pollution and low income (excepting students)                                                                                                | Justice40                                                            |       |
+| Subject | Column | Description | Source | Notes |
+| ---- | ---- | ---- | ---- | ---- |
+| Identifiers | `county_id_fips` | County FIPS ID | Census | |
+| | `resource_or_sector` | The fuel type (for power plants) or sector category (for fossil infrastructure facilities) | LBNL (proposed power), PUDL (existing power) or EIP (infrastructure) | |
+| | `status` | Categorizes a facility as proposed or existing | LBNL (proposed power), PUDL (existing power) or EIP (infrastructure) | |
+| | `facility_type` | Categorizes a facility as a power plant or fossil infrastructure facility | LBNL (proposed power), PUDL (existing power) or EIP (infrastructure) | |
+| Properties | `state` | US State name | Census | |
+| | `county` | County name | Census | |
+| | `state_id_fips` | State FIPS ID | Census | |
+| | `facility_count` | Total number of facilities of the given type, resource, and status in the given county | LBNL (proposed power), PUDL (existing power) or EIP (infrastructure) | |
+| | `capacity_mw` | Total generation capacity of power plants (in Megawatts). | LBNL (proposed power except offshore wind), original research (offshore wind), PUDL (existing power), EIP (infrastructure) | |
+| | `county_land_area_km2` | Total land area of a county with units of square kilometers. | Census TIGER | |
+| | `unprotected_land_area_km2` | Total county area minus protected area (GAP 1 or 2). See Protected Land Area section below. | USGS PAD | |
+| | `federal_fraction_unprotected_land` | Fraction of unprotected land area managed by Federal agencies. | USGS PAD | |
+| Emissions | `co2e_tonnes_per_year` | Metric tonnes of CO2 equivalent emitted per year (100 year warming potential) | derived from PUDL (power) or EIP (infrastructure) | |
+| | `nox_tonnes_per_year` | Metric tonnes of Nitrous Oxides emitted per year | EIP | |
+| | `pm2_5_tonnes_per_year` | Metric tonnes of Particulate Matter (2.5 micron) emitted per year | EIP | |
+| Regulatory | `ordinance` | Summary text of the local ordinances in the given county, if any. | RELDI | |
+| | `has_ordinance` | True/false indicator of the presence of any local ordinances in the county. | derived from RELDI | |
+| | `ordinance_earliest_year_mentioned` | Approximate year the local ordinance was enacted. This was automatically extracted from the ordinance text so is not perfectly accurate. | derived from RELDI | |
+| | `ordinance_jurisdiction_name` | Name of the jurisdiction with a local ordinance. This is usually a county or town within that county. "multiple" if more than one jurisdiction within the county has an ordinance. | RELDI | |
+| | `ordinance_jurisdiction_type` | Category of jurisdiction: county, town, or city. "multiple" if more than one jurisdiction type within the county has an ordinance. | derived from RELDI | |
+| | `state_permitting_text` | Summary text of the wind permitting rules of the given state. | NCSL | |
+| | `state_permitting_type` | Category of the state's wind permitting jurisdiction: state, local, or hybrid. | NCSL | |
+| | `has_solar_ban_nrel` | True when a county has banned solar development according to NREL's ordinance database. | NREL | See 'NREL Ordinance Interpretation' section below |
+| | `has_wind_ban_nrel` | True when a county has banned wind development according to NREL's ordinance database. | NREL | See 'NREL Ordinance Interpretation' section below |
+| | `has_de_facto_ban_nrel` | True when a wind/solar ban is based on technical criteria like setback distances, as opposed to an outright ban. | NREL | See 'NREL Ordinance Interpretation' section below |
+| | `has_ban` | True when any of `has_solar_ban_nrel`, `has_wind_ban_nrel`, or `has_ordinance` are True | NREL/RELDI | |
+| Environmental Justice | `total_tracts` | Number of Census tracts contained in this county | Justice40 | |
+| | `justice40_dbcp_index` | Proprietary environmental justice score. See Justice40 section below. | Justice40 | |
+| | `n_distinct_qualifying_tracts` | Number of distinct tracts that meet Justice40's criterion for "disadvantaged" within this county | Justice40 | |
+| | `n_tracts_agriculture_loss_low_income_not_students` | Number of tracts with high predicted climate-driven agriculture loss and low income (excepting students) | Justice40 | |
+| | `n_tracts_asthma_low_income_not_students` | Number of tracts with high asthma rates and low income (excepting students) | Justice40 | |
+| | `n_tracts_below_poverty_and_low_high_school` | Number of tracts with high poverty rates and low high school graduation rates | Justice40 | |
+| | `n_tracts_below_poverty_line_less_than_high_school_islands` | Number of tracts with high poverty rates and low high school graduation rates (island territories only) | Justice40 | |
+| | `n_tracts_building_loss_low_income_not_students` | Number of tracts with high predicted climate-driven building loss and low income (excepting students) | Justice40 | |
+| | `n_tracts_diabetes_low_income_not_students` | Number of tracts with high diabetes rates and low income (excepting students) | Justice40 | |
+| | `n_tracts_diesel_particulates_low_income_not_students` | Number of tracts with high diesel emissions and low income (excepting students) | Justice40 | |
+| | `n_tracts_energy_burden_low_income_not_students` | Number of tracts with high energy burden and low income (excepting students) | Justice40 | |
+| | `n_tracts_hazardous_waste_proximity_low_income_not_students` | Number of tracts with close proximity to hazardous waste sites and low income (excepting students) | Justice40 | |
+| | `n_tracts_heart_disease_low_income_not_students` | Number of tracts with high heart disease rates and low income (excepting students) | Justice40 | |
+| | `n_tracts_housing_burden_low_income_not_students` | Number of tracts with high housing burden and low income (excepting students) | Justice40 | |
+| | `n_tracts_lead_paint_and_median_home_price_low_income_not_studen` | Number of tracts with high lead paint exposure, high home prices, and low income (excepting students) | Justice40 | |
+| | `n_tracts_life_expectancy_low_income_not_students` | Number of tracts with low life expectancy and low income (excepting students) | Justice40 | |
+| | `n_tracts_linguistic_isolation_and_low_high_school` | Number of tracts with high linguistic isolation and low high school graduation rates | Justice40 | |
+| | `n_tracts_local_to_area_income_ratio_and_low_high_school` | Number of tracts with low ratios of local to regional income and low high school graduation rates | Justice40 | |
+| | `n_tracts_local_to_area_income_ratio_less_than_high_school_islan` | Number of tracts with low ratios of local to regional income and low high school graduation rates (island territories only) | Justice40 | |
+| | `n_tracts_pm2_5_low_income_not_students` | Number of tracts with high particulate matter pollution and low income (excepting students) | Justice40 | |
+| | `n_tracts_population_loss_low_income_not_students` | Number of tracts with high predicted climate-driven population loss and low income (excepting students) | Justice40 | |
+| | `n_tracts_risk_management_plan_proximity_low_income_not_students` | Number of tracts with close proximity to RMP sites and low income (excepting students) | Justice40 | |
+| | `n_tracts_superfund_proximity_low_income_not_students` | Number of tracts with close proximity to superfund sites and low income (excepting students) | Justice40 | |
+| | `n_tracts_traffic_low_income_not_students` | Number of tracts with high traffic exposure and low income (excepting students) | Justice40 | |
+| | `n_tracts_unemployment_and_low_high_school` | Number of tracts with high unemployment and low high school graduation rates | Justice40 | |
+| | `n_tracts_unemployment_less_than_high_school_islands` | Number of tracts with high unemployment and low high school graduation rates (island territories only) | Justice40 | |
+| | `n_tracts_wastewater_low_income_not_students` | Number of tracts with high wastewater pollution and low income (excepting students) | Justice40 | |
 
 ## Modeling Decisions
 
@@ -68,6 +75,16 @@ See the description in the iso\_projects\_long\_format section for details.
 {% endcontent-ref %}
 
 When aggregating to the county level, 8 out of 92 (9%) counties (as of January 2022) have multiple associated ordinances. In those cases, the ordinance descriptions have been concatenated together.
+
+### NREL Ordinance Interpretation
+
+See the description in the NREL_ordinance section for details.
+
+{% content-ref url="../NREL_ordinance_bans.md" %}
+[NREL_ordinance_bans.md](../NREL_ordinance_bans.md)
+{% endcontent-ref %}
+
+Additionally, as with the RELDI local ordinance dataset above, some ordinances belong to sub-county level jurisdictions such as townships. In those cases, the ban is propagated up to the entire county when represented in this county-level table.
 
 ### EIP Emissions Aggregates
 
@@ -107,3 +124,21 @@ The category weights are:
 | Housing   | 0.5    |
 | Health    | 0.5    |
 | Workforce | 0.5    |
+
+### Offshore Wind
+
+#### Capacity is Split Between Cable Landing Locations
+
+Some prospective offshore wind power plants propose to connect to the grid at multiple locations on shore. For these projects, the total project capacity is split equally between landing locations and assigned to their respective counties.
+
+#### Use of Original Data Source -- Not LBNL's ISO Queue
+
+We have compiled proposed offshore wind data from industry insiders that we believe to be more certain than the entries in the ISO queues. Unlike the ISO queues, this dataset does not include highly speculative and occasionally duplicative entries. This causes the total proposed MW to be about 1/3 the size of the total from the ISO queue projects.
+
+### Protected Land Area
+
+See here for details:
+
+{% content-ref url="../protected-land-area.md" %}
+[Protected Land Area](../protected-land-area.md)
+{% endcontent-ref %}

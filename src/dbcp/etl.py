@@ -10,7 +10,7 @@ import dbcp
 from dbcp.constants import FIPS_CODE_VINTAGE
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.metadata.data_warehouse import metadata
-from dbcp.transform.helpers import GEOCODER_CACHE
+from dbcp.transform.helpers import GEOCODER_CACHE, bedford_addfips_fix
 from pudl.helpers import add_fips_ids as _add_fips_ids
 from pudl.output.pudltabl import PudlTabl
 
@@ -79,7 +79,11 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
 
     mcoe = pudl_out.mcoe(all_gens=True)
     # add FIPS
-    filled_location = mcoe.loc[:, ["state", "county"]].fillna("")
+    # workaround for addfips Bedford, VA problem
+    bedford_addfips_fix(mcoe)
+    filled_location = mcoe.loc[:, ["state", "county"]].fillna(
+        ""
+    )  # copy; don't want to fill actual table
     fips = _add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
     mcoe = pd.concat(
         [mcoe, fips[["state_id_fips", "county_id_fips"]]], axis=1, copy=False
@@ -104,7 +108,8 @@ def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
 
 def etl_fips_tables() -> Dict[str, pd.DataFrame]:
     """Master state and county FIPS table ETL."""
-    fips = dbcp.extract.fips_tables.extract(vintage=FIPS_CODE_VINTAGE)
+    source_path = Path("/app/data/data_cache/tl_2021_us_county.zip")
+    fips = dbcp.extract.fips_tables.extract(census_path=source_path)
     out = dbcp.transform.fips_tables.transform(fips)
 
     return out
@@ -137,6 +142,26 @@ def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
     return nrel_transformed_dfs
 
 
+def etl_offshore_wind() -> dict[str, pd.DataFrame]:
+    """ETL manually curated offshore wind data."""
+    locations_path = Path("/app/data/raw/offshore_wind_locations.csv")
+    projects_path = Path("/app/data/raw/offshore_wind_projects.csv")
+    raw_offshore_dfs = dbcp.extract.offshore_wind.extract(
+        locations_path=locations_path, projects_path=projects_path
+    )
+    offshore_transformed_dfs = dbcp.transform.offshore_wind.transform(raw_offshore_dfs)
+
+    return offshore_transformed_dfs
+
+
+def etl_protected_area_by_county() -> dict[str, pd.DataFrame]:
+    """ETL the PAD-US intersection with TIGER county geometries."""
+    source_path = Path("/app/data/raw/padus_intersect_counties.parquet")
+    raw_df = dbcp.extract.protected_area_by_county.extract(source_path)
+    transformed = dbcp.transform.protected_area_by_county.transform(raw_df)
+    return transformed
+
+
 def etl(args):
     """Run dbc ETL."""
     # Setup postgres
@@ -148,6 +173,9 @@ def etl(args):
     GEOCODER_CACHE.reduce_size()
 
     etl_funcs = {
+        "fips_tables": etl_fips_tables,
+        "protected_area_by_county": etl_protected_area_by_county,
+        "offshore_wind": etl_offshore_wind,
         "justice40_tracts": etl_justice40,
         "nrel_wind_solar_ordinances": etl_nrel_ordinances,
         "eip_infrastructure": etl_eip_infrastructure,
@@ -155,7 +183,6 @@ def etl(args):
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
         "columbia_local_opp": etl_columbia_local_opp,
-        "fips_tables": etl_fips_tables,
     }
 
     # Extract and transform the data sets

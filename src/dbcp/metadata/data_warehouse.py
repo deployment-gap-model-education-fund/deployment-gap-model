@@ -24,6 +24,12 @@ county_fips = (
         Column("county_id_fips", String, nullable=False, primary_key=True),
         Column("state_id_fips", String, nullable=False),
         Column("county_name", String, nullable=False),
+        Column("county_name_long", String, nullable=False),
+        Column("functional_status", String, nullable=False),
+        Column("land_area_km2", Float, nullable=False),
+        Column("water_area_km2", Float, nullable=False),
+        Column("centroid_latitude", Float, nullable=False),
+        Column("centroid_longitude", Float, nullable=False),
         schema=schema,
     ),
 )
@@ -483,7 +489,12 @@ mcoe = Table(
     Column("winter_estimated_capability_mw", Float),
     Column("zip_code", Integer),
     Column("state_id_fips", String),
-    Column("county_id_fips", String),
+    Column(
+        "county_id_fips",
+        String,
+        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        nullable=True,
+    ),
     schema=schema,
 )
 
@@ -607,9 +618,107 @@ nrel_local_ordinances = Table(
     Column("value", Float),
     Column("energy_type", String),
     Column("state_id_fips", String),
-    Column("county_id_fips", String),
+    Column(
+        "county_id_fips",
+        String,
+        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        nullable=True,
+    ),
     Column("geocoded_locality_name", String),
     Column("geocoded_locality_type", String),
     Column("geocoded_containing_county", String),
+    Column("standardized_units", String),
+    Column("standardized_value", Float),
+    Column("is_ban", Boolean),
+    Column("is_de_facto_ban", Boolean),
+    schema=schema,
+)
+
+
+##########################
+# Offshore Wind Projects #
+##########################
+
+
+offshore_wind_projects = Table(
+    "offshore_wind_projects",
+    metadata,
+    Column("project_id", Integer, primary_key=True),
+    Column("name", String),
+    Column("recipient_state", String),
+    Column("developer", String),
+    Column("status", String),
+    Column("capacity_mw", Float),
+    Column("proposed_completion_year", Integer),
+    Column("notes", String),
+    schema=schema,
+)
+offshore_wind_locations = Table(
+    "offshore_wind_locations",
+    metadata,
+    Column("location_id", Integer, primary_key=True),
+    Column("raw_city", String),
+    Column("raw_state_abbrev", String),
+    Column("raw_county", String),
+    Column("raw_county_fips", String),
+    Column("why_of_interest", String),
+    Column("priority", String),
+    Column("notes", String),
+    Column(
+        "county_id_fips",
+        String,
+        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        nullable=True,
+    ),
+    Column("geocoded_locality_name", String),
+    Column("geocoded_locality_type", String),
+    Column("geocoded_containing_county", String),
+    schema=schema,
+)
+offshore_wind_cable_landing_association = Table(
+    "offshore_wind_cable_landing_association",
+    metadata,
+    Column("location_id", Integer, primary_key=True),
+    Column("project_id", Integer, primary_key=True),
+    schema=schema,
+)
+offshore_wind_port_association = Table(
+    "offshore_wind_port_association",
+    metadata,
+    Column("location_id", Integer, primary_key=True),
+    Column("project_id", Integer, primary_key=True),
+    schema=schema,
+)
+
+
+#################
+# Federal Lands #
+#################
+
+protected_area_by_county = Table(
+    "protected_area_by_county",
+    metadata,
+    # primary key should be (county_id_fips, id_padus) but PAD-US has no key.
+    # TODO: make a surrogate and assign PK
+    Column(
+        "county_id_fips",
+        String,
+        # This FK should hold but addfips is out of date, even with "2020" data
+        # ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        nullable=False,
+    ),
+    Column("county_area_coast_clipped_km2", Float),
+    # PAD columns
+    Column("protection_mechanism", String),
+    Column("owner_type", String),
+    Column("owner_name", String),
+    Column("manager_type", String),
+    Column("manager_name", String),
+    Column("designation_type_standardized", String),
+    Column("designation_type_local", String),
+    Column("name_padus", String),
+    Column("gap_status", String),
+    # join columns
+    Column("intersection_area_padus_km2", Float),
     schema=schema,
 )
