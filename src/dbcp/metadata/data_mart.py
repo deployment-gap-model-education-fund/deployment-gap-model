@@ -155,6 +155,9 @@ counties_wide_format = Table(
     Column("unprotected_land_area_km2", Float),
     Column("federal_fraction_unprotected_land", Float),
     Column("county_land_area_km2", Float),
+    Column("ec_coal_closures_area_fraction", Float),
+    Column("ec_qualifies_via_employment", Boolean),
+    Column("ec_qualifies", Boolean),
     schema=schema,
 )
 
@@ -356,5 +359,8 @@ counties_long_format = Table(
     Column("unprotected_land_area_km2", Float),
     Column("federal_fraction_unprotected_land", Float),
     Column("county_land_area_km2", Float),
+    Column("ec_coal_closures_area_fraction", Float),
+    Column("ec_qualifies_via_employment", Boolean),
+    Column("ec_qualifies", Boolean),
     schema=schema,
 )
