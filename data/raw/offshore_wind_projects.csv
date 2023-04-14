@@ -1,17 +1,19 @@
-﻿Name,Recipient State,Developer,Status,Proposed cable landing,County of Cable Landing,Port Locations,Size (megawatts),Online date,Notes,project_id,Cable Location IDs,Port Location IDs
-Commonwealth Wind,MA,Avangrid,Contracted,Barnstable,Barnstable County,"Somerset,Salem",800,,,1,3,"45, 42"
-Kitty Hawk Offshore,TBD,Avangrid,Permitting underway - no contract,"Virginia Beach,Dare County","Dare County, Virginia Beach",,2500,,,2,"49, 12",
-Vineyard Wind,MA,"Avangrid,CIP",Under construction,Barnstable,Barnstable County,"New Bedford,Salem",800,2023,,3,3,"28, 42"
-South Fork Wind Farm,NY,Orsted,Under construction,East Hampton,Suffolk County,"New London,Montauk",132,2023,,4,13,"29, 25"
-Revolution Wind,"RI,CT",Orsted,Contracted,North Kingstown,Washington County,"North Kingstown,Providence,New London",700,2023,,5,30,"30, 39, 29"
-Ocean Wind  1 & 2,NJ,Orsted,Contracted,"Seaside Park,Ocean City,Forked River","Ocean County, Cape May","Paulsboro,Lower Alloways Creek,Atlantic City",2248,2024,,6,"44, 31, 17","35, 24, 2"
-Mayflower Wind,MA,"Shell,EDPR,Engie",Contracted,"Somerset,Falmouth","Bristol County, Barnstable County",New Bedford,1204,2025,,7,"45, 15",28
-Sunrise Wind,NY,Orsted,Contracted,Brookhaven,Suffolk County,"New London,Port Jefferson,Coeymans",924,2025,,8,6,"29, 37, 9"
-Park City Wind,CT,Avangrid,Contracted,Barnstable,Barnstable County,"Bridgeport,Salem",804,2025,,9,3,"5, 42"
-Coastal Virginia Offshore Wind ,VA,Dominion,Contracted,Virginia Beach,Virginia Beach County,Hampton Roads,2600,2026,,10,49,20
-Momentum Wind,MD,US Wind,Contracted,"Rehoboth Beach,Dagsboro",Sussex Couty,"Sparrows Point,Ocean City",809,2026,,11,"41, 11","46, 32"
-Empire Wind 1 & 2,NY,"Equinor,BP",Contracted,"Brooklyn,Oceanside","Kings County, Nassau County","Brooklyn,Staten Island",2076,2026,,12,"8, 33","8, 47"
-Skipjack Wind 1 & 2,MD,Orsted,Contracted,"Rehoboth Beach,Dagsboro",Sussex Couty,"Sparrows Point,Federalsburg",966,2026,,13,"41, 11","46, 16"
-Marwin,MD,US Wind,Contracted,"Rehoboth Beach,Dagsboro",Sussex Couty,"Sparrows Point,Ocean City",248,2026,,14,"41, 11","46, 32"
-Atlantic Shores,NJ,"Shell,EDF",Contracted,"Atlantic City,Sea Girt","Atlantic County, Monmouth County","Paulsboro,Lower Alloways Creek",1510,2028,,15,"2, 43","35, 24"
-Beacon Wind,NY,"Equinor,BP",Contracted,Queens,Queens County,"Brooklyn,Albany",1230,2028,,16,40,"8, 1"
+﻿Name,Recipient State,Developer,Proposed cable landing,County of Cable Landing,Port Locations,Size (megawatts),Online date,Notes,project_id,Cable Location IDs,Port Location IDs,COP in Process?,Permitting Status,Contracting Status,Construction Status,Overall project status,Lease Areas
+Commonwealth Wind,MA,Avangrid,Barnstable,Barnstable County,"Somerset,Salem",1232,,,1,3,"45, 42",,COP in process,Contract awarded,Site assessment underway,,MA WEA Lease OCS-A 0534
+Kitty Hawk Offshore,TBD,Avangrid,"Virginia Beach,Dare County","Dare County, Virginia Beach",,2500,,,2,"49, 12",,,COP in process,No contract,Site assessment underway,,NC WEA Lease OCS-A 0508
+Vineyard Wind ,MA,"Avangrid,CIP",Barnstable,Barnstable County,"New Bedford,Salem",800,2023,,3,3,"28, 42",,Permitting complete,Contract awarded,Construction underway,,MA WEA Lease OCS-A 0501
+South Fork Wind Farm,NY,"Orsted,Eversource",East Hampton,Suffolk County,"New London,Montauk",132,2023,,4,13,"29, 25",,Permitting complete,Contract awarded,Construction underway,,RI-MA WEA Lease OCS-A 0517
+Revolution Wind,"RI,CT","Orsted,Eversource",North Kingstown,Washington County,"North Kingstown,Providence,New London",700,2023,,5,30,"30, 39, 29",,COP in process,Contract awarded,Site assessment underway,,RI-MA WEA Lease OCS-A 0486
+Ocean Wind  1 & 2,NJ,"Orsted,PSEG","Seaside Park,Ocean City,Forked River","Ocean County, Cape May","Paulsboro,Lower Alloways Creek,Atlantic City",2248,2024,,6,"44, 31, 17","35, 24, 2",,COP in process,Contract awarded,Site assessment underway,,NJ WEA Lease OCS-A 0498
+South Coast Wind,MA,"Shell,EDPR,Engie","Somerset,Falmouth","Bristol County, Barnstable County",New Bedford,1204,2025,,7,"45, 15",28,,COP in process,Contract awarded,Site assessment underway,,MA WEA OCS-A 0521
+Sunrise Wind,NY,"Orsted,Eversource",Brookhaven,Suffolk County,"New London,Port Jefferson,Coeymans",924,2025,,8,6,"29, 37, 9",,COP in process,Contract awarded,Site assessment underway,,RI-MA WEA Lease OCS-A 0487
+Park City Wind,CT,Avangrid,Barnstable,Barnstable County,"Bridgeport,Salem",804,2025,,9,3,"5, 42",,COP in process,Contract awarded,Site assessment underway,,MA WEA Lease OCS-A 0534
+Coastal Virginia Offshore Wind ,VA,Dominion,Virginia Beach,Virginia Beach County,Hampton Roads,2600,2026,,10,49,20,https://www.boem.gov/renewable-energy/state-activities/cvow-construction-and-operations-plan,COP in process,Contract awarded,Site assessment underway,,VA WEA Lease OCS‐A 0483
+Momentum Wind,MD,US Wind,"Rehoboth Beach,Dagsboro",Sussex Couty,"Sparrows Point,Ocean City",809,2026,,11,"41, 11","46, 32",,COP in process,Contract awarded,Site assessment underway,,MD WEA Lease OCS-A 0490
+Empire Wind 1 & 2,NY,"Equinor,BP","Brooklyn,Oceanside","Kings County, Nassau County","Brooklyn,Staten Island",2076,2026,,12,"8, 33","8, 47",,COP in process,Contract awarded,Site assessment underway,,NY WEA Lease OCS-A 0512
+Skipjack Wind 1 & 2,MD,Orsted,"Rehoboth Beach,Dagsboro",Sussex Couty,"Sparrows Point,Federalsburg",966,2026,,13,"41, 11","46, 16",,COP in process,Contract awarded,Site assessment underway,,DE WEA Lease OCS-A 0519
+Marwin,MD,US Wind,"Rehoboth Beach,Dagsboro",Sussex Couty,"Sparrows Point,Ocean City",248,2026,,14,"41, 11","46, 32",,COP in process,Contract awarded,Site assessment underway,,MD WEA Lease OCS-A 0490
+Atlantic Shores,NJ,"Shell,EDF","Atlantic City,Sea Girt","Atlantic County, Monmouth County","Paulsboro,Lower Alloways Creek",1510,2028,,15,"2, 43","35, 24",,COP in process,Contract awarded,Site assessment underway,,NJ WEA Lease OCS-A 0499
+Beacon Wind,NY,"Equinor,BP",Queens,Queens County,"Brooklyn,Albany",1230,2028,,16,40,"8, 1",,Not yet submitted,Contract awarded,Site assessment underway,,MA WEA OCS-A 0520
+Block Island Wind Farm,RI,Orsted,"New Shoreham,Narragansett",,"Providence,Quonset",30,2016,,20,"51, 52","39, 53",,Permitting complete,Contract awarded,Online,,
+Ocean Winds,,,,,,,,,23,,,,,,,,
