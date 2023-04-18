@@ -194,6 +194,11 @@ def etl_epa_avert() -> dict[str, pd.DataFrame]:
     return transformed
 
 
+def etl_gridstatus_isoqueues():
+    """ETL gridstatus ISO queues."""
+    _ = dbcp.extract.gridstatus_isoqueues.extract()
+
+
 def etl(args):
     """Run dbc ETL."""
     # Setup postgres
