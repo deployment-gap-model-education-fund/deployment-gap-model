@@ -137,6 +137,11 @@ def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
     return nrel_transformed_dfs
 
 
+def etl_gridstatus_isoqueues():
+    """ETL gridstatus ISO queues."""
+    _ = dbcp.extract.gridstatus_isoqueues.extract()
+
+
 def etl(args):
     """Run dbc ETL."""
     # Setup postgres
