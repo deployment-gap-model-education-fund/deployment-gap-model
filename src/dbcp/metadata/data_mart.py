@@ -259,6 +259,8 @@ iso_projects_long_format = Table(
     metadata,
     Column("state", String),
     Column("county", String),
+    Column("county_id_fips", String, primary_key=True),
+    Column("resource_clean", String, primary_key=True),
     Column("project_id", Integer, primary_key=True),
     Column("date_proposed_online", DateTime),
     Column("developer", String),
@@ -271,9 +273,7 @@ iso_projects_long_format = Table(
     Column("iso_region", String, nullable=False),
     Column("utility", String),
     Column("capacity_mw", Float),
-    Column("resource_clean", String, primary_key=True),
     Column("state_id_fips", String),
-    Column("county_id_fips", String),
     Column("state_permitting_type", String),
     Column("co2e_tonnes_per_year", Float),
     Column("ordinance_earliest_year_mentioned", Float),
@@ -283,6 +283,8 @@ iso_projects_long_format = Table(
     Column("has_ordinance", Boolean, nullable=False),
     Column("is_hybrid", Boolean, nullable=False),
     Column("resource_class", String),
+    Column("frac_locations_in_county", Float),
+    Column("source", String),
     schema=schema,
 )
 
