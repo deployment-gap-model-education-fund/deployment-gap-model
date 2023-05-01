@@ -28,6 +28,12 @@ def extract(*, locations_path: Path, projects_path: Path) -> dict[str, pd.DataFr
         "Notes": pd.StringDtype(),
         "Cable Location IDs": pd.StringDtype(),
         "Port Location IDs": pd.StringDtype(),
+        "COP in Process?": pd.StringDtype(),
+        "Permitting Status": pd.StringDtype(),
+        "Contracting Status": pd.StringDtype(),
+        "Construction Status": pd.StringDtype(),
+        "Overall project status": pd.StringDtype(),
+        "Lease Areas": pd.StringDtype(),
     }
     locs_dtypes = {
         "City": pd.StringDtype(),

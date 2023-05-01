@@ -21,7 +21,7 @@ from dbcp.data_mart.helpers import (
     _get_state_fips_df,
     _subset_db_columns,
 )
-from dbcp.data_mart.projects import create_data_mart as create_iso_data_mart
+from dbcp.data_mart.projects import create_long_format as create_iso_data_mart
 from dbcp.helpers import get_pudl_engine, get_sql_engine
 
 JUSTICE40_AGGREGATES = pd.read_csv(
@@ -342,7 +342,7 @@ def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
 def _iso_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     # Avoid db dependency order by recreating the df.
     # Could also make an orchestration script.
-    iso = create_iso_data_mart(engine)["iso_projects_long_format"]
+    iso = create_iso_data_mart(engine)
 
     # equivalent SQL query that I translated to pandas to avoid dependency
     # on the data_mart schema (which doesn't yet exist when this function runs)
@@ -351,14 +351,22 @@ def _iso_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
         county_id_fips,
         resource_clean as resource_or_sector,
         count(project_id) as facility_count,
-        sum(co2e_tonnes_per_year) as co2e_tonnes_per_year,
-        sum(capacity_mw) as capacity_mw,
+        sum(co2e_tonnes_per_year * frac_locations_in_county) as co2e_tonnes_per_year,
+        sum(capacity_mw::float * frac_locations_in_county) as capacity_mw,
         'power plant' as facility_type,
         'proposed' as status
     from data_mart.iso_projects_long_format
     group by 1, 2
     ;
     """
+    # Distribute project-level quantities across locations, when there are multiple.
+    # A handful of ISO projects are in multiple counties and the proprietary offshore
+    # wind projects have an entry for each cable landing.
+    # This approximation assumes an equal distribution.
+    iso.loc[:, ["capacity_mw", "co2e_tonnes_per_year"]] = iso.loc[
+        :, ["capacity_mw", "co2e_tonnes_per_year"]
+    ].mul(iso["frac_locations_in_county"], axis=0)
+
     grp = iso.groupby(["county_id_fips", "resource_clean"])
     aggs = grp.agg(
         {
@@ -381,43 +389,6 @@ def _iso_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
         inplace=True,
     )
     return aggs
-
-
-def _get_curated_offshore_wind_df(engine: sa.engine.Engine) -> pd.DataFrame:
-    """Offshore wind with capacity split by cable landing location then aggregated to county.
-
-    Output matches structure of _iso_projects_counties() so we can easily replace
-    the less certain ISO offshore projects with these.
-    """
-    query = """
-    WITH
-    proj_landings AS (
-        SELECT
-            proj."project_id",
-            cable.location_id,
-            locs.county_id_fips,
-            proj."capacity_mw",
-            COUNT(*) OVER(PARTITION BY proj."project_id") AS n_landings
-        FROM "data_warehouse"."offshore_wind_projects" as proj
-        INNER JOIN data_warehouse.offshore_wind_cable_landing_association as cable
-        USING(project_id)
-        INNER JOIN data_warehouse.offshore_wind_locations as locs
-        USING(location_id)
-    )
-    SELECT
-        county_id_fips,
-        'Offshore Wind' as resource_or_sector,
-        count( distinct (project_id)) as facility_count,
-        NULL as co2e_tonnes_per_year,
-        SUM(capacity_mw / n_landings) as capacity_mw,
-        'power plant' as facility_type,
-        'proposed' as status
-    FROM proj_landings
-    GROUP BY 1
-    ;
-    """
-    df = pd.read_sql(query, engine)
-    return df
 
 
 def _get_ncsl_wind_permitting_df(engine: sa.engine.Engine) -> pd.DataFrame:
@@ -700,7 +671,6 @@ def create_long_format(
     all_states = _get_state_fips_df(postgres_engine)
     county_properties = _get_county_properties(postgres_engine=postgres_engine)
     iso = _iso_projects_counties(postgres_engine)
-    curated_offshore = _get_curated_offshore_wind_df(postgres_engine)
     infra = _fossil_infrastructure_counties(postgres_engine)
     existing = _existing_plants_counties(
         pudl_engine=pudl_engine,
@@ -708,10 +678,6 @@ def create_long_format(
         state_fips_table=all_states,
         county_fips_table=all_counties,
     )
-
-    # replace ISO Offshore Wind with curated data
-    iso = iso.loc[iso["resource_or_sector"] != "Offshore Wind", :]
-    iso = pd.concat([iso, curated_offshore], axis=0, ignore_index=True)
 
     # join it all
     out = pd.concat([iso, existing, infra], axis=0, ignore_index=True)
@@ -752,6 +718,13 @@ def create_long_format(
 
 
 def _get_offshore_wind_extra_cols(engine: sa.engine.Engine) -> pd.DataFrame:
+    # create columns that count how much offshore wind capacity is associated
+    # with a particular county:
+    #   1. comes from ports (m:m)
+    #   2. is attributed to a particular interest type (m:1)
+
+    # Note that these aggregates do not divide capacity across the counties. Instead,
+    # they give a sum total of associated capacity.
     query = """
     WITH
     proj_ports AS (
@@ -779,9 +752,9 @@ def _get_offshore_wind_extra_cols(engine: sa.engine.Engine) -> pd.DataFrame:
     interest AS (
         SELECT
             county_id_fips,
-            why_of_interest as offshore_wind_interest_type
+            string_agg(distinct(why_of_interest), ',' order by why_of_interest) as offshore_wind_interest_type
         FROM data_warehouse.offshore_wind_locations as locs
-        GROUP BY 1,2
+        GROUP BY 1
         ORDER BY 1
     )
     SELECT

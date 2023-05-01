@@ -647,10 +647,14 @@ offshore_wind_projects = Table(
     Column("name", String),
     Column("recipient_state", String),
     Column("developer", String),
-    Column("status", String),
     Column("capacity_mw", Float),
     Column("proposed_completion_year", Integer),
     Column("notes", String),
+    Column("permitting_status", String),
+    Column("contracting_status", String),
+    Column("construction_status", String),
+    Column("overall_project_status", String),
+    Column("lease_areas", String),
     schema=schema,
 )
 offshore_wind_locations = Table(
