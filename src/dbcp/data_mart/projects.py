@@ -18,6 +18,8 @@ from dbcp.helpers import get_sql_engine
 def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
     """Get ISO projects.
 
+    PK should be (project_id, county_id_fips, resource_clean), but county_id_fips has nulls.
+
     Note that this duplicates projects that have multiple prospective locations. Use the frac_locations_in_county
     column to allocate capacity and co2e estimates to counties when aggregating.
     Otherwise they will be double-counted.
@@ -90,6 +92,8 @@ def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
 def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame:
     """Get proprietary offshore wind data in a format that imitates the ISO queues.
 
+    PK is (project_id, county_id_fips).
+
     Note that this duplicates projects that have multiple cable landings. Use the frac_locations_in_county
     column to allocate capacity and co2e estimates to counties when aggregating.
     Otherwise they will be double-counted.
@@ -98,7 +102,7 @@ def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame
     WITH
     cable_locs as (
         SELECT
-            "project_id",
+            project_id,
             locs.county_id_fips,
             COUNT(*) OVER(PARTITION BY project_id) AS n_locations
         FROM data_warehouse.offshore_wind_cable_landing_association as cable
@@ -116,7 +120,7 @@ def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame
         FROM cable_locs
         group by 1,2
     )
-    -- join on the project, state, and county stuff
+    -- join the project, state, and county stuff
     SELECT
         assoc.*,
         substr(assoc.county_id_fips, 1, 2) as state_id_fips,
@@ -127,6 +131,7 @@ def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame
         date(proj.proposed_completion_year::text || '-01-01') as date_proposed_online,
         'active' as queue_status,
         'Offshore Wind' as resource_clean,
+        0.0 as co2e_tonnes_per_year,
 
         sfip.state_name as state,
         cfip.county_name as county,
@@ -151,7 +156,10 @@ def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame
 def _replace_iso_offshore_with_proprietary(
     iso_queues: pd.DataFrame, proprietary: pd.DataFrame
 ) -> pd.DataFrame:
-    """Replace offshore wind projects in the ISO queues with proprietary data."""
+    """Replace offshore wind projects in the ISO queues with proprietary data.
+
+    PK should be (source, project_id, county_id_fips, resource_clean), but county_id_fips has nulls.
+    """
     iso_to_keep = iso_queues.loc[iso_queues["resource_clean"] != "Offshore Wind", :]
     out = pd.concat(
         [iso_to_keep, proprietary.assign(source="proprietary")],
@@ -163,6 +171,12 @@ def _replace_iso_offshore_with_proprietary(
 
 
 def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
+    """Restructure the long-format data as a single row per project.
+
+    PK is (source, project_id)
+    1:m relationships are handled by creating multiple columns for each m.
+    Wide format is ugly but it's what the people want.
+    """
     long = long_format.copy()
     # separate generation from storage
     is_storage = long.loc[:, "resource_clean"].str.contains("storage", flags=IGNORECASE)
@@ -172,6 +186,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     storage = long.loc[is_storage, :]
 
     group_keys = ["project_id", "source", "county_id_fips"]
+    # create multiple generation columns
     group = gen.groupby(group_keys, dropna=False)[["generation_type", "capacity_mw"]]
     # first generation source
     rename_dict = {
@@ -189,13 +204,13 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     assert group.nth(2).shape[0] == 0
     gen = pd.concat([gen_1, gen_2], axis=1, copy=False)
 
-    # storage
+    # create storage column
     assert storage.duplicated(subset=group_keys).sum() == 0  # no multi-storage projects
     storage = storage.set_index(group_keys)[["capacity_mw"]].rename(
         columns={"capacity_mw": "storage_capacity_mw"}
     )
 
-    # combine
+    # combine gen and storage cols
     gen_stor = gen.join(storage, how="outer")
     assert (
         len(gen_stor) == long.groupby(group_keys, dropna=False).ngroups
@@ -213,12 +228,32 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         .groupby(group_keys, dropna=False)
         .nth(0)
     )
-    wide = pd.concat([gen_stor, other_cols, co2e], axis=1, copy=False)
+    project_locations = pd.concat([gen_stor, other_cols, co2e], axis=1, copy=False)
+
+    # now create multiple location columns
+    project_keys = ["source", "project_id"]
+    projects = project_locations.reset_index("county_id_fips").groupby(
+        project_keys, dropna=False
+    )
+    loc1 = projects.nth(0).rename(
+        columns={"county_id_fips": "county_id_fips_1", "county": "county_1"}
+    )
+    assert (
+        not loc1.index.to_frame().isna().any().any()
+    ), "Nulls found in project_id or source."
+    loc2 = (
+        projects[["county_id_fips", "county"]]
+        .nth(1)
+        .rename(columns={"county_id_fips": "county_id_fips_2", "county": "county_2"})
+    )
+    assert projects.nth(2).shape[0] == 0, "More than 2 locations found for a project."
+
+    wide = pd.concat([loc1, loc2], axis=1, copy=False)
     wide.sort_index(inplace=True)
     wide.reset_index(inplace=True)
-    # test that the only duplicate projects are due to multiple locations
-    dupes = wide.duplicated(subset=["project_id", "source"], keep=False)
-    assert wide.loc[dupes, "frac_locations_in_county"].ne(1.0).all()
+    wide.rename(
+        columns={"state": "state_1", "state_id_fips": "state_id_fips_1"}, inplace=True
+    )
     wide_col_order = [
         "project_id",
         "project_name",
@@ -226,10 +261,12 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "entity",
         "utility",
         "developer",
-        "state",
-        "county",
-        "state_id_fips",
-        "county_id_fips",
+        "state_1",
+        "state_id_fips_1",
+        "county_1",
+        "county_id_fips_1",
+        "county_2",
+        "county_id_fips_2",
         "resource_class",
         "is_hybrid",
         "generation_type_1",
@@ -250,8 +287,8 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "ordinance_earliest_year_mentioned",
         "ordinance",
         "state_permitting_type",
-        # "source",  doesn't make sense in wide format
-        # "frac_locations_in_county",  internal intermediate
+        "source",
+        # "frac_locations_in_county", not needed in wide format
     ]
     wide = wide.loc[:, wide_col_order]
 
@@ -260,9 +297,12 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
 
 def _add_derived_columns(mart: pd.DataFrame) -> None:
     mart["has_ordinance"] = mart["ordinance"].notna()
-    # This categorizes projects with multiple generation types, but
-    # no storage, as 'hybrid'
-    mart["is_hybrid"] = mart.duplicated("project_id", keep=False)
+    # This categorizes any project with multiple generation or storage types as 'hybrid'
+    mart["is_hybrid"] = (
+        mart.groupby(["source", "project_id", "county_id_fips"])["resource_clean"]
+        .transform("size")
+        .gt(1)
+    )
 
     resource_map = {
         "Battery Storage": "storage",
@@ -304,11 +344,14 @@ def _add_derived_columns(mart: pd.DataFrame) -> None:
     assert len(not_mapped) == 0, f"Unmapped resource type(s): {not_mapped}"
     mart["resource_class"] = mart["resource_clean"].map(resource_map)
 
-    return mart
+    return
 
 
 def create_long_format(engine: sa.engine.Engine) -> pd.DataFrame:
     """Create table of ISO projects in long format.
+
+    PK should be (source, project_id, county_id_fips, resource_clean), but county_id_fips has nulls.
+    So I added a surrogate key.
 
     Note that this duplicates projects with multiple prospective locations. Use the frac_locations_in_county
     column to allocate capacity and co2e estimates to counties when aggregating.
@@ -342,6 +385,9 @@ def create_long_format(engine: sa.engine.Engine) -> pd.DataFrame:
         combined_opp, on="county_id_fips", how="left", validate="m:1"
     )
     _add_derived_columns(long_format)
+    pk = ["source", "project_id", "county_id_fips", "resource_clean"]
+    assert long_format.duplicated(subset=pk).sum() == 0, "Duplicate rows in long format"
+    long_format["surrogate_id"] = range(len(long_format))
     return long_format
 
 

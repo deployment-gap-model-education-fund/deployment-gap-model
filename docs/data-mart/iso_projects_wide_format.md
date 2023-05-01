@@ -4,15 +4,18 @@ Derived from iso_projects_long_format, this table is about individual ISO projec
 
 ## Column Descriptions
 
-**Unique Key Column(s):** `project_id`
+**Unique Key Column(s):** (`source`, `project_id`)
 
 |Subject|Column|Description|Source|Notes|
 |----|----|----|----|----|
 |Identifiers|`project_id`|A unique ID assigned to each project.|derived||
-|Location|`state`|US State name|Census||
-||`county`|County name|Census||
-||`state_id_fips`|State FIPS ID|Census||
-||`county_id_fips`|County FIPS ID|Census||
+||`source`|"iso" or "proprietary" (for offshore wind projects)|derived||
+|Location|`state_1`|US State name of the first location.|Census||
+||`state_id_fips_1`|State FIPS ID of the first location.|Census||
+||`county_1`|County name of the first location.|Census||
+||`county_id_fips_1`|County FIPS ID of the first location.|Census||
+||`county_2`|County name of the second location.|Census||
+||`county_id_fips_2`|County FIPS ID of the second location.|Census||
 |Properties|`project_name`|Name of the project|LBNL||
 ||`iso_region`|Name of the ISO region containing the project. Non-ISO projects are categorized as either Northwest or Southeast by LBNL|LBNL||
 ||`entity`|Similar to iso_region, but non-ISO projects are identified by utility|LBNL||
