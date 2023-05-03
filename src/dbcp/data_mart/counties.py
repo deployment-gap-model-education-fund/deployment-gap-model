@@ -406,7 +406,7 @@ def _get_ncsl_wind_permitting_df(engine: sa.engine.Engine) -> pd.DataFrame:
 
 def _add_derived_columns(mart: pd.DataFrame) -> pd.DataFrame:
     out = mart.copy()
-    out["ordinance_via_reldi"] = out["ordinance"].notna()
+    out["ordinance_via_reldi"] = out["ordinance_text"].notna()
     ban_cols = [
         "ordinance_via_reldi",
         "ordinance_via_solar_nrel",
@@ -474,7 +474,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "ordinance_via_reldi",
         "ordinance_jurisdiction_name",
         "ordinance_jurisdiction_type",
-        "ordinance",
+        "ordinance_text",
         "ordinance_earliest_year_mentioned",
         "state_permitting_type",
         "state_permitting_text",
@@ -644,7 +644,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "infra_synthetic_fertilizers_proposed_nox_tonnes_per_year",
         "infra_synthetic_fertilizers_proposed_pm2_5_tonnes_per_year",
         "ordinance_via_reldi",
-        "ordinance",
+        "ordinance_text",
         "ordinance_earliest_year_mentioned",
         "ordinance_jurisdiction_name",
         "ordinance_jurisdiction_type",
@@ -700,7 +700,7 @@ def create_long_format(
         "ordinance_jurisdiction_name",
         "ordinance_jurisdiction_type",
         "ordinance_via_reldi",
-        "ordinance",
+        "ordinance_text",
         "ordinance_earliest_year_mentioned",
         "ordinance_via_solar_nrel",
         "ordinance_via_wind_nrel",
@@ -944,7 +944,7 @@ def _join_all_counties_to_wide_format(
         "county",
         "ordinance_via_reldi",
         "state_permitting_type",
-        "ordinance",
+        "ordinance_text",
         "ordinance_earliest_year_mentioned",
         "ordinance_jurisdiction_name",
         "ordinance_jurisdiction_type",

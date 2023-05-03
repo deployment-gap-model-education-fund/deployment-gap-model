@@ -303,7 +303,7 @@ local_ordinance = Table(
     metadata,
     Column("raw_state_name", String, nullable=False),
     Column("raw_locality_name", String, nullable=False),
-    Column("ordinance", String, nullable=False),
+    Column("ordinance_text", String, nullable=False),
     Column("year_enacted", Integer),
     Column("energy_type", String),
     Column("source", String),

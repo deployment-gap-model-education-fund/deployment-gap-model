@@ -285,7 +285,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "ordinance_jurisdiction_name",
         "ordinance_jurisdiction_type",
         "ordinance_earliest_year_mentioned",
-        "ordinance",
+        "ordinance_text",
         "state_permitting_type",
         "source",
         # "frac_locations_in_county", not needed in wide format
@@ -296,7 +296,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
 
 
 def _add_derived_columns(mart: pd.DataFrame) -> None:
-    mart["ordinance_via_reldi"] = mart["ordinance"].notna()
+    mart["ordinance_via_reldi"] = mart["ordinance_text"].notna()
     ban_cols = [
         "ordinance_via_reldi",
         "ordinance_via_solar_nrel",
@@ -379,7 +379,9 @@ def create_long_format(engine: sa.engine.Engine) -> pd.DataFrame:
     aggregator = CountyOpposition(
         engine=engine, county_fips_df=all_counties, state_fips_df=all_states
     )
-    combined_opp = aggregator.agg_to_counties(include_state_policies=False, include_nrel_bans=True)
+    combined_opp = aggregator.agg_to_counties(
+        include_state_policies=False, include_nrel_bans=True
+    )
     rename_dict = {
         "geocoded_locality_name": "ordinance_jurisdiction_name",
         "geocoded_locality_type": "ordinance_jurisdiction_type",

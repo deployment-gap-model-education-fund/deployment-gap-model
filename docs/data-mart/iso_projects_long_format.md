@@ -37,6 +37,10 @@ Note that **this duplicates projects with multiple prospective locations.** Use 
 ||`ordinance_earliest_year_mentioned`|Approximate year the local ordinance was enacted. This was automatically extracted from the ordinance text so is not perfectly accurate.|derived from RELDI||
 ||`ordinance_jurisdiction_name`|Name of the jurisdiction with a local ordinance. This is usually a county or town within that county. "multiple" if more than one jurisdiction within the county has an ordinance.|RELDI||
 ||`ordinance_jurisdiction_type`|Category of jurisdiction: county, town, or city. "multiple" if more than one jurisdiction type within the county has an ordinance.|derived from RELDI||
+||`ordinance_via_solar_nrel`|True when a county has banned solar development according to NREL's ordinance database.|NREL|See 'NREL Ordinance Interpretation' section below|
+||`ordinance_via_wind_nrel`|True when a county has banned wind development according to NREL's ordinance database.|NREL|See 'NREL Ordinance Interpretation' section below|
+||`ordinance_via_nrel_is_de_facto`|True when a wind/solar ban is based on technical criteria like setback distances, as opposed to an outright ban.|NREL|See 'NREL Ordinance Interpretation' section below|
+||`ordinance_via_anything`|True when any of `ordinance_via_solar_nrel`, `ordinance_via_wind_nrel`, or `ordinance_via_reldi` are True|NREL/RELDI||
 ||`state_permitting_text`|Summary text of the wind permitting rules of the given state.|NCSL||
 ||`state_permitting_type`|Category of the state's wind permitting jurisdiction: state, local, or hybrid.|NCSL||
 
@@ -81,6 +85,16 @@ ISO projects are only geolocated by state/county. Local ordinances can be either
 The maps in Tableau also reflect this conservative assumption. A more accurate map would require shapefiles of city/town jurisdictions, which is entirely doable but was deemed low priority.
 
 Furthermore, there are 6 state-level laws affecting RE siting in some capacity, but these laws are not included in the scope of local ordinances. The law in NY is pro-RE and the law in ME was repealed. The law in OH simply adds a level of veto power to county jurisdictions. Laws in KS, OR, and CT restrict development on certain types of land; their severity can only be assessed by an expert.
+
+### NREL Ordinance Interpretation
+
+See the description in the NREL_ordinance section for details.
+
+{% content-ref url="../NREL_ordinance_bans.md" %}
+[NREL_ordinance_bans.md](../NREL_ordinance_bans.md)
+{% endcontent-ref %}
+
+Additionally, as with the RELDI local ordinance dataset above, some ordinances belong to sub-county level jurisdictions such as townships. In those cases, the ban is propagated up to the entire county when represented in this county-level table.
 
 ### CO2e Estimates
 

@@ -64,7 +64,7 @@ class CountyOpposition(object):
             "geocoded_locality_name",
             "geocoded_locality_type",
             # 'n_years_mentioned',  # for simplicity, only include one year metric (earliest_year_mentioned)
-            "ordinance",
+            "ordinance_text",
             # 'raw_locality_name',  # drop raw name in favor of canonical one
             # 'raw_state_name',  # drop raw name in favor of canonical one
             # 'state_id_fips',  # will join on 5-digit county FIPS, which includes state
@@ -117,7 +117,7 @@ class CountyOpposition(object):
         states_as_counties["geocoded_locality_type"] = "state"
         rename_dict = {
             "state_name": "geocoded_locality_name",
-            "policy": "ordinance",
+            "policy": "ordinance_text",
         }
         states_as_counties = states_as_counties.rename(columns=rename_dict).drop(
             columns=["state_id_fips"]
@@ -151,8 +151,8 @@ class CountyOpposition(object):
         dupes = ordinances.loc[dupe_counties, :].copy()
         not_dupes = ordinances.loc[~dupe_counties, :].copy()
 
-        dupes["ordinance"] = (
-            dupes["geocoded_locality_name"] + ": " + dupes["ordinance"] + r"\n"
+        dupes["ordinance_text"] = (
+            dupes["geocoded_locality_name"] + ": " + dupes["ordinance_text"] + r"\n"
         )
         grp = dupes.groupby("county_id_fips")
 
@@ -165,7 +165,7 @@ class CountyOpposition(object):
             .mask(n_unique > 1, other="multiple")
         )
 
-        descriptions = grp["ordinance"].sum().str.strip()
+        descriptions = grp["ordinance_text"].sum().str.strip()
 
         agg_dupes = pd.concat([years, localities, descriptions], axis=1).reset_index()
         recombined = pd.concat(
