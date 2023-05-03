@@ -33,7 +33,7 @@ Note that **this duplicates projects with multiple prospective locations.** Use 
 ||`co2e_tonnes_per_year`|Estimate of annual equivalent CO2 emissions of proposed gas plants, in metric tonnes.|derived from LBNL||
 ||`frac_locations_in_county`|Fraction of this project's total locations in this county.|derived||
 |Regulatory|`ordinance`|Summary text of the local ordinances in the given county, if any.|RELDI||
-||`has_ordinance`|True/false indicator of the presence of any local ordinances in the county.|derived from RELDI||
+||`ordinance_via_reldi`|True when a county has banned wind or solar development according to RELDI's ordinance database.|derived from RELDI||
 ||`ordinance_earliest_year_mentioned`|Approximate year the local ordinance was enacted. This was automatically extracted from the ordinance text so is not perfectly accurate.|derived from RELDI||
 ||`ordinance_jurisdiction_name`|Name of the jurisdiction with a local ordinance. This is usually a county or town within that county. "multiple" if more than one jurisdiction within the county has an ordinance.|RELDI||
 ||`ordinance_jurisdiction_type`|Category of jurisdiction: county, town, or city. "multiple" if more than one jurisdiction type within the county has an ordinance.|derived from RELDI||

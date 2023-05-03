@@ -281,7 +281,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "interconnection_status",
         "point_of_interconnection",
         "queue_status",
-        "has_ordinance",
+        "ordinance_via_reldi",
         "ordinance_jurisdiction_name",
         "ordinance_jurisdiction_type",
         "ordinance_earliest_year_mentioned",
@@ -296,7 +296,13 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
 
 
 def _add_derived_columns(mart: pd.DataFrame) -> None:
-    mart["has_ordinance"] = mart["ordinance"].notna()
+    mart["ordinance_via_reldi"] = mart["ordinance"].notna()
+    ban_cols = [
+        "ordinance_via_reldi",
+        "ordinance_via_solar_nrel",
+        "ordinance_via_wind_nrel",
+    ]
+    mart["ordinance_via_anything"] = mart[ban_cols].fillna(False).any(axis=1)
     # This categorizes any project with multiple generation or storage types as 'hybrid'
     mart["is_hybrid"] = (
         mart.groupby(["source", "project_id", "county_id_fips"])["resource_clean"]
@@ -373,7 +379,7 @@ def create_long_format(engine: sa.engine.Engine) -> pd.DataFrame:
     aggregator = CountyOpposition(
         engine=engine, county_fips_df=all_counties, state_fips_df=all_states
     )
-    combined_opp = aggregator.agg_to_counties(include_state_policies=False)
+    combined_opp = aggregator.agg_to_counties(include_state_policies=False, include_nrel_bans=True)
     rename_dict = {
         "geocoded_locality_name": "ordinance_jurisdiction_name",
         "geocoded_locality_type": "ordinance_jurisdiction_type",

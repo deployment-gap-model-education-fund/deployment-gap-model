@@ -35,7 +35,7 @@ Derived from iso_projects_long_format, this table is about individual ISO projec
 ||`co2e_tonnes_per_year`|Estimate of annual equivalent CO2 emissions of proposed gas plants, in metric tonnes.|derived from LBNL||
 |Dates|`date_entered_queue`|The date the project entered the ISO queue.|LBNL||
 ||`date_proposed_online`|The date the developer expects the project to be completed.|LBNL||
-|Regulatory|`has_ordinance`|True/false indicator of the presence of any local ordinances in the county.|derived from RELDI||
+|Regulatory|`ordinance_via_reldi`|True when a county has banned wind or solar development according to RELDI's ordinance database.|derived from RELDI||
 ||`ordinance_earliest_year_mentioned`|Approximate year the local ordinance was enacted. This was automatically extracted from the ordinance text so is not perfectly accurate.|derived from RELDI||
 ||`ordinance_jurisdiction_name`|Name of the jurisdiction with a local ordinance. This is usually a county or town within that county. "multiple" if more than one jurisdiction within the county has an ordinance.|RELDI||
 ||`ordinance_jurisdiction_type`|Category of jurisdiction: county, town, or city. "multiple" if more than one jurisdiction type within the county has an ordinance.|derived from RELDI||

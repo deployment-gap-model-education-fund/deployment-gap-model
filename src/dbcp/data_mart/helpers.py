@@ -182,9 +182,9 @@ class CountyOpposition(object):
         query = """
         SELECT
             county_id_fips,
-            bool_or(is_ban AND energy_type = 'solar') as has_solar_ban_nrel,
-            bool_or(is_ban AND energy_type = 'wind') as has_wind_ban_nrel,
-            bool_or(is_de_facto_ban) as has_de_facto_ban_nrel
+            bool_or(is_ban AND energy_type = 'solar') as ordinance_via_solar_nrel,
+            bool_or(is_ban AND energy_type = 'wind') as ordinance_via_wind_nrel,
+            bool_or(is_de_facto_ban) as ordinance_via_nrel_is_de_facto
         FROM "data_warehouse"."nrel_local_ordinances"
         -- NOTE: this upscales town-level bans to their containing counties to be consistent with the Columbia dataset.
         -- Use WHERE geocoded_locality_type = 'county' to restrict to whole-county bans.
@@ -209,7 +209,7 @@ class CountyOpposition(object):
             states_as_counties = self._represent_state_policy_as_local_ordinances()
             opposition = pd.concat([opposition, states_as_counties], axis=0)
         aggregated = self._agg_local_ordinances_to_counties(opposition)
-        aggregated["has_ordinance"] = True
+        aggregated["ordinance_via_reldi"] = True
         if include_nrel_bans:
             nrel = self._get_nrel_bans()
             aggregated = aggregated.merge(nrel, on="county_id_fips", how="outer")
