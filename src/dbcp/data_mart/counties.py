@@ -412,7 +412,7 @@ def _add_derived_columns(mart: pd.DataFrame) -> pd.DataFrame:
         "ordinance_via_solar_nrel",
         "ordinance_via_wind_nrel",
     ]
-    out["ordinance_via_anything"] = out[ban_cols].fillna(False).any(axis=1)
+    out["ordinance_is_restrictive"] = out[ban_cols].fillna(False).any(axis=1)
 
     return out
 
@@ -481,7 +481,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "ordinance_via_solar_nrel",
         "ordinance_via_wind_nrel",
         "ordinance_via_nrel_is_de_facto",
-        "ordinance_via_anything",
+        "ordinance_is_restrictive",
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",
@@ -573,7 +573,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "county_id_fips",
         "state",
         "county",
-        "ordinance_via_anything",
+        "ordinance_is_restrictive",
         "state_permitting_type",
         "county_total_co2e_tonnes_per_year",
         "fossil_existing_capacity_mw",
@@ -696,7 +696,7 @@ def create_long_format(
         "co2e_tonnes_per_year",
         "pm2_5_tonnes_per_year",
         "nox_tonnes_per_year",
-        "ordinance_via_anything",
+        "ordinance_is_restrictive",
         "ordinance_jurisdiction_name",
         "ordinance_jurisdiction_type",
         "ordinance_via_reldi",
@@ -952,7 +952,7 @@ def _join_all_counties_to_wide_format(
         "ordinance_via_solar_nrel",
         "ordinance_via_wind_nrel",
         "ordinance_via_nrel_is_de_facto",
-        "ordinance_via_anything",
+        "ordinance_is_restrictive",
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",

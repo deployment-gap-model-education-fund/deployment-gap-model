@@ -302,7 +302,7 @@ def _add_derived_columns(mart: pd.DataFrame) -> None:
         "ordinance_via_solar_nrel",
         "ordinance_via_wind_nrel",
     ]
-    mart["ordinance_via_anything"] = mart[ban_cols].fillna(False).any(axis=1)
+    mart["ordinance_is_restrictive"] = mart[ban_cols].fillna(False).any(axis=1)
     # This categorizes any project with multiple generation or storage types as 'hybrid'
     mart["is_hybrid"] = (
         mart.groupby(["source", "project_id", "county_id_fips"])["resource_clean"]
