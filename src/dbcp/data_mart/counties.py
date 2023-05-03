@@ -21,7 +21,7 @@ from dbcp.data_mart.helpers import (
     _get_state_fips_df,
     _subset_db_columns,
 )
-from dbcp.data_mart.projects import create_data_mart as create_iso_data_mart
+from dbcp.data_mart.projects import create_long_format as create_iso_data_mart
 from dbcp.helpers import get_pudl_engine, get_sql_engine
 
 JUSTICE40_AGGREGATES = pd.read_csv(
@@ -342,7 +342,7 @@ def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
 def _iso_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     # Avoid db dependency order by recreating the df.
     # Could also make an orchestration script.
-    iso = create_iso_data_mart(engine)["iso_projects_long_format"]
+    iso = create_iso_data_mart(engine)
 
     # equivalent SQL query that I translated to pandas to avoid dependency
     # on the data_mart schema (which doesn't yet exist when this function runs)
@@ -351,14 +351,22 @@ def _iso_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
         county_id_fips,
         resource_clean as resource_or_sector,
         count(project_id) as facility_count,
-        sum(co2e_tonnes_per_year) as co2e_tonnes_per_year,
-        sum(capacity_mw) as capacity_mw,
+        sum(co2e_tonnes_per_year * frac_locations_in_county) as co2e_tonnes_per_year,
+        sum(capacity_mw::float * frac_locations_in_county) as capacity_mw,
         'power plant' as facility_type,
         'proposed' as status
     from data_mart.iso_projects_long_format
     group by 1, 2
     ;
     """
+    # Distribute project-level quantities across locations, when there are multiple.
+    # A handful of ISO projects are in multiple counties and the proprietary offshore
+    # wind projects have an entry for each cable landing.
+    # This approximation assumes an equal distribution.
+    iso.loc[:, ["capacity_mw", "co2e_tonnes_per_year"]] = iso.loc[
+        :, ["capacity_mw", "co2e_tonnes_per_year"]
+    ].mul(iso["frac_locations_in_county"], axis=0)
+
     grp = iso.groupby(["county_id_fips", "resource_clean"])
     aggs = grp.agg(
         {
@@ -383,43 +391,6 @@ def _iso_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     return aggs
 
 
-def _get_curated_offshore_wind_df(engine: sa.engine.Engine) -> pd.DataFrame:
-    """Offshore wind with capacity split by cable landing location then aggregated to county.
-
-    Output matches structure of _iso_projects_counties() so we can easily replace
-    the less certain ISO offshore projects with these.
-    """
-    query = """
-    WITH
-    proj_landings AS (
-        SELECT
-            proj."project_id",
-            cable.location_id,
-            locs.county_id_fips,
-            proj."capacity_mw",
-            COUNT(*) OVER(PARTITION BY proj."project_id") AS n_landings
-        FROM "data_warehouse"."offshore_wind_projects" as proj
-        INNER JOIN data_warehouse.offshore_wind_cable_landing_association as cable
-        USING(project_id)
-        INNER JOIN data_warehouse.offshore_wind_locations as locs
-        USING(location_id)
-    )
-    SELECT
-        county_id_fips,
-        'Offshore Wind' as resource_or_sector,
-        count( distinct (project_id)) as facility_count,
-        NULL as co2e_tonnes_per_year,
-        SUM(capacity_mw / n_landings) as capacity_mw,
-        'power plant' as facility_type,
-        'proposed' as status
-    FROM proj_landings
-    GROUP BY 1
-    ;
-    """
-    df = pd.read_sql(query, engine)
-    return df
-
-
 def _get_ncsl_wind_permitting_df(engine: sa.engine.Engine) -> pd.DataFrame:
     cols = [
         "description",
@@ -435,13 +406,13 @@ def _get_ncsl_wind_permitting_df(engine: sa.engine.Engine) -> pd.DataFrame:
 
 def _add_derived_columns(mart: pd.DataFrame) -> pd.DataFrame:
     out = mart.copy()
-    out["has_ordinance"] = out["ordinance"].notna()
+    out["ordinance_via_reldi"] = out["ordinance_text"].notna()
     ban_cols = [
-        "has_ordinance",
-        "has_solar_ban_nrel",
-        "has_wind_ban_nrel",
+        "ordinance_via_reldi",
+        "ordinance_via_solar_nrel",
+        "ordinance_via_wind_nrel",
     ]
-    out["has_ban"] = out[ban_cols].fillna(False).any(axis=1)
+    out["ordinance_is_restrictive"] = out[ban_cols].fillna(False).any(axis=1)
 
     return out
 
@@ -500,20 +471,23 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "state_id_fips",
         "state",
         "county",
-        "has_ordinance",
+        "ordinance_via_reldi",
         "ordinance_jurisdiction_name",
         "ordinance_jurisdiction_type",
-        "ordinance",
+        "ordinance_text",
         "ordinance_earliest_year_mentioned",
         "state_permitting_type",
         "state_permitting_text",
-        "has_solar_ban_nrel",
-        "has_wind_ban_nrel",
-        "has_de_facto_ban_nrel",
-        "has_ban",
+        "ordinance_via_solar_nrel",
+        "ordinance_via_wind_nrel",
+        "ordinance_via_nrel_is_de_facto",
+        "ordinance_is_restrictive",
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",
+        "ec_coal_closures_area_fraction",
+        "ec_qualifies_via_employment",
+        "ec_qualifies",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
     wide = long.pivot(index=idx_cols, columns=col_cols, values=val_cols)
 
@@ -599,7 +573,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "county_id_fips",
         "state",
         "county",
-        "has_ban",
+        "ordinance_is_restrictive",
         "state_permitting_type",
         "county_total_co2e_tonnes_per_year",
         "fossil_existing_capacity_mw",
@@ -669,18 +643,21 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "infra_synthetic_fertilizers_proposed_facility_count",
         "infra_synthetic_fertilizers_proposed_nox_tonnes_per_year",
         "infra_synthetic_fertilizers_proposed_pm2_5_tonnes_per_year",
-        "has_ordinance",
-        "ordinance",
+        "ordinance_via_reldi",
+        "ordinance_text",
         "ordinance_earliest_year_mentioned",
         "ordinance_jurisdiction_name",
         "ordinance_jurisdiction_type",
         "state_permitting_text",
-        "has_solar_ban_nrel",
-        "has_wind_ban_nrel",
-        "has_de_facto_ban_nrel",
+        "ordinance_via_solar_nrel",
+        "ordinance_via_wind_nrel",
+        "ordinance_via_nrel_is_de_facto",
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",
+        "ec_coal_closures_area_fraction",
+        "ec_qualifies_via_employment",
+        "ec_qualifies",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
     return wide.loc[:, col_order].copy()
 
@@ -694,7 +671,6 @@ def create_long_format(
     all_states = _get_state_fips_df(postgres_engine)
     county_properties = _get_county_properties(postgres_engine=postgres_engine)
     iso = _iso_projects_counties(postgres_engine)
-    curated_offshore = _get_curated_offshore_wind_df(postgres_engine)
     infra = _fossil_infrastructure_counties(postgres_engine)
     existing = _existing_plants_counties(
         pudl_engine=pudl_engine,
@@ -702,10 +678,6 @@ def create_long_format(
         state_fips_table=all_states,
         county_fips_table=all_counties,
     )
-
-    # replace ISO Offshore Wind with curated data
-    iso = iso.loc[iso["resource_or_sector"] != "Offshore Wind", :]
-    iso = pd.concat([iso, curated_offshore], axis=0, ignore_index=True)
 
     # join it all
     out = pd.concat([iso, existing, infra], axis=0, ignore_index=True)
@@ -724,25 +696,35 @@ def create_long_format(
         "co2e_tonnes_per_year",
         "pm2_5_tonnes_per_year",
         "nox_tonnes_per_year",
-        "has_ban",
+        "ordinance_is_restrictive",
         "ordinance_jurisdiction_name",
         "ordinance_jurisdiction_type",
-        "has_ordinance",
-        "ordinance",
+        "ordinance_via_reldi",
+        "ordinance_text",
         "ordinance_earliest_year_mentioned",
-        "has_solar_ban_nrel",
-        "has_wind_ban_nrel",
-        "has_de_facto_ban_nrel",
+        "ordinance_via_solar_nrel",
+        "ordinance_via_wind_nrel",
+        "ordinance_via_nrel_is_de_facto",
         "state_permitting_type",
         "state_permitting_text",
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",
+        "ec_coal_closures_area_fraction",
+        "ec_qualifies_via_employment",
+        "ec_qualifies",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
     return out.loc[:, col_order]
 
 
 def _get_offshore_wind_extra_cols(engine: sa.engine.Engine) -> pd.DataFrame:
+    # create columns that count how much offshore wind capacity is associated
+    # with a particular county:
+    #   1. comes from ports (m:m)
+    #   2. is attributed to a particular interest type (m:1)
+
+    # Note that these aggregates do not divide capacity across the counties. Instead,
+    # they give a sum total of associated capacity.
     query = """
     WITH
     proj_ports AS (
@@ -770,9 +752,9 @@ def _get_offshore_wind_extra_cols(engine: sa.engine.Engine) -> pd.DataFrame:
     interest AS (
         SELECT
             county_id_fips,
-            why_of_interest as offshore_wind_interest_type
+            string_agg(distinct(why_of_interest), ',' order by why_of_interest) as offshore_wind_interest_type
         FROM data_warehouse.offshore_wind_locations as locs
-        GROUP BY 1,2
+        GROUP BY 1
         ORDER BY 1
     )
     SELECT
@@ -791,23 +773,21 @@ def _get_offshore_wind_extra_cols(engine: sa.engine.Engine) -> pd.DataFrame:
 def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
     query = """
     select
-        f.county_id_fips,
+        county_id_fips,
         gap_status,
         manager_type,
         intersection_area_padus_km2,
-        f.land_area_km2 as county_land_area_km2,
         county_area_coast_clipped_km2
     from data_warehouse.protected_area_by_county as pa
-    LEFT JOIN data_warehouse.county_fips as f
-    USING (county_id_fips)
     """
     pad = pd.read_sql(query, postgres_engine)
-    # county_land_area is the high accuracy value
-    # county_area_coast_clipped is the consistent value (consistent with clipped PAD-US)
+    # county_area_coast_clipped is consistent with clipped PAD-US but
+    # the county_fips.land_area_km2 is more accurate and preferred for
+    # downstream analysis.
     # I use the consistent value to calculate ratio, then pair that ratio
     #  with the accurate land area in the data mart
     county_areas = pad.groupby("county_id_fips")[
-        ["county_land_area_km2", "county_area_coast_clipped_km2"]
+        "county_area_coast_clipped_km2"
     ].first()
     is_developable = pad["gap_status"].str.match("^[34]")
     is_federally_managed = pad["manager_type"] == "Federal"
@@ -837,7 +817,6 @@ def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
     out_cols = [
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
-        "county_land_area_km2",
     ]
     correlated_rounding_errors = areas["federal_fraction_unprotected_land"].gt(1)
     assert (
@@ -848,6 +827,31 @@ def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
     ] = 1.0  # manually clip
 
     return areas.loc[:, out_cols].copy()
+
+
+def _get_energy_community_qualification(postgres_engine: sa.engine.Engine):
+    # NOTE: this query contains hardcoded parameters for the
+    # energy communities qualification criteria
+    query = """
+    WITH
+    ec as (
+        SELECT
+            ec.county_id_fips,
+            coal_qualifying_area_fraction as ec_coal_closures_area_fraction,
+            qualifies_by_employment_criteria as ec_qualifies_via_employment
+        FROM data_warehouse.energy_communities_by_county AS ec
+        LEFT JOIN data_warehouse.county_fips AS fips
+        USING (county_id_fips)
+    )
+    SELECT
+        *,
+        (ec_coal_closures_area_fraction > 0.5 OR
+        ec_qualifies_via_employment) as ec_qualifies
+    FROM ec
+    """
+    ec = pd.read_sql(query, postgres_engine)
+
+    return ec
 
 
 def _get_county_properties(
@@ -864,12 +868,14 @@ def _get_county_properties(
             "permitting_type": "state_permitting_type",
             "state_name": "state",
             "county_name": "county",
+            "land_area_km2": "county_land_area_km2",
         }
     ncsl = _get_ncsl_wind_permitting_df(postgres_engine)
     all_counties = _get_county_fips_df(postgres_engine)
     all_states = _get_state_fips_df(postgres_engine)
     env_justice = _get_env_justice_df(postgres_engine)
     fed_lands = _get_federal_land_fraction(postgres_engine)
+    ec_counties = _get_energy_community_qualification(postgres_engine)
 
     # model local opposition
     aggregator = CountyOpposition(
@@ -880,10 +886,9 @@ def _get_county_properties(
         include_nrel_bans=True,
     )
 
-    county_properties = all_counties[["county_name", "county_id_fips"]].merge(
-        combined_opp, on="county_id_fips", how="left"
-    )
-    county_properties["state_id_fips"] = county_properties["county_id_fips"].str[:2]
+    county_properties = all_counties[
+        ["county_name", "county_id_fips", "state_id_fips", "land_area_km2"]
+    ].merge(combined_opp, on="county_id_fips", how="left")
     county_properties = county_properties.merge(
         ncsl, on="state_id_fips", how="left", validate="m:1"
     )
@@ -903,6 +908,23 @@ def _get_county_properties(
         fed_lands, on="county_id_fips", how="left", validate="1:1"
     )
 
+    # NOTE: the ec dataset uses 2010 FIPS codes.
+    # Some (02261) are not present in the rest of the datasets.
+    # Non-matching FIPS are currently dropped.
+    county_properties = county_properties.merge(
+        ec_counties, on="county_id_fips", how="left", validate="1:1"
+    )
+    #  EC data currently only includes counties that have qualifying features.
+    #  Fill in nulls for counties that do not qualify.
+    county_properties.fillna(
+        {
+            "ec_coal_closures_area_fraction": 0.0,
+            "ec_qualifies_via_employment": False,
+            "ec_qualifies": False,
+        },
+        inplace=True,
+    )
+
     county_properties = county_properties.rename(columns=rename_dict)
     return county_properties
 
@@ -920,20 +942,23 @@ def _join_all_counties_to_wide_format(
         "state_id_fips",
         "state",
         "county",
-        "has_ordinance",
+        "ordinance_via_reldi",
         "state_permitting_type",
-        "ordinance",
+        "ordinance_text",
         "ordinance_earliest_year_mentioned",
         "ordinance_jurisdiction_name",
         "ordinance_jurisdiction_type",
         "state_permitting_text",
-        "has_solar_ban_nrel",
-        "has_wind_ban_nrel",
-        "has_de_facto_ban_nrel",
-        "has_ban",
+        "ordinance_via_solar_nrel",
+        "ordinance_via_wind_nrel",
+        "ordinance_via_nrel_is_de_facto",
+        "ordinance_is_restrictive",
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",
+        "ec_coal_closures_area_fraction",
+        "ec_qualifies_via_employment",
+        "ec_qualifies",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
     wide_format_subset = wide_format.drop(columns=county_columns)
     county_properties = county_properties.merge(

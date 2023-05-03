@@ -4,15 +4,18 @@ Derived from iso_projects_long_format, this table is about individual ISO projec
 
 ## Column Descriptions
 
-**Unique Key Column(s):** `project_id`
+**Unique Key Column(s):** (`source`, `project_id`)
 
 |Subject|Column|Description|Source|Notes|
 |----|----|----|----|----|
 |Identifiers|`project_id`|A unique ID assigned to each project.|derived||
-|Location|`state`|US State name|Census||
-||`county`|County name|Census||
-||`state_id_fips`|State FIPS ID|Census||
-||`county_id_fips`|County FIPS ID|Census||
+||`source`|"iso" or "proprietary" (for offshore wind projects)|derived||
+|Location|`state_1`|US State name of the first location.|Census||
+||`state_id_fips_1`|State FIPS ID of the first location.|Census||
+||`county_1`|County name of the first location.|Census||
+||`county_id_fips_1`|County FIPS ID of the first location.|Census||
+||`county_2`|County name of the second location.|Census||
+||`county_id_fips_2`|County FIPS ID of the second location.|Census||
 |Properties|`project_name`|Name of the project|LBNL||
 ||`iso_region`|Name of the ISO region containing the project. Non-ISO projects are categorized as either Northwest or Southeast by LBNL|LBNL||
 ||`entity`|Similar to iso_region, but non-ISO projects are identified by utility|LBNL||
@@ -32,10 +35,14 @@ Derived from iso_projects_long_format, this table is about individual ISO projec
 ||`co2e_tonnes_per_year`|Estimate of annual equivalent CO2 emissions of proposed gas plants, in metric tonnes.|derived from LBNL||
 |Dates|`date_entered_queue`|The date the project entered the ISO queue.|LBNL||
 ||`date_proposed_online`|The date the developer expects the project to be completed.|LBNL||
-|Regulatory|`has_ordinance`|True/false indicator of the presence of any local ordinances in the county.|derived from RELDI||
+|Regulatory|`ordinance_via_reldi`|True when a county has banned wind or solar development according to RELDI's ordinance database.|derived from RELDI||
 ||`ordinance_earliest_year_mentioned`|Approximate year the local ordinance was enacted. This was automatically extracted from the ordinance text so is not perfectly accurate.|derived from RELDI||
 ||`ordinance_jurisdiction_name`|Name of the jurisdiction with a local ordinance. This is usually a county or town within that county. "multiple" if more than one jurisdiction within the county has an ordinance.|RELDI||
 ||`ordinance_jurisdiction_type`|Category of jurisdiction: county, town, or city. "multiple" if more than one jurisdiction type within the county has an ordinance.|derived from RELDI||
+||`ordinance_via_solar_nrel`|True when a county has banned solar development according to NREL's ordinance database.|NREL|See 'NREL Ordinance Interpretation' section below|
+||`ordinance_via_wind_nrel`|True when a county has banned wind development according to NREL's ordinance database.|NREL|See 'NREL Ordinance Interpretation' section below|
+||`ordinance_via_nrel_is_de_facto`|True when a wind/solar ban is based on technical criteria like setback distances, as opposed to an outright ban.|NREL|See 'NREL Ordinance Interpretation' section below|
+||`ordinance_is_restrictive`|True when any of `ordinance_via_solar_nrel`, `ordinance_via_wind_nrel`, or `ordinance_via_reldi` are True|NREL/RELDI||
 ||`state_permitting_type`|Category of the state's wind permitting jurisdiction: state, local, or hybrid.|NCSL||
 
 ## Modeling Decisions

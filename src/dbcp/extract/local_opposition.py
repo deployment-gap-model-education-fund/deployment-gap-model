@@ -34,7 +34,7 @@ class ColumbiaDocxParser(object):
         self.local_ordinance_dict: Dict[str, List[str]] = {
             "state": [],
             "locality": [],
-            "ordinance": [],
+            "ordinance_text": [],
         }
         self.contested_projects_dict: Dict[str, List[str]] = {
             "state": [],
@@ -97,7 +97,7 @@ class ColumbiaDocxParser(object):
 
             self.local_ordinance_dict["state"].append(self.current_state)
             self.local_ordinance_dict["locality"].append(locality)
-            self.local_ordinance_dict["ordinance"].append(ordinance.strip())
+            self.local_ordinance_dict["ordinance_text"].append(ordinance.strip())
             return
 
         elif self.current_header == "Contested Projects":
@@ -171,7 +171,7 @@ class ColumbiaDocxParser(object):
         )
         subset = output["local_ordinance"].query(query_str).reset_index()
         if not subset.empty:
-            if subset["ordinance"].iat[0] != "Enacted July 9, 2020:":
+            if subset["ordinance_text"].iat[0] != "Enacted July 9, 2020:":
                 raise ValueError(
                     "Data has changed and Brownsville correction is no longer valid"
                 )
@@ -212,7 +212,7 @@ def _extract_march_2022_update(
             columns={"Description": "policy"}
         ),
         "local_ordinance": df.query("opposition_type == 'Local Ordinance'").rename(
-            columns={"Description": "ordinance"}
+            columns={"Description": "ordinance_text"}
         ),
         "contested_project": df.query("opposition_type == 'Contested project'").rename(
             columns={"Description": "description"}
