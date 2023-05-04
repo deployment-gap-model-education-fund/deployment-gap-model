@@ -80,6 +80,8 @@ def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
     ;
     """
     df = pd.read_sql(query, engine)
+    # projects with missing location info get full capacity allocation
+    df["frac_locations_in_county"].fillna(1.0, inplace=True)
     # two whole-row dupes due to both town and county names present in raw data
     dupes = df.duplicated(keep="first")
     assert df.loc[dupes, "county"].isin({"Wilbarger", None}).all()

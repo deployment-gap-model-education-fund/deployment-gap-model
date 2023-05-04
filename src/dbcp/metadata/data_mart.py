@@ -296,7 +296,7 @@ iso_projects_long_format = Table(
     Column("ordinance_is_restrictive", Boolean),
     Column("is_hybrid", Boolean, nullable=False),
     Column("resource_class", String),
-    Column("frac_locations_in_county", Float),
+    Column("frac_locations_in_county", Float, nullable=False),
     Column("source", String, nullable=False),
     Column("surrogate_id", Integer, primary_key=True),
     schema=schema,
