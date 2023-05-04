@@ -22,9 +22,6 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 |Location|`county`|County name|Census||
 ||`state_id_fips`|State FIPS ID|Census||
 ||`state`|US State name|Census||
-||`county_land_area_km2`|Total land area of a county with units of square kilometers.|Census TIGER||
-||`unprotected_land_area_km2`|Total county area minus protected area (GAP 1 or 2). See Protected Land Area section below.|USGS PAD||
-||`federal_fraction_unprotected_land`|Fraction of unprotected land area managed by Federal agencies.|USGS PAD||
 |Resource Aggregates|`county_total_co2e_tonnes_per_year`|Total CO2e emissions, across all sources and both proposed and existing, in metric tonnes per year.|PUDL, LBNL, EIP||
 ||`fossil_existing_capacity_mw`|Generation capacity, in megawatts, of existing fossil power plants.|PUDL||
 ||`fossil_existing_co2e_tonnes_per_year`|Annual CO2 equivalent emissions from existing fossil power plants, in metric tonnes.|derived from PUDL||
@@ -95,20 +92,23 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 ||`infra_synthetic_fertilizers_proposed_facility_count`|Number of existing infrastructure facilities in the fertilizers sector.|EIP||
 ||`infra_synthetic_fertilizers_proposed_nox_tonnes_per_year`|Annual NOx emissions from all proposed fossil infrastructure projects, in metric tonnes.|EIP||
 ||`infra_synthetic_fertilizers_proposed_pm2_5_tonnes_per_year`|Annual PM2.5 emissions from all proposed fossil infrastructure projects, in metric tonnes.|EIP||
-|Regulatory|`ordinance`|Summary text of the local ordinances in the given county, if any.|RELDI||
+|Regulatory|`ordinance_text`|Summary text of the local ordinances in the given county, if any.|RELDI||
 ||`ordinance_via_reldi`|True when a county has banned wind or solar development according to RELDI's ordinance database.|derived from RELDI||
 ||`ordinance_earliest_year_mentioned`|Approximate year the local ordinance was enacted. This was automatically extracted from the ordinance text so is not perfectly accurate.|derived from RELDI||
 ||`ordinance_jurisdiction_name`|Name of the jurisdiction with a local ordinance. This is usually a county or town within that county. "multiple" if more than one jurisdiction within the county has an ordinance.|RELDI||
 ||`ordinance_jurisdiction_type`|Category of jurisdiction: county, town, or city. "multiple" if more than one jurisdiction type within the county has an ordinance.|derived from RELDI||
-||`state_permitting_text`|Summary text of the wind permitting rules of the given state.|NCSL||
-||`state_permitting_type`|Category of the state's wind permitting jurisdiction: state, local, or hybrid.|NCSL||
 ||`ordinance_via_solar_nrel`|True when a county has banned solar development according to NREL's ordinance database.|NREL|See 'NREL Ordinance Interpretation' section below|
 ||`ordinance_via_wind_nrel`|True when a county has banned wind development according to NREL's ordinance database.|NREL|See 'NREL Ordinance Interpretation' section below|
 ||`ordinance_via_nrel_is_de_facto`|True when a wind/solar ban is based on technical criteria like setback distances, as opposed to an outright ban.|NREL|See 'NREL Ordinance Interpretation' section below|
 ||`ordinance_is_restrictive`|True when any of `ordinance_via_solar_nrel`, `ordinance_via_wind_nrel`, or `ordinance_via_reldi` are True|NREL/RELDI||
+||`state_permitting_text`|Summary text of the wind permitting rules of the given state.|NCSL||
+||`state_permitting_type`|Category of the state's wind permitting jurisdiction: state, local, or hybrid.|NCSL||
 ||`ec_qualifies`|True if the county qualifies via employment OR the fraction of qualifying area from coal closures is >= 50%|derived from RMI||
 ||`ec_coal_closures_area_fraction`|Fraction of county land area that qualifies due to coal mine and generator closures.|RMI||
 ||`ec_qualifies_via_employment`|True if the county is part of a qualifying Statistical Area based on fossil fuel employment.|RMI||
+||`county_land_area_km2`|Total land area of a county with units of square kilometers.|Census TIGER||
+||`unprotected_land_area_km2`|Total county area minus protected area (GAP 1 or 2). See Protected Land Area section below.|USGS PAD||
+||`federal_fraction_unprotected_land`|Fraction of unprotected land area managed by Federal agencies.|USGS PAD||
 |Environmental Justice|`total_tracts`|Number of Census tracts contained in this county|Justice40||
 ||`justice40_dbcp_index`|Proprietary environmental justice score. See Justice40 section below.|Justice40||
 ||`n_distinct_qualifying_tracts`|Number of distinct tracts that meet Justice40's criterion for "disadvantaged" within this county|Justice40||
