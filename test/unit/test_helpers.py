@@ -32,6 +32,13 @@ class TestBQSchemaHelpers:
             {"name": "county_id_fips", "mode": "REQUIRED", "type": "STRING"},
             {"name": "state_id_fips", "mode": "REQUIRED", "type": "STRING"},
             {"name": "county_name", "mode": "REQUIRED", "type": "STRING"},
+            {"name": "county_name_long", "mode": "REQUIRED", "type": "STRING"},
+            {"name": "functional_status", "mode": "REQUIRED", "type": "STRING"},
+            {"name": "land_area_km2", "mode": "REQUIRED", "type": "FLOAT"},
+            {"name": "water_area_km2", "mode": "REQUIRED", "type": "FLOAT"},
+            {"name": "centroid_latitude", "mode": "REQUIRED", "type": "FLOAT"},
+            {"name": "centroid_longitude", "mode": "REQUIRED", "type": "FLOAT"},
+            {"name": "tribal_land_percent", "mode": "REQUIRED", "type": "FLOAT"},
         ]
 
         bq_schema = dbcp.helpers.get_bq_schema_from_metadata(

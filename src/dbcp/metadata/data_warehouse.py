@@ -1,6 +1,7 @@
 """SQL Alchemy metadata for the datawarehouse tables."""
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     Float,
@@ -30,6 +31,14 @@ county_fips = (
         Column("water_area_km2", Float, nullable=False),
         Column("centroid_latitude", Float, nullable=False),
         Column("centroid_longitude", Float, nullable=False),
+        Column(
+            "tribal_land_percent",
+            Float,
+            CheckConstraint(
+                "tribal_land_percent >= 0.0 AND tribal_land_percent <= 1.0"
+            ),
+            nullable=False,
+        ),
         schema=schema,
     ),
 )

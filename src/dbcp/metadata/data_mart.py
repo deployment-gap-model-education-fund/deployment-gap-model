@@ -1,6 +1,7 @@
 """SQL Alchemy metadata for the data mart tables."""
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     Float,
@@ -155,6 +156,12 @@ counties_wide_format = Table(
     Column("unprotected_land_area_km2", Float),
     Column("federal_fraction_unprotected_land", Float),
     Column("county_land_area_km2", Float),
+    Column(
+        "tribal_land_percent",
+        Float,
+        CheckConstraint("tribal_land_percent >= 0.0 AND tribal_land_percent <= 1.0"),
+        nullable=False,
+    ),
     schema=schema,
 )
 
@@ -356,5 +363,11 @@ counties_long_format = Table(
     Column("unprotected_land_area_km2", Float),
     Column("federal_fraction_unprotected_land", Float),
     Column("county_land_area_km2", Float),
+    Column(
+        "tribal_land_percent",
+        Float,
+        CheckConstraint("tribal_land_percent >= 0.0 AND tribal_land_percent <= 1.0"),
+        nullable=False,
+    ),
     schema=schema,
 )
