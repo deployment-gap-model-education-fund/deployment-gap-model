@@ -302,23 +302,6 @@ iso_projects_long_format = Table(
     schema=schema,
 )
 
-proposed_power_dash_local_opp = Table(
-    "proposed_power_dash_local_opp",
-    metadata,
-    Column("county_id_fips", String, primary_key=True),
-    Column("ordinance_earliest_year_mentioned", Integer),
-    Column("ordinance_jurisdiction_name", String, nullable=False),
-    Column("ordinance_jurisdiction_type", String, nullable=False),
-    Column("ordinance_text", String, nullable=False),
-    Column("ordinance_via_reldi", Boolean, nullable=False),
-    Column("state_id_fips", String, nullable=False),
-    Column("county", String, nullable=False),
-    Column("state", String, nullable=False),
-    Column("state_abbrev", String, nullable=False),
-    Column("permitting_type", String),
-    schema=schema,
-)
-
 counties_long_format = Table(
     "counties_long_format",
     metadata,
