@@ -32,11 +32,15 @@ county_fips = (
         Column("centroid_latitude", Float, nullable=False),
         Column("centroid_longitude", Float, nullable=False),
         Column(
-            "tribal_land_percent",
+            "raw_tribal_land_frac",
             Float,
-            CheckConstraint(
-                "tribal_land_percent >= 0.0 AND tribal_land_percent <= 1.0"
-            ),
+            CheckConstraint("raw_tribal_land_frac >= 0.0"),
+            nullable=False,
+        ),
+        Column(
+            "tribal_land_frac",
+            Float,
+            CheckConstraint("tribal_land_frac >= 0.0 AND tribal_land_frac <= 1.0"),
             nullable=False,
         ),
         schema=schema,

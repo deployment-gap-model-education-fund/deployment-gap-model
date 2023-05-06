@@ -38,7 +38,8 @@ class TestBQSchemaHelpers:
             {"name": "water_area_km2", "mode": "REQUIRED", "type": "FLOAT"},
             {"name": "centroid_latitude", "mode": "REQUIRED", "type": "FLOAT"},
             {"name": "centroid_longitude", "mode": "REQUIRED", "type": "FLOAT"},
-            {"name": "tribal_land_percent", "mode": "REQUIRED", "type": "FLOAT"},
+            {"name": "raw_tribal_land_frac", "mode": "REQUIRED", "type": "FLOAT"},
+            {"name": "tribal_land_frac", "mode": "REQUIRED", "type": "FLOAT"},
         ]
 
         bq_schema = dbcp.helpers.get_bq_schema_from_metadata(

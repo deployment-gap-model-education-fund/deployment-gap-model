@@ -8,20 +8,20 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-def _add_tribal_land_percent(
+def _add_tribal_land_frac(
     counties: gpd.GeoDataFrame, tribal_land: gpd.GeoDataFrame
 ) -> gpd.GeoDataFrame:
     """
-    Add tribal_land_percent column to the counties table.
+    Add tribal_land_frac column to the counties table.
 
     Args:
         counties: clean county fips table.
         tribal_land: raw tribal land geodataframe.
 
     Return:
-        counties: clean county fips table with tribal_land_percent column.
+        counties: clean county fips table with tribal_land_frac column.
     """
-    logger.info("Add tribal_land_percent to counties table.")
+    logger.info("Add tribal_land_frac to counties table.")
     # Convert to a project we can use to calculate areas and perform intersections
     counties = counties.to_crs("ESRI:102008")
     tribal_land = tribal_land.to_crs("ESRI:102008")
@@ -33,22 +33,22 @@ def _add_tribal_land_percent(
     counties["tribal_land_intersection"] = (
         counties.intersection(dissolved_tribal_geometry).area / 1e6
     )
-    counties["tribal_land_percent"] = (
+    counties["raw_tribal_land_frac"] = (
         counties["tribal_land_intersection"] / counties["land_area_km2"]
     )
 
-    tribal_land_larger_than_county = counties.tribal_land_percent > 1
+    tribal_land_larger_than_county = counties.raw_tribal_land_frac > 1
     logger.info(
         f"Number of counties with where tribal land is great 100% of land area:\n{tribal_land_larger_than_county.value_counts()}"
     )
-    counties["tribal_land_percent"] = counties.tribal_land_percent.mask(
+    counties["tribal_land_frac"] = counties.raw_tribal_land_frac.mask(
         tribal_land_larger_than_county, 1.0
     )
-    counties["tribal_land_percent"] = counties["tribal_land_percent"].round(2)
+    counties["tribal_land_frac"] = counties["tribal_land_frac"].round(2)
     counties = counties.drop(columns="tribal_land_intersection")
 
     assert (
-        counties.tribal_land_percent <= 1.0
+        counties.tribal_land_frac <= 1.0
     ).all(), "Found a county where tribal land is greater than 100%"
 
     return counties
@@ -108,7 +108,7 @@ def county_fips(counties: pd.DataFrame, tribal_land: pd.DataFrame) -> pd.DataFra
     # N Nonfunctioning legal entity.
     # S Statistical entity.
 
-    counties = _add_tribal_land_percent(counties, tribal_land)
+    counties = _add_tribal_land_frac(counties, tribal_land)
     counties = counties.drop(columns="geometry")
 
     return counties

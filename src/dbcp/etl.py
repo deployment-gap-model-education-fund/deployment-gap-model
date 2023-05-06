@@ -108,7 +108,14 @@ def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
 
 def etl_fips_tables() -> Dict[str, pd.DataFrame]:
     """Master state and county FIPS table ETL."""
-    fips = dbcp.extract.fips_tables.extract()
+    census_path = Path("census/tl_2021_us_county.zip")
+    fips = dbcp.extract.fips_tables.extract_fips(census_path)
+
+    tribal_lands_path = Path("census/tl_2021_us_aiannh.zip")
+    fips["tribal_land"] = dbcp.extract.fips_tables.extract_census_tribal_land(
+        tribal_lands_path
+    )
+
     out = dbcp.transform.fips_tables.transform(fips)
 
     return out
