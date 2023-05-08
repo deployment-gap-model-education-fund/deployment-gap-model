@@ -485,6 +485,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",
+        "tribal_land_frac",
         "ec_coal_closures_area_fraction",
         "ec_qualifies_via_employment",
         "ec_qualifies",
@@ -655,6 +656,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",
+        "tribal_land_frac",
         "ec_coal_closures_area_fraction",
         "ec_qualifies_via_employment",
         "ec_qualifies",
@@ -710,6 +712,7 @@ def create_long_format(
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",
+        "tribal_land_frac",
         "ec_coal_closures_area_fraction",
         "ec_qualifies_via_employment",
         "ec_qualifies",
@@ -778,7 +781,7 @@ def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
         manager_type,
         intersection_area_padus_km2,
         county_area_coast_clipped_km2
-    from data_warehouse.protected_area_by_county as pa
+    from data_warehouse.protected_area_by_county
     """
     pad = pd.read_sql(query, postgres_engine)
     # county_area_coast_clipped is consistent with clipped PAD-US but
@@ -887,7 +890,13 @@ def _get_county_properties(
     )
 
     county_properties = all_counties[
-        ["county_name", "county_id_fips", "state_id_fips", "land_area_km2"]
+        [
+            "county_name",
+            "county_id_fips",
+            "state_id_fips",
+            "land_area_km2",
+            "tribal_land_frac",
+        ]
     ].merge(combined_opp, on="county_id_fips", how="left")
     county_properties = county_properties.merge(
         ncsl, on="state_id_fips", how="left", validate="m:1"
@@ -956,6 +965,7 @@ def _join_all_counties_to_wide_format(
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",
+        "tribal_land_frac",
         "ec_coal_closures_area_fraction",
         "ec_qualifies_via_employment",
         "ec_qualifies",

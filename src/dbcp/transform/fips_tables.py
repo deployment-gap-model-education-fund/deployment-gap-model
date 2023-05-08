@@ -2,12 +2,59 @@
 import logging
 from typing import Dict, Sequence
 
+import geopandas as gpd
 import pandas as pd
 
 logger = logging.getLogger(__name__)
 
 
-def county_fips(counties: pd.DataFrame) -> pd.DataFrame:
+def _add_tribal_land_frac(
+    counties: gpd.GeoDataFrame, tribal_land: gpd.GeoDataFrame
+) -> gpd.GeoDataFrame:
+    """
+    Add tribal_land_frac column to the counties table.
+
+    Args:
+        counties: clean county fips table.
+        tribal_land: raw tribal land geodataframe.
+
+    Return:
+        counties: clean county fips table with tribal_land_frac column.
+    """
+    logger.info("Add tribal_land_frac to counties table.")
+    # Convert to a project we can use to calculate areas and perform intersections
+    counties = counties.to_crs("ESRI:102008")
+    tribal_land = tribal_land.to_crs("ESRI:102008")
+
+    dissolved_tribal = tribal_land.dissolve()
+    dissolved_tribal_geometry = dissolved_tribal.geometry.iloc[0]
+
+    # Calculate intersection, convert to km
+    counties["tribal_land_intersection"] = (
+        counties.intersection(dissolved_tribal_geometry).area / 1e6
+    )
+    counties["raw_tribal_land_frac"] = (
+        counties["tribal_land_intersection"] / counties["land_area_km2"]
+    )
+
+    tribal_land_larger_than_county = counties.raw_tribal_land_frac > 1
+    logger.info(
+        f"Number of counties with where tribal land is great 100% of land area:\n{tribal_land_larger_than_county.value_counts()}"
+    )
+    counties["tribal_land_frac"] = counties.raw_tribal_land_frac.mask(
+        tribal_land_larger_than_county, 1.0
+    )
+    counties["tribal_land_frac"] = counties["tribal_land_frac"].round(2)
+    counties = counties.drop(columns="tribal_land_intersection")
+
+    assert (
+        counties.tribal_land_frac <= 1.0
+    ).all(), "Found a county where tribal land is greater than 100%"
+
+    return counties
+
+
+def county_fips(counties: pd.DataFrame, tribal_land: pd.DataFrame) -> pd.DataFrame:
     """
     Apply transformations to county table.
 
@@ -36,6 +83,7 @@ def county_fips(counties: pd.DataFrame) -> pd.DataFrame:
         # "internal point" is a point closest to centroid (equal to centroid except for weird shapes)
         "INTPTLAT": "centroid_latitude",
         "INTPTLON": "centroid_longitude",
+        "geometry": "geometry",
     }
     counties = counties.loc[:, rename_dict.keys()].rename(columns=rename_dict)  # type: ignore
 
@@ -59,6 +107,9 @@ def county_fips(counties: pd.DataFrame) -> pd.DataFrame:
     # functions.
     # N Nonfunctioning legal entity.
     # S Statistical entity.
+
+    counties = _add_tribal_land_frac(counties, tribal_land)
+    counties = counties.drop(columns="geometry")
 
     return counties
 
@@ -107,15 +158,10 @@ def transform(fips_tables: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     """
     transformed_fips_tables = {}
 
-    transform_functions = {
-        "county_fips": county_fips,
-        "state_fips": state_fips,
-    }
-
-    for table_name, transform_func in transform_functions.items():
-        logger.info(f"FIPS tables: Transforming {table_name} table.")
-
-        transformed_fips_tables[table_name] = transform_func(fips_tables[table_name])
+    transformed_fips_tables["county_fips"] = county_fips(
+        fips_tables["counties"], fips_tables["tribal_land"]
+    )
+    transformed_fips_tables["state_fips"] = state_fips(fips_tables["states"])
 
     return transformed_fips_tables
 

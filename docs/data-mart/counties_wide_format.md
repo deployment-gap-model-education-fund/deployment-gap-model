@@ -109,6 +109,7 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 ||`county_land_area_km2`|Total land area of a county with units of square kilometers.|Census TIGER||
 ||`unprotected_land_area_km2`|Total county area minus protected area (GAP 1 or 2). See Protected Land Area section below.|USGS PAD||
 ||`federal_fraction_unprotected_land`|Fraction of unprotected land area managed by Federal agencies.|USGS PAD||
+||`tribal_land_frac`|Fraction of county area under American Indian, Alaska Native, or Native Hawaiian governance.|Census||
 |Environmental Justice|`total_tracts`|Number of Census tracts contained in this county|Justice40||
 ||`justice40_dbcp_index`|Proprietary environmental justice score. See Justice40 section below.|Justice40||
 ||`n_distinct_qualifying_tracts`|Number of distinct tracts that meet Justice40's criterion for "disadvantaged" within this county|Justice40||
