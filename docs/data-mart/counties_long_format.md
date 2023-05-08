@@ -20,6 +20,7 @@ This table provides county-level aggregates by facility type: existing power, pr
 | | `county_land_area_km2` | Total land area of a county with units of square kilometers. | Census TIGER | |
 | | `unprotected_land_area_km2` | Total county area minus protected area (GAP 1 or 2). See Protected Land Area section below. | USGS PAD | |
 | | `federal_fraction_unprotected_land` | Fraction of unprotected land area managed by Federal agencies. | USGS PAD | |
+| | `tribal_land_frac` | Fraction of county area under American Indian, Alaska Native, or Native Hawaiian governance. | Census | |
 | Emissions | `co2e_tonnes_per_year` | Metric tonnes of CO2 equivalent emitted per year (100 year warming potential) | derived from PUDL (power) or EIP (infrastructure) | |
 | | `nox_tonnes_per_year` | Metric tonnes of Nitrous Oxides emitted per year | EIP | |
 | | `pm2_5_tonnes_per_year` | Metric tonnes of Particulate Matter (2.5 micron) emitted per year | EIP | |
