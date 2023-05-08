@@ -57,10 +57,11 @@ def _add_geocoded_locations(transformed_locs: pd.DataFrame) -> None:
     We need to use a two-pass geocoding system because both city and county names are present in the "city" column.
     The first pass operates on a concatenated "city, county" field, then any NaN results are filled using just "city".
 
-    This is because Google Maps Platform resolves city/county ambiguity by returning the higher level of government.
-    This messes up some of the `geocoded_locality_type` results (Albany, NY is in Albany County, NY). It also
+    This is one way to fix the following problem:
+    Google Maps Platform resolves city/county ambiguity by returning the higher level of government.
+    That messes up some of the `geocoded_locality_type` results (Albany, NY is in Albany County, NY). It also
     occasionally messes up the FIPS when the identically-named city and county are not colocated
-    (Houston, TX is not in Houston County, TX). One way to fix this is to use the two-pass geocoding system used here.
+    (Houston, TX is not in Houston County, TX).
 
     Args:
         transformed_locs (pd.DataFrame): locations df after other cleaning has been performed
@@ -104,7 +105,9 @@ def _validate_raw_data(raw_dfs: dict[str, pd.DataFrame]) -> None:
         ), f"Empty strings in df with index {df.index.name}"
         assert df.index.is_unique, f"Index {df.index.name} is not unique."
 
-    assert proj["Size (megawatts)"].min() > 100, "Found unusually small project."
+    assert (
+        proj["Size (megawatts)"].lt(100).sum() == 1
+    ), "Found unusually small project. Block Island is the only known exception."
     assert proj["Size (megawatts)"].max() < 10_000, "Found unusually large project."
 
     assert (
@@ -112,8 +115,8 @@ def _validate_raw_data(raw_dfs: dict[str, pd.DataFrame]) -> None:
     ), "More missing recipient states than expected."
 
     assert (
-        proj["Online date"].min() > 2022
-    ), "Found project with erroneously early online_date."
+        proj["Online date"].lt(2022).sum() == 1
+    ), "Found project with erroneously early online_date. Block Island is the only known exception."
     assert (
         proj["Online date"].max() < 2040
     ), "Found project with erroneously late online_date."
@@ -140,6 +143,7 @@ def _validate_raw_data(raw_dfs: dict[str, pd.DataFrame]) -> None:
         )[["location_id", "project_id"]]
     )
     assert locations_to_ports.symmetric_difference(ports_to_locations).empty
+    return
 
 
 def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
@@ -153,6 +157,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         "proposed_cable_landing",
         "county_of_cable_landing",
         "port_locations",
+        "cop_in_process",
     ]
     proj_rename_dict = {
         "size_megawatts": "capacity_mw",

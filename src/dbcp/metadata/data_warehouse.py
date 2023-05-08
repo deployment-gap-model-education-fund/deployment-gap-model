@@ -316,7 +316,7 @@ local_ordinance = Table(
     metadata,
     Column("raw_state_name", String, nullable=False),
     Column("raw_locality_name", String, nullable=False),
-    Column("ordinance", String, nullable=False),
+    Column("ordinance_text", String, nullable=False),
     Column("year_enacted", Integer),
     Column("energy_type", String),
     Column("source", String),
@@ -660,10 +660,14 @@ offshore_wind_projects = Table(
     Column("name", String),
     Column("recipient_state", String),
     Column("developer", String),
-    Column("status", String),
     Column("capacity_mw", Float),
     Column("proposed_completion_year", Integer),
     Column("notes", String),
+    Column("permitting_status", String),
+    Column("contracting_status", String),
+    Column("construction_status", String),
+    Column("overall_project_status", String),
+    Column("lease_areas", String),
     schema=schema,
 )
 offshore_wind_locations = Table(
@@ -733,5 +737,34 @@ protected_area_by_county = Table(
     Column("gap_status", String),
     # join columns
     Column("intersection_area_padus_km2", Float),
+    schema=schema,
+)
+
+
+######################
+# Energy Communities #
+######################
+
+energy_communities = Table(
+    "energy_communities_by_county",
+    metadata,
+    Column(
+        "county_id_fips",
+        String,
+        # should have FK on county_fips but EC currently uses 2010 county geometry
+        # ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        primary_key=True,
+    ),
+    Column("raw_county_id_fips", String),
+    Column("raw_county_name", String),
+    Column("raw_state_name", String),
+    Column("n_brownfields", Integer),
+    Column("brownfield_acreage", Float),
+    Column("brownfield_acreage_mean_fill", Float),
+    Column("brownfield_acreage_median_fill", Float),
+    Column("n_coal_qualifying_tracts", Integer),
+    Column("coal_qualifying_area_fraction", Float),
+    Column("qualifies_by_employment_criteria", Boolean),
+    Column("geocoded_locality_name", String),
     schema=schema,
 )

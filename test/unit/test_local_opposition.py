@@ -83,7 +83,7 @@ def test_extract():  # integration test
             {
                 "state": ["Alabama"],
                 "locality": ["Lovely County"],
-                "ordinance": ["Important Ordinance"],
+                "ordinance_text": ["Important Ordinance"],
             }
         ),
         "contested_project": pd.DataFrame(
