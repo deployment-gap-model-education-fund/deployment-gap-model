@@ -514,6 +514,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",
+        "tribal_land_frac",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
     wide = long.pivot(index=idx_cols, columns=col_cols, values=val_cols)
 
@@ -681,6 +682,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",
+        "tribal_land_frac",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
     return wide.loc[:, col_order].copy()
 
@@ -738,6 +740,7 @@ def create_long_format(
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",
+        "tribal_land_frac",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
     return out.loc[:, col_order]
 
@@ -791,23 +794,20 @@ def _get_offshore_wind_extra_cols(engine: sa.engine.Engine) -> pd.DataFrame:
 def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
     query = """
     select
-        f.county_id_fips,
+        county_id_fips,
         gap_status,
         manager_type,
         intersection_area_padus_km2,
-        f.land_area_km2 as county_land_area_km2,
         county_area_coast_clipped_km2
-    from data_warehouse.protected_area_by_county as pa
-    LEFT JOIN data_warehouse.county_fips as f
-    USING (county_id_fips)
+    from data_warehouse.protected_area_by_county
     """
     pad = pd.read_sql(query, postgres_engine)
-    # county_land_area is the high accuracy value
+    # county_fips.land_area_km2 is the high accuracy value
     # county_area_coast_clipped is the consistent value (consistent with clipped PAD-US)
     # I use the consistent value to calculate ratio, then pair that ratio
     #  with the accurate land area in the data mart
     county_areas = pad.groupby("county_id_fips")[
-        ["county_land_area_km2", "county_area_coast_clipped_km2"]
+        ["county_area_coast_clipped_km2"]
     ].first()
     is_developable = pad["gap_status"].str.match("^[34]")
     is_federally_managed = pad["manager_type"] == "Federal"
@@ -837,7 +837,6 @@ def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
     out_cols = [
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
-        "county_land_area_km2",
     ]
     correlated_rounding_errors = areas["federal_fraction_unprotected_land"].gt(1)
     assert (
@@ -864,6 +863,7 @@ def _get_county_properties(
             "permitting_type": "state_permitting_type",
             "state_name": "state",
             "county_name": "county",
+            "land_area_km2": "county_land_area_km2",
         }
     ncsl = _get_ncsl_wind_permitting_df(postgres_engine)
     all_counties = _get_county_fips_df(postgres_engine)
@@ -880,9 +880,9 @@ def _get_county_properties(
         include_nrel_bans=True,
     )
 
-    county_properties = all_counties[["county_name", "county_id_fips"]].merge(
-        combined_opp, on="county_id_fips", how="left"
-    )
+    county_properties = all_counties[
+        ["county_name", "county_id_fips", "tribal_land_frac", "land_area_km2"]
+    ].merge(combined_opp, on="county_id_fips", how="left")
     county_properties["state_id_fips"] = county_properties["county_id_fips"].str[:2]
     county_properties = county_properties.merge(
         ncsl, on="state_id_fips", how="left", validate="m:1"
@@ -934,6 +934,7 @@ def _join_all_counties_to_wide_format(
         "unprotected_land_area_km2",
         "federal_fraction_unprotected_land",
         "county_land_area_km2",
+        "tribal_land_frac",
     ] + JUSTICE40_AGGREGATES["name"].to_list()
     wide_format_subset = wide_format.drop(columns=county_columns)
     county_properties = county_properties.merge(
