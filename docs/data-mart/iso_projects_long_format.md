@@ -3,6 +3,7 @@
 This table gives insight into proposed ISO projects by type and location. The rows are rather abstract: each row represents a combination of project\_id, resource\_clean, and county\_id\_fips with other information joined on for convenience (county, ordinance, and project information). The data sources are primarily the LBNL compiled ISO queues and our proprietary offshore wind data, plus local ordinances (via Columbia), state wind permitting types (via NCSL), and standard state/county IDs (from the Census). The last sheet of the raw ISO data contains a list of columns and their definitions for comparison to this table.
 
 Note that **this duplicates projects with multiple prospective locations.** Use the frac_locations_in_county column to allocate capacity and co2e estimates to counties when aggregating. Otherwise they will be double-counted.
+
 ## Column Descriptions
 
 **Unique Key Column(s):** (`source`, `project_id`, `resource_clean`, `county_id_fips`)
@@ -32,7 +33,7 @@ Note that **this duplicates projects with multiple prospective locations.** Use 
 |Technical|`capacity_mw`|Export capacity of the generator or storage facility, in megawatts. |LBNL||
 ||`co2e_tonnes_per_year`|Estimate of annual equivalent CO2 emissions of proposed gas plants, in metric tonnes.|derived from LBNL||
 ||`frac_locations_in_county`|Fraction of this project's total locations in this county.|derived||
-|Regulatory|`ordinance`|Summary text of the local ordinances in the given county, if any.|RELDI||
+|Regulatory|`ordinance_text`|Summary text of the local ordinances in the given county, if any.|RELDI||
 ||`ordinance_via_reldi`|True when a county has banned wind or solar development according to RELDI's ordinance database.|derived from RELDI||
 ||`ordinance_earliest_year_mentioned`|Approximate year the local ordinance was enacted. This was automatically extracted from the ordinance text so is not perfectly accurate.|derived from RELDI||
 ||`ordinance_jurisdiction_name`|Name of the jurisdiction with a local ordinance. This is usually a county or town within that county. "multiple" if more than one jurisdiction within the county has an ordinance.|RELDI||
