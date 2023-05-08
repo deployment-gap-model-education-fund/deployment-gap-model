@@ -67,10 +67,10 @@ def local_opposition(
     return county_opp
 
 
-def _add_has_ordinance_column(
+def _add_ordinance_via_reldi_column(
     *, county_df: pd.DataFrame, local_opp: pd.DataFrame
 ) -> pd.DataFrame:
-    """Add boolean column has_ordinance to indicate presence of local opposition.
+    """Add boolean column ordinance_via_reldi to indicate presence of local opposition.
 
     Args:
         county_df (pd.DataFrame): dataframe with county FIPS codes
@@ -80,13 +80,13 @@ def _add_has_ordinance_column(
         pd.DataFrame: county_df plus a new column
     """
     out = county_df.merge(
-        local_opp[["has_ordinance", "county_id_fips"]],
+        local_opp[["ordinance_via_reldi", "county_id_fips"]],
         how="left",
         on="county_id_fips",
         copy=False,
         validate="m:1",
     )
-    out.loc[:, "has_ordinance"] = out.loc[:, "has_ordinance"].fillna(False)
+    out.loc[:, "ordinance_via_reldi"] = out.loc[:, "ordinance_via_reldi"].fillna(False)
     return out
 
 

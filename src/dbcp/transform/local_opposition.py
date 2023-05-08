@@ -79,7 +79,7 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
         " Solar$| Wind$| Zoning Ordinance$", "", regex=True
     )
     # manual error correction
-    filter_ = local.loc[:, "ordinance"].str.startswith(
+    filter_ = local.loc[:, "ordinance_text"].str.startswith(
         "In November 2021, the Boone County Commission"
     )
     assert filter_.sum() == 1
@@ -88,7 +88,7 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
     # add fips codes to counties (but many names are cities)
     with_fips = add_county_fips_with_backup_geocoding(local, locality_col="locality")
 
-    year_summaries = _extract_years(local["ordinance"])
+    year_summaries = _extract_years(local["ordinance_text"])
     local = pd.concat([with_fips, year_summaries], axis=1)
     local.rename(
         columns={"locality": "raw_locality_name", "state": "raw_state_name"},
