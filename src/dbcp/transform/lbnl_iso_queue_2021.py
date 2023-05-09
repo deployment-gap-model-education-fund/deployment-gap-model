@@ -87,6 +87,16 @@ RESOURCE_DICT = {
 }
 
 
+def _harmonize_interconnection_status_lbnl(statuses: pd.Series) -> pd.Series:
+    """Harmonize the interconnection_status_lbnl values."""
+    mapping = {
+        "Feasability Study": "Feasibility Study",
+        "Facilities Study": "Facility Study",
+        "IA in Progress": "In Progress (unknown study)",
+    }
+    return statuses.replace(mapping)
+
+
 def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform active iso queue data."""
     rename_dict = {
@@ -95,6 +105,11 @@ def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
     }
     active_projects["project_id"] = np.arange(len(active_projects), dtype=np.int32)
     active_projects = active_projects.rename(columns=rename_dict)  # copy
+    active_projects.loc[
+        :, "interconnection_status_lbnl"
+    ] = _harmonize_interconnection_status_lbnl(
+        active_projects.loc[:, "interconnection_status_lbnl"]
+    )
     # drop irrelevant columns (structurally all nan due to 'active' filter)
     active_projects.drop(columns=["date_withdrawn", "date_operational"], inplace=True)
     active_projects = remove_duplicates(active_projects)  # sets index to project_id
