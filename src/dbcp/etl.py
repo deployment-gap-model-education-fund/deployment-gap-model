@@ -10,6 +10,7 @@ import dbcp
 from dbcp.constants import FIPS_CODE_VINTAGE
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.metadata.data_warehouse import metadata
+from dbcp.transform.fips_tables import SPATIAL_CACHE
 from dbcp.transform.helpers import GEOCODER_CACHE, bedford_addfips_fix
 from pudl.helpers import add_fips_ids as _add_fips_ids
 from pudl.output.pudltabl import PudlTabl
@@ -29,11 +30,11 @@ def etl_eip_infrastructure() -> Dict[str, pd.DataFrame]:
     return eip_transformed_dfs
 
 
-def etl_lbnl_iso_queue_2021() -> Dict[str, pd.DataFrame]:
-    """LBNL ISO Queues 2021 ETL."""
-    source_path = Path("/app/data/raw/queues_2021_clean_data.xlsx")
-    lbnl_raw_dfs = dbcp.extract.lbnl_iso_queue_2021.extract(source_path)
-    lbnl_transformed_dfs = dbcp.transform.lbnl_iso_queue_2021.transform(lbnl_raw_dfs)
+def etl_lbnl_iso_queue() -> Dict[str, pd.DataFrame]:
+    """LBNL ISO Queues ETL."""
+    source_path = Path("/app/data/raw/queues_2022_clean_data.xlsx")
+    lbnl_raw_dfs = dbcp.extract.lbnl_iso_queue.extract(source_path)
+    lbnl_transformed_dfs = dbcp.transform.lbnl_iso_queue.transform(lbnl_raw_dfs)
 
     return lbnl_transformed_dfs
 
@@ -183,8 +184,9 @@ def etl(args):
     with engine.connect() as con:
         engine.execute("CREATE SCHEMA IF NOT EXISTS data_warehouse")
 
-    # Reduce size of geocoder cache if necessary
+    # Reduce size of caches if necessary
     GEOCODER_CACHE.reduce_size()
+    SPATIAL_CACHE.reduce_size()
 
     etl_funcs = {
         "energy_communities_by_county": etl_energy_communities_by_county,
@@ -194,7 +196,7 @@ def etl(args):
         "justice40_tracts": etl_justice40,
         "nrel_wind_solar_ordinances": etl_nrel_ordinances,
         "eip_infrastructure": etl_eip_infrastructure,
-        "lbnl_iso_queue_2021": etl_lbnl_iso_queue_2021,
+        "lbnl_iso_queue": etl_lbnl_iso_queue,
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
         "columbia_local_opp": etl_columbia_local_opp,
