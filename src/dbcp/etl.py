@@ -30,11 +30,11 @@ def etl_eip_infrastructure() -> Dict[str, pd.DataFrame]:
     return eip_transformed_dfs
 
 
-def etl_lbnl_iso_queue_2021() -> Dict[str, pd.DataFrame]:
-    """LBNL ISO Queues 2021 ETL."""
-    source_path = Path("/app/data/raw/queues_2021_clean_data.xlsx")
-    lbnl_raw_dfs = dbcp.extract.lbnl_iso_queue_2021.extract(source_path)
-    lbnl_transformed_dfs = dbcp.transform.lbnl_iso_queue_2021.transform(lbnl_raw_dfs)
+def etl_lbnl_iso_queue() -> Dict[str, pd.DataFrame]:
+    """LBNL ISO Queues ETL."""
+    source_path = Path("/app/data/raw/queues_2022_clean_data.xlsx")
+    lbnl_raw_dfs = dbcp.extract.lbnl_iso_queue.extract(source_path)
+    lbnl_transformed_dfs = dbcp.transform.lbnl_iso_queue.transform(lbnl_raw_dfs)
 
     return lbnl_transformed_dfs
 
@@ -196,7 +196,7 @@ def etl(args):
         "justice40_tracts": etl_justice40,
         "nrel_wind_solar_ordinances": etl_nrel_ordinances,
         "eip_infrastructure": etl_eip_infrastructure,
-        "lbnl_iso_queue_2021": etl_lbnl_iso_queue_2021,
+        "lbnl_iso_queue": etl_lbnl_iso_queue,
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
         "columbia_local_opp": etl_columbia_local_opp,

@@ -122,9 +122,9 @@ def multiformat_string_date_parser(
         raise ValueError(f"Column is not a string dtype. Given {dates.dtype}.")
 
     # Fill incomplete dates that contain only a year, eg "2020"
-    # Conservatively only do this for 4 digit numbers from 1990-2029
+    # Conservatively only do this for 4 digit numbers from 1990-2039
     dates = dates.str.replace(
-        r"^(199\d|20[012]\d)$", lambda x: f"07/01/{x.group(1)}", regex=True
+        r"^(199\d|20[0123]\d)$", lambda x: f"07/01/{x.group(1)}", regex=True
     )
 
     # separate numeric encodings from string encodings
@@ -136,7 +136,7 @@ def multiformat_string_date_parser(
         date_strings, infer_datetime_format=True, errors="coerce"
     )
     remaining_nan = parsed_dates.isna().sum()
-    while True:
+    while remaining_nan > 0:
         nans = parsed_dates.isna()
         nan_to_dates = pd.to_datetime(
             date_strings[nans], infer_datetime_format=True, errors="coerce"
@@ -144,6 +144,20 @@ def multiformat_string_date_parser(
         parsed_dates = parsed_dates.fillna(nan_to_dates)
         new_remaining_nan = nans.sum()
         if new_remaining_nan == remaining_nan:  # no improvement
+            # try specific weird formats
+            formats = [
+                "%d%b%Y",  # 01Jan2020
+                "%m/%y",  # 01/20 or 1/20
+                "%b-%y",  # Jan-20
+            ]
+            for fmt in formats:
+                nan_to_dates = pd.to_datetime(
+                    date_strings[nans], format=fmt, errors="coerce"
+                )
+                parsed_dates = parsed_dates.fillna(nan_to_dates)
+                nans = parsed_dates.isna()
+                if nans.sum() == 0:
+                    break
             break
         else:
             remaining_nan = new_remaining_nan

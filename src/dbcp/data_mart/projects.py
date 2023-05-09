@@ -41,8 +41,8 @@ def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
             proj.utility,
             res.capacity_mw,
             res.resource_clean
-        FROM data_warehouse.iso_projects_2021 as proj
-        INNER JOIN data_warehouse.iso_resource_capacity_2021 as res
+        FROM data_warehouse.iso_projects as proj
+        INNER JOIN data_warehouse.iso_resource_capacity as res
         ON proj.project_id = res.project_id
     ),
     loc as (
@@ -53,7 +53,7 @@ def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
             state_id_fips,
             county_id_fips,
             (1.0 / count(*) over (partition by project_id))::real as frac_locations_in_county
-        FROM data_warehouse.iso_locations_2021
+        FROM data_warehouse.iso_locations
     ),
     iso as (
         SELECT
@@ -82,10 +82,13 @@ def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
     df = pd.read_sql(query, engine)
     # projects with missing location info get full capacity allocation
     df["frac_locations_in_county"].fillna(1.0, inplace=True)
-    # two whole-row dupes due to both town and county names present in raw data
+    # one whole-row duplicate due to a multi-county project with missing state value.
+    # Makes both county_id_fips and state_id_fips null.
     dupes = df.duplicated(keep="first")
-    assert df.loc[dupes, "county"].isin({"Wilbarger", None}).all()
-    assert dupes.sum() == 2, f"Expected 2 duplicate rows, got {dupes.sum()}."
+    assert dupes.sum() == 1, f"Expected 1 duplicate row, got {dupes.sum()}."
+    assert (
+        df.loc[dupes, "project_id"].eq(9118).all()
+    ), f"Duplicate counties: {df.loc[dupes, ['project_id', 'county']]}"
     df = df.loc[~dupes]
     _estimate_proposed_power_co2e(df)
     return df
