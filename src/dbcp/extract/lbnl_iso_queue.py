@@ -6,7 +6,7 @@ import pandas as pd
 
 
 def extract(path: Path) -> Dict[str, pd.DataFrame]:
-    """Read Excel file with 2021 LBNL ISO Queue dataset."""
+    """Read Excel file with LBNL ISO Queue dataset."""
     assert path.exists()
     all_projects = pd.read_excel(path, sheet_name="data")
     rename_dict = {
@@ -34,5 +34,5 @@ def extract(path: Path) -> Dict[str, pd.DataFrame]:
     }
     all_projects.rename(columns=rename_dict, inplace=True)
     return {
-        "lbnl_iso_queue_2021": all_projects,
+        "lbnl_iso_queue": all_projects,
     }

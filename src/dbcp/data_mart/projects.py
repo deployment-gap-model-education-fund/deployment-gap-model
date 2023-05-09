@@ -41,8 +41,8 @@ def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
             proj.utility,
             res.capacity_mw,
             res.resource_clean
-        FROM data_warehouse.iso_projects_2021 as proj
-        INNER JOIN data_warehouse.iso_resource_capacity_2021 as res
+        FROM data_warehouse.iso_projects as proj
+        INNER JOIN data_warehouse.iso_resource_capacity as res
         ON proj.project_id = res.project_id
     ),
     loc as (
@@ -53,7 +53,7 @@ def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
             state_id_fips,
             county_id_fips,
             (1.0 / count(*) over (partition by project_id))::real as frac_locations_in_county
-        FROM data_warehouse.iso_locations_2021
+        FROM data_warehouse.iso_locations
     ),
     iso as (
         SELECT

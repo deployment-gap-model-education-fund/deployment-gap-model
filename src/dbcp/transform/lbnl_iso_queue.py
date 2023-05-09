@@ -1,12 +1,4 @@
-"""Functions to transform 2021 LBNL ISO queue tables.
-
-Notable differences compared to 2020 version:
-* all in one sheet instead of split into active, completed, withdrawn sheets
-* new queue_status "suspended" (unknown meaning, maybe documented on their website)
-* queue_status "completed" renamed to "operational"
-* new columns "interconnection_date" and "interconnection_service_type"
-* lost column "withdrawal_reason"
-"""
+"""Functions to transform LBNL ISO queue tables."""
 
 from typing import Dict, List
 
@@ -135,9 +127,7 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     Returns:
         lbnl_transformed_dfs: Dictionary of the transformed tables.
     """
-    active = (
-        lbnl_raw_dfs["lbnl_iso_queue_2021"].query("queue_status == 'active'").copy()
-    )
+    active = lbnl_raw_dfs["lbnl_iso_queue"].query("queue_status == 'active'").copy()
     transformed = active_iso_queue_projects(active)  # sets index to project_id
     for col in transformed.columns:
         if pd.api.types.is_object_dtype(transformed.loc[:, col]):
@@ -151,27 +141,25 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     # I write to a new variable because _manual_county_state_name_fixes overwrites
     # raw names with lowercase + manual corrections. I want to preserve raw names in the final
     # output but didn't want to refactor these functions to do it.
-    new_locs = _manual_county_state_name_fixes(
-        lbnl_normalized_dfs["iso_locations_2021"]
-    )
+    new_locs = _manual_county_state_name_fixes(lbnl_normalized_dfs["iso_locations"])
     new_locs = add_county_fips_with_backup_geocoding(
         new_locs, state_col="raw_state_name", locality_col="raw_county_name"
     )
     new_locs = _fix_independent_city_fips(new_locs)
     new_locs.loc[:, ["raw_state_name", "raw_county_name"]] = (
-        lbnl_normalized_dfs["iso_locations_2021"]
+        lbnl_normalized_dfs["iso_locations"]
         .loc[:, ["raw_state_name", "raw_county_name"]]
         .copy()
     )
-    lbnl_normalized_dfs["iso_locations_2021"] = new_locs
+    lbnl_normalized_dfs["iso_locations"] = new_locs
 
     # Clean up and categorize resources
-    lbnl_normalized_dfs["iso_resource_capacity_2021"] = clean_resource_type(
-        lbnl_normalized_dfs["iso_resource_capacity_2021"]
+    lbnl_normalized_dfs["iso_resource_capacity"] = clean_resource_type(
+        lbnl_normalized_dfs["iso_resource_capacity"]
     )
-    if lbnl_normalized_dfs["iso_resource_capacity_2021"].resource_clean.isna().any():
+    if lbnl_normalized_dfs["iso_resource_capacity"].resource_clean.isna().any():
         raise AssertionError("Missing Resources!")
-    lbnl_normalized_dfs["iso_projects_2021"].reset_index(inplace=True)
+    lbnl_normalized_dfs["iso_projects"].reset_index(inplace=True)
 
     return lbnl_normalized_dfs
 
@@ -285,9 +273,9 @@ def normalize_lbnl_dfs(lbnl_transformed_df: pd.DataFrame) -> Dict[str, pd.DataFr
     resource_capacity_dfs = _normalize_resource_capacity(lbnl_transformed_df)
     location_dfs = _normalize_location(resource_capacity_dfs["project_df"])
     return {
-        "iso_projects_2021": location_dfs["project_df"],
-        "iso_locations_2021": location_dfs["location_df"],
-        "iso_resource_capacity_2021": resource_capacity_dfs["resource_capacity_df"],
+        "iso_projects": location_dfs["project_df"],
+        "iso_locations": location_dfs["location_df"],
+        "iso_resource_capacity": resource_capacity_dfs["resource_capacity_df"],
     }
 
 
