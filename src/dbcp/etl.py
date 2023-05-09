@@ -10,6 +10,7 @@ import dbcp
 from dbcp.constants import FIPS_CODE_VINTAGE
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.metadata.data_warehouse import metadata
+from dbcp.transform.fips_tables import SPATIAL_CACHE
 from dbcp.transform.helpers import GEOCODER_CACHE, bedford_addfips_fix
 from pudl.helpers import add_fips_ids as _add_fips_ids
 from pudl.output.pudltabl import PudlTabl
@@ -183,8 +184,9 @@ def etl(args):
     with engine.connect() as con:
         engine.execute("CREATE SCHEMA IF NOT EXISTS data_warehouse")
 
-    # Reduce size of geocoder cache if necessary
+    # Reduce size of caches if necessary
     GEOCODER_CACHE.reduce_size()
+    SPATIAL_CACHE.reduce_size()
 
     etl_funcs = {
         "energy_communities_by_county": etl_energy_communities_by_county,

@@ -48,9 +48,9 @@ def cache_gcs_archive_file_locally(
         )
 
         if revision_num:
-            blob = bucket.blob(filename, generation=revision_num)
+            blob = bucket.blob(str(filename), generation=revision_num)
         else:
-            blob = bucket.blob(filename)
+            blob = bucket.blob(str(filename))
 
         filepath.parent.mkdir(parents=True, exist_ok=True)
         with open(filepath, "wb+") as f:
