@@ -31,7 +31,7 @@ def etl_eip_infrastructure() -> Dict[str, pd.DataFrame]:
 
 def etl_lbnl_iso_queue_2021() -> Dict[str, pd.DataFrame]:
     """LBNL ISO Queues 2021 ETL."""
-    source_path = Path("/app/data/raw/queues_2021_clean_data.xlsx")
+    source_path = Path("/app/data/raw/queues_2022_clean_data.xlsx")
     lbnl_raw_dfs = dbcp.extract.lbnl_iso_queue_2021.extract(source_path)
     lbnl_transformed_dfs = dbcp.transform.lbnl_iso_queue_2021.transform(lbnl_raw_dfs)
 

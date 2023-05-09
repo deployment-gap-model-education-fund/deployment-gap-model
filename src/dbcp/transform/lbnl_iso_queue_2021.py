@@ -25,7 +25,7 @@ RESOURCE_DICT = {
         "codes": ["Battery", "Batteries", "BAT", "ES"],
         "type": "Renewable",
     },
-    "Biofuel": {"codes": [], "type": "Renewable"},
+    "Biofuel": {"codes": ["Biogas"], "type": "Renewable"},
     "Biomass": {"codes": ["Wood", "W", "BLQ WDS", "WDS"], "type": "Renewable"},
     "Coal": {"codes": ["BIT", "C"], "type": "Fossil"},
     "Combustion Turbine": {"codes": ["CT"], "type": "Fossil"},
@@ -33,7 +33,6 @@ RESOURCE_DICT = {
     "Geothermal": {"codes": [], "type": "Renewable"},
     "Hydro": {"codes": ["WAT", "H", "Water"], "type": "Renewable"},
     "Landfill Gas": {"codes": ["LFG", "L"], "type": "Fossil"},
-    "Methane; Solar": {"codes": [], "type": "Hybrid"},
     "Municipal Solid Waste": {"codes": ["MSW"], "type": "Fossil"},
     "Natural Gas": {
         "codes": [
@@ -58,29 +57,24 @@ RESOURCE_DICT = {
         ],
         "type": "Fossil",
     },
-    "Natural Gas; Other; Storage; Solar": {"codes": [], "type": "Hybrid"},
-    "Natural Gas; Storage": {"codes": [], "type": "Fossil"},
     "Nuclear": {"codes": ["NU", "NUC"], "type": "Renewable"},
     "Offshore Wind": {"codes": [], "type": "Renewable"},
     "Oil": {
         "codes": ["DFO", "Diesel", "CT-D", "CC-D", "JF", "KER", "DFO KER", "D"],
         "type": "Fossil",
     },
-    "Oil; Biomass": {"codes": ["BLQ DFO KER WDS"], "type": "Hybrid"},
     "Onshore Wind": {"codes": ["Wind", "WND", "Wind Turbine"], "type": "Renewable"},
     "Other": {"codes": [], "type": "Unknown Resource"},
-    "Unknown": {"codes": ["Wo", "F", "HYBRID", "M"], "type": "Unknown Resource"},
-    "Other Storage": {"codes": ["Flywheel", "Storage"], "type": "Renewable"},
+    "Unknown": {"codes": ["Wo", "F", "Hybrid", "M"], "type": "Unknown Resource"},
+    "Other Storage": {
+        "codes": ["Flywheel", "Storage", "CAES", "Gravity Rail", "Hydrogen"],
+        "type": "Renewable",
+    },
     "Pumped Storage": {
         "codes": ["Pump Storage", "Pumped-Storage hydro", "PS"],
         "type": "Renewable",
     },
     "Solar": {"codes": ["SUN", "S"], "type": "Renewable"},
-    "Solar; Biomass": {"codes": [], "type": "Renewable"},
-    "Solar; Storage": {
-        "codes": ["Solar; Battery", "SUN BAT", "Storage; Solar"],
-        "type": "Renewable",
-    },
     "Steam": {"codes": ["ST"], "type": "Fossil"},
     "Waste Heat": {
         "codes": [
@@ -90,19 +84,7 @@ RESOURCE_DICT = {
         ],
         "type": "Fossil",
     },
-    "Wind; Storage": {"codes": ["WND BAT"], "type": "Renewable"},
 }
-
-
-def _fix_negative_and_zero_capacity_values_inplace(iso_df: pd.DataFrame) -> None:
-    capacity_cols = [
-        col for col in iso_df.columns if col.startswith("capacity_mw_resource_")
-    ]
-    # Fix negative capacity values. Some still don't look right but most are plausible.
-    # Only 11 values in 'active' as of 2020 data.
-    # Zero capacity obviously means missing. 146 values in active in 2020 data
-    iso_df.loc[:, capacity_cols] = iso_df.loc[:, capacity_cols].abs().replace(0, np.nan)
-    return
 
 
 def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
@@ -111,12 +93,20 @@ def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
         "state": "raw_state_name",
         "county": "raw_county_name",
     }
+    active_projects["project_id"] = np.arange(len(active_projects), dtype=np.int32)
     active_projects = active_projects.rename(columns=rename_dict)  # copy
-    # drop irrelevant columns (all nan)
+    # drop irrelevant columns (structurally all nan due to 'active' filter)
     active_projects.drop(columns=["date_withdrawn", "date_operational"], inplace=True)
-    _fix_negative_and_zero_capacity_values_inplace(active_projects)
-    active_projects = remove_duplicates(active_projects)
+    active_projects = remove_duplicates(active_projects)  # sets index to project_id
     parse_date_columns(active_projects)
+    # manual fix for duplicate resource type in raw data
+    bad_proj_id = 1606
+    assert (
+        active_projects.loc[bad_proj_id, "project_name"] == "Coleto Creek ESS Addition"
+    ), "Manual correction is misidentified."
+    active_projects.loc[
+        bad_proj_id, "resource_type_1"
+    ] = "Coal"  # raw data has two instances of "battery storage"
     return active_projects
 
 
@@ -133,8 +123,10 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     active = (
         lbnl_raw_dfs["lbnl_iso_queue_2021"].query("queue_status == 'active'").copy()
     )
-    active["project_id"] = np.arange(len(active), dtype=np.int32)
-    transformed = active_iso_queue_projects(active)
+    transformed = active_iso_queue_projects(active)  # sets index to project_id
+    for col in transformed.columns:
+        if pd.api.types.is_object_dtype(transformed.loc[:, col]):
+            transformed.loc[:, col] = transformed.loc[:, col].str.strip()
 
     # Combine and normalize iso queue tables
     lbnl_normalized_dfs = normalize_lbnl_dfs(transformed)
@@ -165,7 +157,6 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     if lbnl_normalized_dfs["iso_resource_capacity_2021"].resource_clean.isna().any():
         raise AssertionError("Missing Resources!")
     lbnl_normalized_dfs["iso_projects_2021"].reset_index(inplace=True)
-    lbnl_normalized_dfs["iso_projects_2021"].drop(columns=["index"], inplace=True)
 
     return lbnl_normalized_dfs
 
@@ -300,11 +291,16 @@ def clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
     # Modify RESOURCE DICT for mapping
     long_dict = {}
     for clean_name, code_type_dict in RESOURCE_DICT.items():
+        long_dict[clean_name] = clean_name
         for code in code_type_dict["codes"]:
             long_dict[code] = clean_name
     # Map clean resource values into new column
-    resource_df["resource_clean"] = resource_df.resource.fillna("Unknown")
-    resource_df = resource_df.replace({"resource_clean": long_dict})
+    resource_df["resource_clean"] = resource_df["resource"].fillna("Unknown")
+    resource_df["resource_clean"] = resource_df["resource_clean"].map(long_dict)
+    unmapped = resource_df["resource_clean"].isna()
+    if unmapped.sum() != 0:
+        debug = resource_df.loc[unmapped, "resource"].value_counts()
+        raise AssertionError(f"Unmapped resource types: {debug}")
     return resource_df
 
 
@@ -340,28 +336,16 @@ def remove_duplicates(df: pd.DataFrame) -> pd.DataFrame:
         "point_of_interconnection_clean"
     ].str.strip()
 
-    # groupby this set of keys and keep the duplicate with the most listed resources
-    # Note: "active" projects have county_1 and region, "completed" and "withdrawn" only have county and entity
-    if "county_1" in df.columns:  # active projects
-        key = [
-            "point_of_interconnection_clean",
-            "capacity_mw_resource_1",
-            "county_1",
-            "raw_state_name",
-            "region",
-            "resource_type_1",
-        ]
-    else:  # completed and withdrawn projects
-        key = [
-            "point_of_interconnection_clean",
-            "capacity_mw_resource_1",
-            "raw_county_name",
-            "raw_state_name",
-            "entity",
-            "resource_type_1",
-        ]
+    key = [
+        "point_of_interconnection_clean",
+        "capacity_mw_resource_1",
+        "county_1",
+        "raw_state_name",
+        "region",
+        "resource_type_1",
+    ]
     df["len_resource_type"] = df.resource_type_lbnl.str.len()
-    df = df.reset_index()
+    df.reset_index(drop=True, inplace=True)
     dups = df.copy()
     dups = dups.groupby(key, as_index=False, dropna=False).len_resource_type.max()
     df = dups.merge(df, on=(key + ["len_resource_type"]))
@@ -419,12 +403,18 @@ def _manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
         pd.DataFrame: copy of location_df with more correct county, state pairs
 
     """
-    # the following code was copied from unmerged PR #105 and lightly edited
+    # TODO: of the 77 null county_id_fips, about half of them have missing state
+    # values that could probably be inferred by appending "county" to the
+    # raw_county_name and extracting the geocoded state, if unique.
     manual_county_state_name_fixes = [
         ["skamania", "or", "skamania", "wa"],
+        ["coos & curry", "or", "coos", "or"],
+        ["coos & curry", "", "coos", "or"],
+        ["lake", "or", "lake county", "or"],
         ["franklin-clinton", "ny", "franklin", "ny"],
         ["san juan", "az", "san juan", "nm"],
         ["hidalgo", "co", "hidalgo", "nm"],
+        ["coconino", "co", "coconino", "az"],
         ["antelope & wheeler", "ne", "antelope", "ne"],
         ["linden", "ny", "union", "nj"],
         ["church", "nv", "churchill", "nv"],
@@ -433,6 +423,8 @@ def _manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
         ["san benito", "nv", "san benito", "ca"],
         ["frqanklin", "me", "franklin", "me"],
         ["logan,menard", "il", "logan", "il"],
+        ["clarke", "in", "clark", "il"],
+        ["lincoln", "co", "lincoln county", "co"],
         ["new york-nj", "ny", "new york", "ny"],
         ["peneobscot/washington", "me", "penobscot", "me"],
         # workaround for bug in addfips library.
