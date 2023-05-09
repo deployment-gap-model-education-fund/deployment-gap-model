@@ -7,18 +7,32 @@ import addfips
 import geopandas as gpd
 import pandas as pd
 
+import dbcp
 
-def _extract_census(census_path: Path) -> pd.DataFrame:
+
+def _extract_census_counties(census_path: Path) -> pd.DataFrame:
     """Extract canonical county FIPS tables from census data.
 
     Args:
-        census_path (Path): path to zipped shapefiles.
-
-    Returns:
-        pd.DataFrame: output dataframes of county-level info
+        census_path: path to zipped shapefiles.
     """
     # ignore geometry info -- big and not currently used
-    counties = gpd.read_file(census_path, ignore_geometry=True)
+    path = dbcp.extract.helpers.cache_gcs_archive_file_locally(census_path)
+    counties = gpd.read_file(path)
+    return counties
+
+
+def extract_census_tribal_land(archive_path: Path) -> pd.DataFrame:
+    """Extract Tribal land in the census.
+
+    Args:
+        archive_path: path of file to extract from the dgm-archive GCS bucket.
+
+    Returns:
+        output dataframes of county-level info.
+    """
+    path = dbcp.extract.helpers.cache_gcs_archive_file_locally(archive_path)
+    counties = gpd.read_file(path)
     return counties
 
 
@@ -37,15 +51,13 @@ def _extract_state_fips() -> pd.DataFrame:
     return states
 
 
-def extract(census_path: Path) -> Dict[str, pd.DataFrame]:
+def extract_fips(census_path: Path) -> Dict[str, pd.DataFrame]:
     """Extract canonical state and county FIPS tables from census data and the addfips library.
-
-    Args:
-        vintage (int, optional): which Census year to use. Defaults to FIPS_CODE_VINTAGE.
 
     Returns:
         Dict[str, pd.DataFrame]: output dictionary of dataframes
     """
-    counties = _extract_census(census_path=census_path)
-    states = _extract_state_fips()
-    return {"county_fips": counties, "state_fips": states}
+    fips_data = {}
+    fips_data["counties"] = _extract_census_counties(census_path=census_path)
+    fips_data["states"] = _extract_state_fips()
+    return fips_data
