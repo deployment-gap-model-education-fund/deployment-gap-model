@@ -1,15 +1,15 @@
 """Small helper functions for dbcp etl."""
-
 import logging
 import os
-import tarfile
 from pathlib import Path
 
+import boto3
 import pandas as pd
 import pandas_gbq
 import pydata_google_auth
-import requests
 import sqlalchemy as sa
+from botocore import UNSIGNED
+from botocore.config import Config
 from tqdm import tqdm
 
 import dbcp
@@ -76,34 +76,28 @@ def get_sql_engine() -> sa.engine.Engine:
 def get_pudl_engine() -> sa.engine.Engine:
     """Create a sql alchemy engine for the pudl database."""
     pudl_data_path = download_pudl_data()
-    pudl_engine = sa.create_engine(
-        f"sqlite:////{pudl_data_path}/pudl_data/sqlite/pudl.sqlite"
-    )
+    pudl_engine = sa.create_engine(f"sqlite:////{pudl_data_path}")
     return pudl_engine
 
 
 def download_pudl_data() -> Path:
-    """Download pudl data from Zenodo."""
-    # TODO(bendnorman): Ideally this is replaced with Intake.
+    """Download pudl data from AWS."""
     PUDL_VERSION = os.environ["PUDL_VERSION"]
 
-    input_path = Path("/app/data/data_cache")
-    pudl_data_path = input_path / PUDL_VERSION
+    pudl_cache = Path("/app/data/data_cache/pudl/")
+    pudl_cache.mkdir(exist_ok=True)
+    pudl_version_cache = pudl_cache / PUDL_VERSION
+    pudl_data_path = pudl_version_cache / "pudl.sqlite"
     if not pudl_data_path.exists():
-        logger.info("PUDL data directory does not exist, downloading from Zenodo.")
-        response = requests.get(
-            f"https://zenodo.org/record/5701406/files/{PUDL_VERSION}.tgz", stream=True
+        logger.info("PUDL data directory does not exist, downloading from AWS.")
+        pudl_version_cache.mkdir()
+
+        s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
+        s3.download_file(
+            "intake.catalyst.coop",
+            f"{PUDL_VERSION}/pudl.sqlite",
+            str(pudl_data_path),
         )
-        tgz_file_path = input_path / f"{PUDL_VERSION}.tgz"
-
-        tgz_file = open(tgz_file_path, "wb")
-        for chunk in tqdm(response.iter_content(chunk_size=1024)):
-            tgz_file.write(chunk)
-        logger.info("Finished downloading PUDL data.")
-
-        logger.info("Extracting PUDL tgz file.")
-        with tarfile.open(f"{pudl_data_path}.tgz") as tar:
-            tar.extractall(path=input_path, members=track_tar_progress(tar))
 
     return pudl_data_path
 

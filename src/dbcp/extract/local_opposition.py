@@ -5,13 +5,13 @@ from typing import Dict, List, Optional
 import docx
 import pandas as pd
 
-from pudl.metadata.enums import US_STATES
+from dbcp.constants import US_STATES
 
 
 class ColumbiaDocxParser(object):
     """Parser for the Columbia Local Opposition .docx file."""
 
-    POSSIBLE_STATES = set(US_STATES.values())
+    POSSIBLE_STATES = US_STATES
     POSSIBLE_HEADERS = {"Local Laws/Ordinances", "Contested Projects", "State Policy"}
     FIRST_STATE = "Alabama"
     NULL_ORDINANCE = {

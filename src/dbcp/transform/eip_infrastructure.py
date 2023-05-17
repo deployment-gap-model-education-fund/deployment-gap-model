@@ -120,6 +120,7 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
     # Simplify by only taking first county
     fac["county"] = fac["raw_county_or_parish"].str.split(",", n=1).str[0]
     # standardize null values (only 2)
+    fac["county"] = fac["county"].astype("string")
     fac["county"].replace("TDB", pd.NA, inplace=True)
 
     fac = add_county_fips_with_backup_geocoding(
