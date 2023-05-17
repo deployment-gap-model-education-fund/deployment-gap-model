@@ -1,10 +1,12 @@
 """Functions to transform LBNL ISO queue tables."""
 
+from io import StringIO
 from typing import Dict, List
 
 import numpy as np
 import pandas as pd
 
+from dbcp.constants import LBNL_LATEST_YEAR
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     normalize_multicolumns_to_rows,
@@ -114,6 +116,11 @@ def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
     active_projects.loc[
         bad_proj_id, "resource_type_1"
     ] = "Coal"  # raw data has two instances of "battery storage"
+    # clean up whitespace
+    for col in active_projects.columns:
+        if pd.api.types.is_object_dtype(active_projects.loc[:, col]):
+            active_projects.loc[:, col] = active_projects.loc[:, col].str.strip()
+    active_projects = _add_actionable_and_late_stage_classification(active_projects)
     return active_projects
 
 
@@ -129,9 +136,6 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     """
     active = lbnl_raw_dfs["lbnl_iso_queue"].query("queue_status == 'active'").copy()
     transformed = active_iso_queue_projects(active)  # sets index to project_id
-    for col in transformed.columns:
-        if pd.api.types.is_object_dtype(transformed.loc[:, col]):
-            transformed.loc[:, col] = transformed.loc[:, col].str.strip()
 
     # Combine and normalize iso queue tables
     lbnl_normalized_dfs = normalize_lbnl_dfs(transformed)
@@ -183,7 +187,9 @@ def parse_date_columns(queue: pd.DataFrame) -> None:
     ]
 
     # add _raw suffix
-    rename_dict = dict(zip(date_cols, [col + "_raw" for col in date_cols]))
+    rename_dict: dict[str, str] = dict(
+        zip(date_cols, [col + "_raw" for col in date_cols])
+    )
     queue.rename(columns=rename_dict, inplace=True)
 
     for date_col, raw_col in rename_dict.items():
@@ -205,10 +211,7 @@ def _normalize_resource_capacity(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFram
     Returns:
         Dict[str, pd.DataFrame]: dict with the projects and multivalues split into two dataframes
     """
-    if "capacity_mw_resource_3" in lbnl_df.columns:  # only active projects
-        n_multicolumns = 3
-    else:
-        n_multicolumns = 2
+    n_multicolumns = 3
     attr_columns = {
         "resource": ["resource_type_" + str(n) for n in range(1, n_multicolumns + 1)],
         "capacity_mw": [
@@ -236,24 +239,18 @@ def _normalize_location(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     Returns:
         Dict[str, pd.DataFrame]: dict with the projects and locations split into two dataframes
     """
-    if "county_3" in lbnl_df.columns:  # only active projects are multivalued
-        county_cols = ["county_" + str(n) for n in range(1, 4)]
-        location_df = normalize_multicolumns_to_rows(
-            lbnl_df,
-            attribute_columns_dict={"raw_county_name": county_cols},
-            preserve_original_names=False,
-            dropna=True,
-        )
-        location_df = location_df.merge(
-            lbnl_df.loc[:, "raw_state_name"], on="project_id", validate="m:1"
-        )
+    county_cols = ["county_" + str(n) for n in range(1, 4)]
+    location_df = normalize_multicolumns_to_rows(
+        lbnl_df,
+        attribute_columns_dict={"raw_county_name": county_cols},
+        preserve_original_names=False,
+        dropna=True,
+    )
+    location_df = location_df.merge(
+        lbnl_df.loc[:, "raw_state_name"], on="project_id", validate="m:1"
+    )
 
-        project_df = lbnl_df.drop(columns=county_cols + ["raw_state_name"])
-    else:
-        location_df = lbnl_df.loc[
-            :, ["raw_state_name", "raw_county_name"]
-        ].reset_index()
-        project_df = lbnl_df.drop(columns=["raw_state_name", "raw_county_name"])
+    project_df = lbnl_df.drop(columns=county_cols + ["raw_state_name"])
 
     location_df.dropna(
         subset=["raw_state_name", "raw_county_name"], how="all", inplace=True
@@ -455,3 +452,152 @@ def _manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
     )
     locs = locs.drop(["clean_county", "clean_state"], axis=1)
     return locs
+
+
+def _add_actionable_and_late_stage_classification(queue: pd.DataFrame) -> pd.DataFrame:
+    """Add columns is_actionable and is_actionable_or_late_stage that classify each project.
+
+    Here is the excel formula that was translated into this function. It has been
+    formated for readability.
+
+    =IF(
+        $C$7=$D$9,  # "likely MW" (actionable)
+        IF(
+            $D17="no",  # if IA status not included
+            0,  # then 0
+            SUMIFS(  # else: (so IA status included)
+                $LBNL_data_2022.$AA:$AA,  # sum range, MW1 only
+                $LBNL_data_2022.$B:$B,  # range, status
+                $Sheet1.$C$5,  # criteria, "active"
+                $LBNL_data_2022.$T:$T,  # range, proposed year
+                ">=2022",  # criteria, year
+                $LBNL_data_2022.$P:$P,  # range, region
+                $B17,  # criteria, region per row
+                $LBNL_data_2022.$V:$V,  # range, ia_status_clean
+                $C17,  # criteria, ia_status_clean per row
+                $LBNL_data_2022.$W:$W,  # range, type_clean
+                H$9  # criteria, type_clean per column
+                )
+        ),
+        IF(  # (projected; equals actionable plus late-stage projects)
+            $E17="no",  # IA status not included
+            0,
+            SUMIFS(  # else: same as above
+                $LBNL_data_2022.$AA:$AA,
+                $LBNL_data_2022.$B:$B,
+                $Sheet1.$C$5,
+                $LBNL_data_2022.$T:$T,
+                ">=2022",
+                $LBNL_data_2022.$P:$P,
+                $B17,
+                $LBNL_data_2022.$V:$V,
+                $C17,
+                $LBNL_data_2022.$W:$W,
+                H$9
+            )
+        )
+    )
+    """
+    if not queue["queue_status"].eq("active").all():
+        raise ValueError("This function only applies to active projects.")
+    # the following was manually defined by a consultant
+    region_ia_status_inclusion = """
+"region","interconnection_status_lbnl","include_actionable","include_projected"
+"CAISO","Feasibility Study",False,False
+"CAISO","Operational",False,True
+"CAISO","System Impact Study",True,False
+"CAISO","IA Executed",False,True
+"CAISO","Facility Study",False,False
+"ERCOT","IA Executed",False,True
+"ERCOT","Facility Study",False,False
+"ERCOT","System Impact Study",True,True
+"ISO-NE","In Progress (unknown study)",False,False
+"ISO-NE","Operational",False,True
+"ISO-NE","IA Executed",False,True
+"ISO-NE","System Impact Study",True,True
+"ISO-NE","Not Started",False,False
+"ISO-NE","Feasibility Study",False,False
+"ISO-NE","Facility Study",False,False
+"MISO","IA Executed",False,True
+"MISO","In Progress (unknown study)",False,False
+"MISO","Facility Study",False,False
+"MISO","Operational",False,True
+"MISO","System Impact Study",True,True
+"MISO","Withdrawn",False,False
+"MISO","Feasibility Study",False,False
+"MISO","Not Started",False,False
+"NYISO","Withdrawn",False,False
+"NYISO","In Progress (unknown study)",False,False
+"NYISO","Facility Study",False,True
+"NYISO","System Impact Study",True,True
+"NYISO","Operational",False,True
+"NYISO","Feasibility Study",False,False
+"PJM","Feasibility Study",False,False
+"PJM","Facility Study",False,True
+"PJM","System Impact Study",True,True
+"PJM","Withdrawn",False,False
+"PJM","IA Executed",False,True
+"PJM","In Progress (unknown study)",False,False
+"Southeast (non-ISO)","Withdrawn",False,False
+"Southeast (non-ISO)","IA Executed",False,True
+"Southeast (non-ISO)","Facilities Study",False,True
+"Southeast (non-ISO)","System Impact Study",True,True
+"Southeast (non-ISO)","In Progress (unknown study)",False,False
+"Southeast (non-ISO)","Feasibility Study",False,False
+"Southeast (non-ISO)","Facility Study",False,True
+"Southeast (non-ISO)","Suspended",False,False
+"Southeast (non-ISO)","Not Started",False,False
+"Southeast (non-ISO)","Operational",False,False
+"Southeast (non-ISO)","Construction",False,True
+"Southeast (non-ISO)","Feasibility",False,False
+"SPP","System Impact Study",True,True
+"SPP","Operational",False,True
+"SPP","IA Executed",False,True
+"SPP","Facility Study",False,True
+"SPP","In Progress (unknown study)",False,False
+"SPP","Suspended",False,False
+"West (non-ISO)","System Impact Study",True,True
+"West (non-ISO)","Suspended",False,False
+"West (non-ISO)","Facility Study",False,True
+"West (non-ISO)","IA Executed",False,True
+"West (non-ISO)","Withdrawn",False,False
+"West (non-ISO)","Feasibility Study",False,False
+"West (non-ISO)","In Progress (unknown study)",False,False
+"West (non-ISO)","Operational",False,True
+"West (non-ISO)","Cluster Study",False,False
+"West (non-ISO)","Feasability Study",False,False
+"West (non-ISO)","Not Started",False,False
+"West (non-ISO)","IA in Progress",False,True
+"West (non-ISO)","Phase 4 Study",True,True
+"West (non-ISO)","IA Pending",False,True
+"West (non-ISO)","Combined",False,False
+"West (non-ISO)","Withdrawn, Feasibility Study",False,False
+"West (non-ISO)","Construction",False,False
+"West (non-ISO)","Unknown",False,False
+"""
+    region_ia_status_inclusion = pd.read_csv(StringIO(region_ia_status_inclusion))
+    queue = (
+        queue.reset_index(drop=False)
+        .merge(
+            region_ia_status_inclusion,
+            how="left",
+            on=["region", "interconnection_status_lbnl"],
+        )
+        .set_index("project_id")
+    )
+    assert (
+        queue[["include_actionable", "include_projected"]].notnull().all().all()
+    ), "Uncategorized region-IA_status combinations found."
+    # As of 2022 data, 337 active projects are missing year_proposed. Use queue_year as
+    # a conservative backup estimate. Only 8 projects have no date information; they
+    # are omitted.
+    year_qualifies = (
+        queue["year_proposed"]
+        .fillna(queue["queue_year"])
+        .ge(LBNL_LATEST_YEAR)
+        .fillna(False)
+    )
+    queue["is_actionable"] = queue["include_actionable"] & year_qualifies
+    queue["is_actionable_or_late_stage"] = queue["include_projected"] & year_qualifies
+    queue.drop(columns=["include_actionable", "include_projected"], inplace=True)
+    return queue
