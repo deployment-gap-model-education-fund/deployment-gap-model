@@ -20,6 +20,8 @@ Note that **this duplicates projects with multiple prospective locations.** Use 
 ||`county_id_fips`|County FIPS ID|Census||
 |Properties|`project_name`|Name of the project|LBNL||
 ||`is_hybrid`|True/False indicator of whether the project has both generation and storage|derived from LBNL||
+||`is_actionable`|True/False indicator of whether the project development process is in the actionable zone.|derived from LBNL||
+||`is_nearly_certain`|True/False indicator of whether the project development process is in the actionable zone or nearly completed.|derived from LBNL||
 ||`resource_class`|Renewable, fossil, or storage|derived from LBNL||
 ||`iso_region`|Name of the ISO region containing the project. Non-ISO projects are categorized as either Northwest or Southeast by LBNL|LBNL||
 ||`entity`|Similar to iso_region, but non-ISO projects are identified by utility|LBNL||

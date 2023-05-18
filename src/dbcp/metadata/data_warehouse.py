@@ -85,7 +85,7 @@ iso_projects = Table(
     Column("interconnection_service_type", String),
     Column("queue_date_raw", String),
     Column("is_actionable", Boolean),
-    Column("is_actionable_or_late_stage", Boolean),
+    Column("is_nearly_certain", Boolean),
     schema=schema,
 )
 

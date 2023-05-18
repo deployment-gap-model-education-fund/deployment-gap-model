@@ -39,6 +39,8 @@ def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
             proj.queue_status,
             proj.region as iso_region,
             proj.utility,
+            proj.is_actionable,
+            proj.is_nearly_certain,
             res.capacity_mw,
             res.resource_clean
         FROM data_warehouse.iso_projects as proj
@@ -137,6 +139,8 @@ def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame
         'active' as queue_status,
         'Offshore Wind' as resource_clean,
         0.0 as co2e_tonnes_per_year,
+        True as is_actionable,
+        True as is_nearly_certain,
 
         sfip.state_name as state,
         cfip.county_name as county,
@@ -292,6 +296,8 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "ordinance_earliest_year_mentioned",
         "ordinance_text",
         "state_permitting_type",
+        "is_actionable",
+        "is_nearly_certain",
         "source",
         # "frac_locations_in_county", not needed in wide format
     ]

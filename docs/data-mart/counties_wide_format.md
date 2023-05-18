@@ -34,6 +34,10 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 ||`renewable_and_battery_existing_facility_count`|Number of existing renewable generation or battery storage facilities.|PUDL||
 ||`renewable_and_battery_proposed_capacity_mw`|Combined generation and storage capacity, in megawatts, of proposed renewable power and storage facilities.|LBNL||
 ||`renewable_and_battery_proposed_facility_count`|Number of proposed renewable generation or battery storage facilities.|LBNL||
+||`renewable_and_battery_proposed_capacity_mw_actionable`|Combined generation and storage capacity, in megawatts, of proposed renewable power and storage facilities in the actionable stage of development.|derived from LBNL||
+||`renewable_and_battery_proposed_facility_count_actionable`|Number of proposed renewable generation or battery storage facilities in the actionable stage of development.|derived from LBNL||
+||`renewable_and_battery_proposed_capacity_mw_nearly_certain`|Combined generation and storage capacity, in megawatts, of proposed renewable power and storage facilities in the actionable or nearly completed stages of development.|derived from LBNL||
+||`renewable_and_battery_proposed_facility_count_nearly_certain`|Number of proposed renewable generation or battery storage facilities in the actionable or nearly completed stages of development.|derived from LBNL||
 ||`infra_total_proposed_co2e_tonnes_per_year`|Annual CO2 equivalent emissions from all proposed fossil infrastructure projects, in metric tonnes.|EIP||
 ||`infra_total_proposed_facility_count`|Number of proposed fossil infrastructure facilities across all sectors.|EIP||
 ||`infra_total_proposed_nox_tonnes_per_year`|Annual NOx emissions from all proposed fossil infrastructure projects, in metric tonnes.|EIP||
@@ -62,6 +66,9 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 ||`offshore_wind_interest_type`|Describes the relationship of this county to offshore wind. One of `Proposed lease area`, `Contracted project`,  `Lease area in proximity`, or NULL.|original work||
 ||`oil_existing_capacity_mw`|Generation capacity, in megawatts, of existing oil and diesel power plants.|PUDL||
 ||`oil_existing_co2e_tonnes_per_year`|Annual CO2 equivalent emissions from existing oil power plants, in metric tonnes.|derived from PUDL||
+||`oil_proposed_facility_count`|Number of proposed oil power plants.|LBNL||
+||`oil_proposed_capacity_mw`|Generation capacity, in megawatts, of proposed oil and diesel power plants.|LBNL||
+||`oil_proposed_co2e_tonnes_per_year`|Annual CO2 equivalent emissions from proposed oil power plants, in metric tonnes.|derived from LBNL||
 ||`oil_existing_facility_count`|Number of existing oil power plants.|PUDL||
 ||`onshore_wind_existing_capacity_mw`|Generation capacity, in megawatts, of existing onshore wind power plants.|PUDL||
 ||`onshore_wind_existing_facility_count`|Number of existing onshore wind power plants.|PUDL||

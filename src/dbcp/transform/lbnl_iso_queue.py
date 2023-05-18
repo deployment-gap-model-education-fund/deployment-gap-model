@@ -455,7 +455,7 @@ def _manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _add_actionable_and_late_stage_classification(queue: pd.DataFrame) -> pd.DataFrame:
-    """Add columns is_actionable and is_actionable_or_late_stage that classify each project.
+    """Add columns is_actionable and is_nearly_certain that classify each project.
 
     Here is the excel formula that was translated into this function. It has been
     formated for readability.
@@ -598,6 +598,6 @@ def _add_actionable_and_late_stage_classification(queue: pd.DataFrame) -> pd.Dat
         .fillna(False)
     )
     queue["is_actionable"] = queue["include_actionable"] & year_qualifies
-    queue["is_actionable_or_late_stage"] = queue["include_projected"] & year_qualifies
+    queue["is_nearly_certain"] = queue["include_projected"] & year_qualifies
     queue.drop(columns=["include_actionable", "include_projected"], inplace=True)
     return queue

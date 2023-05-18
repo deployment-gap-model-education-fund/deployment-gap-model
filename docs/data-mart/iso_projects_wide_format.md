@@ -23,6 +23,8 @@ Derived from iso_projects_long_format, this table is about individual ISO projec
 ||`developer`|The name of the project developer.|LBNL||
 ||`resource_class`|Renewable, fossil, or storage|derived from LBNL||
 ||`is_hybrid`|True/False indicator of whether the project has both generation and storage|derived from LBNL||
+||`is_actionable`|True/False indicator of whether the project development process is in the actionable zone.|derived from LBNL||
+||`is_nearly_certain`|True/False indicator of whether the project development process is in the actionable zone or nearly completed.|derived from LBNL||
 ||`interconnection_status`|LBNL's status category for the interconnection agreement ("not started", "in progress", "IA executed")|LBNL||
 ||`point_of_interconnection`|The name of the substation where the plant connects to the grid|LBNL||
 ||`queue_status`|These project have already been filtered to proposed projects, so this column is all "active".|LBNL||
