@@ -430,6 +430,7 @@ def _manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
         ["lincoln", "co", "lincoln county", "co"],
         ["new york-nj", "ny", "new york", "ny"],
         ["peneobscot/washington", "me", "penobscot", "me"],
+        ["delaware (ok)", "ok", "delaware", "ok"],
         # workaround for bug in addfips library.
         # See https://github.com/fitnr/addfips/issues/8
         ["bedford", "va", "bedford county", "va"],
@@ -453,5 +454,11 @@ def _manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
     locs.loc[:, "raw_state_name"] = locs.loc[:, "clean_state"].fillna(
         locs.loc[:, "raw_state_name"]
     )
+    # one cross-state project breaks the schema, so remove the second location for now.
+    is_cross_state = locs["raw_county_name"].eq("benton (ar)") & locs.loc[
+        :, "raw_state_name"
+    ].eq("ok")
+    assert is_cross_state.sum() == 1, "Expected one match for cross-state project."
+    locs = locs.loc[~is_cross_state, :]
     locs = locs.drop(["clean_county", "clean_state"], axis=1)
     return locs

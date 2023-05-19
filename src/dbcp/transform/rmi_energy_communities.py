@@ -26,8 +26,8 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     # fix one null FIPS (Villalba Municipio, Puerto Rico)
     fips_is_nan = transformed["county_id_fips"].isna()
     assert (
-        fips_is_nan.sum() == 2
-    ), f"Assumption violation: expected 2 null FIPS, got {fips_is_nan.sum()}"
+        fips_is_nan.sum() == 1
+    ), f"Assumption violation: expected 1 null FIPS, got {fips_is_nan.sum()}"
     transformed.loc[:, "county_id_fips"] = transformed.loc[:, "county_id_fips"].fillna(
         transformed.loc[:, "raw_county_id_fips"]
     )
