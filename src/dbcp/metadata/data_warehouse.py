@@ -1,6 +1,7 @@
 """SQL Alchemy metadata for the datawarehouse tables."""
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     Float,
@@ -30,6 +31,18 @@ county_fips = (
         Column("water_area_km2", Float, nullable=False),
         Column("centroid_latitude", Float, nullable=False),
         Column("centroid_longitude", Float, nullable=False),
+        Column(
+            "raw_tribal_land_frac",
+            Float,
+            CheckConstraint("raw_tribal_land_frac >= 0.0"),
+            nullable=False,
+        ),
+        Column(
+            "tribal_land_frac",
+            Float,
+            CheckConstraint("tribal_land_frac >= 0.0 AND tribal_land_frac <= 1.0"),
+            nullable=False,
+        ),
         schema=schema,
     ),
 )
@@ -44,11 +57,11 @@ state_fips = (
     ),
 )
 
-###################
-# ISO Queues 2021 #
-###################
-iso_projects_2021 = Table(
-    "iso_projects_2021",
+##############
+# ISO Queues #
+##############
+iso_projects = Table(
+    "iso_projects",
     metadata,
     Column("project_id", Integer, primary_key=True, autoincrement=False),
     Column("date_proposed_raw", String),
@@ -74,12 +87,10 @@ iso_projects_2021 = Table(
     schema=schema,
 )
 
-iso_locations_2021 = Table(
-    "iso_locations_2021",
+iso_locations = Table(
+    "iso_locations",
     metadata,
-    Column(
-        "project_id", Integer, ForeignKey("data_warehouse.iso_projects_2021.project_id")
-    ),
+    Column("project_id", Integer, ForeignKey("data_warehouse.iso_projects.project_id")),
     Column("raw_county_name", String),
     Column("raw_state_name", String),
     Column(
@@ -100,12 +111,10 @@ iso_locations_2021 = Table(
     schema=schema,
 )
 
-iso_resource_capacity_2021 = Table(
-    "iso_resource_capacity_2021",
+iso_resource_capacity = Table(
+    "iso_resource_capacity",
     metadata,
-    Column(
-        "project_id", Integer, ForeignKey("data_warehouse.iso_projects_2021.project_id")
-    ),
+    Column("project_id", Integer, ForeignKey("data_warehouse.iso_projects.project_id")),
     Column("resource", String),
     Column("resource_clean", String),
     Column("capacity_mw", Float),

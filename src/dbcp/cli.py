@@ -6,6 +6,7 @@ import sys
 import coloredlogs
 
 import dbcp
+from dbcp.transform.fips_tables import SPATIAL_CACHE
 from dbcp.transform.helpers import GEOCODER_CACHE
 
 logger = logging.getLogger(__name__)
@@ -56,10 +57,10 @@ def parse_command_line():
     )
     parser.add_argument(
         "-clr",
-        "--clear-geocoder-cache",
+        "--clear-cache",
         action="store_true",
         default=False,
-        help="Delete saved geocoder results, forcing fresh API calls.",
+        help="Delete saved geocoder and spatial join results, forcing fresh API calls and computation.",
     )
     arguments = parser.parse_args()
     return arguments
@@ -74,8 +75,9 @@ def main():
     log_format = "%(asctime)s [%(levelname)8s] %(name)s:%(lineno)s %(message)s"
     coloredlogs.install(fmt=log_format, level=args.loglevel, logger=dbcp_logger)
 
-    if args.clear_geocoder_cache:
+    if args.clear_cache:
         GEOCODER_CACHE.clear()
+        SPATIAL_CACHE.clear()
 
     if args.etl:
         dbcp.etl.etl(args)

@@ -77,8 +77,8 @@ local.env
 # Jupyter NB Checkpoints
 .ipynb_checkpoints/
 
-# geocoder disk cache
-data/geocoder_cache/*
+# disk caches
+data/*_cache/
 
 # EIP api reverse engineering stuff
 references/eip_api_reverse_eng/*
