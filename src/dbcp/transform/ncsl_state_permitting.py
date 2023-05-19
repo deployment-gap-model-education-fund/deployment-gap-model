@@ -4,8 +4,8 @@ from typing import Dict
 import numpy as np
 import pandas as pd
 
+from dbcp.constants import US_STATES_TERRITORIES
 from pudl.helpers import add_fips_ids as _add_fips_ids
-from pudl.metadata.enums import US_STATES_TERRITORIES
 
 
 def transform(raw_df: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
@@ -56,7 +56,7 @@ def validate(ncsl_df: pd.DataFrame) -> None:
         AssertionError: if unexpected state name is found
         AssertionError: if unexpected permitting type is found
     """
-    expected_states = set(US_STATES_TERRITORIES.values())
+    expected_states = US_STATES_TERRITORIES
     df_states = set(ncsl_df.loc[:, "raw_state_name"].unique())
     # don't want symmetric diff due to territories
     set_diff = df_states.difference(expected_states)
