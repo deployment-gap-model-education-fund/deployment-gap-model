@@ -155,7 +155,9 @@ def upload_schema_to_bigquery(schema: str) -> None:
         "https://www.googleapis.com/auth/cloud-platform",
     ]
 
-    credentials = pydata_google_auth.get_user_credentials(SCOPES)
+    credentials = pydata_google_auth.get_user_credentials(
+        SCOPES, use_local_webserver=False
+    )
 
     for table_name, df in loaded_tables.items():
         logger.info(f"Loading: {table_name}")
