@@ -139,8 +139,14 @@ def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame
         'active' as queue_status,
         'Offshore Wind' as resource_clean,
         0.0 as co2e_tonnes_per_year,
-        True as is_actionable,
-        True as is_nearly_certain,
+        (CASE
+            WHEN proj.construction_status = 'Construction underway' THEN True
+            ELSE False
+        END) as is_nearly_certain,
+        (CASE
+            WHEN proj.construction_status NOT IN ('Construction underway', 'Online') THEN True
+            ELSE False -- includes NULL
+        END) as is_actionable,
 
         sfip.state_name as state,
         cfip.county_name as county,
