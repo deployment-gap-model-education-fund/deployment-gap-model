@@ -106,3 +106,24 @@ We estimated annual CO2e production for proposed gas and coal plants. See the pa
 {% content-ref url="../co2-estimation.md" %}
 [co2-estimation.md](../co2-estimation.md)
 {% endcontent-ref %}
+
+### "Actionable" and "Nearly Certain" Projects
+
+These values are based on where a project is in the interconnection process. An "actionable" project is one that meets the following criteria:
+
+* proposed operating date in the latest year queue data or later (forward looking)
+* is active in the queue
+* is in one of the following stages of interconnection, as classified by LBNL:
+  * Facility Study
+  * System Impact Study
+  * Phase 4 Study
+  * "IA Pending"
+  * "IA in Progress"
+Offshore wind projects come from a separate source, so their only "actionable" qualification is to have a `construction_status` of "Site assessment underway" or "Not started".
+
+A "nearly certain" project is one that meets the "actionable" criteria but with the following additional allowable interconnection stages:
+
+* Construction
+* IA Executed
+* Operational
+Offshore wind projects come from a separate source, so their only "nearly certain" qualification is to have a `construction_status` of "Construction underway".
