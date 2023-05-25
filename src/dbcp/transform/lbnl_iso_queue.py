@@ -1,6 +1,5 @@
 """Functions to transform LBNL ISO queue tables."""
 
-from io import StringIO
 from typing import Dict, List
 
 import numpy as np
@@ -85,10 +84,32 @@ def _harmonize_interconnection_status_lbnl(statuses: pd.Series) -> pd.Series:
     """Harmonize the interconnection_status_lbnl values."""
     mapping = {
         "Feasability Study": "Feasibility Study",
+        "Feasibility": "Feasibility Study",
         "Facilities Study": "Facility Study",
         "IA in Progress": "In Progress (unknown study)",
+        "Unknown": "In Progress (unknown study)",
+        "Withdrawn, Feasibility Study": "Withdrawn",
     }
-    return statuses.replace(mapping)
+    allowed_statuses = {
+        "Cluster Study",
+        "Combined",
+        "Construction",
+        "Facility Study",
+        "Feasibility Study",
+        "IA Executed",
+        "IA Pending",
+        "In Progress (unknown study)",
+        "Not Started",
+        "Operational",
+        "Phase 4 Study",
+        "Suspended",
+        "System Impact Study",
+        "Withdrawn",
+    }
+    out = statuses.replace(mapping)
+    bad = out.loc[~out.isin(allowed_statuses)]
+    assert len(bad) == 0, f"Unknown interconnection status(es): {bad.value_counts()}"
+    return out
 
 
 def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
@@ -120,7 +141,7 @@ def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
     for col in active_projects.columns:
         if pd.api.types.is_object_dtype(active_projects.loc[:, col]):
             active_projects.loc[:, col] = active_projects.loc[:, col].str.strip()
-    active_projects = _add_actionable_and_late_stage_classification(active_projects)
+    active_projects = _add_actionable_and_nearly_certain_classification(active_projects)
     return active_projects
 
 
@@ -461,140 +482,45 @@ def _manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
     return locs
 
 
-def _add_actionable_and_late_stage_classification(queue: pd.DataFrame) -> pd.DataFrame:
+def _add_actionable_and_nearly_certain_classification(
+    queue: pd.DataFrame,
+) -> pd.DataFrame:
     """Add columns is_actionable and is_nearly_certain that classify each project.
 
-    Here is the excel formula that was translated into this function. It has been
-    formated for readability.
-
-    =IF(
-        $C$7=$D$9,  # "likely MW" (actionable)
-        IF(
-            $D17="no",  # if IA status not included
-            0,  # then 0
-            SUMIFS(  # else: (so IA status included)
-                $LBNL_data_2022.$AA:$AA,  # sum range, MW1 only
-                $LBNL_data_2022.$B:$B,  # range, status
-                $Sheet1.$C$5,  # criteria, "active"
-                $LBNL_data_2022.$T:$T,  # range, proposed year
-                ">=2022",  # criteria, year
-                $LBNL_data_2022.$P:$P,  # range, region
-                $B17,  # criteria, region per row
-                $LBNL_data_2022.$V:$V,  # range, ia_status_clean
-                $C17,  # criteria, ia_status_clean per row
-                $LBNL_data_2022.$W:$W,  # range, type_clean
-                H$9  # criteria, type_clean per column
-                )
-        ),
-        IF(  # (projected; equals actionable plus late-stage projects)
-            $E17="no",  # IA status not included
-            0,
-            SUMIFS(  # else: same as above
-                $LBNL_data_2022.$AA:$AA,
-                $LBNL_data_2022.$B:$B,
-                $Sheet1.$C$5,
-                $LBNL_data_2022.$T:$T,
-                ">=2022",
-                $LBNL_data_2022.$P:$P,
-                $B17,
-                $LBNL_data_2022.$V:$V,
-                $C17,
-                $LBNL_data_2022.$W:$W,
-                H$9
-            )
-        )
-    )
+    This model was created by a consultant in Excel and translated to python.
     """
     if not queue["queue_status"].eq("active").all():
         raise ValueError("This function only applies to active projects.")
-    # the following was manually defined by a consultant
-    region_ia_status_inclusion = """
-"region","interconnection_status_lbnl","include_actionable","include_projected"
-"CAISO","Feasibility Study",False,False
-"CAISO","Operational",False,True
-"CAISO","System Impact Study",True,False
-"CAISO","IA Executed",False,True
-"CAISO","Facility Study",False,False
-"ERCOT","IA Executed",False,True
-"ERCOT","Facility Study",False,False
-"ERCOT","System Impact Study",True,True
-"ISO-NE","In Progress (unknown study)",False,False
-"ISO-NE","Operational",False,True
-"ISO-NE","IA Executed",False,True
-"ISO-NE","System Impact Study",True,True
-"ISO-NE","Not Started",False,False
-"ISO-NE","Feasibility Study",False,False
-"ISO-NE","Facility Study",False,False
-"MISO","IA Executed",False,True
-"MISO","In Progress (unknown study)",False,False
-"MISO","Facility Study",False,False
-"MISO","Operational",False,True
-"MISO","System Impact Study",True,True
-"MISO","Withdrawn",False,False
-"MISO","Feasibility Study",False,False
-"MISO","Not Started",False,False
-"NYISO","Withdrawn",False,False
-"NYISO","In Progress (unknown study)",False,False
-"NYISO","Facility Study",False,True
-"NYISO","System Impact Study",True,True
-"NYISO","Operational",False,True
-"NYISO","Feasibility Study",False,False
-"PJM","Feasibility Study",False,False
-"PJM","Facility Study",False,True
-"PJM","System Impact Study",True,True
-"PJM","Withdrawn",False,False
-"PJM","IA Executed",False,True
-"PJM","In Progress (unknown study)",False,False
-"Southeast (non-ISO)","Withdrawn",False,False
-"Southeast (non-ISO)","IA Executed",False,True
-"Southeast (non-ISO)","Facilities Study",False,True
-"Southeast (non-ISO)","System Impact Study",True,True
-"Southeast (non-ISO)","In Progress (unknown study)",False,False
-"Southeast (non-ISO)","Feasibility Study",False,False
-"Southeast (non-ISO)","Facility Study",False,True
-"Southeast (non-ISO)","Suspended",False,False
-"Southeast (non-ISO)","Not Started",False,False
-"Southeast (non-ISO)","Operational",False,False
-"Southeast (non-ISO)","Construction",False,True
-"Southeast (non-ISO)","Feasibility",False,False
-"SPP","System Impact Study",True,True
-"SPP","Operational",False,True
-"SPP","IA Executed",False,True
-"SPP","Facility Study",False,True
-"SPP","In Progress (unknown study)",False,False
-"SPP","Suspended",False,False
-"West (non-ISO)","System Impact Study",True,True
-"West (non-ISO)","Suspended",False,False
-"West (non-ISO)","Facility Study",False,True
-"West (non-ISO)","IA Executed",False,True
-"West (non-ISO)","Withdrawn",False,False
-"West (non-ISO)","Feasibility Study",False,False
-"West (non-ISO)","In Progress (unknown study)",False,False
-"West (non-ISO)","Operational",False,True
-"West (non-ISO)","Cluster Study",False,False
-"West (non-ISO)","Feasability Study",False,False
-"West (non-ISO)","Not Started",False,False
-"West (non-ISO)","IA in Progress",False,True
-"West (non-ISO)","Phase 4 Study",True,True
-"West (non-ISO)","IA Pending",False,True
-"West (non-ISO)","Combined",False,False
-"West (non-ISO)","Withdrawn, Feasibility Study",False,False
-"West (non-ISO)","Construction",False,False
-"West (non-ISO)","Unknown",False,False
-"""
-    region_ia_status_inclusion = pd.read_csv(StringIO(region_ia_status_inclusion))
-    queue = (
-        queue.reset_index(drop=False)
-        .merge(
-            region_ia_status_inclusion,
-            how="left",
-            on=["region", "interconnection_status_lbnl"],
+    if (
+        queue["interconnection_status_lbnl"]
+        .isin(
+            {
+                "Facilities Study",
+                "Feasability Study",
+            }
         )
-        .set_index("project_id")
+        .any()
+    ):
+        raise ValueError("This function only applies to harmonized IA statuses.")
+    # the following sets were manually defined by a consultant
+    actionable_ia_statuses = {
+        "Facility Study",
+        "System Impact Study",
+        "Phase 4 Study",
+        "IA Pending",
+    }
+    projected_ia_statuses = actionable_ia_statuses | {
+        "Construction",
+        "IA Executed",
+        "Operational",
+    }
+    include_actionable = (
+        queue["interconnection_status_lbnl"].isin(actionable_ia_statuses).fillna(False)
     )
-    assert (
-        queue[["include_actionable", "include_projected"]].notnull().all().all()
-    ), "Uncategorized region-IA_status combinations found."
+    include_projected = (
+        queue["interconnection_status_lbnl"].isin(projected_ia_statuses).fillna(False)
+    )
+
     # As of 2022 data, 337 active projects are missing year_proposed. Use queue_year as
     # a conservative backup estimate. Only 8 projects have no date information; they
     # are omitted.
@@ -604,7 +530,6 @@ def _add_actionable_and_late_stage_classification(queue: pd.DataFrame) -> pd.Dat
         .ge(LBNL_LATEST_YEAR)
         .fillna(False)
     )
-    queue["is_actionable"] = queue["include_actionable"] & year_qualifies
-    queue["is_nearly_certain"] = queue["include_projected"] & year_qualifies
-    queue.drop(columns=["include_actionable", "include_projected"], inplace=True)
+    queue["is_actionable"] = include_actionable & year_qualifies
+    queue["is_nearly_certain"] = include_projected & year_qualifies
     return queue

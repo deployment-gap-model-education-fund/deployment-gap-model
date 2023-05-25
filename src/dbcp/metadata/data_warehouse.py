@@ -670,6 +670,8 @@ offshore_wind_projects = Table(
     Column("construction_status", String),
     Column("overall_project_status", String),
     Column("lease_areas", String),
+    Column("is_actionable", Boolean),
+    Column("is_nearly_certain", Boolean),
     schema=schema,
 )
 offshore_wind_locations = Table(
