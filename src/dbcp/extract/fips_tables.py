@@ -16,7 +16,6 @@ def _extract_census_counties(census_path: Path) -> pd.DataFrame:
     Args:
         census_path: path to zipped shapefiles.
     """
-    # ignore geometry info -- big and not currently used
     path = dbcp.extract.helpers.cache_gcs_archive_file_locally(census_path)
     counties = gpd.read_file(path)
     return counties

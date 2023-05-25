@@ -20,6 +20,8 @@ Note that **this duplicates projects with multiple prospective locations.** Use 
 ||`county_id_fips`|County FIPS ID|Census||
 |Properties|`project_name`|Name of the project|LBNL||
 ||`is_hybrid`|True/False indicator of whether the project has both generation and storage|derived from LBNL||
+||`is_actionable`|True/False indicator of whether the project development process is in the actionable zone.|derived from LBNL||
+||`is_nearly_certain`|True/False indicator of whether the project development process is in the actionable zone or nearly completed.|derived from LBNL||
 ||`resource_class`|Renewable, fossil, or storage|derived from LBNL||
 ||`iso_region`|Name of the ISO region containing the project. Non-ISO projects are categorized as either Northwest or Southeast by LBNL|LBNL||
 ||`entity`|Similar to iso_region, but non-ISO projects are identified by utility|LBNL||
@@ -104,3 +106,24 @@ We estimated annual CO2e production for proposed gas and coal plants. See the pa
 {% content-ref url="../co2-estimation.md" %}
 [co2-estimation.md](../co2-estimation.md)
 {% endcontent-ref %}
+
+### "Actionable" and "Nearly Certain" Projects
+
+These values are based on where a project is in the interconnection process. An "actionable" project is one that meets the following criteria:
+
+* proposed operating date in the latest year queue data or later (forward looking)
+* is active in the queue
+* is in one of the following stages of interconnection, as classified by LBNL:
+  * Facility Study
+  * System Impact Study
+  * Phase 4 Study
+  * "IA Pending"
+  * "IA in Progress"
+Offshore wind projects come from a separate source, so their only "actionable" qualification is to have a `construction_status` of "Site assessment underway" or "Not started".
+
+A "nearly certain" project is one that meets the "actionable" criteria but with the following additional allowable interconnection stages:
+
+* Construction
+* IA Executed
+* Operational
+Offshore wind projects come from a separate source, so their only "nearly certain" qualification is to have a `construction_status` of "Construction underway".

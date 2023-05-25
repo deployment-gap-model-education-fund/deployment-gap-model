@@ -146,6 +146,23 @@ def _validate_raw_data(raw_dfs: dict[str, pd.DataFrame]) -> None:
     return
 
 
+def _add_actionable_and_nearly_certain_classification(projects: pd.DataFrame) -> None:
+    actionable_statuses = {
+        "Site assessment underway",
+        "Not started",
+    }
+    nearly_certain_statuses = actionable_statuses | {
+        "Construction underway",
+    }
+    projects.loc[:, "is_actionable"] = projects["construction_status"].isin(
+        actionable_statuses
+    )
+    projects.loc[:, "is_nearly_certain"] = projects["construction_status"].isin(
+        nearly_certain_statuses
+    )
+    return None
+
+
 def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """Transform offshore wind data."""
     _validate_raw_data(raw_dfs=raw_dfs)
@@ -181,6 +198,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     )
 
     proj.loc[:, "recipient_state"].replace({"TBD": pd.NA}, inplace=True)
+    _add_actionable_and_nearly_certain_classification(projects=proj)
 
     transformed_dfs = {}
     transformed_dfs[

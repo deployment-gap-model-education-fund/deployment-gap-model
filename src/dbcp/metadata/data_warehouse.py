@@ -84,6 +84,8 @@ iso_projects = Table(
     Column("interconnection_date_raw", String),
     Column("interconnection_service_type", String),
     Column("queue_date_raw", String),
+    Column("is_actionable", Boolean),
+    Column("is_nearly_certain", Boolean),
     schema=schema,
 )
 
@@ -402,6 +404,7 @@ mcoe = Table(
     Column("data_source", String),
     Column("deliver_power_transgrid", Boolean),
     Column("distributed_generation", Boolean),
+    Column("data_maturity", String),
     Column("duct_burners", Boolean),
     Column("energy_source_1_transport_1", String),
     Column("energy_source_1_transport_2", String),
@@ -415,8 +418,10 @@ mcoe = Table(
     Column("energy_source_code_4", String),
     Column("energy_source_code_5", String),
     Column("energy_source_code_6", String),
+    Column("energy_storage_capacity_mwh", Float),
     Column("ferc_cogen_status", Boolean),
     Column("ferc_exempt_wholesale_generator", Boolean),
+    Column("ferc_qualifying_facility", Boolean),
     Column("ferc_small_power_producer", Boolean),
     Column("fluidized_bed_tech", Boolean),
     Column("fuel_cost_from_eiaapi", Boolean),
@@ -434,6 +439,7 @@ mcoe = Table(
     Column("minimum_load_mw", Float),
     Column("multiple_fuels", Boolean),
     Column("nameplate_power_factor", Float),
+    Column("net_capacity_mwdc", Float),
     Column("net_generation_mwh", Float),
     Column("operating_date", DateTime),
     Column("operating_switch", String),
@@ -664,6 +670,8 @@ offshore_wind_projects = Table(
     Column("construction_status", String),
     Column("overall_project_status", String),
     Column("lease_areas", String),
+    Column("is_actionable", Boolean),
+    Column("is_nearly_certain", Boolean),
     schema=schema,
 )
 offshore_wind_locations = Table(
