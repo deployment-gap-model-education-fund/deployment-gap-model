@@ -94,7 +94,7 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 ||`infra_petrochemicals_and_plastics_proposed_co2e_tonnes_per_year`|Annual CO2 equivalent emissions from proposed petrochemical and plastics infrastructure, in metric tonnes.|EIP||
 ||`infra_petrochemicals_and_plastics_proposed_facility_count`|Number of existing infrastructure facilities in the petrochemicals and plastics sector, excluding fertilizers.|EIP||
 ||`infra_petrochemicals_and_plastics_proposed_nox_tonnes_per_year`|Annual NOx emissions from all proposed petrochemical and plastics infrastructure projects, in metric tonnes.|EIP||
-||`infra_petrochemicals_and_plastics_proposed_pm2_5_tonnes_per_year`|Annual PM2.5 emissions from all proposed petrochemical and plastics infrastructure projects, in metric tonnes.|EIP||
+||`infra_petrochemicals_and_plastics_proposed_pm2_5_tonnes_per_yea`|Annual PM2.5 emissions from all proposed petrochemical and plastics infrastructure projects, in metric tonnes.|EIP||
 ||`infra_synthetic_fertilizers_proposed_co2e_tonnes_per_year`|Annual CO2 equivalent emissions from proposed fertilizer infrastructure, in metric tonnes.|EIP||
 ||`infra_synthetic_fertilizers_proposed_facility_count`|Number of existing infrastructure facilities in the fertilizers sector.|EIP||
 ||`infra_synthetic_fertilizers_proposed_nox_tonnes_per_year`|Annual NOx emissions from all proposed fossil infrastructure projects, in metric tonnes.|EIP||
