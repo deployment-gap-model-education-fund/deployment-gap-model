@@ -65,20 +65,18 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
 
     pudl_tables = {}
 
-    pudl_engine = sa.create_engine(
-        f"sqlite:////{pudl_data_path}/pudl_data/sqlite/pudl.sqlite"
-    )
+    pudl_engine = sa.create_engine(f"sqlite:////{pudl_data_path}")
     pudl_out = PudlTabl(
         pudl_engine,
-        start_date="2020-01-01",
-        end_date="2020-12-31",
+        start_date="2021-01-01",
+        end_date="2021-12-31",
         freq="AS",
         fill_fuel_cost=False,
         roll_fuel_cost=True,
         fill_net_gen=True,
     )
 
-    mcoe = pudl_out.mcoe(all_gens=True)
+    mcoe = pudl_out.mcoe(all_gens=True, gens_cols="all")
     # add FIPS
     # workaround for addfips Bedford, VA problem
     bedford_addfips_fix(mcoe)

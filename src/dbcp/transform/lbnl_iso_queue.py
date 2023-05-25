@@ -5,6 +5,7 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 
+from dbcp.constants import LBNL_LATEST_YEAR
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     normalize_multicolumns_to_rows,
@@ -83,10 +84,32 @@ def _harmonize_interconnection_status_lbnl(statuses: pd.Series) -> pd.Series:
     """Harmonize the interconnection_status_lbnl values."""
     mapping = {
         "Feasability Study": "Feasibility Study",
+        "Feasibility": "Feasibility Study",
         "Facilities Study": "Facility Study",
         "IA in Progress": "In Progress (unknown study)",
+        "Unknown": "In Progress (unknown study)",
+        "Withdrawn, Feasibility Study": "Withdrawn",
     }
-    return statuses.replace(mapping)
+    allowed_statuses = {
+        "Cluster Study",
+        "Combined",
+        "Construction",
+        "Facility Study",
+        "Feasibility Study",
+        "IA Executed",
+        "IA Pending",
+        "In Progress (unknown study)",
+        "Not Started",
+        "Operational",
+        "Phase 4 Study",
+        "Suspended",
+        "System Impact Study",
+        "Withdrawn",
+    }
+    out = statuses.replace(mapping)
+    bad = out.loc[~out.isin(allowed_statuses)]
+    assert len(bad) == 0, f"Unknown interconnection status(es): {bad.value_counts()}"
+    return out
 
 
 def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
@@ -114,6 +137,11 @@ def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
     active_projects.loc[
         bad_proj_id, "resource_type_1"
     ] = "Coal"  # raw data has two instances of "battery storage"
+    # clean up whitespace
+    for col in active_projects.columns:
+        if pd.api.types.is_object_dtype(active_projects.loc[:, col]):
+            active_projects.loc[:, col] = active_projects.loc[:, col].str.strip()
+    active_projects = _add_actionable_and_nearly_certain_classification(active_projects)
     return active_projects
 
 
@@ -129,9 +157,6 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     """
     active = lbnl_raw_dfs["lbnl_iso_queue"].query("queue_status == 'active'").copy()
     transformed = active_iso_queue_projects(active)  # sets index to project_id
-    for col in transformed.columns:
-        if pd.api.types.is_object_dtype(transformed.loc[:, col]):
-            transformed.loc[:, col] = transformed.loc[:, col].str.strip()
 
     # Combine and normalize iso queue tables
     lbnl_normalized_dfs = normalize_lbnl_dfs(transformed)
@@ -183,7 +208,9 @@ def parse_date_columns(queue: pd.DataFrame) -> None:
     ]
 
     # add _raw suffix
-    rename_dict = dict(zip(date_cols, [col + "_raw" for col in date_cols]))
+    rename_dict: dict[str, str] = dict(
+        zip(date_cols, [col + "_raw" for col in date_cols])
+    )
     queue.rename(columns=rename_dict, inplace=True)
 
     for date_col, raw_col in rename_dict.items():
@@ -205,10 +232,7 @@ def _normalize_resource_capacity(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFram
     Returns:
         Dict[str, pd.DataFrame]: dict with the projects and multivalues split into two dataframes
     """
-    if "capacity_mw_resource_3" in lbnl_df.columns:  # only active projects
-        n_multicolumns = 3
-    else:
-        n_multicolumns = 2
+    n_multicolumns = 3
     attr_columns = {
         "resource": ["resource_type_" + str(n) for n in range(1, n_multicolumns + 1)],
         "capacity_mw": [
@@ -236,24 +260,18 @@ def _normalize_location(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     Returns:
         Dict[str, pd.DataFrame]: dict with the projects and locations split into two dataframes
     """
-    if "county_3" in lbnl_df.columns:  # only active projects are multivalued
-        county_cols = ["county_" + str(n) for n in range(1, 4)]
-        location_df = normalize_multicolumns_to_rows(
-            lbnl_df,
-            attribute_columns_dict={"raw_county_name": county_cols},
-            preserve_original_names=False,
-            dropna=True,
-        )
-        location_df = location_df.merge(
-            lbnl_df.loc[:, "raw_state_name"], on="project_id", validate="m:1"
-        )
+    county_cols = ["county_" + str(n) for n in range(1, 4)]
+    location_df = normalize_multicolumns_to_rows(
+        lbnl_df,
+        attribute_columns_dict={"raw_county_name": county_cols},
+        preserve_original_names=False,
+        dropna=True,
+    )
+    location_df = location_df.merge(
+        lbnl_df.loc[:, "raw_state_name"], on="project_id", validate="m:1"
+    )
 
-        project_df = lbnl_df.drop(columns=county_cols + ["raw_state_name"])
-    else:
-        location_df = lbnl_df.loc[
-            :, ["raw_state_name", "raw_county_name"]
-        ].reset_index()
-        project_df = lbnl_df.drop(columns=["raw_state_name", "raw_county_name"])
+    project_df = lbnl_df.drop(columns=county_cols + ["raw_state_name"])
 
     location_df.dropna(
         subset=["raw_state_name", "raw_county_name"], how="all", inplace=True
@@ -430,6 +448,7 @@ def _manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
         ["lincoln", "co", "lincoln county", "co"],
         ["new york-nj", "ny", "new york", "ny"],
         ["peneobscot/washington", "me", "penobscot", "me"],
+        ["delaware (ok)", "ok", "delaware", "ok"],
         # workaround for bug in addfips library.
         # See https://github.com/fitnr/addfips/issues/8
         ["bedford", "va", "bedford county", "va"],
@@ -453,5 +472,64 @@ def _manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
     locs.loc[:, "raw_state_name"] = locs.loc[:, "clean_state"].fillna(
         locs.loc[:, "raw_state_name"]
     )
+    # one cross-state project breaks the schema, so remove the second location for now.
+    is_cross_state = locs["raw_county_name"].eq("benton (ar)") & locs.loc[
+        :, "raw_state_name"
+    ].eq("ok")
+    assert is_cross_state.sum() == 1, "Expected one match for cross-state project."
+    locs = locs.loc[~is_cross_state, :]
     locs = locs.drop(["clean_county", "clean_state"], axis=1)
     return locs
+
+
+def _add_actionable_and_nearly_certain_classification(
+    queue: pd.DataFrame,
+) -> pd.DataFrame:
+    """Add columns is_actionable and is_nearly_certain that classify each project.
+
+    This model was created by a consultant in Excel and translated to python.
+    """
+    if not queue["queue_status"].eq("active").all():
+        raise ValueError("This function only applies to active projects.")
+    if (
+        queue["interconnection_status_lbnl"]
+        .isin(
+            {
+                "Facilities Study",
+                "Feasability Study",
+            }
+        )
+        .any()
+    ):
+        raise ValueError("This function only applies to harmonized IA statuses.")
+    # the following sets were manually defined by a consultant
+    actionable_ia_statuses = {
+        "Facility Study",
+        "System Impact Study",
+        "Phase 4 Study",
+        "IA Pending",
+    }
+    projected_ia_statuses = actionable_ia_statuses | {
+        "Construction",
+        "IA Executed",
+        "Operational",
+    }
+    include_actionable = (
+        queue["interconnection_status_lbnl"].isin(actionable_ia_statuses).fillna(False)
+    )
+    include_projected = (
+        queue["interconnection_status_lbnl"].isin(projected_ia_statuses).fillna(False)
+    )
+
+    # As of 2022 data, 337 active projects are missing year_proposed. Use queue_year as
+    # a conservative backup estimate. Only 8 projects have no date information; they
+    # are omitted.
+    year_qualifies = (
+        queue["year_proposed"]
+        .fillna(queue["queue_year"])
+        .ge(LBNL_LATEST_YEAR)
+        .fillna(False)
+    )
+    queue["is_actionable"] = include_actionable & year_qualifies
+    queue["is_nearly_certain"] = include_projected & year_qualifies
+    return queue
