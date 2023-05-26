@@ -5,6 +5,8 @@ FIPS_CODE_VINTAGE = 2020
 
 LBNL_LATEST_YEAR = 2022
 
+PUDL_LATEST_YEAR = 2021
+
 US_STATES = set(
     POLITICAL_SUBDIVISIONS.query("subdivision_type == 'state'").subdivision_name
 )

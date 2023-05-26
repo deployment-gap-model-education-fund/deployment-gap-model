@@ -8,6 +8,7 @@ from typing import Optional
 import pandas as pd
 import sqlalchemy as sa
 
+from dbcp.constants import PUDL_LATEST_YEAR
 from dbcp.data_mart.helpers import _get_county_fips_df, _get_state_fips_df
 from dbcp.helpers import download_pudl_data, get_sql_engine
 from dbcp.transform.helpers import (
@@ -17,7 +18,7 @@ from dbcp.transform.helpers import (
 
 
 def _get_existing_plant_fuel_data(pudl_engine: sa.engine.Engine) -> pd.DataFrame:
-    query = """
+    query = f"""
     select
         plant_id_eia,
         fuel_type_code_pudl,
@@ -26,7 +27,9 @@ def _get_existing_plant_fuel_data(pudl_engine: sa.engine.Engine) -> pd.DataFrame
         net_generation_mwh as mwh,
         fuel_consumed_for_electricity_mmbtu as mmbtu
     from generation_fuel_eia923
-    where report_date >= date('2020-01-01') -- this is monthly data
+    -- select one calendar year of monthly data
+    where report_date >= date('{PUDL_LATEST_YEAR}-01-01')
+        and report_date < date('{PUDL_LATEST_YEAR+1}-01-01')
     AND fuel_type_code_pudl in ('coal', 'gas', 'oil')
     ;
     """

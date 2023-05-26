@@ -1,1 +1,4 @@
-skips: ['B101'] # Yes we are working on the assert statements!
+skips: [
+  'B101', # something about assert statements? From PUDL.
+  'B608', # f-string SQL statements are fine in this context.
+  ]
