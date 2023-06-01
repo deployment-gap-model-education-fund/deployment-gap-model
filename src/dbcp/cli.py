@@ -51,6 +51,12 @@ def parse_command_line():
         help="Loads tables to BigQuery.",
     )
     parser.add_argument(
+        "-bqenv",
+        "--bigquery-env",
+        help="Select which BigQuery environment to load the data to (prod or dev).",
+        default="dev",
+    )
+    parser.add_argument(
         "--loglevel",
         help="Set logging level (DEBUG, INFO, WARNING, ERROR, or CRITICAL).",
         default="INFO",
