@@ -1,4 +1,24 @@
-"""Module to create a county-level table for DBCP to use in spreadsheet tools."""
+"""Module to create a county-level table for DBCP to use in spreadsheet tools.
+
+This module creates two tables: county_wide_format and county_long_format.
+The long format primary key is (county, resource), while the wide format
+key is simply county.
+
+The long format table is used primarily by tableau, while the wide format
+is most useful for spreadsheet tools. The wide format table is easier to
+understand for non-data people because 1 row = 1 county, and gets more
+use by the clients themselves. The long format table, via tableau, gets
+more use by the client's clients.
+
+The two tables began with the same data, but over time the wide format has
+accumulated ad hoc requests from the client, so they have diverged somewhat.
+
+For the sake of maintainability, the wide format table is generated from the
+long format table as much as possible. But some columns must be calculated
+separately, such as non-commutative aggregations over nested groupings, eg
+`count(distinct my_column)) group by county, resource` cannot have another
+`count(distinct my_column) group by county` on top of it.
+"""
 from io import StringIO
 from typing import Dict, Optional
 
@@ -154,6 +174,21 @@ def _get_env_justice_df(engine: sa.engine.Engine) -> pd.DataFrame:
 
 def _get_existing_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
     # get plant_id, fuel_type, capacity_mw
+
+    # The query here relies on the fact that each generator has only one fuel_type_pudl.
+    # I confirmed that this is true because the following query returns 1:
+    # WITH
+    # gen_fuels as (
+    #     SELECT
+    #         plant_id_eia,
+    #         generator_id,
+    #         count(fuel_type_code_pudl) as fuel_type_count
+    #     FROM "data_warehouse"."mcoe"
+    #     GROUP BY 1, 2
+    # )
+    # SELECT max(fuel_type_count) as max_fuel_type_count
+    # FROM gen_fuels
+
     query = """
     WITH
     plant_fuel_aggs as (
@@ -267,6 +302,7 @@ def _existing_plants_counties(
     state_fips_table: Optional[pd.DataFrame] = None,
     county_fips_table: Optional[pd.DataFrame] = None,
 ) -> pd.DataFrame:
+    """Create existing plant county-plant aggs for the long-format county table."""
     plants = _get_existing_plants(
         pudl_engine=pudl_engine,
         postgres_engine=postgres_engine,
@@ -304,20 +340,18 @@ def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
 
     # equivalent SQL query that I translated to pandas to avoid dependency
     # on the data_mart schema (which doesn't yet exist when this function runs)
-    """
-    SELECT
-        county_id_fips,
-        industry_sector as resource_or_sector,
-        count(project_id) as facility_count,
-        sum(co2e_tonnes_per_year) as co2e_tonnes_per_year,
-        sum(pm2_5_tonnes_per_year) as pm2_5_tonnes_per_year,
-        sum(nox_tonnes_per_year) as nox_tonnes_per_year,
-        'power plant' as facility_type,
-        'proposed' as status
-    from data_mart.fossil_infrastructure_projects
-    group by 1, 2
-    ;
-    """
+    # SELECT
+    #     county_id_fips,
+    #     industry_sector as resource_or_sector,
+    #     count(project_id) as facility_count,
+    #     sum(co2e_tonnes_per_year) as co2e_tonnes_per_year,
+    #     sum(pm2_5_tonnes_per_year) as pm2_5_tonnes_per_year,
+    #     sum(nox_tonnes_per_year) as nox_tonnes_per_year,
+    #     'power plant' as facility_type,
+    #     'proposed' as status
+    # from data_mart.fossil_infrastructure_projects
+    # group by 1, 2
+
     grp = infra.groupby(["county_id_fips", "industry_sector"])
     aggs = grp.agg(
         {
@@ -348,7 +382,7 @@ def _iso_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     # Could also make an orchestration script.
     iso = create_iso_data_mart(engine)
 
-    # nearly-equivalent SQL query that I translated to pandas to avoid dependency
+    # equivalent SQL query that I translated to pandas to avoid dependency
     # on the data_mart schema (which doesn't yet exist when this function runs)
     """
     SELECT
@@ -360,13 +394,16 @@ def _iso_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
         'power plant' as facility_type,
         'proposed' as status
     from data_mart.iso_projects_long_format
+    where county_id_fips is not null -- 9 rows as of 6/4/2023
     group by 1, 2
     ;
     """
     # Distribute project-level quantities across locations, when there are multiple.
     # A handful of ISO projects are in multiple counties and the proprietary offshore
     # wind projects have an entry for each cable landing.
-    # This approximation assumes an equal distribution.
+    # This approximation assumes an equal distribution between sites.
+    # Also note that this model represents everything relevant to each county,
+    # so multi-county projects are intentionally double-counted; for each relevant county.
     iso.loc[:, ["capacity_mw", "co2e_tonnes_per_year"]] = iso.loc[
         :, ["capacity_mw", "co2e_tonnes_per_year"]
     ].mul(iso["frac_locations_in_county"], axis=0)
@@ -422,11 +459,14 @@ def _add_derived_columns(mart: pd.DataFrame) -> pd.DataFrame:
 
 
 def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
+    # I try to source as much wide-format content as possible from the long-format data.
+    # This is to reduce the number of places that need to be updated when the data changes.
+    # The tradeoff for that reduced maintenance is the complexity of this function.
     long = long_format.copy()
     resources_to_keep = {
         "Battery Storage",
         "Solar",
-        "Natural Gas",
+        "Natural Gas",  # this name is shared between both power and infra
         # "Nuclear",
         "Onshore Wind",
         # "CSP",
@@ -439,7 +479,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         # "Hydro",
         # "Pumped Storage",
         "Coal",
-        "Oil",
+        "Oil",  # this name is shared between both power and infra
         "Liquefied Natural Gas",
         "Synthetic Fertilizers",
         "Petrochemicals and Plastics",
@@ -472,30 +512,13 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "pm2_5_tonnes_per_year",
         "nox_tonnes_per_year",
     ]
-    county_level_cols = [  # not part of pivot
-        "state_id_fips",
-        "state",
-        "county",
-        "ordinance_via_reldi",
-        "ordinance_jurisdiction_name",
-        "ordinance_jurisdiction_type",
-        "ordinance_text",
-        "ordinance_earliest_year_mentioned",
-        "state_permitting_type",
-        "state_permitting_text",
-        "ordinance_via_solar_nrel",
-        "ordinance_via_wind_nrel",
-        "ordinance_via_nrel_is_de_facto",
-        "ordinance_is_restrictive",
-        "unprotected_land_area_km2",
-        "federal_fraction_unprotected_land",
-        "county_land_area_km2",
-        "tribal_land_frac",
-        "ec_coal_closures_area_fraction",
-        "ec_qualifies_via_employment",
-        "ec_qualifies",
-    ] + JUSTICE40_AGGREGATES["name"].to_list()
+    # county level cols are not part of the pivot and get dropped here.
+    # They are added back in with _join_all_counties_to_wide_format()
+    # because that function contains all counties instead of only
+    # counties with power infrastructure in them
+
     wide = long.pivot(index=idx_cols, columns=col_cols, values=val_cols)
+    wide.reset_index(inplace=True)
 
     wide.columns = wide.columns.rename(
         {None: "measures"}
@@ -504,13 +527,6 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     wide.columns = [
         "_".join(col).strip("_") for col in wide.columns
     ]  # flatten multiindex
-
-    # this is not equivalent to left joining _get_county_properties() because
-    # long does not have data for every county. _get_county_properties() does.
-    # I think we can replace this with _join_all_counties_to_wide_format but
-    # don't want to do that refactor right this second.
-    county_stuff = long.groupby("county_id_fips")[county_level_cols].first()
-    wide = wide.join(county_stuff).reset_index()
 
     # co2e total
     co2e_cols_to_sum = [
@@ -573,7 +589,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "battery_storage_existing_co2e_tonnes_per_year",
         "renewable_and_battery_proposed_co2e_tonnes_per_year",  # not currently modeled
         # No superset proposed_facility_counts due to double-counting multi-resource projects.
-        # Have to recalculate those from the project data.
+        # I recalculate those from the project data in _get_category_project_counts()
         "renewable_and_battery_proposed_facility_count",
         "fossil_proposed_facility_count",
     ]
@@ -603,39 +619,7 @@ def create_long_format(
     out = pd.concat([iso, existing, infra], axis=0, ignore_index=True)
     out = out.merge(county_properties, on="county_id_fips", how="left")
     out = _add_derived_columns(out)
-    col_order = [
-        "state_id_fips",
-        "county_id_fips",
-        "state",
-        "county",
-        "facility_type",
-        "resource_or_sector",
-        "status",
-        "facility_count",
-        "capacity_mw",
-        "co2e_tonnes_per_year",
-        "pm2_5_tonnes_per_year",
-        "nox_tonnes_per_year",
-        "ordinance_is_restrictive",
-        "ordinance_jurisdiction_name",
-        "ordinance_jurisdiction_type",
-        "ordinance_via_reldi",
-        "ordinance_text",
-        "ordinance_earliest_year_mentioned",
-        "ordinance_via_solar_nrel",
-        "ordinance_via_wind_nrel",
-        "ordinance_via_nrel_is_de_facto",
-        "state_permitting_type",
-        "state_permitting_text",
-        "unprotected_land_area_km2",
-        "federal_fraction_unprotected_land",
-        "county_land_area_km2",
-        "tribal_land_frac",
-        "ec_coal_closures_area_fraction",
-        "ec_qualifies_via_employment",
-        "ec_qualifies",
-    ] + JUSTICE40_AGGREGATES["name"].to_list()
-    return out.loc[:, col_order]
+    return out
 
 
 def _get_offshore_wind_extra_cols(engine: sa.engine.Engine) -> pd.DataFrame:
@@ -644,8 +628,10 @@ def _get_offshore_wind_extra_cols(engine: sa.engine.Engine) -> pd.DataFrame:
     #   1. comes from ports (m:m)
     #   2. is attributed to a particular interest type (m:1)
 
-    # Note that these aggregates do not divide capacity across the counties. Instead,
-    # they give a sum total of associated capacity.
+    # Note that these aggregates do NOT divide capacity across the counties. Instead,
+    # they intentionally double-count capacity. The theory is that the loss
+    # of any port could block the whole associated project, so we want
+    # to know how much total capacity is at stake in each port county.
     query = """
     WITH
     proj_ports AS (
@@ -665,6 +651,9 @@ def _get_offshore_wind_extra_cols(engine: sa.engine.Engine) -> pd.DataFrame:
     port_aggs AS (
         SELECT
             county_id_fips,
+            -- intentional double-counting here. The theory is that the loss
+            -- of any port could block the whole associated project, so we want
+            -- to know how much total capacity is at stake in each port county.
             SUM(capacity_mw) as offshore_wind_capacity_mw_via_ports
         FROM proj_ports
         GROUP BY 1
@@ -864,38 +853,13 @@ def _join_all_counties_to_wide_format(
     # The long format data does not include rows for all counties, so
     # _convert_long_to_wide does not produce a row for each county.
     county_properties = _add_derived_columns(county_properties)
-    wide_format_column_order = wide_format.columns.copy()
 
-    county_columns = [
-        "state_id_fips",
-        "state",
-        "county",
-        "ordinance_via_reldi",
-        "state_permitting_type",
-        "ordinance_text",
-        "ordinance_earliest_year_mentioned",
-        "ordinance_jurisdiction_name",
-        "ordinance_jurisdiction_type",
-        "state_permitting_text",
-        "ordinance_via_solar_nrel",
-        "ordinance_via_wind_nrel",
-        "ordinance_via_nrel_is_de_facto",
-        "ordinance_is_restrictive",
-        "unprotected_land_area_km2",
-        "federal_fraction_unprotected_land",
-        "county_land_area_km2",
-        "tribal_land_frac",
-        "ec_coal_closures_area_fraction",
-        "ec_qualifies_via_employment",
-        "ec_qualifies",
-    ] + JUSTICE40_AGGREGATES["name"].to_list()
-    wide_format_subset = wide_format.drop(columns=county_columns)
     county_properties = county_properties.merge(
-        wide_format_subset,
+        wide_format,
         on="county_id_fips",
         how="left",
     )
-    return county_properties[wide_format_column_order]
+    return county_properties
 
 
 def _get_actionable_aggs_for_wide_format(engine: sa.engine.Engine) -> pd.DataFrame:
@@ -1069,7 +1033,6 @@ def create_data_mart(
         pudl_engine=pudl_engine,
         long_format=long_format,
     )
-
     out = {
         "counties_long_format": long_format,
         "counties_wide_format": wide_format,

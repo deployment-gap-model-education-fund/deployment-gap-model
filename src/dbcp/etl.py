@@ -12,6 +12,7 @@ from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.metadata.data_warehouse import metadata
 from dbcp.transform.fips_tables import SPATIAL_CACHE
 from dbcp.transform.helpers import GEOCODER_CACHE, bedford_addfips_fix
+from dbcp.validation.tests import validate_warehouse
 from pudl.helpers import add_fips_ids as _add_fips_ids
 from pudl.output.pudltabl import PudlTabl
 
@@ -222,13 +223,7 @@ def etl(args):
                 schema="data_warehouse",
             )
 
-    # TODO: Writing to CSVs is a temporary solution for getting data into Tableau
-    # This should be removed once we have cloudsql setup.
-    if args.csv:
-        logger.info("Writing tables to CSVs.")
-        output_path = Path("/app/data/output/")
-        for table_name, df in transformed_dfs.items():
-            df.to_csv(output_path / f"{table_name}.csv", index=False)
+    validate_warehouse(engine=engine)
 
     if args.upload_to_bigquery:
         dbcp.helpers.upload_schema_to_bigquery("data_warehouse")
