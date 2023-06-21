@@ -59,11 +59,11 @@ def test_extract():  # integration test
         [
             MockParagraph(text="some intro", style=MockStyle(name="Normal")),
             MockParagraph(text="Alabama", style=MockStyle(name="Heading 1")),
-            MockParagraph(text="State Policy", style=MockStyle(name="Heading 2")),
-            MockParagraph(text="Very Important Policy", style=MockStyle(name="Normal")),
             MockParagraph(
-                text="Local Laws/Ordinances", style=MockStyle(name="Heading 2")
+                text="State-Level Restrictions", style=MockStyle(name="Heading 2")
             ),
+            MockParagraph(text="Very Important Policy", style=MockStyle(name="Normal")),
+            MockParagraph(text="Local Restrictions", style=MockStyle(name="Heading 2")),
             MockParagraph(
                 text="Lovely County: Important Ordinance",
                 style=MockStyle(name="Normal"),
@@ -79,6 +79,7 @@ def test_extract():  # integration test
         "state_policy": pd.DataFrame(
             {"state": ["Alabama"], "policy": ["Very Important Policy"]}
         ),
+        "state_notes": pd.DataFrame({"state": [], "notes": []}),
         "local_ordinance": pd.DataFrame(
             {
                 "state": ["Alabama"],

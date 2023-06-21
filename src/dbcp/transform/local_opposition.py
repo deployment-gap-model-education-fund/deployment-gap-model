@@ -3,6 +3,7 @@ from typing import Dict
 
 import pandas as pd
 
+from dbcp.constants import FIPS_CODE_VINTAGE
 from dbcp.transform.helpers import add_county_fips_with_backup_geocoding
 from pudl.helpers import add_fips_ids as _add_fips_ids
 
@@ -50,13 +51,30 @@ def _transform_state_policy(state_policy_df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: dataframe of state policies with additional columns
     """
-    state = _add_fips_ids(state_policy_df, county_col="policy").drop(
-        columns="county_id_fips"
-    )
+    state = _add_fips_ids(
+        state_policy_df, county_col="policy", vintage=FIPS_CODE_VINTAGE
+    ).drop(columns="county_id_fips")
     year_summaries = _extract_years(state.loc[:, "policy"])
     state = pd.concat([state, year_summaries], axis=1)
     state.rename(columns={"state": "raw_state_name"}, inplace=True)
     return state
+
+
+def _transform_state_notes(state_notes_df: pd.DataFrame) -> pd.DataFrame:
+    """Add FIPS codes and summarize years for state notes.
+
+    Args:
+        state_notes_df (pd.DataFrame): dataframe of state notes
+
+    Returns:
+        pd.DataFrame: dataframe of state notes with additional columns
+    """
+    # currently same transform as policy.
+    # Just rename a column for compatibility, then rename it back.
+    notes = state_notes_df.rename(columns={"notes": "policy"})
+    notes = _transform_state_policy(notes)
+    notes.rename(columns={"policy": "notes"}, inplace=True)
+    return notes
 
 
 def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
@@ -74,16 +92,12 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
     ]
     for col in string_cols:
         local.loc[:, col] = local.loc[:, col].str.strip()
-    # remove straggling words in county names
-    local.loc[:, "locality"] = local.loc[:, "locality"].str.replace(
-        " Solar$| Wind$| Zoning Ordinance$", "", regex=True
-    )
-    # manual error correction
-    filter_ = local.loc[:, "ordinance_text"].str.startswith(
-        "In November 2021, the Boone County Commission"
-    )
-    assert filter_.sum() == 1
-    local.loc[filter_, "state"] = "MO"  # Was "MS", but should be Missouri
+
+    # manual corrections
+    location_corrections = {
+        "Batavia Township (Clermont County)": "Batavia Township (Branch County)",
+    }
+    local.loc[:, "locality"].replace(location_corrections, inplace=True)
 
     # add fips codes to counties (but many names are cities)
     with_fips = add_county_fips_with_backup_geocoding(local, locality_col="locality")
@@ -94,6 +108,7 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
         columns={"locality": "raw_locality_name", "state": "raw_state_name"},
         inplace=True,
     )
+    _validate_ordinances(local)
 
     return local
 
@@ -121,6 +136,7 @@ def transform(raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     """Transform local opposition data."""
     transform_funcs = {
         "state_policy": _transform_state_policy,
+        "state_notes": _transform_state_notes,
         "local_ordinance": _transform_local_ordinances,
         "contested_project": _transform_contested_projects,
     }
@@ -128,50 +144,14 @@ def transform(raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     return transformed
 
 
-def _combine_updates(
-    docx_dfs: Dict[str, pd.DataFrame], march_2022_dfs: Dict[str, pd.DataFrame]
-) -> Dict[str, pd.DataFrame]:
-    """Adjust schemas for compatibility."""
-    combine_funcs = {
-        "state_policy": _combine_state_dfs,
-        "local_ordinance": _combine_local_dfs,
-        "contested_project": _combine_project_dfs,
-    }
-    combined = {
-        key: func(docx_dfs[key], march_2022_dfs[key])
-        for key, func in combine_funcs.items()
-    }
-    return combined
-
-
-def _combine_state_dfs(docx_df: pd.DataFrame, update_df: pd.DataFrame) -> pd.DataFrame:
-    update_df = update_df.drop(
-        columns=[
-            "locality",
-            "opposition_type",
-        ]
-    )
-    combined = pd.concat([docx_df, update_df], axis=0, ignore_index=True)
-    return combined
-
-
-def _combine_local_dfs(docx_df: pd.DataFrame, update_df: pd.DataFrame) -> pd.DataFrame:
-    update_df = update_df.drop(
-        columns=[
-            "opposition_type",
-        ]
-    )
-    combined = pd.concat([docx_df, update_df], axis=0, ignore_index=True)
-    return combined
-
-
-def _combine_project_dfs(
-    docx_df: pd.DataFrame, update_df: pd.DataFrame
-) -> pd.DataFrame:
-    update_df = update_df.drop(
-        columns=[
-            "opposition_type",
-        ]
-    )
-    combined = pd.concat([docx_df, update_df], axis=0, ignore_index=True)
-    return combined
+def _validate_ordinances(ordn: pd.DataFrame) -> None:
+    assert (
+        ordn.duplicated(subset=["raw_state_name", "raw_locality_name"]).sum() == 0
+    ), "Duplicate ordinance locations."
+    assert ordn["county_id_fips"].isna().sum() == 0, "Missing FIPS codes."
+    assert (
+        ordn["geocoded_locality_name"].str.contains(r"[0-9]", regex=True).sum() == 0
+    ), "Geocoded locality names contain numbers."
+    assert (
+        ordn["geocoded_locality_type"].isna().sum() == 0
+    ), "Missing geocoded locality types."

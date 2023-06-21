@@ -42,19 +42,15 @@ def etl_lbnl_iso_queue() -> Dict[str, pd.DataFrame]:
 def etl_columbia_local_opp() -> Dict[str, pd.DataFrame]:
     """Columbia Local Opposition ETL."""
     # Extract
-    source_path = Path("/app/data/raw/RELDI report updated 9.10.21 (1).docx")
+    source_path = Path(
+        "/app/data/raw/2023.05.30 Opposition to Renewable Energy Facilities - FINAL.docx"
+    )
     extractor = dbcp.extract.local_opposition.ColumbiaDocxParser()
     extractor.load_docx(source_path)
     docx_dfs = extractor.extract()
 
-    source_path_update = Path("./data/raw/RELDI_local_opposition_2022-03-24.csv")
-    update_dfs = dbcp.extract.local_opposition._extract_march_2022_update(
-        source_path_update
-    )
-
     # Transform
-    combined = dbcp.transform.local_opposition._combine_updates(docx_dfs, update_dfs)
-    transformed_dfs = dbcp.transform.local_opposition.transform(combined)
+    transformed_dfs = dbcp.transform.local_opposition.transform(docx_dfs)
 
     return transformed_dfs
 
@@ -187,6 +183,7 @@ def etl(args):
     SPATIAL_CACHE.reduce_size()
 
     etl_funcs = {
+        "columbia_local_opp": etl_columbia_local_opp,
         "energy_communities_by_county": etl_energy_communities_by_county,
         "fips_tables": etl_fips_tables,
         "protected_area_by_county": etl_protected_area_by_county,
@@ -197,7 +194,6 @@ def etl(args):
         "lbnl_iso_queue": etl_lbnl_iso_queue,
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
-        "columbia_local_opp": etl_columbia_local_opp,
     }
 
     # Extract and transform the data sets
