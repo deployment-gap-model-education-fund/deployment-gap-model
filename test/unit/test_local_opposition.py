@@ -98,19 +98,3 @@ def test_extract():  # integration test
     actual = parser.extract()
     for key, df in actual.items():
         pd.testing.assert_frame_equal(df, expected[key])
-
-
-def test__locality_extractor():
-    test = pd.Series(
-        [
-            "Lovely County",
-            "City of Love (Lovely County)",
-            "Loving Parish",
-            "Loveton (Lovely and Gawdawful Counties)",
-        ]
-    )
-    expected = pd.DataFrame(
-        {
-            "locality": ["Lovely County", "City of Love", "Loving Parish", "Loveton"],
-        }
-    )

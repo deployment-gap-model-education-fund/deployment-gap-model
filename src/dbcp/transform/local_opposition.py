@@ -92,10 +92,12 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
     ]
     for col in string_cols:
         local.loc[:, col] = local.loc[:, col].str.strip()
-    # remove straggling words in county names
-    local.loc[:, "locality"] = local.loc[:, "locality"].str.replace(
-        r"\s?\(.+$", "", regex=True
-    )
+
+    # manual corrections
+    location_corrections = {
+        "Batavia Township (Clermont County)": "Batavia Township (Branch County)",
+    }
+    local.loc[:, "locality"].replace(location_corrections, inplace=True)
 
     # add fips codes to counties (but many names are cities)
     with_fips = add_county_fips_with_backup_geocoding(local, locality_col="locality")
@@ -106,6 +108,7 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
         columns={"locality": "raw_locality_name", "state": "raw_state_name"},
         inplace=True,
     )
+    _validate_ordinances(local)
 
     return local
 
@@ -143,5 +146,12 @@ def transform(raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
 
 def _validate_ordinances(ordn: pd.DataFrame) -> None:
     assert (
-        ordn.duplicated(subset=["state", "locality"]).sum() == 0
+        ordn.duplicated(subset=["raw_state_name", "raw_locality_name"]).sum() == 0
     ), "Duplicate ordinance locations."
+    assert ordn["county_id_fips"].isna().sum() == 0, "Missing FIPS codes."
+    assert (
+        ordn["geocoded_locality_name"].str.contains(r"[0-9]", regex=True).sum() == 0
+    ), "Geocoded locality names contain numbers."
+    assert (
+        ordn["geocoded_locality_type"].isna().sum() == 0
+    ), "Missing geocoded locality types."
