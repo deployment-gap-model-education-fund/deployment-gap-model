@@ -230,9 +230,9 @@ eip_facilities = Table(
         ForeignKey("data_warehouse.county_fips.county_id_fips"),
         nullable=True,
     ),
-    Column("geocoded_locality_name", String, nullable=False),
-    Column("geocoded_locality_type", String, nullable=False),
-    Column("geocoded_containing_county", String, nullable=False),
+    Column("geocoded_locality_name", String, nullable=True),
+    Column("geocoded_locality_type", String, nullable=True),
+    Column("geocoded_containing_county", String, nullable=True),
     Column("longitude", Float),
     Column("latitude", Float),
     Column("date_modified", DateTime, nullable=False),
@@ -347,9 +347,27 @@ state_policy = Table(
     Column(
         "state_id_fips", String, ForeignKey("data_warehouse.state_fips.state_id_fips")
     ),
-    Column("earliest_year_mentioned", Integer, nullable=False),
+    Column("earliest_year_mentioned", Integer),
     Column("latest_year_mentioned", Integer),
-    Column("n_years_mentioned", Integer, nullable=False),
+    Column("n_years_mentioned", Integer),
+    schema=schema,
+)
+
+
+state_notes = Table(
+    "state_notes",
+    metadata,
+    Column("raw_state_name", String, nullable=False),
+    Column("notes", String, nullable=False),
+    Column("year_enacted", Integer),
+    Column("energy_type", String),
+    Column("source", String),
+    Column(
+        "state_id_fips", String, ForeignKey("data_warehouse.state_fips.state_id_fips")
+    ),
+    Column("earliest_year_mentioned", Integer),
+    Column("latest_year_mentioned", Integer),
+    Column("n_years_mentioned", Integer),
     schema=schema,
 )
 
