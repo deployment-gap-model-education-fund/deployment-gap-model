@@ -38,7 +38,7 @@ def _format_column_names(cols: Sequence[str]) -> List[str]:
     return out
 
 
-def _fix_erroneous_array_items(ser: pd.Series) -> pd.Series:
+def _fix_erroneous_array_items(ser: pd.Series, split_on=",", regex=False) -> pd.Series:
     """Split on commas, preserve only the first value, and cast to numeric.
 
     Several columns in EIP data should be numeric types but a small number of erroneous
@@ -53,9 +53,8 @@ def _fix_erroneous_array_items(ser: pd.Series) -> pd.Series:
     """
     if pd.api.types.is_numeric_dtype(ser):
         return ser
-    first_values = ser.str.split(",", n=1).str[0]
-    out = pd.to_numeric(first_values, errors="raise")
-    return out
+    first_values = ser.str.split(split_on, n=1, regex=regex).str[0]
+    return first_values
 
 
 def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
@@ -111,30 +110,35 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
 
     fac.loc[:, "is_ccs"] = _convert_string_to_boolean(fac.loc[:, "raw_is_ccs"])
 
-    # fix 9 (as of 3/22/2022) states that are CSV duplicates like "LA, LA"
-    fac["state"] = fac["raw_state"].str.split(",", n=1).str[0]
-    # standardize null values (only 2)
-    fac["state"].replace({"TDB": pd.NA, "": pd.NA}, inplace=True)
+    # fix states that are CSV duplicates like "LA, LA"
+    fac["state"] = _fix_erroneous_array_items(fac["raw_state"])
+    fac["state"].replace(["TBD", "TDB", ""], pd.NA, inplace=True)
 
-    # fix 4 counties (as of 3/22/2022) with multiple values as CSV.
-    # Simplify by only taking first county
-    fac["county"] = fac["raw_county_or_parish"].str.split(",", n=1).str[0]
-    # standardize null values (only 2)
+    # fix counties with multiple values
+    # Simplify by only taking first county. Only 11 multivalued as of 7/18/2023
+    fac["county"] = _fix_erroneous_array_items(
+        fac["raw_county_or_parish"], split_on=",| and | or ", regex=True
+    )
     fac["county"] = fac["county"].astype("string")
-    fac["county"].replace("TDB", pd.NA, inplace=True)
+    fac["county"].replace(["TBD", "TDB", ""], pd.NA, inplace=True)
 
     fac = add_county_fips_with_backup_geocoding(
         fac, state_col="state", locality_col="county"
     )
     fac.drop(columns=["state", "county"], inplace=True)  # drop intermediates
 
-    coords = fac.loc[:, "raw_location"].str.split(",", n=1, expand=True)
+    coord_pattern = (
+        r"^POINT\((?P<longitude>\-\d{2,3}\.\d{2,7}) (?P<latitude>\d{2,3}\.\d{2,7})\)"
+    )
+    coords = fac["raw_location"].str.extractall(coord_pattern).droplevel("match")
+    assert coords.shape[0] <= fac.shape[0]  # str.extractall() skips non-matches
     for col in coords.columns:
         coords.loc[:, col] = pd.to_numeric(coords.loc[:, col], errors="raise")
     # check order is as assumed
-    assert coords.iloc[:, 0].max() < 0  # USA longitudes
-    assert coords.iloc[:, -1].min() > 0  # USA latitudes
-    fac[["longitude", "latitude"]] = coords
+    assert coords["longitude"].max() < 0  # USA longitudes
+    assert coords["latitude"].min() > 0  # USA latitudes
+    fac = fac.join(coords, how="left")
+    assert fac.index.is_unique  # check join didn't duplicate rows
 
     fac["date_modified"] = pd.to_datetime(
         fac.loc[:, "raw_modified_on"], infer_datetime_format=True
@@ -156,98 +160,6 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
     fac.drop(columns=duplicative_columns, inplace=True)
 
     return fac
-
-
-def _manual_sector_assignments(project_df: pd.DataFrame) -> None:
-    """Manually assign, in place, a single industry_sector to projects that have multiple values."""
-    assignments = [
-        {
-            "index": 545,
-            "sector": "Oil",
-            "validation_str": "refinery",
-        },
-        {
-            "index": 569,
-            "sector": "Petrochemicals and Plastics",
-            "validation_str": "liquid products",
-        },
-        {
-            "index": 597,
-            "sector": "Petrochemicals and Plastics",
-            "validation_str": "alkylation",
-        },
-        {
-            "index": 598,
-            "sector": "Petrochemicals and Plastics",
-            "validation_str": "syngas",
-        },
-        {
-            "index": 614,
-            "sector": "Oil",
-            "validation_str": "carbon dioxide",
-        },
-        {
-            "index": 625,
-            "sector": "Synthetic Fertilizers",
-            "validation_str": "anhydrous ammonia",
-        },
-        {
-            "index": 637,
-            "sector": "Liquefied Natural Gas",
-            "validation_str": "export terminal",
-        },
-        {
-            "index": 663,
-            "sector": "Petrochemicals and Plastics",
-            "validation_str": "methanol-to-gasoline",
-        },
-        {
-            "index": 665,
-            "sector": "Petrochemicals and Plastics",
-            "validation_str": "hydrogen and ammonia",
-        },
-        {
-            "index": 717,
-            "sector": "Oil",
-            "validation_str": "refinery",
-        },
-        {
-            "index": 724,
-            "sector": "Petrochemicals and Plastics",
-            "validation_str": "Blue Bayou Ammonia",
-        },
-        {
-            "index": 725,
-            "sector": "Petrochemicals and Plastics",
-            "validation_str": "Blue Bayou Ammonia",
-        },
-        {
-            "index": 726,
-            "sector": "Petrochemicals and Plastics",
-            "validation_str": "Blue Bayou Ammonia",
-        },
-        {
-            "index": 727,
-            "sector": "Petrochemicals and Plastics",
-            "validation_str": "Blue Bayou Ammonia",
-        },
-        {
-            "index": 767,
-            "sector": "Natural Gas",
-            "validation_str": "Junction Compressor",
-        },
-    ]
-    for assignment in assignments:
-        idx = assignment["index"]
-        expected_description = assignment["validation_str"]
-        assigned_sector = assignment["sector"]
-        if expected_description in project_df.at[idx, "project_description"]:
-            project_df.at[idx, "industry_sector"] = assigned_sector
-        else:
-            raise ValueError(
-                f"Manual sector assignment for index {idx} failed: expected description related to {expected_description}"
-            )
-    return
 
 
 def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
@@ -281,13 +193,14 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
         "other_permits_id": "raw_other_permits_id",
         "project_cost_million_$": "raw_project_cost_millions",
         "project_type": "raw_project_type",
-        "sulfur_dioxide_so2": "raw_sulfur_dioxide_so2",
+        "product_type": "raw_product_type",
         "target_list": "raw_is_ally_target",
         "total_wetlands_affected_temporarily_acres": "raw_total_wetlands_affected_temporarily_acres",
+        "hazardous_air_pollutants_haps": "raw_hazardous_air_pollutants_haps",
         # add tons per year units
+        "sulfur_dioxide_so2": "sulfur_dioxide_so2_tpy",
         "carbon_monoxide_co": "carbon_monoxide_co_tpy",
         "greenhouse_gases_co2e": "greenhouse_gases_co2e_tpy",
-        "hazardous_air_pollutants_haps": "hazardous_air_pollutants_haps_tpy",
         "nitrogen_oxides_nox": "nitrogen_oxides_nox_tpy",
         "particulate_matter_pm2.5": "particulate_matter_pm2_5_tpy",
         "volatile_organic_compounds_voc": "volatile_organic_compounds_voc_tpy",
@@ -300,15 +213,26 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
     )
 
     # transform columns
-    proj["sulfur_dioxide_so2_tpy"] = _fix_erroneous_array_items(
-        proj.loc[:, "raw_sulfur_dioxide_so2"]
+    proj["hazardous_air_pollutants_haps_tpy"] = pd.to_numeric(
+        _fix_erroneous_array_items(proj.loc[:, "raw_hazardous_air_pollutants_haps"]),
+        errors="raise",
     )
-    proj["total_wetlands_affected_temporarily_acres"] = _fix_erroneous_array_items(
-        proj.loc[:, "raw_total_wetlands_affected_temporarily_acres"]
+    proj["total_wetlands_affected_temporarily_acres"] = pd.to_numeric(
+        _fix_erroneous_array_items(
+            proj.loc[:, "raw_total_wetlands_affected_temporarily_acres"]
+        ),
+        errors="raise",
     )
-    proj["cost_millions"] = _fix_erroneous_array_items(
-        proj.loc[:, "raw_project_cost_millions"]
+    proj["cost_millions"] = pd.to_numeric(
+        _fix_erroneous_array_items(proj.loc[:, "raw_project_cost_millions"]),
+        errors="raise",
     )
+    # manual correction for project with 92 Billion dollar cost (lol)
+    proj.loc[
+        proj["name"].eq("Gron Fuels' Renewable Fuels Plant - Initial Construction"),
+        "cost_millions",
+    ] *= 0.1
+
     proj["date_modified"] = pd.to_datetime(
         proj.loc[:, "raw_modified_on"], infer_datetime_format=True
     )
@@ -318,10 +242,12 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
         col="operating_status",
         val_to_replace="Unknown",
         replacement=pd.NA,
-        expected_count=2,
+        expected_count=1,
     )
-    proj["industry_sector"] = proj.loc[:, "raw_industry_sector"].copy()
-    _manual_sector_assignments(proj)  # in place
+    # pick first of multi-valued entries
+    proj["industry_sector"] = (
+        proj.loc[:, "raw_industry_sector"].str.split(",", n=1).str[0]
+    ).astype("string")
 
     duplicative_columns = [  # these are raw names
         # These columns are just a concatenation of the names and IDs corresponding to the ID columns
@@ -350,25 +276,34 @@ def air_construction_transform(raw_air_constr_df: pd.DataFrame) -> pd.DataFrame:
     """
     air = raw_air_constr_df.copy()
     air.columns = _format_column_names(air.columns)
+    # there are a 7 columns with facility-wide criteria pollutant metrics, but they are
+    # almost all null.
+    air.drop(
+        columns=[col for col in air.columns if col.startswith("facility-wide_pte:")],
+        inplace=True,
+    )
     rename_dict = {  # add 'raw_' prefix to columns that need transformation
         "id": "air_construction_id",
+        # 'name',
         "created_on": "raw_created_on",
         "modified_on": "raw_modified_on",
         "date_last_checked": "raw_date_last_checked",
         "project_id": "raw_project_id",
-        "statute": "raw_statute",
-        "permitting_action": "raw_permitting_action",
+        # "project",
         "permit_status": "raw_permit_status",
         "application_date": "raw_application_date",
         "draft_permit_issuance_date": "raw_draft_permit_issuance_date",
         "last_day_to_comment": "raw_last_day_to_comment",
         "final_permit_issuance_date": "raw_final_permit_issuance_date",
         "deadline_to_begin_construction": "raw_deadline_to_begin_construction",
+        # 'description_or_purpose',
+        # 'detailed_permitting_history',
+        # 'document_url',
     }
     air.rename(columns=rename_dict, inplace=True)
 
     # transform columns
-    air["date_modified"] = pd.to_datetime(
+    air["date_modified"] = pd.to_datetime(  # ignore other date columns for now
         air.loc[:, "raw_modified_on"], infer_datetime_format=True
     )
     air["permit_status"] = air.loc[:, "raw_permit_status"].copy()
