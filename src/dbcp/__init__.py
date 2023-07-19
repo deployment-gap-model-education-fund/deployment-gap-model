@@ -26,3 +26,4 @@ import dbcp.transform.nrel_wind_solar_ordinances  # noqa: F401
 import dbcp.transform.offshore_wind  # noqa: F401
 import dbcp.transform.protected_area_by_county  # noqa: F401
 import dbcp.transform.rmi_energy_communities  # noqa: F401
+import dbcp.validation.tests  # noqa: F401
