@@ -222,6 +222,13 @@ def etl(args):
     validate_warehouse(engine=engine)
 
     if args.upload_to_bigquery:
-        dbcp.helpers.upload_schema_to_bigquery("data_warehouse")
+        if args.bigquery_env == "dev":
+            dbcp.helpers.upload_schema_to_bigquery("data_warehouse")
+        elif args.bigquery_env == "prod":
+            dbcp.helpers.upload_schema_to_bigquery("data_warehouse", dev=False)
+        else:
+            raise ValueError(
+                f"{args.bigquery_env} is an invalid BigQuery environment value. Must be: dev or prod."
+            )
 
     logger.info("Sucessfully finished ETL.")

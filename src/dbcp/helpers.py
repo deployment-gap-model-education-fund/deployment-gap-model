@@ -43,7 +43,9 @@ def get_schema_sql_alchemy_metadata(schema: str) -> sa.MetaData:
         raise ValueError(f"{schema} is not a valid schema.")
 
 
-def get_bq_schema_from_metadata(table_name: str, schema: str) -> list[dict[str, str]]:
+def get_bq_schema_from_metadata(
+    table_name: str, schema: str, dev: bool = True
+) -> list[dict[str, str]]:
     """
     Create a BigQuery schema from SQL Alchemy metadata.
 
@@ -130,7 +132,7 @@ def get_db_schema_tables(engine: sa.engine.Engine, schema: str) -> list[str]:
     return table_names
 
 
-def upload_schema_to_bigquery(schema: str) -> None:
+def upload_schema_to_bigquery(schema: str, dev: bool = True) -> None:
     """Upload a postgres schema to BigQuery."""
     logger.info("Loading tables to BigQuery.")
 
@@ -160,13 +162,14 @@ def upload_schema_to_bigquery(schema: str) -> None:
     )
 
     for table_name, df in loaded_tables.items():
+        full_table_name = f"{schema}{'_dev' if dev else ''}.{table_name}"
         logger.info(f"Loading: {table_name}")
         pandas_gbq.to_gbq(
             df,
-            f"{schema}.{table_name}",
+            full_table_name,
             project_id=GCP_PROJECT_ID,
             if_exists="replace",
             credentials=credentials,
-            table_schema=get_bq_schema_from_metadata(table_name, schema),
+            table_schema=get_bq_schema_from_metadata(table_name, schema, dev),
         )
-        logger.info(f"Finished: {table_name}")
+        logger.info(f"Finished: {full_table_name}")
