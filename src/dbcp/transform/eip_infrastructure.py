@@ -5,7 +5,6 @@ from typing import Dict, List, Sequence
 
 import pandas as pd
 
-from dbcp.extract.eip_infrastructure import _downcast_ints
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     replace_value_with_count_validation,
@@ -133,7 +132,7 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
     coords = fac["raw_location"].str.extractall(coord_pattern).droplevel("match")
     assert coords.shape[0] <= fac.shape[0]  # str.extractall() skips non-matches
     for col in coords.columns:
-        coords.loc[:, col] = pd.to_numeric(coords.loc[:, col], errors="raise")
+        coords[col] = pd.to_numeric(coords.loc[:, col], errors="raise")
     # check order is as assumed
     assert coords["longitude"].max() < 0  # USA longitudes
     assert coords["latitude"].min() > 0  # USA latitudes
@@ -227,11 +226,22 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
         _fix_erroneous_array_items(proj.loc[:, "raw_project_cost_millions"]),
         errors="raise",
     )
-    # manual correction for project with 92 Billion dollar cost (lol)
+    # manual correction for project with 92 Billion dollar cost (lol). Googled it and
+    # it was supposed to be 9.2 Billion
     proj.loc[
         proj["name"].eq("Gron Fuels' Renewable Fuels Plant - Initial Construction"),
         "cost_millions",
     ] *= 0.1
+    # manual fix. One project's facility id doesn't exist. The project is the Oil part
+    # of the willow Project. The next project ID belongs to the gas part, and its
+    # facility ID does exist. So I assign the oil facility ID to the gas facility ID.
+    proj_idx = proj.loc[
+        proj["project_id"].eq(5805)
+        & proj["raw_facility_id"].eq(5804)
+        & proj["name"].str.startswith("Willow ")
+    ].index
+    assert len(proj_idx) == 1
+    proj.at[proj_idx[0], "raw_facility_id"] = 5806
 
     proj["date_modified"] = pd.to_datetime(
         proj.loc[:, "raw_modified_on"], infer_datetime_format=True
@@ -340,11 +350,14 @@ def _create_associative_entity_table(
         pd.DataFrame: long format associative entity table
     """
     ids = df.loc[:, [id_col, idx_col]].set_index(idx_col).squeeze()  # copy
-    assoc_table = ids.str.split(",", expand=True).stack().droplevel(1, axis=0)
+    if pd.api.types.is_string_dtype(ids) or pd.api.types.is_object_dtype(ids):
+        assoc_table = ids.str.split(",", expand=True).stack().droplevel(1, axis=0)
+    if pd.api.types.is_float_dtype(ids):  # 1:1
+        assoc_table = ids.astype(pd.Int32Dtype())
     assoc_table = pd.to_numeric(assoc_table, downcast="unsigned", errors="raise")
     assoc_table.name = ids.name.replace("raw_", "")  # preserve ID column name
     assoc_table = assoc_table.reset_index()
-    _downcast_ints(assoc_table)  # convert to pd.Int32
+    assoc_table.dropna(inplace=True)  # can't meaningfully join on nulls
     return assoc_table
 
 

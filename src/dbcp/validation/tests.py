@@ -40,24 +40,25 @@ def test_j40_county_fips_coverage(engine: Engine):
     USING (county_id_fips)
     where j.county_id_fips is null
     or c.county_id_fips is null
+    order by j40_fips desc nulls last, c_fips desc nulls last
     """
     expected = pd.read_csv(
         StringIO(
             """j40_fips,c_fips
-null,02063
-null,02066
-null,02158
-02261,null
-02270,null
-null,46102
-46113,null
 51515,null
+46113,null
+02270,null
+02261,null
+null,46102
+null,02158
+null,02066
+null,02063
 """
         ),
-        dtype=str,
+        dtype="string",
         header=0,
     )
-    actual = pd.read_sql(query, engine)
+    actual = pd.read_sql(query, engine).astype("string")
     pd.testing.assert_frame_equal(actual, expected)
 
 
@@ -151,7 +152,7 @@ def test_county_wide_coverage(engine: Engine):
     ), "counties_wide_format does not contain all counties"
     notnull = df.notnull()
     assert (
-        notnull.any(axis=1).sum() == 2371
+        notnull.any(axis=1).sum() == 2380
     ), "counties_wide_format has unexpected county coverage"
 
 
