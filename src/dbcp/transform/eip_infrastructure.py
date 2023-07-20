@@ -106,6 +106,22 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         "ccs/ccus": "raw_is_ccs",
     }
     fac.rename(columns=rename_dict, inplace=True)
+    should_be_numeric = [
+        "facility_id",
+        "raw_estimated_population_within_3_miles",
+        "raw_percent_people_of_color_within_3_miles",
+        "raw_percent_low_income_within_3_miles",
+        "raw_percent_under_5_years_old_within_3_miles",
+        "raw_percent_people_over_64_years_old_within_3_miles",
+        "raw_air_toxics_cancer_risk_nata_cancer_risk",
+        "raw_respiratory_hazard_index",
+        "raw_pm2_5_ug_per_m3",
+        "raw_o3_ppb",
+    ]
+    for col in should_be_numeric:
+        if not pd.api.types.is_numeric_dtype(fac[col]):
+            new = _fix_erroneous_array_items(fac[col])
+            fac[col] = pd.to_numeric(new, errors="raise")
 
     fac.loc[:, "is_ccs"] = _convert_string_to_boolean(fac.loc[:, "raw_is_ccs"])
 
@@ -190,42 +206,45 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
         "number_of_jobs_promised": "raw_number_of_jobs_promised",
         "operating_status": "raw_operating_status",
         "other_permits_id": "raw_other_permits_id",
-        "project_cost_million_$": "raw_project_cost_millions",
+        "project_cost_million_$": "cost_millions",
         "project_type": "raw_project_type",
         "product_type": "raw_product_type",
         "target_list": "raw_is_ally_target",
-        "total_wetlands_affected_temporarily_acres": "raw_total_wetlands_affected_temporarily_acres",
-        "hazardous_air_pollutants_haps": "raw_hazardous_air_pollutants_haps",
         # add tons per year units
         "sulfur_dioxide_so2": "sulfur_dioxide_so2_tpy",
         "carbon_monoxide_co": "carbon_monoxide_co_tpy",
+        "hazardous_air_pollutants_haps": "hazardous_air_pollutants_haps_tpy",
         "greenhouse_gases_co2e": "greenhouse_gases_co2e_tpy",
         "nitrogen_oxides_nox": "nitrogen_oxides_nox_tpy",
         "particulate_matter_pm2.5": "particulate_matter_pm2_5_tpy",
         "volatile_organic_compounds_voc": "volatile_organic_compounds_voc_tpy",
     }
     proj.rename(columns=rename_dict, inplace=True)
+    should_be_numeric = [
+        "project_id",
+        "greenhouse_gases_co2e_tpy",
+        "particulate_matter_pm2_5_tpy",
+        "nitrogen_oxides_nox_tpy",
+        "volatile_organic_compounds_voc_tpy",
+        "carbon_monoxide_co_tpy",
+        "hazardous_air_pollutants_haps_tpy",
+        "total_wetlands_affected_temporarily_acres",
+        "total_wetlands_affected_permanently_acres",
+        "sulfur_dioxide_so2_tpy",
+        "cost_millions",
+    ]
+    for col in should_be_numeric:
+        # these columns suffer from occasional duplicate values as CSV for some reason.
+        # Like "1.0, 1.0". The second number is never different.
+        if not pd.api.types.is_numeric_dtype(proj[col]):
+            new = _fix_erroneous_array_items(proj[col])
+            proj[col] = pd.to_numeric(new, errors="raise")
 
     proj.loc[:, "is_ccs"] = _convert_string_to_boolean(proj.loc[:, "raw_is_ccs"])
     proj.loc[:, "is_ally_target"] = _convert_string_to_boolean(
         proj.loc[:, "raw_is_ally_target"]
     )
 
-    # transform columns
-    proj["hazardous_air_pollutants_haps_tpy"] = pd.to_numeric(
-        _fix_erroneous_array_items(proj.loc[:, "raw_hazardous_air_pollutants_haps"]),
-        errors="raise",
-    )
-    proj["total_wetlands_affected_temporarily_acres"] = pd.to_numeric(
-        _fix_erroneous_array_items(
-            proj.loc[:, "raw_total_wetlands_affected_temporarily_acres"]
-        ),
-        errors="raise",
-    )
-    proj["cost_millions"] = pd.to_numeric(
-        _fix_erroneous_array_items(proj.loc[:, "raw_project_cost_millions"]),
-        errors="raise",
-    )
     # manual correction for project with 92 Billion dollar cost (lol). Googled it and
     # it was supposed to be 9.2 Billion
     proj.loc[
