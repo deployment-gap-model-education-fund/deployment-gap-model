@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 def etl_eip_infrastructure() -> Dict[str, pd.DataFrame]:
     """EIP Infrastructure ETL."""
     # Extract
-    source_path = Path("/app/data/raw/fossil_infrastructure.xlsx")
+    source_path = Path("/app/data/raw/2023.05.24 OGW database.xlsx")
     eip_raw_dfs = dbcp.extract.eip_infrastructure.extract(source_path)
 
     # Transform
@@ -184,6 +184,7 @@ def etl(args):
     SPATIAL_CACHE.reduce_size()
 
     etl_funcs = {
+        "eip_infrastructure": etl_eip_infrastructure,
         "columbia_local_opp": etl_columbia_local_opp,
         "energy_communities_by_county": etl_energy_communities_by_county,
         "fips_tables": etl_fips_tables,
@@ -191,7 +192,6 @@ def etl(args):
         "offshore_wind": etl_offshore_wind,
         "justice40_tracts": etl_justice40,
         "nrel_wind_solar_ordinances": etl_nrel_ordinances,
-        "eip_infrastructure": etl_eip_infrastructure,
         "lbnl_iso_queue": etl_lbnl_iso_queue,
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
