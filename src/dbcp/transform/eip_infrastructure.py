@@ -117,6 +117,7 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         "raw_respiratory_hazard_index",
         "raw_pm2_5_ug_per_m3",
         "raw_o3_ppb",
+        "raw_wastewater_discharge_indicator",
     ]
     for col in should_be_numeric:
         if not pd.api.types.is_numeric_dtype(fac[col]):
