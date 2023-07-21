@@ -228,7 +228,7 @@ fossil_infrastructure_projects = Table(
     Column("raw_percent_people_of_color_within_3_miles", Float),
     Column("raw_respiratory_hazard_index_within_3_miles", Float),
     Column("raw_relative_cancer_risk_per_million_within_3_miles", Float),
-    Column("raw_wastewater_discharge_indicator", String),
+    Column("raw_wastewater_discharge_indicator", Float),
     Column("is_ally_target", String, nullable=False),
     schema=schema,
 )
