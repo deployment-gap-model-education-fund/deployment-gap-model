@@ -119,7 +119,7 @@ def etl_fips_tables() -> Dict[str, pd.DataFrame]:
 
 def etl_justice40() -> dict[str, pd.DataFrame]:
     """ETL white house environmental justice dataset."""
-    source_path = Path("/app/data/raw/communities-2022-05-31-1915GMT.zip")
+    source_path = Path("/app/data/raw/1.0-communities.csv")
     raw = dbcp.extract.justice40.extract(source_path)
     out = dbcp.transform.justice40.transform(raw)
     return out
@@ -217,6 +217,7 @@ def etl(args):
                 if_exists="append",
                 index=False,
                 schema="data_warehouse",
+                chunksize=1000,
             )
 
     validate_warehouse(engine=engine)

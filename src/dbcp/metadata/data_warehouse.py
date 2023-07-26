@@ -538,86 +538,469 @@ justice40_tracts = Table(
     "justice40_tracts",
     metadata,
     Column("tract_id_fips", String, primary_key=True),
+    Column(
+        "black_percent",
+        Float,
+        CheckConstraint("black_percent >= 0 AND black_percent <= 1"),
+    ),
+    Column(
+        "aian_percent",
+        Float,
+        CheckConstraint("aian_percent >= 0 AND aian_percent <= 1"),
+    ),
+    Column(
+        "asian_percent",
+        Float,
+        CheckConstraint("asian_percent >= 0 AND asian_percent <= 1"),
+    ),
+    Column(
+        "native_hawaiian_or_pacific_percent",
+        Float,
+        CheckConstraint(
+            "native_hawaiian_or_pacific_percent >= 0 AND native_hawaiian_or_pacific_percent <= 1"
+        ),
+    ),
+    Column(
+        "two_or_more_races_percent",
+        Float,
+        CheckConstraint(
+            "two_or_more_races_percent >= 0 AND two_or_more_races_percent <= 1"
+        ),
+    ),
+    Column(
+        "white_percent",
+        Float,
+        CheckConstraint("white_percent >= 0 AND white_percent <= 1"),
+    ),
+    Column(
+        "hispanic_or_latino_percent",
+        Float,
+        CheckConstraint(
+            "hispanic_or_latino_percent >= 0 AND hispanic_or_latino_percent <= 1"
+        ),
+    ),
+    Column(
+        "other_races_percent",
+        Float,
+        CheckConstraint("other_races_percent >= 0 AND other_races_percent <= 1"),
+    ),
+    Column(
+        "age_under_10_percent",
+        Float,
+        CheckConstraint("age_under_10_percent >= 0 AND age_under_10_percent <= 1"),
+    ),
+    Column(
+        "age_10_to_64_percent",
+        Float,
+        CheckConstraint("age_10_to_64_percent >= 0 AND age_10_to_64_percent <= 1"),
+    ),
+    Column(
+        "age_over_64_percent",
+        Float,
+        CheckConstraint("age_over_64_percent >= 0 AND age_over_64_percent <= 1"),
+    ),
     Column("n_thresholds_exceeded", Integer),
     Column("n_categories_exceeded", Integer),
+    Column("is_disadvantaged_without_considering_neighbors", Boolean),
+    Column("is_disadvantaged_based_on_neighbors_and_low_income_threshold", Boolean),
+    Column("is_disadvantaged_due_to_tribal_overlap", Boolean),
     Column("is_disadvantaged", Boolean),
+    Column(
+        "tract_area_disadvantaged_percent",
+        Integer,
+        CheckConstraint(
+            "tract_area_disadvantaged_percent >= 0 AND tract_area_disadvantaged_percent <= 1"
+        ),
+    ),
+    Column(
+        "disadvantaged_neighbors_percent",
+        Integer,
+        CheckConstraint(
+            "disadvantaged_neighbors_percent >= 0 AND disadvantaged_neighbors_percent <= 1"
+        ),
+    ),
     Column("population", Integer),
-    Column("low_income_and_not_students", Boolean),
-    Column("expected_agriculture_loss_and_low_income_and_not_students", Boolean),
-    Column("expected_agriculture_loss_percentile", Integer),
+    Column(
+        "individuals_below_2x_federal_poverty_line_percentile",
+        Float,
+        CheckConstraint(
+            "individuals_below_2x_federal_poverty_line_percentile >= 0 AND individuals_below_2x_federal_poverty_line_percentile <= 100"
+        ),
+    ),
+    Column(
+        "individuals_below_2x_federal_poverty_line_percent",
+        Float,
+        CheckConstraint(
+            "individuals_below_2x_federal_poverty_line_percent >= 0 AND individuals_below_2x_federal_poverty_line_percent <= 1"
+        ),
+    ),
+    Column("is_low_income", Boolean),
+    Column("is_income_data_imputed", Boolean),
+    Column("90pct_expected_agriculture_loss_rate_is_low_income", Boolean),
+    Column(
+        "expected_agriculture_loss_percentile",
+        Integer,
+        CheckConstraint(
+            "expected_agriculture_loss_percentile >= 0 AND expected_agriculture_loss_percentile <= 100"
+        ),
+    ),
     Column("expected_agriculture_loss", Float),
-    Column("expected_building_loss_and_low_income_and_not_students", Boolean),
-    Column("expected_building_loss_percentile", Integer),
+    Column("90pct_expected_building_loss_rate_is_low_income", Boolean),
+    Column(
+        "expected_building_loss_percentile",
+        Integer,
+        CheckConstraint(
+            "expected_building_loss_percentile >= 0 AND expected_building_loss_percentile <= 100"
+        ),
+    ),
     Column("expected_building_loss", Float),
-    Column("expected_population_loss_and_low_income_and_not_students", Boolean),
-    Column("expected_population_loss_percentile", Integer),
+    Column("90pct_expected_population_loss_rate_is_low_income", Boolean),
+    Column(
+        "expected_population_loss_percentile",
+        Integer,
+        CheckConstraint(
+            "expected_population_loss_percentile >= 0 AND expected_population_loss_percentile <= 100"
+        ),
+    ),
     Column("expected_population_loss", Float),
-    Column("energy_burden_and_low_income_and_not_students", Boolean),
-    Column("energy_burden_percentile", Integer),
+    Column(
+        "props_30year_flood_risk_percentile",
+        Integer,
+        CheckConstraint(
+            "props_30year_flood_risk_percentile >= 0 AND props_30year_flood_risk_percentile <= 100"
+        ),
+    ),
+    Column(
+        "props_30year_flood_risk_percent",
+        Integer,
+        CheckConstraint(
+            "props_30year_flood_risk_percent >= 0 AND props_30year_flood_risk_percent <= 1"
+        ),
+    ),
+    Column("is_90pct_props_30year_flood_risk", Boolean),
+    Column("is_90pct_props_30year_flood_risk_is_low_income", Boolean),
+    Column(
+        "props_30year_fire_risk_percentile",
+        Integer,
+        CheckConstraint(
+            "props_30year_fire_risk_percentile >= 0 AND props_30year_fire_risk_percentile <= 100"
+        ),
+    ),
+    Column(
+        "props_30year_fire_risk_percent",
+        Integer,
+        CheckConstraint(
+            "props_30year_fire_risk_percent >= 0 AND props_30year_fire_risk_percent <= 1"
+        ),
+    ),
+    Column(
+        "is_90pct_props_30year_fire_risk_percent",
+        Boolean,
+    ),
+    Column(
+        "is_90pct_props_30year_fire_risk_percent_is_low_income",
+        Boolean,
+    ),
+    Column("90pct_energy_burden_is_low_income", Boolean),
+    Column(
+        "energy_burden_percentile",
+        Integer,
+        CheckConstraint(
+            "energy_burden_percentile >= 0 AND energy_burden_percentile <= 100"
+        ),
+    ),
     Column("energy_burden", Integer),
-    Column("pm2_5_and_low_income_and_not_students", Boolean),
-    Column("pm2_5_percentile", Integer),
+    Column("90pct_pm2_5_is_low_income", Boolean),
+    Column(
+        "pm2_5_percentile",
+        Integer,
+        CheckConstraint("pm2_5_percentile >= 0 AND pm2_5_percentile <= 100"),
+    ),
     Column("pm2_5", Float),
-    Column("diesel_particulates_and_low_income_and_not_students", Boolean),
-    Column("diesel_particulates_percentile", Integer),
+    Column("90pct_diesel_particulates_is_low_income", Boolean),
+    Column(
+        "diesel_particulates_percentile",
+        Integer,
+        CheckConstraint(
+            "diesel_particulates_percentile >= 0 AND diesel_particulates_percentile <= 100"
+        ),
+    ),
     Column("diesel_particulates", Float),
-    Column("traffic_and_low_income_and_not_students", Boolean),
-    Column("traffic_percentile", Integer),
+    Column("90pct_traffic_proximity_is_low_income", Boolean),
+    Column(
+        "traffic_percentile",
+        Integer,
+        CheckConstraint("traffic_percentile >= 0 AND traffic_percentile <= 100"),
+    ),
     Column("traffic", Float),
-    Column("housing_burden_and_low_income_and_not_students", Boolean),
-    Column("housing_burden_percentile", Integer),
-    Column("housing_burden_percent", Integer),
-    Column("lead_paint_and_median_home_price_and_low_income_and_not_student", Boolean),
-    Column("lead_paint_houses_percentile", Integer),
-    Column("lead_paint_houses_percent", Integer),
-    Column("median_home_price_percentile", Integer),
+    Column("90pct_dot_transit_barriers_is_low_income", Boolean),
+    Column(
+        "dot_travel_barriers_score_percentile",
+        Integer,
+        CheckConstraint(
+            "dot_travel_barriers_score_percentile >= 0 AND dot_travel_barriers_score_percentile <= 100"
+        ),
+    ),
+    Column("90pct_housing_burden_is_low_income", Boolean),
+    Column(
+        "housing_burden_percentile",
+        Integer,
+        CheckConstraint(
+            "housing_burden_percentile >= 0 AND housing_burden_percentile <= 100"
+        ),
+    ),
+    Column(
+        "housing_burden_percent",
+        Integer,
+        CheckConstraint("housing_burden_percent >= 0 AND housing_burden_percent <= 1"),
+    ),
+    Column("90pct_lead_paint_and_median_house_value_is_low_income", Boolean),
+    Column(
+        "lead_paint_houses_percentile",
+        Integer,
+        CheckConstraint(
+            "lead_paint_houses_percentile >= 0 AND lead_paint_houses_percentile <= 100"
+        ),
+    ),
+    Column(
+        "lead_paint_houses_percent",
+        Integer,
+        CheckConstraint(
+            "lead_paint_houses_percent >= 0 AND lead_paint_houses_percent <= 1"
+        ),
+    ),
+    Column(
+        "median_home_price_percentile",
+        Integer,
+        CheckConstraint(
+            "median_home_price_percentile >= 0 AND median_home_price_percentile <= 100"
+        ),
+    ),
     Column("median_home_price", Integer),
-    Column("hazardous_waste_proximity_and_low_income_and_not_students", Boolean),
-    Column("hazardous_waste_proximity_percentile", Integer),
+    Column("90pct_tract_area_covered_by_impervious_surface_is_low_income", Boolean),
+    Column("90pct_tract_area_covered_by_impervious_surface", Boolean),
+    Column(
+        "tract_area_covered_by_impervious_surface_percent",
+        Integer,
+    ),
+    Column(
+        "tract_area_covered_by_impervious_surface_percentile",
+        Integer,
+        CheckConstraint(
+            "tract_area_covered_by_impervious_surface_percentile >= 0 AND tract_area_covered_by_impervious_surface_percentile <= 100"
+        ),
+    ),
+    Column("has_35_acres", Boolean),
+    Column("experienced_historic_underinvestment_and_remains_low_income", Boolean),
+    Column("experienced_historic_underinvestment", Boolean),
+    Column(
+        "homes_with_no_kitchen_or_indoor_plumbing_percentile",
+        Float,
+        CheckConstraint(
+            "homes_with_no_kitchen_or_indoor_plumbing_percentile >= 0 AND homes_with_no_kitchen_or_indoor_plumbing_percentile <= 100"
+        ),
+    ),
+    Column(
+        "homes_with_no_kitchen_or_indoor_plumbing_percent",
+        Float,
+        CheckConstraint(
+            "homes_with_no_kitchen_or_indoor_plumbing_percent >= 0 AND homes_with_no_kitchen_or_indoor_plumbing_percent <= 1"
+        ),
+    ),
+    Column("90pct_proximity_to_hazardous_waste_facilities_is_low_income", Boolean),
+    Column(
+        "hazardous_waste_proximity_percentile",
+        Integer,
+        CheckConstraint(
+            "hazardous_waste_proximity_percentile >= 0 AND hazardous_waste_proximity_percentile <= 100"
+        ),
+    ),
     Column("hazardous_waste_proximity", Float),
-    Column("superfund_proximity_and_low_income_and_not_students", Boolean),
-    Column("superfund_proximity_percentile", Integer),
+    Column("90pct_proximity_to_superfund_sites_is_low_income", Boolean),
+    Column(
+        "superfund_proximity_percentile",
+        Integer,
+        CheckConstraint(
+            "superfund_proximity_percentile >= 0 AND superfund_proximity_percentile <= 100"
+        ),
+    ),
     Column("superfund_proximity", Float),
-    Column("risk_management_plan_proximity_and_low_income_and_not_students", Boolean),
-    Column("risk_management_plan_proximity_percentile", Integer),
+    Column("90pct_proximity_to_RMP_sites_is_low_income", Boolean),
+    Column(
+        "risk_management_plan_proximity_percentile",
+        Integer,
+        CheckConstraint(
+            "risk_management_plan_proximity_percentile >= 0 AND risk_management_plan_proximity_percentile <= 100"
+        ),
+    ),
     Column("risk_management_plan_proximity", Float),
-    Column("wastewater_and_low_income_and_not_students", Boolean),
-    Column("wastewater_percentile", Integer),
+    Column("has_one_FUDS", Boolean),
+    Column("has_one_abandoned_mine", Boolean),
+    Column("has_one_abandoned_mine_is_low_income", Boolean),
+    Column("has_one_FUDS_is_low_income", Boolean),
+    Column("has_one_FUDS_missing_data_treated_as_False", Boolean),
+    Column("has_one_abandoned_mine_missing_data_treated_as_False", Boolean),
+    Column("90pct_wastewater_discharge_is_low_income", Boolean),
+    Column(
+        "wastewater_percentile",
+        Integer,
+        CheckConstraint("wastewater_percentile >= 0 AND wastewater_percentile <= 100"),
+    ),
     Column("wastewater", Float),
-    Column("asthma_and_low_income_and_not_students", Boolean),
-    Column("asthma_percentile", Integer),
+    Column("90pct_leaky_underground_storage_tanks_is_low_income", Boolean),
+    Column(
+        "leaky_underground_storage_tanks_percentile",
+        Integer,
+        CheckConstraint(
+            "leaky_underground_storage_tanks_percentile >= 0 AND leaky_underground_storage_tanks_percentile <= 100"
+        ),
+    ),
+    Column("leaky_underground_storage_tanks", Float),
+    Column("90pct_asthma_is_low_income", Boolean),
+    Column(
+        "asthma_percentile",
+        Integer,
+        CheckConstraint("asthma_percentile >= 0 AND asthma_percentile <= 100"),
+    ),
     Column("asthma", Integer),
-    Column("diabetes_and_low_income_and_not_students", Boolean),
-    Column("diabetes_percentile", Integer),
+    Column("90pct_diabetes_is_low_income", Boolean),
+    Column(
+        "diabetes_percentile",
+        Integer,
+        CheckConstraint("diabetes_percentile >= 0 AND diabetes_percentile <= 100"),
+    ),
     Column("diabetes", Integer),
-    Column("heart_disease_and_low_income_and_not_students", Boolean),
-    Column("heart_disease_percentile", Integer),
+    Column("90pct_heart_disease_is_low_income", Boolean),
+    Column(
+        "heart_disease_percentile",
+        Integer,
+        CheckConstraint(
+            "heart_disease_percentile >= 0 AND heart_disease_percentile <= 100"
+        ),
+    ),
     Column("heart_disease", Integer),
-    Column("life_expectancy_and_low_income_and_not_students", Boolean),
-    Column("life_expectancy_percentile", Integer),
+    Column("90pct_low_life_expectancy_is_low_income", Boolean),
+    Column(
+        "life_expectancy_percentile",
+        Integer,
+        CheckConstraint(
+            "life_expectancy_percentile >= 0 AND life_expectancy_percentile <= 100"
+        ),
+    ),
     Column("life_expectancy", Float),
-    Column("local_to_area_income_ratio_and_less_than_high_school_and_not_st", Boolean),
-    Column("local_to_area_income_ratio_percentile", Integer),
+    Column("90pct_low_median_household_income_and_low_hs_attainment", Boolean),
+    Column(
+        "local_to_area_income_ratio_percentile",
+        Integer,
+        CheckConstraint(
+            "local_to_area_income_ratio_percentile >= 0 AND local_to_area_income_ratio_percentile <= 100"
+        ),
+    ),
     Column("local_to_area_income_ratio", Integer),
-    Column("linguistic_isolation_and_less_than_high_school_and_not_students", Boolean),
-    Column("linguistic_isolation_percentile", Integer),
-    Column("linguistic_isolation_percent", Integer),
-    Column("unemployment_and_less_than_high_school_and_not_students", Boolean),
-    Column("unemployment_percentile", Integer),
-    Column("unemployment_percent", Integer),
-    Column("below_poverty_line_and_less_than_high_school_and_not_students", Boolean),
-    Column("below_2x_poverty_line_percentile", Integer),
-    Column("below_2x_poverty_line_percent", Integer),
-    Column("below_poverty_line_percentile", Integer),
-    Column("below_poverty_line_percent", Integer),
-    Column("less_than_high_school_percentile", Integer),
-    Column("less_than_high_school_percent", Integer),
-    Column("unemployment_2010_percent", Integer),
-    Column("below_poverty_line_2010_percent", Integer),
-    Column("unemployment_and_less_than_high_school_islands", Boolean),
-    Column("below_poverty_line_and_less_than_high_school_islands", Boolean),
-    Column("local_to_area_income_ratio_and_less_than_high_school_islands", Boolean),
-    Column("non_college_students_percent", Integer),
+    Column("90pct_households_in_linguistic_isolation_and_low_hs_attainment", Boolean),
+    Column(
+        "linguistic_isolation_percentile",
+        Integer,
+        CheckConstraint(
+            "linguistic_isolation_percentile >= 0 AND linguistic_isolation_percentile <= 100"
+        ),
+    ),
+    Column(
+        "linguistic_isolation_percent",
+        Integer,
+        CheckConstraint(
+            "linguistic_isolation_percent >= 0 AND linguistic_isolation_percent <= 1"
+        ),
+    ),
+    Column("90pct_unemployment_and_low_hs_attainment", Boolean),
+    Column(
+        "unemployment_percentile",
+        Integer,
+        CheckConstraint(
+            "unemployment_percentile >= 0 AND unemployment_percentile <= 100"
+        ),
+    ),
+    Column(
+        "unemployment_percent",
+        Integer,
+        CheckConstraint("unemployment_percent >= 0 AND unemployment_percent <= 1"),
+    ),
+    Column("90pct_households_below_federal_poverty_level_low_hs_attainment", Boolean),
+    Column(
+        "below_2x_poverty_line_percentile",
+        Integer,
+        CheckConstraint(
+            "below_2x_poverty_line_percentile >= 0 AND below_2x_poverty_line_percentile <= 100"
+        ),
+    ),
+    Column(
+        "below_2x_poverty_line_percent",
+        Integer,
+        CheckConstraint(
+            "below_2x_poverty_line_percent >= 0 AND below_2x_poverty_line_percent <= 1"
+        ),
+    ),
+    Column(
+        "below_poverty_line_percentile",
+        Integer,
+        CheckConstraint(
+            "below_poverty_line_percentile >= 0 AND below_poverty_line_percentile <= 100"
+        ),
+    ),
+    Column(
+        "below_poverty_line_percent",
+        Integer,
+        CheckConstraint(
+            "below_poverty_line_percent >= 0 AND below_poverty_line_percent <= 1"
+        ),
+    ),
+    Column(
+        "less_than_high_school_percentile",
+        Integer,
+        CheckConstraint(
+            "less_than_high_school_percentile >= 0 AND less_than_high_school_percentile <= 100"
+        ),
+    ),
+    Column(
+        "less_than_high_school_percent",
+        Integer,
+        CheckConstraint(
+            "less_than_high_school_percent >= 0 AND less_than_high_school_percent <= 1"
+        ),
+    ),
+    Column(
+        "non_college_students_percent",
+        Integer,
+        CheckConstraint(
+            "non_college_students_percent >= 0 AND non_college_students_percent <= 1"
+        ),
+    ),
+    Column(
+        "unemployment_2010_percent",
+        Integer,
+        CheckConstraint(
+            "unemployment_2010_percent >= 0 AND unemployment_2010_percent <= 1"
+        ),
+    ),
+    Column(
+        "below_poverty_line_2010_percent",
+        Integer,
+        CheckConstraint(
+            "below_poverty_line_2010_percent >= 0 AND below_poverty_line_2010_percent <= 1"
+        ),
+    ),
+    Column("90pct_unemployment_and_low_hs_edu_islands", Boolean),
+    Column("90pct_households_below_federal_poverty_level_low_hs_edu_islands", Boolean),
+    Column("90pct_low_median_household_income_and_low_hs_edu_islands", Boolean),
+    Column("number_of_tribal_areas_within_tract_for_alaska", Integer),
+    Column("names_of_tribal_areas_within_tract", String),
+    Column(
+        "tract_within_tribal_areas_percent",
+        Integer,
+        CheckConstraint(
+            "tract_within_tribal_areas_percent >= 0 AND tract_within_tribal_areas_percent <= 1"
+        ),
+    ),
     schema=schema,
 )
 
