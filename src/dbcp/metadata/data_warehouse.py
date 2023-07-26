@@ -636,7 +636,7 @@ justice40_tracts = Table(
     ),
     Column("is_low_income", Boolean),
     Column("is_income_data_imputed", Boolean),
-    Column("90pct_expected_agriculture_loss_rate_is_low_income", Boolean),
+    Column("expected_agriculture_loss_rate_is_low_income", Boolean),
     Column(
         "expected_agriculture_loss_percentile",
         Integer,
@@ -645,7 +645,7 @@ justice40_tracts = Table(
         ),
     ),
     Column("expected_agriculture_loss", Float),
-    Column("90pct_expected_building_loss_rate_is_low_income", Boolean),
+    Column("expected_building_loss_rate_is_low_income", Boolean),
     Column(
         "expected_building_loss_percentile",
         Integer,
@@ -654,7 +654,7 @@ justice40_tracts = Table(
         ),
     ),
     Column("expected_building_loss", Float),
-    Column("90pct_expected_population_loss_rate_is_low_income", Boolean),
+    Column("expected_population_loss_rate_is_low_income", Boolean),
     Column(
         "expected_population_loss_percentile",
         Integer,
@@ -677,8 +677,8 @@ justice40_tracts = Table(
             "props_30year_flood_risk_percent >= 0 AND props_30year_flood_risk_percent <= 1"
         ),
     ),
-    Column("is_90pct_props_30year_flood_risk", Boolean),
-    Column("is_90pct_props_30year_flood_risk_is_low_income", Boolean),
+    Column("is_props_30year_flood_risk", Boolean),
+    Column("is_props_30year_flood_risk_is_low_income", Boolean),
     Column(
         "props_30year_fire_risk_percentile",
         Integer,
@@ -694,14 +694,14 @@ justice40_tracts = Table(
         ),
     ),
     Column(
-        "is_90pct_props_30year_fire_risk_percent",
+        "is_props_30year_fire_risk_percent",
         Boolean,
     ),
     Column(
-        "is_90pct_props_30year_fire_risk_percent_is_low_income",
+        "is_props_30year_fire_risk_percent_is_low_income",
         Boolean,
     ),
-    Column("90pct_energy_burden_is_low_income", Boolean),
+    Column("energy_burden_is_low_income", Boolean),
     Column(
         "energy_burden_percentile",
         Integer,
@@ -710,14 +710,14 @@ justice40_tracts = Table(
         ),
     ),
     Column("energy_burden", Integer),
-    Column("90pct_pm2_5_is_low_income", Boolean),
+    Column("pm2_5_is_low_income", Boolean),
     Column(
         "pm2_5_percentile",
         Integer,
         CheckConstraint("pm2_5_percentile >= 0 AND pm2_5_percentile <= 100"),
     ),
     Column("pm2_5", Float),
-    Column("90pct_diesel_particulates_is_low_income", Boolean),
+    Column("diesel_particulates_is_low_income", Boolean),
     Column(
         "diesel_particulates_percentile",
         Integer,
@@ -726,14 +726,14 @@ justice40_tracts = Table(
         ),
     ),
     Column("diesel_particulates", Float),
-    Column("90pct_traffic_proximity_is_low_income", Boolean),
+    Column("traffic_proximity_is_low_income", Boolean),
     Column(
         "traffic_percentile",
         Integer,
         CheckConstraint("traffic_percentile >= 0 AND traffic_percentile <= 100"),
     ),
     Column("traffic", Float),
-    Column("90pct_dot_transit_barriers_is_low_income", Boolean),
+    Column("dot_transit_barriers_is_low_income", Boolean),
     Column(
         "dot_travel_barriers_score_percentile",
         Integer,
@@ -741,7 +741,7 @@ justice40_tracts = Table(
             "dot_travel_barriers_score_percentile >= 0 AND dot_travel_barriers_score_percentile <= 100"
         ),
     ),
-    Column("90pct_housing_burden_is_low_income", Boolean),
+    Column("housing_burden_is_low_income", Boolean),
     Column(
         "housing_burden_percentile",
         Integer,
@@ -754,7 +754,7 @@ justice40_tracts = Table(
         Integer,
         CheckConstraint("housing_burden_percent >= 0 AND housing_burden_percent <= 1"),
     ),
-    Column("90pct_lead_paint_and_median_house_value_is_low_income", Boolean),
+    Column("lead_paint_and_median_house_value_is_low_income", Boolean),
     Column(
         "lead_paint_houses_percentile",
         Integer,
@@ -777,8 +777,8 @@ justice40_tracts = Table(
         ),
     ),
     Column("median_home_price", Integer),
-    Column("90pct_tract_area_covered_by_impervious_surface_is_low_income", Boolean),
-    Column("90pct_tract_area_covered_by_impervious_surface", Boolean),
+    Column("tract_area_covered_by_impervious_surface_is_low_income", Boolean),
+    Column("tract_area_covered_by_impervious_surface", Boolean),
     Column(
         "tract_area_covered_by_impervious_surface_percent",
         Integer,
@@ -807,7 +807,7 @@ justice40_tracts = Table(
             "homes_with_no_kitchen_or_indoor_plumbing_percent >= 0 AND homes_with_no_kitchen_or_indoor_plumbing_percent <= 1"
         ),
     ),
-    Column("90pct_proximity_to_hazardous_waste_facilities_is_low_income", Boolean),
+    Column("proximity_to_hazardous_waste_facilities_is_low_income", Boolean),
     Column(
         "hazardous_waste_proximity_percentile",
         Integer,
@@ -816,7 +816,7 @@ justice40_tracts = Table(
         ),
     ),
     Column("hazardous_waste_proximity", Float),
-    Column("90pct_proximity_to_superfund_sites_is_low_income", Boolean),
+    Column("proximity_to_superfund_sites_is_low_income", Boolean),
     Column(
         "superfund_proximity_percentile",
         Integer,
@@ -825,7 +825,7 @@ justice40_tracts = Table(
         ),
     ),
     Column("superfund_proximity", Float),
-    Column("90pct_proximity_to_RMP_sites_is_low_income", Boolean),
+    Column("proximity_to_RMP_sites_is_low_income", Boolean),
     Column(
         "risk_management_plan_proximity_percentile",
         Integer,
@@ -840,14 +840,14 @@ justice40_tracts = Table(
     Column("has_one_FUDS_is_low_income", Boolean),
     Column("has_one_FUDS_missing_data_treated_as_False", Boolean),
     Column("has_one_abandoned_mine_missing_data_treated_as_False", Boolean),
-    Column("90pct_wastewater_discharge_is_low_income", Boolean),
+    Column("wastewater_discharge_is_low_income", Boolean),
     Column(
         "wastewater_percentile",
         Integer,
         CheckConstraint("wastewater_percentile >= 0 AND wastewater_percentile <= 100"),
     ),
     Column("wastewater", Float),
-    Column("90pct_leaky_underground_storage_tanks_is_low_income", Boolean),
+    Column("leaky_underground_storage_tanks_is_low_income", Boolean),
     Column(
         "leaky_underground_storage_tanks_percentile",
         Integer,
@@ -856,21 +856,21 @@ justice40_tracts = Table(
         ),
     ),
     Column("leaky_underground_storage_tanks", Float),
-    Column("90pct_asthma_is_low_income", Boolean),
+    Column("asthma_is_low_income", Boolean),
     Column(
         "asthma_percentile",
         Integer,
         CheckConstraint("asthma_percentile >= 0 AND asthma_percentile <= 100"),
     ),
     Column("asthma", Integer),
-    Column("90pct_diabetes_is_low_income", Boolean),
+    Column("diabetes_is_low_income", Boolean),
     Column(
         "diabetes_percentile",
         Integer,
         CheckConstraint("diabetes_percentile >= 0 AND diabetes_percentile <= 100"),
     ),
     Column("diabetes", Integer),
-    Column("90pct_heart_disease_is_low_income", Boolean),
+    Column("heart_disease_is_low_income", Boolean),
     Column(
         "heart_disease_percentile",
         Integer,
@@ -879,7 +879,7 @@ justice40_tracts = Table(
         ),
     ),
     Column("heart_disease", Integer),
-    Column("90pct_low_life_expectancy_is_low_income", Boolean),
+    Column("low_life_expectancy_is_low_income", Boolean),
     Column(
         "life_expectancy_percentile",
         Integer,
@@ -888,7 +888,7 @@ justice40_tracts = Table(
         ),
     ),
     Column("life_expectancy", Float),
-    Column("90pct_low_median_household_income_and_low_hs_attainment", Boolean),
+    Column("low_median_household_income_and_low_hs_attainment", Boolean),
     Column(
         "local_to_area_income_ratio_percentile",
         Integer,
@@ -897,7 +897,7 @@ justice40_tracts = Table(
         ),
     ),
     Column("local_to_area_income_ratio", Integer),
-    Column("90pct_households_in_linguistic_isolation_and_low_hs_attainment", Boolean),
+    Column("households_in_linguistic_isolation_and_low_hs_attainment", Boolean),
     Column(
         "linguistic_isolation_percentile",
         Integer,
@@ -912,7 +912,7 @@ justice40_tracts = Table(
             "linguistic_isolation_percent >= 0 AND linguistic_isolation_percent <= 1"
         ),
     ),
-    Column("90pct_unemployment_and_low_hs_attainment", Boolean),
+    Column("unemployment_and_low_hs_attainment", Boolean),
     Column(
         "unemployment_percentile",
         Integer,
@@ -925,7 +925,7 @@ justice40_tracts = Table(
         Integer,
         CheckConstraint("unemployment_percent >= 0 AND unemployment_percent <= 1"),
     ),
-    Column("90pct_households_below_federal_poverty_level_low_hs_attainment", Boolean),
+    Column("households_below_federal_poverty_level_low_hs_attainment", Boolean),
     Column(
         "below_2x_poverty_line_percentile",
         Integer,
@@ -989,9 +989,9 @@ justice40_tracts = Table(
             "below_poverty_line_2010_percent >= 0 AND below_poverty_line_2010_percent <= 1"
         ),
     ),
-    Column("90pct_unemployment_and_low_hs_edu_islands", Boolean),
-    Column("90pct_households_below_federal_poverty_level_low_hs_edu_islands", Boolean),
-    Column("90pct_low_median_household_income_and_low_hs_edu_islands", Boolean),
+    Column("unemployment_and_low_hs_edu_islands", Boolean),
+    Column("households_below_federal_poverty_level_low_hs_edu_islands", Boolean),
+    Column("low_median_household_income_and_low_hs_edu_islands", Boolean),
     Column("number_of_tribal_areas_within_tract_for_alaska", Integer),
     Column("names_of_tribal_areas_within_tract", String),
     Column(

@@ -58,30 +58,27 @@ JUSTICE40_AGGREGATES = pd.read_csv(
 total_tracts,
 justice40_dbcp_index,
 n_distinct_qualifying_tracts,
-n_tracts_agriculture_loss_low_income_not_students,climate
-n_tracts_asthma_low_income_not_students,health
+n_tracts_agriculture_loss_low_income,climate
+n_tracts_asthma_low_income,health
 n_tracts_below_poverty_and_low_high_school,workforce
 n_tracts_below_poverty_line_less_than_high_school_islands,workforce
-n_tracts_building_loss_low_income_not_students,climate
-n_tracts_diabetes_low_income_not_students,health
-n_tracts_diesel_particulates_low_income_not_students,transit
-n_tracts_energy_burden_low_income_not_students,energy
-n_tracts_hazardous_waste_proximity_low_income_not_students,pollution
-n_tracts_heart_disease_low_income_not_students,health
-n_tracts_housing_burden_low_income_not_students,housing
-n_tracts_lead_paint_and_median_home_price_low_income_not_studen,housing
-n_tracts_life_expectancy_low_income_not_students,health
+n_tracts_building_loss_low_income,climate
+n_tracts_diabetes_low_income,health
+n_tracts_diesel_particulates_low_income,transit
+n_tracts_energy_burden_low_income,energy
+n_tracts_hazardous_waste_proximity_low_income,pollution
+n_tracts_heart_disease_low_income,health
+n_tracts_housing_burden_low_income,housing
+n_tracts_lead_paint_and_median_home_price_low_income,housing
+n_tracts_life_expectancy_low_income,health
 n_tracts_linguistic_isolation_and_low_high_school,workforce
-n_tracts_local_to_area_income_ratio_and_low_high_school,workforce
-n_tracts_local_to_area_income_ratio_less_than_high_school_islan,workforce
-n_tracts_pm2_5_low_income_not_students,energy
-n_tracts_population_loss_low_income_not_students,climate
-n_tracts_risk_management_plan_proximity_low_income_not_students,pollution
-n_tracts_superfund_proximity_low_income_not_students,pollution
-n_tracts_traffic_low_income_not_students,transit
+n_tracts_pm2_5_low_income,energy
+n_tracts_population_loss_low_income,climate
+n_tracts_superfund_proximity_low_income,pollution
+n_tracts_traffic_low_income,transit
 n_tracts_unemployment_and_low_high_school,workforce
 n_tracts_unemployment_less_than_high_school_islands,workforce
-n_tracts_wastewater_low_income_not_students,water
+n_tracts_wastewater_low_income,water
 """
     )
 )
@@ -140,30 +137,27 @@ def _get_env_justice_df(engine: sa.engine.Engine) -> pd.DataFrame:
         SUBSTRING("tract_id_fips", 1, 5) as county_id_fips,
         COUNT("tract_id_fips") as total_tracts,
         SUM("is_disadvantaged"::INTEGER) as n_distinct_qualifying_tracts,
-        SUM("expected_agriculture_loss_and_low_income_and_not_students"::INTEGER) as n_tracts_agriculture_loss_low_income_not_students,
-        SUM("expected_building_loss_and_low_income_and_not_students"::INTEGER) as n_tracts_building_loss_low_income_not_students,
-        SUM("expected_population_loss_and_low_income_and_not_students"::INTEGER) as n_tracts_population_loss_low_income_not_students,
-        SUM("diesel_particulates_and_low_income_and_not_students"::INTEGER) as n_tracts_diesel_particulates_low_income_not_students,
-        SUM("energy_burden_and_low_income_and_not_students"::INTEGER) as n_tracts_energy_burden_low_income_not_students,
-        SUM("pm2_5_and_low_income_and_not_students"::INTEGER) as n_tracts_pm2_5_low_income_not_students,
-        SUM("traffic_and_low_income_and_not_students"::INTEGER) as n_tracts_traffic_low_income_not_students,
-        SUM("lead_paint_and_median_home_price_and_low_income_and_not_student"::INTEGER) as n_tracts_lead_paint_and_median_home_price_low_income_not_students,
-        SUM("housing_burden_and_low_income_and_not_students"::INTEGER) as n_tracts_housing_burden_low_income_not_students,
-        SUM("risk_management_plan_proximity_and_low_income_and_not_students"::INTEGER) as n_tracts_risk_management_plan_proximity_low_income_not_students,
-        SUM("superfund_proximity_and_low_income_and_not_students"::INTEGER) as n_tracts_superfund_proximity_low_income_not_students,
-        SUM("wastewater_and_low_income_and_not_students"::INTEGER) as n_tracts_wastewater_low_income_not_students,
-        SUM("asthma_and_low_income_and_not_students"::INTEGER) as n_tracts_asthma_low_income_not_students,
-        SUM("heart_disease_and_low_income_and_not_students"::INTEGER) as n_tracts_heart_disease_low_income_not_students,
-        SUM("diabetes_and_low_income_and_not_students"::INTEGER) as n_tracts_diabetes_low_income_not_students,
-        SUM("local_to_area_income_ratio_and_less_than_high_school_and_not_st"::INTEGER) as n_tracts_local_to_area_income_ratio_and_low_high_school,
-        SUM("linguistic_isolation_and_less_than_high_school_and_not_students"::INTEGER) as n_tracts_linguistic_isolation_and_low_high_school,
-        SUM("below_poverty_line_and_less_than_high_school_and_not_students"::INTEGER) as n_tracts_below_poverty_and_low_high_school,
-        SUM("unemployment_and_less_than_high_school_and_not_students"::INTEGER) as n_tracts_unemployment_and_low_high_school,
-        SUM("hazardous_waste_proximity_and_low_income_and_not_students"::INTEGER) as n_tracts_hazardous_waste_proximity_low_income_not_students,
-        SUM("unemployment_and_less_than_high_school_islands"::INTEGER) as n_tracts_unemployment_less_than_high_school_islands,
-        SUM("local_to_area_income_ratio_and_less_than_high_school_islands"::INTEGER) as n_tracts_local_to_area_income_ratio_less_than_high_school_islands,
-        SUM("below_poverty_line_and_less_than_high_school_islands"::INTEGER) as n_tracts_below_poverty_line_less_than_high_school_islands,
-        SUM("life_expectancy_and_low_income_and_not_students"::INTEGER) as n_tracts_life_expectancy_low_income_not_students
+        SUM("expected_agriculture_loss_rate_is_low_income"::INTEGER) as n_tracts_agriculture_loss_low_income,
+        SUM("expected_building_loss_rate_is_low_income"::INTEGER) as n_tracts_building_loss_low_income,
+        SUM("expected_population_loss_rate_is_low_income"::INTEGER) as n_tracts_population_loss_low_income,
+        SUM("diesel_particulates_is_low_income"::INTEGER) as n_tracts_diesel_particulates_low_income,
+        SUM("energy_burden_is_low_income"::INTEGER) as n_tracts_energy_burden_low_income,
+        SUM("pm2_5_is_low_income"::INTEGER) as n_tracts_pm2_5_low_income,
+        SUM("traffic_proximity_is_low_income"::INTEGER) as n_tracts_traffic_low_income,
+        SUM("lead_paint_and_median_house_value_is_low_income"::INTEGER) as n_tracts_lead_paint_and_median_home_price_low_income,
+        SUM("housing_burden_is_low_income"::INTEGER) as n_tracts_housing_burden_low_income,
+        SUM("proximity_to_superfund_sites_is_low_income"::INTEGER) as n_tracts_superfund_proximity_low_income,
+        SUM("wastewater_discharge_is_low_income"::INTEGER) as n_tracts_wastewater_low_income,
+        SUM("asthma_is_low_income"::INTEGER) as n_tracts_asthma_low_income,
+        SUM("heart_disease_is_low_income"::INTEGER) as n_tracts_heart_disease_low_income,
+        SUM("diabetes_is_low_income"::INTEGER) as n_tracts_diabetes_low_income,
+        SUM("households_in_linguistic_isolation_and_low_hs_attainment"::INTEGER) as n_tracts_linguistic_isolation_and_low_high_school,
+        SUM("households_below_federal_poverty_level_low_hs_attainment"::INTEGER) as n_tracts_below_poverty_and_low_high_school,
+        SUM("unemployment_and_low_hs_attainment"::INTEGER) as n_tracts_unemployment_and_low_high_school,
+        SUM("proximity_to_hazardous_waste_facilities_is_low_income"::INTEGER) as n_tracts_hazardous_waste_proximity_low_income,
+        SUM("unemployment_and_low_hs_edu_islands"::INTEGER) as n_tracts_unemployment_less_than_high_school_islands,
+        SUM("households_below_federal_poverty_level_low_hs_edu_islands"::INTEGER) as n_tracts_below_poverty_line_less_than_high_school_islands,
+        SUM("low_life_expectancy_is_low_income"::INTEGER) as n_tracts_life_expectancy_low_income
     FROM "data_warehouse"."justice40_tracts"
     GROUP BY 1;
     """
