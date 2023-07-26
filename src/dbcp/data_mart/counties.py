@@ -72,6 +72,8 @@ n_tracts_housing_burden_low_income,housing
 n_tracts_lead_paint_and_median_home_price_low_income,housing
 n_tracts_life_expectancy_low_income,health
 n_tracts_linguistic_isolation_and_low_high_school,workforce
+n_tracts_local_to_area_income_ratio_and_low_high_school,workforce
+n_tracts_local_to_area_income_ratio_less_than_high_school_islan,workforce
 n_tracts_pm2_5_low_income,energy
 n_tracts_population_loss_low_income,climate
 n_tracts_superfund_proximity_low_income,pollution
@@ -151,7 +153,7 @@ def _get_env_justice_df(engine: sa.engine.Engine) -> pd.DataFrame:
         SUM("asthma_is_low_income"::INTEGER) as n_tracts_asthma_low_income,
         SUM("heart_disease_is_low_income"::INTEGER) as n_tracts_heart_disease_low_income,
         SUM("diabetes_is_low_income"::INTEGER) as n_tracts_diabetes_low_income,
-        SUM("low_median_household_income_and_low_hs_attainment::INTEGER") as n_tracts_local_to_area_income_ratio_and_low_high_school,
+        SUM("low_median_household_income_and_low_hs_attainment"::INTEGER) as n_tracts_local_to_area_income_ratio_and_low_high_school,
         SUM("households_in_linguistic_isolation_and_low_hs_attainment"::INTEGER) as n_tracts_linguistic_isolation_and_low_high_school,
         SUM("households_below_federal_poverty_level_low_hs_attainment"::INTEGER) as n_tracts_below_poverty_and_low_high_school,
         SUM("unemployment_and_low_hs_attainment"::INTEGER) as n_tracts_unemployment_and_low_high_school,

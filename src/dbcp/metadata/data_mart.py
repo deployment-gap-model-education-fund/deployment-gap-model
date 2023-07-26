@@ -151,6 +151,7 @@ counties_wide_format = Table(
     Column("n_tracts_life_expectancy_low_income", Integer),
     Column("n_tracts_linguistic_isolation_and_low_high_school", Integer),
     Column("n_tracts_local_to_area_income_ratio_and_low_high_school", Integer),
+    Column("n_tracts_local_to_area_income_ratio_less_than_high_school_islan", Integer),
     Column("n_tracts_pm2_5_low_income", Integer),
     Column("n_tracts_population_loss_low_income", Integer),
     Column("n_tracts_risk_management_plan_proximity_low_income", Integer),
