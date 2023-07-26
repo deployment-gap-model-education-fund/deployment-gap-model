@@ -151,11 +151,13 @@ def _get_env_justice_df(engine: sa.engine.Engine) -> pd.DataFrame:
         SUM("asthma_is_low_income"::INTEGER) as n_tracts_asthma_low_income,
         SUM("heart_disease_is_low_income"::INTEGER) as n_tracts_heart_disease_low_income,
         SUM("diabetes_is_low_income"::INTEGER) as n_tracts_diabetes_low_income,
+        SUM("low_median_household_income_and_low_hs_attainment::INTEGER") as n_tracts_local_to_area_income_ratio_and_low_high_school,
         SUM("households_in_linguistic_isolation_and_low_hs_attainment"::INTEGER) as n_tracts_linguistic_isolation_and_low_high_school,
         SUM("households_below_federal_poverty_level_low_hs_attainment"::INTEGER) as n_tracts_below_poverty_and_low_high_school,
         SUM("unemployment_and_low_hs_attainment"::INTEGER) as n_tracts_unemployment_and_low_high_school,
         SUM("proximity_to_hazardous_waste_facilities_is_low_income"::INTEGER) as n_tracts_hazardous_waste_proximity_low_income,
         SUM("unemployment_and_low_hs_edu_islands"::INTEGER) as n_tracts_unemployment_less_than_high_school_islands,
+        SUM("low_median_household_income_and_low_hs_edu_islands"::INTEGER) as n_tracts_local_to_area_income_ratio_less_than_high_school_islands,
         SUM("households_below_federal_poverty_level_low_hs_edu_islands"::INTEGER) as n_tracts_below_poverty_line_less_than_high_school_islands,
         SUM("low_life_expectancy_is_low_income"::INTEGER) as n_tracts_life_expectancy_low_income
     FROM "data_warehouse"."justice40_tracts"
