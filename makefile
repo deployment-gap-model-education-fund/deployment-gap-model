@@ -48,3 +48,5 @@ update_conda:
 
 jupyter_lab:
 	docker compose up
+
+.PHONY: test # "test" collides with a directory name. This tells make to run the command even if there is a directory named "test"

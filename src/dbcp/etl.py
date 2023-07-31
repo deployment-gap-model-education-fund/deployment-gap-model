@@ -12,6 +12,7 @@ from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.metadata.data_warehouse import metadata
 from dbcp.transform.fips_tables import SPATIAL_CACHE
 from dbcp.transform.helpers import GEOCODER_CACHE, bedford_addfips_fix
+from dbcp.validation.tests import validate_warehouse
 from pudl.helpers import add_fips_ids as _add_fips_ids
 from pudl.output.pudltabl import PudlTabl
 
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 def etl_eip_infrastructure() -> Dict[str, pd.DataFrame]:
     """EIP Infrastructure ETL."""
     # Extract
-    source_path = Path("/app/data/raw/fossil_infrastructure.xlsx")
+    source_path = Path("/app/data/raw/2023.05.24 OGW database.xlsx")
     eip_raw_dfs = dbcp.extract.eip_infrastructure.extract(source_path)
 
     # Transform
@@ -42,19 +43,15 @@ def etl_lbnl_iso_queue() -> Dict[str, pd.DataFrame]:
 def etl_columbia_local_opp() -> Dict[str, pd.DataFrame]:
     """Columbia Local Opposition ETL."""
     # Extract
-    source_path = Path("/app/data/raw/RELDI report updated 9.10.21 (1).docx")
+    source_path = Path(
+        "/app/data/raw/2023.05.30 Opposition to Renewable Energy Facilities - FINAL.docx"
+    )
     extractor = dbcp.extract.local_opposition.ColumbiaDocxParser()
     extractor.load_docx(source_path)
     docx_dfs = extractor.extract()
 
-    source_path_update = Path("./data/raw/RELDI_local_opposition_2022-03-24.csv")
-    update_dfs = dbcp.extract.local_opposition._extract_march_2022_update(
-        source_path_update
-    )
-
     # Transform
-    combined = dbcp.transform.local_opposition._combine_updates(docx_dfs, update_dfs)
-    transformed_dfs = dbcp.transform.local_opposition.transform(combined)
+    transformed_dfs = dbcp.transform.local_opposition.transform(docx_dfs)
 
     return transformed_dfs
 
@@ -122,7 +119,7 @@ def etl_fips_tables() -> Dict[str, pd.DataFrame]:
 
 def etl_justice40() -> dict[str, pd.DataFrame]:
     """ETL white house environmental justice dataset."""
-    source_path = Path("/app/data/raw/communities-2022-05-31-1915GMT.zip")
+    source_path = Path("/app/data/raw/1.0-communities.csv")
     raw = dbcp.extract.justice40.extract(source_path)
     out = dbcp.transform.justice40.transform(raw)
     return out
@@ -187,17 +184,17 @@ def etl(args):
     SPATIAL_CACHE.reduce_size()
 
     etl_funcs = {
+        "eip_infrastructure": etl_eip_infrastructure,
+        "columbia_local_opp": etl_columbia_local_opp,
         "energy_communities_by_county": etl_energy_communities_by_county,
         "fips_tables": etl_fips_tables,
         "protected_area_by_county": etl_protected_area_by_county,
         "offshore_wind": etl_offshore_wind,
         "justice40_tracts": etl_justice40,
         "nrel_wind_solar_ordinances": etl_nrel_ordinances,
-        "eip_infrastructure": etl_eip_infrastructure,
         "lbnl_iso_queue": etl_lbnl_iso_queue,
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
-        "columbia_local_opp": etl_columbia_local_opp,
     }
 
     # Extract and transform the data sets
@@ -220,15 +217,10 @@ def etl(args):
                 if_exists="append",
                 index=False,
                 schema="data_warehouse",
+                chunksize=1000,
             )
 
-    # TODO: Writing to CSVs is a temporary solution for getting data into Tableau
-    # This should be removed once we have cloudsql setup.
-    if args.csv:
-        logger.info("Writing tables to CSVs.")
-        output_path = Path("/app/data/output/")
-        for table_name, df in transformed_dfs.items():
-            df.to_csv(output_path / f"{table_name}.csv", index=False)
+    validate_warehouse(engine=engine)
 
     if args.upload_to_bigquery:
         if args.bigquery_env == "dev":
