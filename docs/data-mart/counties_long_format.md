@@ -156,3 +156,24 @@ Fossil employment qualification is defined on Metropolitan Statistical Areas, wh
 Coal closure qualification is defined on the Census tract level. Counties are combinations of Census tracts, so many counties will contain qualifying area but may not completely qualify. We reconcile this by arbitrarily defining a threshold at 50% of county area.
 
 Finally, individual brownfield sites are elligible for tax credits. In the future, we plan to aggregate the total area of qualifying sites, but have not yet implemented this. Brownfield qualification does not yet play any role in our current qualification rubric.
+
+### "Actionable" and "Nearly Certain" Projects
+
+These values are based on where a project is in the interconnection process. An "actionable" project is one that meets the following criteria:
+
+* proposed operating date in the latest year queue data or later (forward looking)
+* is active in the queue
+* is in one of the following stages of interconnection, as classified by LBNL:
+  * Facility Study
+  * System Impact Study
+  * Phase 4 Study
+  * "IA Pending"
+  * "IA in Progress"
+Offshore wind projects come from a separate source, so their only "actionable" qualification is to have a `construction_status` of "Site assessment underway" or "Not started".
+
+A "nearly certain" project is one that meets the "actionable" criteria but with the following additional allowable interconnection stages:
+
+* Construction
+* IA Executed
+* Operational
+Offshore wind projects come from a separate source, so their only "nearly certain" qualification is to have a `construction_status` of "Construction underway".
