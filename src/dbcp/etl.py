@@ -172,6 +172,16 @@ def etl_energy_communities_by_county() -> dict[str, pd.DataFrame]:
     return transformed
 
 
+def etl_ballot_ready() -> dict[str, pd.DataFrame]:
+    """ETL Ballot Ready election data."""
+    source_path = Path(
+        "ballot_ready/2023_04_05_climate_partners_upcoming_races_with_counties.csv"
+    )
+    raw_df = dbcp.extract.ballot_ready.extract(source_path)
+    transformed = dbcp.transform.ballot_ready.transform(raw_df)
+    return transformed
+
+
 def etl(args):
     """Run dbc ETL."""
     # Setup postgres
@@ -195,6 +205,7 @@ def etl(args):
         "lbnl_iso_queue": etl_lbnl_iso_queue,
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
+        "ballot_ready": etl_ballot_ready,
     }
 
     # Extract and transform the data sets
