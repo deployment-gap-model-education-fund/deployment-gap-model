@@ -10,27 +10,27 @@ import pandas as pd
 import dbcp
 
 
-def _extract_census_counties(census_path: Path) -> pd.DataFrame:
+def _extract_census_counties(census_uri: Path) -> pd.DataFrame:
     """Extract canonical county FIPS tables from census data.
 
     Args:
-        census_path: path to zipped shapefiles.
+        census_uri: path to zipped shapefiles.
     """
-    path = dbcp.extract.helpers.cache_gcs_archive_file_locally(census_path)
+    path = dbcp.extract.helpers.cache_gcs_archive_file_locally(census_uri)
     counties = gpd.read_file(path)
     return counties
 
 
-def extract_census_tribal_land(archive_path: Path) -> pd.DataFrame:
+def extract_census_tribal_land(archive_uri: Path) -> pd.DataFrame:
     """Extract Tribal land in the census.
 
     Args:
-        archive_path: path of file to extract from the dgm-archive GCS bucket.
+        archive_uri: path of file to extract from the dgm-archive GCS bucket.
 
     Returns:
         output dataframes of county-level info.
     """
-    path = dbcp.extract.helpers.cache_gcs_archive_file_locally(archive_path)
+    path = dbcp.extract.helpers.cache_gcs_archive_file_locally(archive_uri)
     counties = gpd.read_file(path)
     return counties
 
@@ -50,13 +50,13 @@ def _extract_state_fips() -> pd.DataFrame:
     return states
 
 
-def extract_fips(census_path: Path) -> Dict[str, pd.DataFrame]:
+def extract_fips(census_uri: str) -> Dict[str, pd.DataFrame]:
     """Extract canonical state and county FIPS tables from census data and the addfips library.
 
     Returns:
         Dict[str, pd.DataFrame]: output dictionary of dataframes
     """
     fips_data = {}
-    fips_data["counties"] = _extract_census_counties(census_path=census_path)
+    fips_data["counties"] = _extract_census_counties(census_uri=census_uri)
     fips_data["states"] = _extract_state_fips()
     return fips_data
