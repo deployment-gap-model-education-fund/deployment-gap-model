@@ -1176,8 +1176,8 @@ energy_communities = Table(
 # Ballot Ready #
 ################
 
-ballot_ready_counties = Table(
-    "ballot_ready_counties",
+br_election_data = Table(
+    "br_election_data",
     metadata,
     Column("county", String, nullable=False, primary_key=True),
     Column("election_id", Integer, nullable=False),
@@ -1201,7 +1201,6 @@ ballot_ready_counties = Table(
     Column("number_of_seats", Integer, nullable=False),
     Column("normalized_position_id", Integer, nullable=False),
     Column("normalized_position_name", String, nullable=False),
-    Column("position_description", String, nullable=True),
     Column("frequency", String, nullable=False),
     Column("reference_year", Integer, nullable=False),
     Column("partisan_type", String, nullable=True),

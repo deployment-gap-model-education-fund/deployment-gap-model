@@ -46,6 +46,9 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     # Add state and county fips codes
     ballot_ready = add_fips_ids(ballot_ready)
 
+    # Drop unused columns
+    ballot_ready = ballot_ready.drop(columns=["position_description"])
+
     trns_dfs = {}
-    trns_dfs["ballot_ready_counties"] = ballot_ready
+    trns_dfs["br_election_data"] = ballot_ready
     return trns_dfs

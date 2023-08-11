@@ -172,6 +172,11 @@ counties_wide_format = Table(
     Column("ec_coal_closures_area_fraction", Float),
     Column("ec_qualifies_via_employment", Boolean),
     Column("ec_qualifies", Boolean),
+    Column("next_election_date", DateTime),
+    Column("next_election_reference_year", Integer),
+    Column("next_election_frequency", String),
+    Column("next_election_position_name", String),
+    Column("next_election_number_of_seats", Integer),
     schema=schema,
 )
 
