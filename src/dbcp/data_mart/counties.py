@@ -785,6 +785,7 @@ def _get_county_properties(
     env_justice = _get_env_justice_df(postgres_engine)
     fed_lands = _get_federal_land_fraction(postgres_engine)
     ec_counties = _get_energy_community_qualification(postgres_engine)
+    next_election_data = _get_ballot_ready_election_cols(postgres_engine)
 
     # model local opposition
     aggregator = CountyOpposition(
@@ -838,6 +839,12 @@ def _get_county_properties(
             "ec_qualifies": False,
         },
         inplace=True,
+    )
+
+    # NOTE: not sure if ballot ready uses a consistent FIPS vintage. But the presence of
+    # 02261 suggest it uses 2010 FIPS, if not multiple.
+    county_properties = county_properties.merge(
+        next_election_data, on="county_id_fips", how="left", validate="1:1"
     )
 
     county_properties = county_properties.rename(columns=rename_dict)
@@ -939,10 +946,6 @@ def _get_ballot_ready_election_cols(engine: sa.engine.Engine) -> pd.DataFrame:
         list(rename_dict.keys()) + ["county_id_fips"]
     ].rename(columns=rename_dict)
 
-    # For some reason Yakatat AK does not have required information state_id_fips, county name, ...
-    next_election_day = next_election_day[
-        ~(next_election_day.county_id_fips == "02261")
-    ]
     return next_election_day.set_index("county_id_fips")
 
 
@@ -970,16 +973,12 @@ def create_wide_format(
     offshore_bits = _get_offshore_wind_extra_cols(postgres_engine)
     actionable_bits = _get_actionable_aggs_for_wide_format(postgres_engine)
 
-    # add ballot ready data
-    next_election_data = _get_ballot_ready_election_cols(postgres_engine)
-
     wide_format = pd.concat(
         [
             wide_format.set_index("county_id_fips"),
             proposed_counts,
             offshore_bits,
             actionable_bits,
-            next_election_data,
         ],
         axis=1,
         join="outer",
