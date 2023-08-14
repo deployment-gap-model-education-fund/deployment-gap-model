@@ -104,12 +104,12 @@ def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
 
 def etl_fips_tables() -> Dict[str, pd.DataFrame]:
     """Master state and county FIPS table ETL."""
-    census_path = Path("census/tl_2021_us_county.zip")
-    fips = dbcp.extract.fips_tables.extract_fips(census_path)
+    census_uri = "gs://dgm-archive/census/tl_2021_us_county.zip"
+    fips = dbcp.extract.fips_tables.extract_fips(census_uri)
 
-    tribal_lands_path = Path("census/tl_2021_us_aiannh.zip")
+    tribal_lands_uri = "gs://dgm-archive/census/tl_2021_us_aiannh.zip"
     fips["tribal_land"] = dbcp.extract.fips_tables.extract_census_tribal_land(
-        tribal_lands_path
+        tribal_lands_uri
     )
 
     out = dbcp.transform.fips_tables.transform(fips)
@@ -174,10 +174,8 @@ def etl_energy_communities_by_county() -> dict[str, pd.DataFrame]:
 
 def etl_ballot_ready() -> dict[str, pd.DataFrame]:
     """ETL Ballot Ready election data."""
-    source_path = Path(
-        "ballot_ready/2023_04_05_climate_partners_upcoming_races_with_counties.csv"
-    )
-    raw_df = dbcp.extract.ballot_ready.extract(source_path)
+    source_uri = "gs://dgm-archive/ballot_ready/2023_04_05_climate_partners_upcoming_races_with_counties.csv"
+    raw_df = dbcp.extract.ballot_ready.extract(source_uri)
     transformed = dbcp.transform.ballot_ready.transform(raw_df)
     return transformed
 
