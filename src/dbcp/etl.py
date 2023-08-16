@@ -174,7 +174,7 @@ def etl_energy_communities_by_county() -> dict[str, pd.DataFrame]:
 
 def etl_ballot_ready() -> dict[str, pd.DataFrame]:
     """ETL Ballot Ready election data."""
-    source_uri = "gs://dgm-archive/ballot_ready/2023_04_05_climate_partners_upcoming_races_with_counties.csv"
+    source_uri = "gs://dgm-archive/ballot_ready/BallotReady_upcoming_races_with_counties_08_14_2023.csv"
     raw_df = dbcp.extract.ballot_ready.extract(source_uri)
     transformed = dbcp.transform.ballot_ready.transform(raw_df)
     return transformed

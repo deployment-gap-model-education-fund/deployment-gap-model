@@ -26,7 +26,9 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         ballot_ready[col] = pd.to_datetime(ballot_ready[col])
 
     # Explode counties column
-    ballot_ready["counties"] = ballot_ready.counties.str[1:-1].str.split(",")
+    ballot_ready["counties"] = (
+        ballot_ready.counties.str.replace('"', "").str[1:-1].str.split(", ")
+    )
 
     exp_ballot_ready = ballot_ready.explode("counties")
     exp_ballot_ready = exp_ballot_ready.rename(columns={"counties": "county"})
@@ -44,10 +46,14 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     assert ~ballot_ready.duplicated(subset=["county", "race_id"], keep=False).any()
 
     # Add state and county fips codes
+    # Fix LaSalle Parish spelling to match addfips library
+    ballot_ready.loc[
+        (ballot_ready.county == "LaSalle Parish"), "county"
+    ] = "La Salle Parish"
     ballot_ready = add_fips_ids(ballot_ready)
 
     # Drop unused columns
-    ballot_ready = ballot_ready.drop(columns=["position_description"])
+    ballot_ready = ballot_ready.drop(columns=["position_description", "id"])
 
     trns_dfs = {}
     trns_dfs["br_election_data"] = ballot_ready
