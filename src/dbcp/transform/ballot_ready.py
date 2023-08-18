@@ -30,8 +30,9 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         ballot_ready.counties.str.replace('"', "").str[1:-1].str.split(", ")
     )
 
-    exp_ballot_ready = ballot_ready.explode("counties")
-    exp_ballot_ready = exp_ballot_ready.rename(columns={"counties": "county"})
+    exp_ballot_ready = ballot_ready.explode("counties").rename(
+        columns={"counties": "county"}
+    )
 
     duplicate_race = exp_ballot_ready.duplicated(
         subset=["county", "race_id"], keep=False
@@ -54,6 +55,9 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     # Drop unused columns
     ballot_ready = ballot_ready.drop(columns=["position_description", "id"])
+    ballot_ready = ballot_ready.rename(
+        columns={"county": "raw_county", "state": "raw_state"}
+    )
 
     trns_dfs = {}
     trns_dfs["br_election_data"] = ballot_ready

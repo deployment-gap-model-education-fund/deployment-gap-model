@@ -1179,7 +1179,7 @@ energy_communities = Table(
 br_election_data = Table(
     "br_election_data",
     metadata,
-    Column("county", String, nullable=False, primary_key=True),
+    Column("raw_county", String, nullable=False, primary_key=True),
     Column("election_id", Integer, nullable=False),
     Column("election_name", String, nullable=False),
     Column("election_day", DateTime, nullable=False),
@@ -1193,7 +1193,7 @@ br_election_data = Table(
     Column("sub_area_value", String, nullable=True),
     Column("sub_area_name_secondary", String, nullable=True),
     Column("sub_area_value_secondary", String, nullable=True),
-    Column("state", String, nullable=False),
+    Column("raw_state", String, nullable=False),
     Column("level", String, nullable=False),
     Column("tier", Integer, nullable=False),
     Column("is_judicial", Boolean, nullable=False),

@@ -785,7 +785,6 @@ def _get_county_properties(
     env_justice = _get_env_justice_df(postgres_engine)
     fed_lands = _get_federal_land_fraction(postgres_engine)
     ec_counties = _get_energy_community_qualification(postgres_engine)
-    next_election_data = _get_ballot_ready_election_cols(postgres_engine)
 
     # model local opposition
     aggregator = CountyOpposition(
@@ -839,12 +838,6 @@ def _get_county_properties(
             "ec_qualifies": False,
         },
         inplace=True,
-    )
-
-    # NOTE: not sure if ballot ready uses a consistent FIPS vintage. But the presence of
-    # 02261 suggest it uses 2010 FIPS, if not multiple.
-    county_properties = county_properties.merge(
-        next_election_data, on="county_id_fips", how="left", validate="1:1"
     )
 
     county_properties = county_properties.rename(columns=rename_dict)
