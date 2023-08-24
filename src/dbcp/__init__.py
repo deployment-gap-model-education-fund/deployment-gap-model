@@ -5,6 +5,7 @@ import dbcp.data_mart.projects  # noqa: F401
 import dbcp.etl  # noqa: F401
 import dbcp.extract  # noqa: F401
 import dbcp.extract.eip_infrastructure  # noqa: F401
+import dbcp.extract.epa_avert  # noqa: F401
 import dbcp.extract.fips_tables  # noqa: F401
 import dbcp.extract.helpers  # noqa: F401
 import dbcp.extract.justice40  # noqa: F401
@@ -17,6 +18,7 @@ import dbcp.extract.protected_area_by_county  # noqa: F401
 import dbcp.extract.rmi_energy_communities  # noqa: F401
 import dbcp.helpers  # noqa: F401
 import dbcp.transform.eip_infrastructure  # noqa: F401
+import dbcp.transform.epa_avert  # noqa: F401
 import dbcp.transform.fips_tables  # noqa: F401
 import dbcp.transform.justice40  # noqa: F401
 import dbcp.transform.lbnl_iso_queue  # noqa: F401
