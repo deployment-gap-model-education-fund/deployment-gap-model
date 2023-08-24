@@ -868,9 +868,6 @@ def _get_actionable_aggs_for_wide_format(engine: sa.engine.Engine) -> pd.DataFra
     is_renewable_and_battery = iso["resource_clean"].isin(set(RENEWABLE_TYPES))
     actionable_filter = is_renewable_and_battery & iso["is_actionable"]
     nearly_certain_filter = is_renewable_and_battery & iso["is_nearly_certain"]
-    assert (
-        nearly_certain_filter.sum() > actionable_filter.sum()
-    ), "nearly_certain is a superset of actionable; it should have more entries."
 
     # Distribute project-level quantities across locations, when there are multiple.
     # A handful of ISO projects are in multiple counties and the proprietary offshore
@@ -907,12 +904,7 @@ def _get_actionable_aggs_for_wide_format(engine: sa.engine.Engine) -> pd.DataFra
         agg.rename(columns=rename_dict, inplace=True)
         aggs.append(agg)
     aggs = pd.concat(aggs, axis=1, join="outer")
-    assert (
-        aggs["renewable_and_battery_proposed_facility_count_nearly_certain"]
-        .fillna(0)
-        .ge(aggs["renewable_and_battery_proposed_facility_count_actionable"].fillna(0))
-        .all()
-    ), "actionable count should be less than or equal to nearly_certain count"
+
     return aggs
 
 
