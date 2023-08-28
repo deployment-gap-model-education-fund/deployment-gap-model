@@ -424,3 +424,19 @@ br_election_data = Table(
     ),  # Should not be nullable in future updates
     schema=schema,
 )
+
+county_commission_election_info = Table(
+    "county_commission_election_info",
+    metadata,
+    Column("county_id_fips", String, nullable=False, primary_key=True),
+    Column("election_id", Integer, nullable=False, primary_key=True),
+    Column("county", String, nullable=False),
+    Column("election_name", String, nullable=False),
+    Column("election_day", DateTime, nullable=False),
+    Column("total_n_of_seats", Integer, nullable=False),
+    Column("total_n_races", Integer, nullable=False),
+    Column("all_race_names", String, nullable=False),
+    Column("frequency", String, nullable=False),
+    Column("reference_year", Integer, nullable=False),
+    schema=schema,
+)
