@@ -70,15 +70,30 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """
     cap_factors = _capacity_factor_transform(raw_dfs["avert_capacity_factors"])
     emissions = _emissions_transform(raw_dfs["avert_emissions_factors"])
+    avert_factors = cap_factors.merge(
+        emissions, on=["avert_region", "resource_type"], how="outer"
+    )
+    assert (
+        avert_factors[["avert_region", "resource_type"]]
+        .isna()
+        .sum()
+        .eq(0)
+        .all()
+        .squeeze()
+    )
+    assert "Alaska" not in avert_factors["avert_region"].unique()
+    assert "Hawaii" not in avert_factors["avert_region"].unique()
+    avert_factors["co2e_tonnes_per_year_per_mw"] = (
+        avert_factors["tonnes_co2_per_mwh"] * avert_factors["capacity_factor"] * 8766
+    )
+
     crosswalk = _crosswalk_transform(raw_dfs["avert_county_region_assoc"])
-    capacity_regions = set(cap_factors["avert_region"].unique())
-    crosswalk_regions = set(crosswalk["avert_region"].unique())
-    assert capacity_regions == set(emissions["avert_region"].unique())
-    assert capacity_regions.difference(crosswalk_regions) == set()
-    assert crosswalk_regions.difference(capacity_regions) == set(["Alaska", "Hawaii"])
+    avert_regions = set(avert_factors["avert_region"].unique())
+    assert set(crosswalk["avert_region"].unique()).symmetric_difference(
+        avert_regions
+    ) == set(["Alaska", "Hawaii"])
     return {
-        "avert_capacity_factors": cap_factors,
-        "avert_emissions_factors": emissions,
+        "avert_avoided_emissions_factors": avert_factors,
         "avert_county_region_assoc": crosswalk,
     }
 

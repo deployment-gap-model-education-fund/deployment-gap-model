@@ -865,9 +865,7 @@ def _get_actionable_aggs_for_wide_format(engine: sa.engine.Engine) -> pd.DataFra
     # Had to do this separately because including the is_actionable condition in
     # the long format data would be too ugly.
     iso = create_iso_data_mart(engine)
-    is_renewable_and_battery = iso["resource_clean"].isin(set(RENEWABLE_TYPES))
-    actionable_filter = is_renewable_and_battery & iso["is_actionable"]
-    nearly_certain_filter = is_renewable_and_battery & iso["is_nearly_certain"]
+    iso = _add_avoided_co2e(iso, engine)
 
     # Distribute project-level quantities across locations, when there are multiple.
     # A handful of ISO projects are in multiple counties and the proprietary offshore
@@ -876,36 +874,105 @@ def _get_actionable_aggs_for_wide_format(engine: sa.engine.Engine) -> pd.DataFra
     iso.loc[:, "capacity_mw"] = iso.loc[:, "capacity_mw"].mul(
         iso["frac_locations_in_county"]
     )
+    iso.loc[:, "avoided_co2e_tonnes_per_year"] = iso.loc[
+        :, "avoided_co2e_tonnes_per_year"
+    ].mul(iso["frac_locations_in_county"])
 
-    action_rename_dict = {
-        "capacity_mw": "renewable_and_battery_proposed_capacity_mw_actionable",
-        "project_id": "renewable_and_battery_proposed_facility_count_actionable",
-    }
-    certain_rename_dict = {
-        "capacity_mw": "renewable_and_battery_proposed_capacity_mw_nearly_certain",
-        "project_id": "renewable_and_battery_proposed_facility_count_nearly_certain",
-    }
-
+    resources = ["Onshore Wind", "Offshore Wind", "Solar", "renewable_and_battery"]
     aggs = []
-    for filter_, rename_dict in [
-        (actionable_filter, action_rename_dict),
-        (nearly_certain_filter, certain_rename_dict),
-    ]:
-        agg = (
-            iso.loc[filter_, :]
-            .groupby("county_id_fips")
-            .agg(
-                {
-                    "capacity_mw": "sum",
-                    "project_id": "nunique",  # "count" would over-count multi-resource projects
-                }
+    for resource in resources:
+        if resource == "renewable_and_battery":
+            resource_filter = iso["resource_clean"].isin(set(RENEWABLE_TYPES))
+        else:
+            resource_filter = iso["resource_clean"] == resource
+        resource_name = resource.lower().replace(" ", "_")
+        for status in ["actionable", "nearly_certain"]:
+            filter_ = resource_filter & iso[f"is_{status}"]
+            rename_dict = {
+                "capacity_mw": f"{resource_name}_proposed_capacity_mw_{status}",
+                "project_id": f"{resource_name}_proposed_facility_count_{status}",
+                "avoided_co2e_tonnes_per_year": f"{resource_name}_proposed_avoided_co2e_{status}",
+            }
+            agg = (
+                iso.loc[filter_, :]
+                .groupby("county_id_fips")
+                .agg(
+                    {
+                        "capacity_mw": "sum",
+                        "project_id": "nunique",  # "count" would over-count multi-resource projects
+                        "avoided_co2e_tonnes_per_year": "sum",
+                    }
+                )
             )
+            agg.rename(columns=rename_dict, inplace=True)
+            aggs.append(agg)
+        # and avoided co2 totals. This doesn't belong in this function but c'est la vie.
+        agg = (
+            iso.loc[resource_filter, :]
+            .groupby("county_id_fips")["avoided_co2e_tonnes_per_year"]
+            .sum()
+            .rename(f"{resource_name}_proposed_avoided_co2e_tonnes_per_year")
         )
-        agg.rename(columns=rename_dict, inplace=True)
         aggs.append(agg)
+
     aggs = pd.concat(aggs, axis=1, join="outer")
 
     return aggs
+
+
+def _add_avoided_co2e(iso: pd.DataFrame, engine: sa.engine.Engine) -> pd.DataFrame:
+    emiss_fac_by_county = _get_avoided_emissions_by_county_resource(engine)
+    emiss_fac_by_county["resource_type"].replace(
+        {
+            "onshore_wind": "Onshore Wind",
+            "offshore_wind": "Offshore Wind",
+            "utility_pv": "Solar",
+        },
+        inplace=True,
+    )
+    emiss_fac_by_county.rename(
+        columns={"resource_type": "resource_clean"}, inplace=True
+    )
+
+    iso = iso.merge(
+        emiss_fac_by_county, on=["county_id_fips", "resource_clean"], how="left"
+    )
+    iso["avoided_co2e_tonnes_per_year"] = (
+        iso["capacity_mw"] * iso["co2e_tonnes_per_year_per_mw"]
+    )
+    return iso
+
+
+def _get_avoided_emissions_by_county_resource(engine: sa.engine.Engine) -> pd.DataFrame:
+    query = """
+    select
+        avert_region,
+        resource_type,
+        co2e_tonnes_per_year_per_mw
+    from data_warehouse.avert_avoided_emissions_factors
+    -- drop distributed_pv
+    WHERE resource_type in ('onshore_wind', 'offshore_wind', 'utility_pv')
+    """
+    emiss_fac = pd.read_sql(query, engine)
+    crosswalk = pd.read_sql_table(
+        "avert_county_region_assoc", engine, schema="data_warehouse"
+    )
+    emiss_fac_by_county = crosswalk.merge(emiss_fac, on="avert_region", how="left")
+
+    # fill in AK and HI with national averages
+    national_avgs = (
+        emiss_fac.groupby("resource_type")["co2e_tonnes_per_year_per_mw"]
+        .mean()
+        .rename("avg_co2")
+    )
+    emiss_fac_by_county = emiss_fac_by_county.merge(
+        national_avgs, on="resource_type", how="left"
+    )
+    emiss_fac_by_county["co2e_tonnes_per_year_per_mw"].fillna(
+        emiss_fac_by_county["avg_co2"], inplace=True
+    )
+    emiss_fac_by_county.drop(columns=["avg_co2", "avert_region"], inplace=True)
+    return emiss_fac_by_county
 
 
 def create_wide_format(
@@ -1028,3 +1095,11 @@ def create_data_mart(
         "counties_wide_format": wide_format,
     }
     return out
+
+
+if __name__ == "__main__":
+    # debugging entry point
+    engine = get_sql_engine()
+    pudl_engine = get_pudl_engine()
+    marts = create_data_mart(engine=engine, pudl_engine=pudl_engine)
+    print("hooray")

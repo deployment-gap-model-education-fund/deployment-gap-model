@@ -16,6 +16,30 @@ metadata = MetaData()
 schema = "data_warehouse"
 
 ###############################
+# EPA AVERT Avoided Emissions #
+###############################
+
+avert_capacity_factors = Table(
+    "avert_avoided_emissions_factors",
+    metadata,
+    Column("avert_region", String, primary_key=True),
+    Column("resource_type", String, primary_key=True),
+    Column("capacity_factor", Float, nullable=True),
+    Column("tonnes_co2_per_mwh", Float, nullable=True),
+    Column("co2e_tonnes_per_year_per_mw", Float, nullable=True),
+    schema=schema,
+)
+
+avert_county_region_assoc = Table(
+    "avert_county_region_assoc",
+    metadata,
+    Column("avert_region", String, primary_key=True),
+    Column("county_id_fips", String, primary_key=True),
+    schema=schema,
+)
+
+
+###############################
 # State and County Fips Codes #
 ###############################
 county_fips = (
