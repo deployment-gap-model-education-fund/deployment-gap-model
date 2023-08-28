@@ -34,10 +34,13 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 ||`renewable_and_battery_existing_facility_count`|Number of existing renewable generation or battery storage facilities.|PUDL||
 ||`renewable_and_battery_proposed_capacity_mw`|Combined generation and storage capacity, in megawatts, of proposed renewable power and storage facilities.|LBNL||
 ||`renewable_and_battery_proposed_facility_count`|Number of proposed renewable generation or battery storage facilities.|LBNL||
+||`renewable_and_battery_proposed_avoided_co2e_tonnes_per_year`|Estimated avoided CO2 equivalent emissions of proposed projects, in metric tonnes per year.|EPA AVERT||
 ||`renewable_and_battery_proposed_capacity_mw_actionable`|Combined generation and storage capacity, in megawatts, of proposed renewable power and storage facilities in the actionable stage of development.|derived from LBNL||
 ||`renewable_and_battery_proposed_facility_count_actionable`|Number of proposed renewable generation or battery storage facilities in the actionable stage of development.|derived from LBNL||
-||`renewable_and_battery_proposed_capacity_mw_nearly_certain`|Combined generation and storage capacity, in megawatts, of proposed renewable power and storage facilities in the actionable or nearly completed stages of development.|derived from LBNL||
-||`renewable_and_battery_proposed_facility_count_nearly_certain`|Number of proposed renewable generation or battery storage facilities in the actionable or nearly completed stages of development.|derived from LBNL||
+||`renewable_and_battery_proposed_avoided_co2e_actionable`|Estimated avoided CO2 equivalent emissions of proposed projects in the actionable stage of development, in metric tonnes per year.|EPA AVERT||
+||`renewable_and_battery_proposed_capacity_mw_nearly_certain`|Combined generation and storage capacity, in megawatts, of proposed renewable power and storage facilities in the nearly completed stages of development.|derived from LBNL||
+||`renewable_and_battery_proposed_facility_count_nearly_certain`|Number of proposed renewable generation or battery storage facilities in the nearly completed stages of development.|derived from LBNL||
+||`renewable_and_battery_proposed_avoided_co2e_nearly_certain`|Estimated avoided CO2 equivalent emissions of proposed but nearly completed projects, in metric tonnes per year.|EPA AVERT||
 ||`infra_total_proposed_co2e_tonnes_per_year`|Annual CO2 equivalent emissions from all proposed fossil infrastructure projects, in metric tonnes.|EIP||
 ||`infra_total_proposed_facility_count`|Number of proposed fossil infrastructure facilities across all sectors.|EIP||
 ||`infra_total_proposed_nox_tonnes_per_year`|Annual NOx emissions from all proposed fossil infrastructure projects, in metric tonnes.|EIP||
@@ -62,8 +65,15 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 ||`offshore_wind_existing_facility_count`|Number of existing offshore wind power plants.|PUDL||
 ||`offshore_wind_proposed_capacity_mw`|Generation capacity, in megawatts, of propsed offshore wind power plants. When a wind farm has multiple cable landing locations, the capacity is split equally between landing locations. Note that this is the only proposed capacity column NOT sourced from LBNL.|original work||
 ||`offshore_wind_proposed_facility_count`|Number of proposed offshore wind power plants.|original work||
+||`offshore_wind_proposed_avoided_co2e_tonnes_per_year`|Estimated avoided CO2 equivalent emissions of all proposed offshore wind projects, in metric tonnes per year.|EPA AVERT||
 ||`offshore_wind_capacity_mw_via_ports`|Total generation capacity, in megawatts, of propsed offshore wind power plants with an assembly/manufacturing port in this county. Capacity has NOT been split between multiple port locations, so the sum of this column is deliberately greater than total proposed offshore wind capacity.|original work||
 ||`offshore_wind_interest_type`|Describes the relationship of this county to offshore wind. One of `Proposed lease area`, `Contracted project`,  `Lease area in proximity`, or NULL.|original work||
+||`offshore_wind_proposed_capacity_mw_actionable`|Total capacity, in megawatts, of proposed offshore wind facilities in the actionable stage of development.|EPA AVERT||
+||`offshore_wind_proposed_facility_count_actionable`|Number of proposed offshore wind projects in the actionable stage of development.|EPA AVERT||
+||`offshore_wind_proposed_avoided_co2e_actionable`|Estimated avoided CO2 equivalent emissions of proposed offshore wind projects in the actionable stage of development, in metric tonnes per year.|EPA AVERT||
+||`offshore_wind_proposed_capacity_mw_nearly_certain`|Total capacity, in megawatts, of nearly completed offshore wind facilities.|EPA AVERT||
+||`offshore_wind_proposed_facility_count_nearly_certain`|Number of nearly completed offshore wind facilities.|EPA AVERT||
+||`offshore_wind_proposed_avoided_co2e_nearly_certain`|Estimated avoided CO2 equivalent emissions of nearly completed offshore wind projects, in metric tonnes per year.|EPA AVERT||
 ||`oil_existing_capacity_mw`|Generation capacity, in megawatts, of existing oil and diesel power plants.|PUDL||
 ||`oil_existing_co2e_tonnes_per_year`|Annual CO2 equivalent emissions from existing oil power plants, in metric tonnes.|derived from PUDL||
 ||`oil_proposed_facility_count`|Number of proposed oil power plants.|LBNL||
@@ -74,11 +84,25 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 ||`onshore_wind_existing_facility_count`|Number of existing onshore wind power plants.|PUDL||
 ||`onshore_wind_proposed_capacity_mw`|Generation capacity, in megawatts, of proposed onshore wind power plants.|LBNL||
 ||`onshore_wind_proposed_facility_count`|Number of proposed onshore wind power plants.|LBNL||
+||`onshore_wind_proposed_avoided_co2e_tonnes_per_year`|Estimated avoided CO2 equivalent emissions of all proposed onshore wind projects, in metric tonnes per year.|EPA AVERT||
+||`onshore_wind_proposed_capacity_mw_actionable`|Total capacity, in megawatts, of proposed onshore wind facilities in the actionable stage of development.|EPA AVERT||
+||`onshore_wind_proposed_facility_count_actionable`|Number of proposed onshore wind projects in the actionable stage of development.|EPA AVERT||
+||`onshore_wind_proposed_avoided_co2e_actionable`|Estimated avoided CO2 equivalent emissions of proposed onshore wind projects in the actionable stage of development, in metric tonnes per year.|EPA AVERT||
+||`onshore_wind_proposed_capacity_mw_nearly_certain`|Total capacity, in megawatts, of nearly completed onshore wind facilities.|EPA AVERT||
+||`onshore_wind_proposed_facility_count_nearly_certain`|Number of nearly completed onshore wind facilities.|EPA AVERT||
+||`onshore_wind_proposed_avoided_co2e_nearly_certain`|Estimated avoided CO2 equivalent emissions of nearly completed onshore wind projects, in metric tonnes per year.|EPA AVERT||
 ||`solar_existing_capacity_mw`|Generation capacity, in megawatts, of existing solar power plants.|PUDL||
 ||`solar_existing_co2e_tonnes_per_year`|Annual CO2 equivalent emissions from existing solar power plants, in metric tonnes. The few non-zero values of this column come from solar thermal facilities that also burn gas.|derived from PUDL||
 ||`solar_existing_facility_count`|Number of existing solar power plants.|PUDL||
 ||`solar_proposed_capacity_mw`|Generation capacity, in megawatts, of proposed solar power plants.|LBNL||
 ||`solar_proposed_facility_count`|Number of proposed solar power plants.|LBNL||
+||`solar_proposed_avoided_co2e_tonnes_per_year`|Estimated avoided CO2 equivalent emissions of all proposed solar projects, in metric tonnes per year.|EPA AVERT||
+||`solar_proposed_capacity_mw_actionable`|Total capacity, in megawatts, of proposed solar facilities in the actionable stage of development.|EPA AVERT||
+||`solar_proposed_facility_count_actionable`|Number of proposed solar projects in the actionable stage of development.|EPA AVERT||
+||`solar_proposed_avoided_co2e_actionable`|Estimated avoided CO2 equivalent emissions of proposed solar projects in the actionable stage of development, in metric tonnes per year.|EPA AVERT||
+||`solar_proposed_capacity_mw_nearly_certain`|Total capacity, in megawatts, of nearly completed solar facilities.|EPA AVERT||
+||`solar_proposed_facility_count_nearly_certain`|Number of nearly completed solar facilities.|EPA AVERT||
+||`solar_proposed_avoided_co2e_nearly_certain`|Estimated avoided CO2 equivalent emissions of nearly completed solar projects, in metric tonnes per year.|EPA AVERT||
 ||`infra_gas_proposed_co2e_tonnes_per_year`|Annual CO2 equivalent emissions from proposed gas infrastructure, in metric tonnes.|EIP||
 ||`infra_gas_proposed_facility_count`|Number of existing infrastructure facilities in the gas sector, excluding LNG.|EIP||
 ||`infra_gas_proposed_nox_tonnes_per_year`|Annual NOx emissions from all proposed gas infrastructure projects, in metric tonnes.|EIP||
