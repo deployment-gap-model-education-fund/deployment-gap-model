@@ -6,20 +6,23 @@ Repository containing the ETL that produces the [Deployment Gap](https://www.dep
 
 All data is subject to the terms of agreement individual to each data source:
 
-| Data Source                            | Source                                                                                                       | License and Terms of Use |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------ |
-| ISO Queues                             | [LBNL](https://emp.lbl.gov/generation-storage-and-hybrid-capacity)                                           | Ambiguous                |
-| Local Renewables Opposition Ordinances | [RELDI](https://climate.law.columbia.edu/sites/default/files/content/RELDI%20report%20updated%209.10.21.pdf) | Ambiguous                |
-| Fossil Infrastructure                  | [EIP Oil and Gas Watch](https://oilandgaswatch.org/)                                                         | Ambiguous                |
-| Marginal Cost of Energy                | [PUDL](https://github.com/catalyst-cooperative/pudl)                                                         | CC-BY-4.0                |
-| County FIPS codes                      | Census Bureau                                                                                                | Public Domain            |
-| State Wind Permits                     | [NCSL](https://www.ncsl.org/research/energy/state-wind-energy-siting.aspx)                                   | Ambiguous                |
+| Data Source                                 | Source                                                                                                       | License and Terms of Use                                                         |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| ISO Queues                                  | [LBNL](https://emp.lbl.gov/generation-storage-and-hybrid-capacity)                                           | Ambiguous                                                                        |
+| Local Renewables Opposition Ordinances      | [RELDI](https://climate.law.columbia.edu/sites/default/files/content/RELDI%20report%20updated%209.10.21.pdf) | Ambiguous                                                                        |
+| Fossil Infrastructure                       | [EIP Oil and Gas Watch](https://oilandgaswatch.org/)                                                         | Ambiguous                                                                        |
+| Marginal Cost of Energy                     | [PUDL](https://github.com/catalyst-cooperative/pudl)                                                         | CC-BY-4.0                                                                        |
+| County FIPS codes                           | Census Bureau                                                                                                | Public Domain                                                                    |
+| State Wind Permits                          | [NCSL](https://www.ncsl.org/research/energy/state-wind-energy-siting.aspx)                                   | Ambiguous                                                                        |
+| Climate and Economic Justice Screening Tool | [CEJST](https://screeningtool.geoplatform.gov/en/downloads#3/33.47/-97.5)                                    | [CC0 1.0 Universal](https://github.com/usds/justice40-tool/blob/main/LICENSE.md) |
+| Ballot Ready Upcoming Elections             | [Ballot Ready](https://www.ballotready.org/)                                                                 | Ambiguous                                                                        |
 
 There is no stated license for this repository's data input and output data because of upstream licensing ambiguities.
 
 All other code and assets are published under the [MIT License](https://opensource.org/licenses/MIT).
 
 ## Data Access
+
 To access the processed data, add the `dbcp-dev-350818` project to your Big Query instance. To do this, select Add Data > Pin project > Enter Project Name. There should be two datasets named `data_warehouse` and `data_mart`.
 
 # Setup

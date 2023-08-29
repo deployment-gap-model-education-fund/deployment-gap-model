@@ -11,6 +11,7 @@ from dbcp.data_mart.counties import (
     _get_county_properties,
     _get_offshore_wind_extra_cols,
 )
+from dbcp.helpers import get_sql_engine
 from dbcp.metadata.data_mart import counties_wide_format
 
 logger = logging.getLogger(__name__)
@@ -139,6 +140,17 @@ def test_iso_projects_data_mart_aggregates_are_close(engine: Engine):
     ), f"relative_difference too large: {relative_diff}"
 
 
+def test_county_commission_election_info(engine: Engine):
+    """Check total_n_of_seats is >= total_n_races."""
+    with engine.connect() as con:
+        df = pd.read_sql_table(
+            "county_commission_election_info", con, schema="data_mart"
+        )
+    assert (
+        df.total_n_of_seats >= df.total_n_races
+    ).all(), "Found more races than seats in county_commission_election_info!"
+
+
 def test_county_wide_coverage(engine: Engine):
     """Check how many counties have technical data in counties_wide_format."""
     cols_to_fetch = _get_non_county_cols_from_wide_format(engine)
@@ -245,9 +257,15 @@ def validate_data_mart(engine: Engine):
     test_county_long_vs_wide(engine)
     test_county_wide_coverage(engine)
     test_iso_projects_data_mart_aggregates_are_close(engine)
+    test_county_commission_election_info(engine)
 
 
 def validate_all(engine: Engine):
     """Run all validation tests."""
     validate_warehouse(engine)
     validate_data_mart(engine)
+
+
+if __name__ == "__main__":
+    engine = get_sql_engine()
+    validate_all(engine)
