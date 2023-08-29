@@ -1,6 +1,6 @@
 # counties\_long\_format
 
-This table provides county-level aggregates by facility type: existing power, proposed power, or proposed fossil infrastructure. Each row represents a unique combination of county, facility\_type, status, and resource\_or\_sector. Local ordinance and state wind permitting information has been joined on for convenience. The data sources are the LBNL compiled ISO queues, EIP fossil infrastructure, PUDL power plant data, plus Columbia local opposition and NCSL state wind permitting types.
+This table is mostly a restructured version of counties_wide_format. It provides county-level aggregates by facility type: existing power, proposed power, or proposed fossil infrastructure. Each row represents a unique combination of county, facility\_type, status, and resource\_or\_sector. Local ordinance and state wind permitting information has been joined on for convenience. The data sources are the LBNL compiled ISO queues, EIP fossil infrastructure, PUDL power plant data, plus Columbia local opposition and NCSL state wind permitting types. The only other difference is the removal of two columns `offshore_wind_capacity_mw_via_ports` and `offshore_wind_interest_type`. See below for details.
 
 ## Column Descriptions
 
@@ -31,9 +31,9 @@ This table provides county-level aggregates by facility type: existing power, pr
 ||`ordinance_is_restrictive`|True when any of `ordinance_via_solar_nrel`, `ordinance_via_wind_nrel`, or `ordinance_via_reldi` are True|NREL/RELDI||
 ||`state_permitting_text`|Summary text of the wind permitting rules of the given state.|NCSL||
 ||`state_permitting_type`|Category of the state's wind permitting jurisdiction: state, local, or hybrid.|NCSL||
-||`ec_qualifies`|True if the county qualifies via employment OR the fraction of qualifying area from coal closures is >= 50%|derived from RMI||
-||`ec_coal_closures_area_fraction`|Fraction of county land area that qualifies due to coal mine and generator closures.|RMI||
-||`ec_qualifies_via_employment`|True if the county is part of a qualifying Statistical Area based on fossil fuel employment.|RMI||
+||`energy_community_qualifies`|True if the county qualifies via employment OR the fraction of qualifying area from coal closures is >= 50%|derived from RMI||
+||`energy_community_coal_closures_area_fraction`|Fraction of county land area that qualifies due to coal mine and generator closures.|RMI||
+||`energy_community_qualifies_via_employment`|True if the county is part of a qualifying Statistical Area based on fossil fuel employment.|RMI||
 ||`county_land_area_km2`|Total land area of a county with units of square kilometers.|Census TIGER||
 ||`unprotected_land_area_km2`|Total county area minus protected area (GAP 1 or 2). See Protected Land Area section below.|USGS PAD||
 ||`federal_fraction_unprotected_land`|Fraction of unprotected land area managed by Federal agencies.|USGS PAD||
@@ -68,112 +68,8 @@ This table provides county-level aggregates by facility type: existing power, pr
 
 ## Modeling Decisions
 
-Almost all the decisions from the ISO and fossil infrastructure project level tables are inherited by these aggregates. The following are in addition to, not instead of, those decisions.
+With the exception of the two columns mentioned above, this is a restructured version of counties_long_format. See the entry for that table for description of methodology:
 
-### Local Ordinance Resolution Mismatch
-
-See the description in the iso\_projects\_long\_format section for details.
-
-{% content-ref url="iso_projects_long_format.md" %}
-[iso\_projects\_long\_format.md](iso\_projects\_long\_format.md)
+{% content-ref url="counties_wide_format.md" %}
+[counties\_wide\_format.md](counties\_wide\_format.md)
 {% endcontent-ref %}
-
-When aggregating to the county level, 8 out of 92 (9%) counties (as of January 2022) have multiple associated ordinances. In those cases, the ordinance descriptions have been concatenated together.
-
-### NREL Ordinance Interpretation
-
-See the description in the NREL_ordinance section for details.
-
-{% content-ref url="../NREL_ordinance_bans.md" %}
-[NREL_ordinance_bans.md](../NREL_ordinance_bans.md)
-{% endcontent-ref %}
-
-Additionally, as with the RELDI local ordinance dataset above, some ordinances belong to sub-county level jurisdictions such as townships. In those cases, the ban is propagated up to the entire county when represented in this county-level table.
-
-### EIP Emissions Aggregates
-
-EIP tracks 7 different types of emissions: CO2e, PM2.5, NOx, VOC, SO2, CO, HAPs. For the sake of simplicity, this table contains only:
-
-* CO2e, because of its direct climate relevance and for comparison with power plants
-* PM2.5, because of its outsize impact on public health and the EPA’s damage assessments
-* NOx, another well-known combustion byproduct
-
-### EIP Project Filtering
-
-EIP’s project database also contains older projects that are already completed or under construction. To keep this table forward looking, those older projects have been removed from these aggregates. This leaves only 136/439 (31%) of the projects as of January 2022 data.
-
-### Justice40 Environmental Justice Metrics
-
-The Climate and Economic Justice Screening Tool (CEJST) derives from the Justice40 Biden Administration Initiative. The CEJST dataset measures socio-economic and environmental measures for each Census tract and identifies overburdened and underserved census tracts within counties in the U.S. Communities are considered disadvantaged: 1) if they are in census tracts that meet the thresholds for at least one of the tool’s categories of burden, or 2) if they are on land within the boundaries of Federally Recognized Tribes. &#x20;
-
-The data derives many indicators from these measures, such as "high diabetes rates, low income, and low college student population". To qualify, a tract must (1) exceed the 90th percentile of the environmental or climate indicator (i.e., particulate matter exposure), AND 2) meet the socioeconomic indicators designed to identify low income communities (i.e., exceed the 65th percentile for households living at or below 200% of the Federal poverty level and have 80% or more of the population over 15 not currently enrolled in higher education)." See [their documentation](https://static-data-screeningtool.geoplatform.gov/data-pipeline/data/score/downloadable/cejst\_technical\_support\_document.pdf) for details.
-
-#### Proprietary Justice40 Index
-
-We derive an index in order to condense all the environmental justice information into a single summary number. The index is calculated as follows:
-
-1. Aggregate by category: for each tract, sum the indicators within each category. If the sum is >= 1, assign 1, else 0.
-2. Aggregate by county: take a weighted sum of the new indicators and the category weights below. This produces an index value for each county.
-3. Counties with a score of ≥4 points are considered an EJ priority.
-
-The category weights are:
-
-| Category  | Weight |
-| --------- | ------ |
-| Climate   | 1.0    |
-| Energy    | 1.0    |
-| Transit   | 1.0    |
-| Pollution | 0.75   |
-| Water     | 0.75   |
-| Housing   | 0.5    |
-| Health    | 0.5    |
-| Workforce | 0.5    |
-
-### Offshore Wind
-
-#### Capacity is Split Between Cable Landing Locations
-
-Some prospective offshore wind power plants propose to connect to the grid at multiple locations on shore. For these projects, the total project capacity is split equally between landing locations and assigned to their respective counties.
-
-#### Use of Original Data Source -- Not LBNL's ISO Queue
-
-We have compiled proposed offshore wind data from industry insiders that we believe to be more certain than the entries in the ISO queues. Unlike the ISO queues, this dataset does not include highly speculative and occasionally duplicative entries. This causes the total proposed MW to be about 1/3 the size of the total from the ISO queue projects.
-
-### Protected Land Area
-
-See here for details:
-
-{% content-ref url="../protected-land-area.md" %}
-[Protected Land Area](../protected-land-area.md)
-{% endcontent-ref %}
-
-### Energy Community Qualification
-
-The Inflation Reduction Act tax credit qualifications are defined at three different spatial resolutions, only one of which directly maps to county boundaries. We reconcile that spatial mismatch as follows:
-
-Fossil employment qualification is defined on Metropolitan Statistical Areas, which are sets of counties. There is a direct mapping from MSAs to counties, so there is no modeling ambiguity here.
-
-Coal closure qualification is defined on the Census tract level. Counties are combinations of Census tracts, so many counties will contain qualifying area but may not completely qualify. We reconcile this by arbitrarily defining a threshold at 50% of county area.
-
-Finally, individual brownfield sites are elligible for tax credits. In the future, we plan to aggregate the total area of qualifying sites, but have not yet implemented this. Brownfield qualification does not yet play any role in our current qualification rubric.
-
-### "Actionable" and "Nearly Certain" Projects
-
-These values are based on where a project is in the interconnection process. An "actionable" project is one that meets the following criteria:
-
-* proposed operating date in the latest year queue data or later (forward looking)
-* is active in the queue
-* is in one of the following stages of interconnection, as classified by LBNL:
-  * Facility Study
-  * System Impact Study
-  * Phase 4 Study
-  * "IA Pending"
-  * "IA in Progress"
-Offshore wind projects come from a separate source, so their only "actionable" qualification is to have a `construction_status` of "Site assessment underway" or "Not started".
-
-A "nearly certain" project is one that meets the "actionable" criteria but with the following additional allowable interconnection stages:
-
-* Construction
-* IA Executed
-* Operational
-Offshore wind projects come from a separate source, so their only "nearly certain" qualification is to have a `construction_status` of "Construction underway".

@@ -104,12 +104,12 @@ def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
 
 def etl_fips_tables() -> Dict[str, pd.DataFrame]:
     """Master state and county FIPS table ETL."""
-    census_path = Path("census/tl_2021_us_county.zip")
-    fips = dbcp.extract.fips_tables.extract_fips(census_path)
+    census_uri = "gs://dgm-archive/census/tl_2021_us_county.zip"
+    fips = dbcp.extract.fips_tables.extract_fips(census_uri)
 
-    tribal_lands_path = Path("census/tl_2021_us_aiannh.zip")
+    tribal_lands_uri = "gs://dgm-archive/census/tl_2021_us_aiannh.zip"
     fips["tribal_land"] = dbcp.extract.fips_tables.extract_census_tribal_land(
-        tribal_lands_path
+        tribal_lands_uri
     )
 
     out = dbcp.transform.fips_tables.transform(fips)
@@ -172,6 +172,28 @@ def etl_energy_communities_by_county() -> dict[str, pd.DataFrame]:
     return transformed
 
 
+def etl_ballot_ready() -> dict[str, pd.DataFrame]:
+    """ETL Ballot Ready election data."""
+    source_uri = "gs://dgm-archive/ballot_ready/BallotReady_upcoming_races_with_counties_08_14_2023.csv"
+    raw_df = dbcp.extract.ballot_ready.extract(source_uri)
+    transformed = dbcp.transform.ballot_ready.transform(raw_df)
+    return transformed
+
+
+def etl_epa_avert() -> dict[str, pd.DataFrame]:
+    """ETL EPA AVERT avoided emissions data."""
+    # https://github.com/USEPA/AVERT/blob/v4.1.0/utilities/data/county-fips.txt
+    path_county_region_xwalk = Path("/app/data/raw/avert_county-fips.txt")
+    # https://www.epa.gov/avert/avoided-emission-rates-generated-avert
+    path_emission_rates = Path("/app/data/raw/avert_emission_rates_04-25-23.xlsx")
+    raw_dfs = dbcp.extract.epa_avert.extract(
+        county_crosswalk_path=path_county_region_xwalk,
+        emission_rates_path=path_emission_rates,
+    )
+    transformed = dbcp.transform.epa_avert.transform(raw_dfs)
+    return transformed
+
+
 def etl(args):
     """Run dbc ETL."""
     # Setup postgres
@@ -184,6 +206,7 @@ def etl(args):
     SPATIAL_CACHE.reduce_size()
 
     etl_funcs = {
+        "epa_avert": etl_epa_avert,
         "eip_infrastructure": etl_eip_infrastructure,
         "columbia_local_opp": etl_columbia_local_opp,
         "energy_communities_by_county": etl_energy_communities_by_county,
@@ -195,6 +218,7 @@ def etl(args):
         "lbnl_iso_queue": etl_lbnl_iso_queue,
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
+        "ballot_ready": etl_ballot_ready,
     }
 
     # Extract and transform the data sets

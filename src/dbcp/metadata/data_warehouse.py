@@ -16,6 +16,30 @@ metadata = MetaData()
 schema = "data_warehouse"
 
 ###############################
+# EPA AVERT Avoided Emissions #
+###############################
+
+avert_capacity_factors = Table(
+    "avert_avoided_emissions_factors",
+    metadata,
+    Column("avert_region", String, primary_key=True),
+    Column("resource_type", String, primary_key=True),
+    Column("capacity_factor", Float, nullable=True),
+    Column("tonnes_co2_per_mwh", Float, nullable=True),
+    Column("co2e_tonnes_per_year_per_mw", Float, nullable=True),
+    schema=schema,
+)
+
+avert_county_region_assoc = Table(
+    "avert_county_region_assoc",
+    metadata,
+    Column("avert_region", String, primary_key=True),
+    Column("county_id_fips", String, primary_key=True),
+    schema=schema,
+)
+
+
+###############################
 # State and County Fips Codes #
 ###############################
 county_fips = (
@@ -1169,5 +1193,46 @@ energy_communities = Table(
     Column("coal_qualifying_area_fraction", Float),
     Column("qualifies_by_employment_criteria", Boolean),
     Column("geocoded_locality_name", String),
+    schema=schema,
+)
+
+################
+# Ballot Ready #
+################
+
+br_election_data = Table(
+    "br_election_data",
+    metadata,
+    Column("raw_county", String, nullable=False, primary_key=True),
+    Column("election_id", Integer, nullable=False),
+    Column("election_name", String, nullable=False),
+    Column("election_day", DateTime, nullable=False),
+    Column("race_id", Integer, nullable=False, primary_key=True),
+    Column("is_primary", Boolean, nullable=False),
+    Column("is_runoff", Boolean, nullable=False),
+    Column("is_unexpired", Boolean, nullable=False),
+    Column("position_id", Integer, nullable=False),
+    Column("position_name", String, nullable=False),
+    Column("sub_area_name", String, nullable=True),
+    Column("sub_area_value", String, nullable=True),
+    Column("sub_area_name_secondary", String, nullable=True),
+    Column("sub_area_value_secondary", String, nullable=True),
+    Column("raw_state", String, nullable=False),
+    Column("level", String, nullable=False),
+    Column("tier", Integer, nullable=False),
+    Column("is_judicial", Boolean, nullable=False),
+    Column("is_retention", Boolean, nullable=False),
+    Column("number_of_seats", Integer, nullable=False),
+    Column("normalized_position_id", Integer, nullable=False),
+    Column("normalized_position_name", String, nullable=False),
+    Column("frequency", String, nullable=False),
+    Column("reference_year", Integer, nullable=False),
+    Column("partisan_type", String, nullable=True),
+    Column("race_created_at", DateTime, nullable=False),
+    Column("race_updated_at", DateTime, nullable=False),
+    Column("state_id_fips", String, nullable=False),
+    Column(
+        "county_id_fips", String, nullable=True
+    ),  # Should not be nullable in future updates
     schema=schema,
 )

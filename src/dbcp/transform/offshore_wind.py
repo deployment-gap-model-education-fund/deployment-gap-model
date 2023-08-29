@@ -151,7 +151,7 @@ def _add_actionable_and_nearly_certain_classification(projects: pd.DataFrame) ->
         "Site assessment underway",
         "Not started",
     }
-    nearly_certain_statuses = actionable_statuses | {
+    nearly_certain_statuses = {
         "Construction underway",
     }
     projects.loc[:, "is_actionable"] = projects["construction_status"].isin(
