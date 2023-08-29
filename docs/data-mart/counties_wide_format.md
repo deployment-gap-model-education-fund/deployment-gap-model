@@ -176,7 +176,6 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 
 ## Modeling Decisions
 
-
 Almost all the decisions from the ISO and fossil infrastructure project level tables are inherited by these aggregates. The following are in addition to, not instead of, those decisions.
 
 ### Local Ordinance Resolution Mismatch
@@ -287,7 +286,6 @@ A "nearly certain" project is one that meets the "actionable" criteria but with 
 * Operational
 Offshore wind projects come from a separate source, so their only "nearly certain" qualification is to have a `construction_status` of "Construction underway".
 
-
 ### Definition of "Renewables" includes Battery Storage
 
 The columns prefixed with `renewable_and_battery_` contain aggregates of both generation and storage assets. The generation sources are solar photovoltaic, onshore wind, and offshore wind techonologies. The only included storage type is battery storage. Batteries are included here because
@@ -295,3 +293,12 @@ The columns prefixed with `renewable_and_battery_` contain aggregates of both ge
 * batteries increase capacity factors of wind & solar plants
 * batteries allow arbitrage against tariffs, enabling higher project values
 * batteries are also additional local economic development (more tax base)
+
+### Avoided CO2e Emissons
+
+Avoided emissions estimates are based on the EPA's AVERT model. In this model, the avoided emissions are calculated as the difference between the emissions of the proposed generator (zero for renewables) and the emissions of the existing generator that would be displaced by the proposed generator. This gives an esimate of the short term emissions impact of the proposed generator.
+
+The marginal generator is determined by the proposed generator's location and the time of day/year. Avoided emissions are scaled by the capacity of the proposed generator times an average capacity factor for the proposed generator's resource type and location.
+
+The equation for avoided emissions is:
+(Capacity of proposed generator [MW]) \* (Average capacity factor of proposed generator [MWh/hour/MW]) \* (8766 [average hours/year]) * (Emissions factor of marginal generator [tonnes/MWh])

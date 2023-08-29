@@ -6,16 +6,16 @@ Repository containing the ETL that produces the [Deployment Gap](https://www.dep
 
 All data is subject to the terms of agreement individual to each data source:
 
-| Data Source                                 | Source                                                                                                       | License and Terms of Use                                                         |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| ISO Queues                                  | [LBNL](https://emp.lbl.gov/generation-storage-and-hybrid-capacity)                                           | Ambiguous                                                                        |
-| Local Renewables Opposition Ordinances      | [RELDI](https://climate.law.columbia.edu/sites/default/files/content/RELDI%20report%20updated%209.10.21.pdf) | Ambiguous                                                                        |
-| Fossil Infrastructure                       | [EIP Oil and Gas Watch](https://oilandgaswatch.org/)                                                         | Ambiguous                                                                        |
-| Marginal Cost of Energy                     | [PUDL](https://github.com/catalyst-cooperative/pudl)                                                         | CC-BY-4.0                                                                        |
-| County FIPS codes                           | Census Bureau                                                                                                | Public Domain                                                                    |
-| State Wind Permits                          | [NCSL](https://www.ncsl.org/research/energy/state-wind-energy-siting.aspx)                                   | Ambiguous                                                                        |
-| Climate and Economic Justice Screening Tool | [CEJST](https://screeningtool.geoplatform.gov/en/downloads#3/33.47/-97.5)                                    | [CC0 1.0 Universal](https://github.com/usds/justice40-tool/blob/main/LICENSE.md) |
-| Ballot Ready Upcoming Elections             | [Ballot Ready](https://www.ballotready.org/)                                                                 | Ambiguous                                                                        |
+| Data Source | Source | License and Terms of Use |
+| ---- | ---- | ---- |
+| ISO Queues | [LBNL](https://emp.lbl.gov/generation-storage-and-hybrid-capacity) | Ambiguous |
+| Local Renewables Opposition Ordinances | [RELDI](https://climate.law.columbia.edu/sites/default/files/content/RELDI%20report%20updated%209.10.21.pdf) | Ambiguous |
+| Fossil Infrastructure | [EIP Oil and Gas Watch](https://oilandgaswatch.org/) | Ambiguous |
+| Marginal Cost of Energy | [PUDL](https://github.com/catalyst-cooperative/pudl) | CC-BY-4.0 |
+| County FIPS codes | Census Bureau | Public Domain |
+| State Wind Permits | [NCSL](https://www.ncsl.org/research/energy/state-wind-energy-siting.aspx) | Ambiguous |
+| Climate and Economic Justice Screening Tool | [CEJST](https://screeningtool.geoplatform.gov/en/downloads#3/33.47/-97.5) | [CC0 1.0 Universal](https://github.com/usds/justice40-tool/blob/main/LICENSE.md) |
+| Ballot Ready Upcoming Elections | [Ballot Ready](https://www.ballotready.org/) | Ambiguous |
 
 There is no stated license for this repository's data input and output data because of upstream licensing ambiguities.
 
