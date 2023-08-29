@@ -193,9 +193,9 @@ counties_wide_format = Table(
         CheckConstraint("tribal_land_frac >= 0.0 AND tribal_land_frac <= 1.0"),
         nullable=False,
     ),
-    Column("ec_coal_closures_area_fraction", Float),
-    Column("ec_qualifies_via_employment", Boolean),
-    Column("ec_qualifies", Boolean),
+    Column("energy_community_coal_closures_area_fraction", Float),
+    Column("energy_community_qualifies_via_employment", Boolean),
+    Column("energy_community_qualifies", Boolean),
     schema=schema,
 )
 
@@ -406,8 +406,8 @@ counties_long_format = Table(
         CheckConstraint("tribal_land_frac >= 0.0 AND tribal_land_frac <= 1.0"),
         nullable=False,
     ),
-    Column("ec_coal_closures_area_fraction", Float),
-    Column("ec_qualifies_via_employment", Boolean),
-    Column("ec_qualifies", Boolean),
+    Column("energy_community_coal_closures_area_fraction", Float),
+    Column("energy_community_qualifies_via_employment", Boolean),
+    Column("energy_community_qualifies", Boolean),
     schema=schema,
 )
