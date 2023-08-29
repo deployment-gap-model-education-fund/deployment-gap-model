@@ -391,7 +391,9 @@ counties_long_format = Table(
 br_election_data = Table(
     "br_election_data",
     metadata,
-    Column("county", String, nullable=False, primary_key=True),
+    Column("state_name", String, nullable=False),
+    Column("county_name", String),
+    Column("raw_county", String, nullable=False, primary_key=True),
     Column("election_id", Integer, nullable=False),
     Column("election_name", String, nullable=False),
     Column("election_day", DateTime, nullable=False),
@@ -401,11 +403,11 @@ br_election_data = Table(
     Column("is_unexpired", Boolean, nullable=False),
     Column("position_id", Integer, nullable=False),
     Column("position_name", String, nullable=False),
-    Column("sub_area_name", String, nullable=True),
-    Column("sub_area_value", String, nullable=True),
-    Column("sub_area_name_secondary", String, nullable=True),
-    Column("sub_area_value_secondary", String, nullable=True),
-    Column("state", String, nullable=False),
+    Column("sub_area_name", String),
+    Column("sub_area_value", String),
+    Column("sub_area_name_secondary", String),
+    Column("sub_area_value_secondary", String),
+    Column("raw_state", String, nullable=False),
     Column("level", String, nullable=False),
     Column("tier", Integer, nullable=False),
     Column("is_judicial", Boolean, nullable=False),
@@ -415,22 +417,20 @@ br_election_data = Table(
     Column("normalized_position_name", String, nullable=False),
     Column("frequency", String, nullable=False),
     Column("reference_year", Integer, nullable=False),
-    Column("partisan_type", String, nullable=True),
+    Column("partisan_type", String),
     Column("race_created_at", DateTime, nullable=False),
     Column("race_updated_at", DateTime, nullable=False),
     Column("state_id_fips", String, nullable=False),
-    Column(
-        "county_id_fips", String, nullable=True
-    ),  # Should not be nullable in future updates
+    Column("county_id_fips", String),  # Should not be nullable in future updates
     schema=schema,
 )
 
 county_commission_election_info = Table(
     "county_commission_election_info",
     metadata,
+    Column("county_name", String, nullable=False),
     Column("county_id_fips", String, nullable=False, primary_key=True),
     Column("election_id", Integer, nullable=False, primary_key=True),
-    Column("county", String, nullable=False),
     Column("election_name", String, nullable=False),
     Column("election_day", DateTime, nullable=False),
     Column("total_n_of_seats", Integer, nullable=False),
