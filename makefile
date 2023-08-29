@@ -43,6 +43,9 @@ test:
 clean:
 	docker compose down -v
 
+validate:
+	docker compose run --rm app python -m dbcp.validation.tests
+
 update_conda:
 	conda env update --file environment.yml --name dbcp-dev --prune
 

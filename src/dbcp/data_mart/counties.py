@@ -916,32 +916,6 @@ def _get_actionable_aggs_for_wide_format(engine: sa.engine.Engine) -> pd.DataFra
     return aggs
 
 
-def _get_ballot_ready_election_cols(engine: sa.engine.Engine) -> pd.DataFrame:
-    with engine.connect() as conn:
-        br_election_data = pd.read_sql_table(
-            "br_election_data", conn, schema="data_warehouse"
-        )
-
-    next_election_day_idx = br_election_data.groupby("county_id_fips")[
-        "election_day"
-    ].idxmin()
-    next_election_day = br_election_data.loc[next_election_day_idx]
-
-    rename_dict = {
-        "election_day": "next_election_date",
-        "reference_year": "next_election_reference_year",
-        "frequency": "next_election_frequency",
-        "position_name": "next_election_position_name",
-        "number_of_seats": "next_election_number_of_seats",
-    }
-
-    next_election_day = next_election_day[
-        list(rename_dict.keys()) + ["county_id_fips"]
-    ].rename(columns=rename_dict)
-
-    return next_election_day.set_index("county_id_fips")
-
-
 def create_wide_format(
     postgres_engine: Optional[sa.engine.Engine] = None,
     pudl_engine: Optional[sa.engine.Engine] = None,
