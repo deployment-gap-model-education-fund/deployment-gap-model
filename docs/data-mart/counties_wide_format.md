@@ -168,11 +168,20 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 ||`n_tracts_unemployment_and_low_high_school`|Number of tracts with high unemployment and low high school graduation rates|Justice40||
 ||`n_tracts_unemployment_less_than_high_school_islands`|Number of tracts with high unemployment and low high school graduation rates (island territories only)|Justice40||
 ||`n_tracts_wastewater_low_income_not_students`|Number of tracts with high wastewater pollution and low income (excepting students)|Justice40||
+|Elections|`next_election_date`|The date of closest upcoming election in the county.|Ballot Ready||
+||`next_election_reference_year`|Refers to a base year that the election frequency can be calculated from, either into the future or the past|Ballot Ready|For example, a position with a reference_year of 2022 and frequency of 4 has scheduled elections in 2018, 2022, 2026, etc.|
+||`next_election_frequency`|How often the position is regularly scheduled for election|Ballot Ready|Certain positions are scheduled for election on non-standard frequences, such as 4 years then 2 years then 4 years (4-2-4) to align with 10 year redistricting cycles. Thus the field is returned as an array of frequncies rather than a single integer.|
+||`next_election_position_name`|The name of the position that encompasses both official ballot and BallotReady position naming conventions|Ballot Ready||
+||`next_election_number_of_seats`|The maximum number of people who will be elected to that position during a given race.|Ballot Ready|Note that staggered term positions will have seats on a board split over multiple positions. For example, a 5 member board that elects 2 members in 2022 and 3 members in 2024 will have two separate position records, one with 2 seats and one with 3 seats.|
 
 ## Modeling Decisions
 
 With the exception of the two columns mentioned above, this is a restructured version of counties_long_format. See the entry for that table for description of methodology:
-{% page-ref page="counties_long_format.md" %}
+
+{% content-ref url="counties_long_format.md" %}
+[counties\_long\_format.md](counties\_long\_format.md)
+{% endcontent-ref %}
+
 The following are in addition to, not instead of, those modeling decisions.
 
 ### Definition of "Renewables" includes Battery Storage
