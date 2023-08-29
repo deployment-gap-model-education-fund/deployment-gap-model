@@ -5,7 +5,6 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 
-from dbcp.constants import LBNL_LATEST_YEAR
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     normalize_multicolumns_to_rows,
@@ -509,27 +508,18 @@ def _add_actionable_and_nearly_certain_classification(
         "Phase 4 Study",
         "IA Pending",
     }
-    projected_ia_statuses = actionable_ia_statuses | {
+    nearly_certain_ia_statuses = {
         "Construction",
         "IA Executed",
         "Operational",
     }
-    include_actionable = (
+    queue["is_actionable"] = (
         queue["interconnection_status_lbnl"].isin(actionable_ia_statuses).fillna(False)
     )
-    include_projected = (
-        queue["interconnection_status_lbnl"].isin(projected_ia_statuses).fillna(False)
-    )
-
-    # As of 2022 data, 337 active projects are missing year_proposed. Use queue_year as
-    # a conservative backup estimate. Only 8 projects have no date information; they
-    # are omitted.
-    year_qualifies = (
-        queue["year_proposed"]
-        .fillna(queue["queue_year"])
-        .ge(LBNL_LATEST_YEAR)
+    queue["is_nearly_certain"] = (
+        queue["interconnection_status_lbnl"]
+        .isin(nearly_certain_ia_statuses)
         .fillna(False)
     )
-    queue["is_actionable"] = include_actionable & year_qualifies
-    queue["is_nearly_certain"] = include_projected & year_qualifies
+
     return queue
