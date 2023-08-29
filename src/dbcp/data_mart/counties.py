@@ -746,16 +746,16 @@ def _get_energy_community_qualification(postgres_engine: sa.engine.Engine):
     ec as (
         SELECT
             ec.county_id_fips,
-            coal_qualifying_area_fraction as ec_coal_closures_area_fraction,
-            qualifies_by_employment_criteria as ec_qualifies_via_employment
+            coal_qualifying_area_fraction as energy_community_coal_closures_area_fraction,
+            qualifies_by_employment_criteria as energy_community_qualifies_via_employment
         FROM data_warehouse.energy_communities_by_county AS ec
         LEFT JOIN data_warehouse.county_fips AS fips
         USING (county_id_fips)
     )
     SELECT
         *,
-        (ec_coal_closures_area_fraction > 0.5 OR
-        ec_qualifies_via_employment) as ec_qualifies
+        (energy_community_coal_closures_area_fraction > 0.5 OR
+        energy_community_qualifies_via_employment) as energy_community_qualifies
     FROM ec
     """
     ec = pd.read_sql(query, postgres_engine)
@@ -784,7 +784,7 @@ def _get_county_properties(
     all_states = _get_state_fips_df(postgres_engine)
     env_justice = _get_env_justice_df(postgres_engine)
     fed_lands = _get_federal_land_fraction(postgres_engine)
-    ec_counties = _get_energy_community_qualification(postgres_engine)
+    energy_community_counties = _get_energy_community_qualification(postgres_engine)
 
     # model local opposition
     aggregator = CountyOpposition(
@@ -827,15 +827,15 @@ def _get_county_properties(
     # Some (02261) are not present in the rest of the datasets.
     # Non-matching FIPS are currently dropped.
     county_properties = county_properties.merge(
-        ec_counties, on="county_id_fips", how="left", validate="1:1"
+        energy_community_counties, on="county_id_fips", how="left", validate="1:1"
     )
     #  EC data currently only includes counties that have qualifying features.
     #  Fill in nulls for counties that do not qualify.
     county_properties.fillna(
         {
-            "ec_coal_closures_area_fraction": 0.0,
-            "ec_qualifies_via_employment": False,
-            "ec_qualifies": False,
+            "energy_community_coal_closures_area_fraction": 0.0,
+            "energy_community_qualifies_via_employment": False,
+            "energy_community_qualifies": False,
         },
         inplace=True,
     )
