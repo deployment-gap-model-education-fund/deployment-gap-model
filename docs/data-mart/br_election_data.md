@@ -6,14 +6,16 @@ This table contains a few entities that are worth describing:
 
 - `position` is the office/position someone is running for (president, Alaska House of Reps District 1). There can be multiple elections for a single position (special election, runoffs, general...)
 - `election` is the election/event that elects people to positions (special election, runoffs, general...). There can be multiple positions for an election. For example,the 2024 Georgia General Election has ~1500 positions.
-- `race`` is a unique combination of a position and an election. It is unique in this dataset.
+- `race` is a unique combination of a position and an election. It is unique in this dataset.
 
 ## Column Descriptions
 
 **Unique Key Column(s):** `race_id`
 |Subject|Column|Description|Source|Notes|
 |----|----|----|----|----|
-|Elections|`county`|County name||Ballot Ready|
+|Elections|`state_name`|The state in which the position is elected|Census||
+||`county_name`|County name||Census|
+||`raw_county`|Original county name from Ballot Ready. It may contain minor variation on the official Census name.||Ballot Ready|
 ||`election_id`|A unique identifier for each election in the BallotReady database|||
 ||`election_name`|A descriptive name for the election according to BallotReady's naming conventions.description|||
 ||`election_day`|The date of the election|||
@@ -27,7 +29,6 @@ This table contains a few entities that are worth describing:
 ||`sub_area_value`|A parsed portion of the position name, used to help identify the specific area the position represents. Sub_area_value is used to identify the number or office of the subarea (e.g., "1" or "West").|||
 ||`sub_area_name_secondary`|A second parsed portion of the position name, used to help identify the specific area the position represents when there are two levels of sub area.|||
 ||`sub_area_value_secondary`|A second parsed portion of the position name, used to help identify the specific area the position represents when there are two levels of sub area.|||
-||`state`|The state in which the position is elected|||
 ||`level`|An identifier for the level of the position: federal, state, regional, county, city, or local|||
 ||`tier`|BallotReady-defined standard tiers (1-5)|||
 ||`is_judicial`|A boolean marked as true if the position is for electing a judge|||

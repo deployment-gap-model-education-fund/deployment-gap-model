@@ -7,9 +7,9 @@ This table contains all upcoming county commissioner elections from Ballot Ready
 **Unique Key Column(s):** (`election_id`, `county_fips_id`)
 |Subject|Column|Description|Source|Notes|
 |----|----|----|----|----|
-|Elections|`county_id_fips`|County FIPS ID|Ballot Ready||
+|Elections|`county_name`|County name|Census||
+||`county_id_fips`|County FIPS ID|Ballot Ready||
 ||`election_id`|A unique identifier for each election in the BallotReady database|||
-||`county`|County name|||
 ||`election_name`|A descriptive name for the election according to BallotReady's naming conventions.|||
 ||`election_day`|The date of the election|||
 ||`total_n_of_seats`|Total number of people who will be elected to positions for the election.|||
