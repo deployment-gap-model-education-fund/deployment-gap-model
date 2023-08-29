@@ -127,3 +127,12 @@ A "nearly certain" project is one that meets the "actionable" criteria but with 
 * IA Executed
 * Operational
 Offshore wind projects come from a separate source, so their only "nearly certain" qualification is to have a `construction_status` of "Construction underway".
+
+### Avoided CO2e Emissons
+
+Avoided emissions estimates are based on the EPA's AVERT model. In this model, the avoided emissions are calculated as the difference between the emissions of the proposed generator (zero for renewables) and the emissions of the existing generator that would be displaced by the proposed generator. This gives an esimate of the short term emissions impact of the proposed generator.
+
+The marginal generator is determined by the proposed generator's location and the time of day/year. Avoided emissions are scaled by the capacity of the proposed generator times an average capacity factor for the proposed generator's resource type and location.
+
+The equation for avoided emissions is:
+(Capacity of proposed generator [MW]) * (Average capacity factor of proposed generator [MWh/hour/MW]) * (8766 [average hours/year]) * (Emissions factor of marginal generator [tonnes/MWh])

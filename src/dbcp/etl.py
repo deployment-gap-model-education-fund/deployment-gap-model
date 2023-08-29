@@ -172,6 +172,20 @@ def etl_energy_communities_by_county() -> dict[str, pd.DataFrame]:
     return transformed
 
 
+def etl_epa_avert() -> dict[str, pd.DataFrame]:
+    """ETL EPA AVERT avoided emissions data."""
+    # https://github.com/USEPA/AVERT/blob/v4.1.0/utilities/data/county-fips.txt
+    path_county_region_xwalk = Path("/app/data/raw/avert_county-fips.txt")
+    # https://www.epa.gov/avert/avoided-emission-rates-generated-avert
+    path_emission_rates = Path("/app/data/raw/avert_emission_rates_04-25-23.xlsx")
+    raw_dfs = dbcp.extract.epa_avert.extract(
+        county_crosswalk_path=path_county_region_xwalk,
+        emission_rates_path=path_emission_rates,
+    )
+    transformed = dbcp.transform.epa_avert.transform(raw_dfs)
+    return transformed
+
+
 def etl(args):
     """Run dbc ETL."""
     # Setup postgres
@@ -184,6 +198,7 @@ def etl(args):
     SPATIAL_CACHE.reduce_size()
 
     etl_funcs = {
+        "epa_avert": etl_epa_avert,
         "eip_infrastructure": etl_eip_infrastructure,
         "columbia_local_opp": etl_columbia_local_opp,
         "energy_communities_by_county": etl_energy_communities_by_county,
