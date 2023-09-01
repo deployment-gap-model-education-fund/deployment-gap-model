@@ -1218,7 +1218,6 @@ br_positions = Table(
     Column("sub_area_value", String, nullable=True),
     Column("sub_area_name_secondary", String, nullable=True),
     Column("sub_area_value_secondary", String, nullable=True),
-    Column("raw_state", String, nullable=False),
     Column("level", String, nullable=False),
     Column("tier", Integer, nullable=False),
     Column("is_judicial", Boolean, nullable=False),

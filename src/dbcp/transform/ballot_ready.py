@@ -44,7 +44,6 @@ def _normalize_entities(ballot_ready: pd.DataFrame) -> dict[str, pd.DataFrame]:
         "sub_area_value",
         "sub_area_name_secondary",
         "sub_area_value_secondary",
-        "raw_state",
         "level",
         "tier",
         "is_judicial",
