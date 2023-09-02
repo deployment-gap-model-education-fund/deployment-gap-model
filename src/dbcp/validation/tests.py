@@ -141,13 +141,19 @@ def test_iso_projects_data_mart_aggregates_are_close(engine: Engine):
 
 
 def test_county_commission_election_info(engine: Engine):
-    """Check total_n_of_seats is >= total_n_races."""
+    """Check total_n_seats is >= total_n_races."""
     with engine.connect() as con:
         df = pd.read_sql_table(
             "county_commission_election_info", con, schema="data_mart"
-        )
+        ).convert_dtypes()
     assert (
-        df.total_n_of_seats >= df.total_n_races
+        df.next_primary_total_n_seats >= df.next_primary_total_n_races
+    ).all(), "Found more races than seats in county_commission_election_info!"
+    assert (
+        df.next_general_total_n_seats >= df.next_general_total_n_races
+    ).all(), "Found more races than seats in county_commission_election_info!"
+    assert (
+        df.next_run_off_total_n_seats >= df.next_run_off_total_n_races
     ).all(), "Found more races than seats in county_commission_election_info!"
 
 
