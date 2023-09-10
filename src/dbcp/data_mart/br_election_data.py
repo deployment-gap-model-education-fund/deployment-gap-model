@@ -91,7 +91,7 @@ def _create_county_commission_elections_long(
     ).any(), "County comissioner election primary key is not unique."
     assert (
         comissioner_elections.total_n_seats >= comissioner_elections.total_n_races
-    ).all(), "Number of seats should alweays be greater or equal to number of races in a county."
+    ).all(), "Number of seats should always be greater or equal to number of races in a county."
     return comissioner_elections
 
 

@@ -124,7 +124,7 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
     )
     # Initial batch of raw data has duplicates in counties
     assert (
-        duplicate_race.sum() <= 506
+        duplicate_race.sum() <= 20
     ), "Found more duplicate county/race combinations that expected."
 
     # Drop duplicates. A later version of ballot ready data will remedy this problem.
