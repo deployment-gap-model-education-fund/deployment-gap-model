@@ -1233,15 +1233,40 @@ br_races = Table(
     "br_races",
     metadata,
     Column("race_id", Integer, nullable=False, primary_key=True),
-    Column(
-        "raw_county", String, nullable=False, primary_key=True
-    ),  # Can't use county_id_fips because Connecticut changed it's county system recently
     Column("is_primary", Boolean, nullable=False),
     Column("is_runoff", Boolean, nullable=False),
     Column("is_unexpired", Boolean, nullable=False),
     Column("number_of_seats", Integer, nullable=False),
     Column("race_created_at", DateTime, nullable=False),
     Column("race_updated_at", DateTime, nullable=False),
+    Column(
+        "election_id",
+        Integer,
+        ForeignKey("data_warehouse.br_elections.election_id"),
+        nullable=False,
+    ),
+    Column(
+        "position_id",
+        Integer,
+        ForeignKey("data_warehouse.br_positions.position_id"),
+        nullable=False,
+    ),
+    schema=schema,
+)
+
+br_positions_counties = Table(
+    "br_positions_counties",
+    metadata,
+    Column(
+        "position_id",
+        Integer,
+        ForeignKey("data_warehouse.br_positions.position_id"),
+        nullable=False,
+        primary_key=True,
+    ),
+    Column(
+        "raw_county", String, nullable=False, primary_key=True
+    ),  # Can't use county_id_fips because Connecticut changed it's county system recently
     Column("raw_state", String, nullable=False),
     Column(
         "state_id_fips",
@@ -1255,17 +1280,5 @@ br_races = Table(
         ForeignKey("data_warehouse.county_fips.county_id_fips"),
         nullable=True,
     ),  # Should not be nullable in future updates
-    Column(
-        "election_id",
-        Integer,
-        ForeignKey("data_warehouse.br_elections.election_id"),
-        nullable=False,
-    ),
-    Column(
-        "position_id",
-        Integer,
-        ForeignKey("data_warehouse.br_positions.position_id"),
-        nullable=False,
-    ),
     schema=schema,
 )

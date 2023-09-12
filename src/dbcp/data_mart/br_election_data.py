@@ -9,27 +9,31 @@ from dbcp.helpers import get_sql_engine
 
 def _create_br_election_data_mart(engine: sa.engine.Engine) -> pd.DataFrame:
     """Denormalize the ballot ready entities."""
-    query = """
+    pos_county_query = """
     SELECT
         cfips.county_name,
         sfips.state_name,
         br.*
-    FROM data_warehouse.br_races as br
+    FROM data_warehouse.br_positions_counties as br
     LEFT JOIN data_warehouse.county_fips as cfips
     USING (county_id_fips)
     LEFT JOIN data_warehouse.state_fips as sfips
     ON sfips.state_id_fips = br.state_id_fips
     """
     with engine.connect() as con:
-        br_races = pd.read_sql(query, con)
+        br_races = pd.read_sql_table("br_races", con, schema="data_warehouse")
         br_elections = pd.read_sql_table("br_elections", con, schema="data_warehouse")
         br_positions = pd.read_sql_table("br_positions", con, schema="data_warehouse")
+        br_positions_counties = pd.read_sql(pos_county_query, con)
 
     br_election_data = br_races.merge(
         br_elections, how="left", on="election_id", validate="m:1"
     )
     br_election_data = br_election_data.merge(
         br_positions, how="left", on="position_id", validate="m:1"
+    )
+    br_election_data = br_election_data.merge(
+        br_positions_counties, how="left", on="position_id", validate="m:m"
     )
     return br_election_data
 

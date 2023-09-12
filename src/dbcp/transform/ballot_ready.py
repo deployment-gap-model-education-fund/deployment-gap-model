@@ -17,18 +17,20 @@ def _normalize_entities(ballot_ready: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """
     trns_dfs = {}
     # Elections
+    election_pk_fields = ["election_id"]
+
     election_fields = [
         "election_id",
         "election_name",
         "election_day",
     ]
     assert (
-        (ballot_ready.groupby("election_id")[election_fields].nunique() <= 1)
+        (ballot_ready.groupby(election_pk_fields)[election_fields].nunique() <= 1)
         .all()
         .all()
     ), "There is duplicate entity information in the elections dataframe."
 
-    br_elections = ballot_ready.drop_duplicates(subset=election_fields)[
+    br_elections = ballot_ready.drop_duplicates(subset=election_pk_fields)[
         election_fields
     ].copy()
     assert br_elections.election_id.is_unique, "election_id is not unique."
@@ -36,6 +38,8 @@ def _normalize_entities(ballot_ready: pd.DataFrame) -> dict[str, pd.DataFrame]:
     trns_dfs["br_elections"] = br_elections
 
     # Positions
+    position_pk_fields = ["position_id"]
+
     position_fields = [
         "reference_year",
         "position_id",
@@ -53,22 +57,24 @@ def _normalize_entities(ballot_ready: pd.DataFrame) -> dict[str, pd.DataFrame]:
         "frequency",
         "partisan_type",
     ]
-    # position_id == 156594 is the only position with two freqquencies and reference_years
+    # position_id == 156594 is the only position with two frequencies and reference_years
     # Create a new index for it
     new_index = ballot_ready.position_id.max() + 1
     assert new_index not in ballot_ready.position_id
     ballot_ready.loc[ballot_ready.race_id == 2020783, "position_id"] = new_index
     assert (
-        (ballot_ready.groupby("position_id")[position_fields].nunique() <= 1)
+        (ballot_ready.groupby(position_pk_fields)[position_fields].nunique() <= 1)
         .all()
         .all()
     ), "There is duplicate entity information in the positions dataframe."
-    br_positions = ballot_ready.drop_duplicates(subset=position_fields)[
+    br_positions = ballot_ready.drop_duplicates(subset=position_pk_fields)[
         position_fields
     ].copy()
     trns_dfs["br_positions"] = br_positions
 
     # Races
+    race_pk_fields = ["race_id"]
+
     race_fields = [
         "race_id",
         "is_primary",
@@ -79,21 +85,30 @@ def _normalize_entities(ballot_ready: pd.DataFrame) -> dict[str, pd.DataFrame]:
         "race_updated_at",
     ]
     assert (
-        (ballot_ready.groupby("race_id")[race_fields].nunique() <= 1).all().all()
+        (ballot_ready.groupby(race_pk_fields)[race_fields].nunique() <= 1).all().all()
     ), "There is duplicate entity informaiton in the races table."
     # Add some one to many fields to the races table dataframe.
     race_fields += [
-        "raw_state",
-        "raw_county",
-        "state_id_fips",
-        "county_id_fips",
         "election_id",
         "position_id",
     ]
-    br_races = ballot_ready.drop_duplicates(subset=race_fields)[race_fields].copy()
-    assert len(br_races) == len(ballot_ready)
+    br_races = ballot_ready.drop_duplicates(subset=race_pk_fields)[race_fields].copy()
+    assert len(br_races) < len(ballot_ready)
+    assert br_races.race_id.is_unique, "race_id is not unique!"
 
     trns_dfs["br_races"] = br_races
+
+    # Create a county and position association table
+    position_counties_fields = [
+        "position_id",
+        "county_id_fips",
+        "raw_county",
+        "state_id_fips",
+        "raw_state",
+    ]
+    trns_dfs["br_positions_counties"] = ballot_ready.drop_duplicates(
+        subset=["position_id", "county_id_fips"]
+    )[position_counties_fields].copy()
     return trns_dfs
 
 
