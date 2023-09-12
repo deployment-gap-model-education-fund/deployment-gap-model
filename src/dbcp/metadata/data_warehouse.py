@@ -1254,8 +1254,8 @@ br_races = Table(
     schema=schema,
 )
 
-br_positions_counties = Table(
-    "br_positions_counties",
+br_positions_counties_assoc = Table(
+    "br_positions_counties_assoc",
     metadata,
     Column(
         "position_id",

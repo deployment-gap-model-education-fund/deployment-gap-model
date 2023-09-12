@@ -106,7 +106,7 @@ def _normalize_entities(ballot_ready: pd.DataFrame) -> dict[str, pd.DataFrame]:
         "state_id_fips",
         "raw_state",
     ]
-    trns_dfs["br_positions_counties"] = ballot_ready.drop_duplicates(
+    trns_dfs["br_positions_counties_assoc"] = ballot_ready.drop_duplicates(
         subset=["position_id", "county_id_fips"]
     )[position_counties_fields].copy()
     return trns_dfs
