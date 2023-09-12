@@ -1214,10 +1214,10 @@ br_positions = Table(
     Column("position_id", Integer, nullable=False, primary_key=True),
     Column("position_name", String, nullable=False),
     Column("reference_year", Integer, nullable=False),
-    Column("sub_area_name", String, nullable=True),
-    Column("sub_area_value", String, nullable=True),
-    Column("sub_area_name_secondary", String, nullable=True),
-    Column("sub_area_value_secondary", String, nullable=True),
+    Column("sub_area_name", String),
+    Column("sub_area_value", String),
+    Column("sub_area_name_secondary", String),
+    Column("sub_area_value_secondary", String),
     Column("level", String, nullable=False),
     Column("tier", Integer, nullable=False),
     Column("is_judicial", Boolean, nullable=False),
@@ -1225,7 +1225,7 @@ br_positions = Table(
     Column("normalized_position_id", Integer, nullable=False),
     Column("normalized_position_name", String, nullable=False),
     Column("frequency", String, nullable=False),
-    Column("partisan_type", String, nullable=True),
+    Column("partisan_type", String),
     schema=schema,
 )
 
