@@ -1199,40 +1199,86 @@ energy_communities = Table(
 ################
 # Ballot Ready #
 ################
-
-br_election_data = Table(
-    "br_election_data",
+br_elections = Table(
+    "br_elections",
     metadata,
-    Column("raw_county", String, nullable=False, primary_key=True),
-    Column("election_id", Integer, nullable=False),
+    Column("election_id", Integer, nullable=False, primary_key=True),
     Column("election_name", String, nullable=False),
     Column("election_day", DateTime, nullable=False),
-    Column("race_id", Integer, nullable=False, primary_key=True),
-    Column("is_primary", Boolean, nullable=False),
-    Column("is_runoff", Boolean, nullable=False),
-    Column("is_unexpired", Boolean, nullable=False),
-    Column("position_id", Integer, nullable=False),
+    schema=schema,
+)
+
+br_positions = Table(
+    "br_positions",
+    metadata,
+    Column("position_id", Integer, nullable=False, primary_key=True),
     Column("position_name", String, nullable=False),
-    Column("sub_area_name", String, nullable=True),
-    Column("sub_area_value", String, nullable=True),
-    Column("sub_area_name_secondary", String, nullable=True),
-    Column("sub_area_value_secondary", String, nullable=True),
-    Column("raw_state", String, nullable=False),
+    Column("reference_year", Integer, nullable=False),
+    Column("sub_area_name", String),
+    Column("sub_area_value", String),
+    Column("sub_area_name_secondary", String),
+    Column("sub_area_value_secondary", String),
     Column("level", String, nullable=False),
     Column("tier", Integer, nullable=False),
     Column("is_judicial", Boolean, nullable=False),
     Column("is_retention", Boolean, nullable=False),
-    Column("number_of_seats", Integer, nullable=False),
     Column("normalized_position_id", Integer, nullable=False),
     Column("normalized_position_name", String, nullable=False),
     Column("frequency", String, nullable=False),
-    Column("reference_year", Integer, nullable=False),
-    Column("partisan_type", String, nullable=True),
+    Column("partisan_type", String),
+    schema=schema,
+)
+
+br_races = Table(
+    "br_races",
+    metadata,
+    Column("race_id", Integer, nullable=False, primary_key=True),
+    Column("is_primary", Boolean, nullable=False),
+    Column("is_runoff", Boolean, nullable=False),
+    Column("is_unexpired", Boolean, nullable=False),
+    Column("number_of_seats", Integer, nullable=False),
     Column("race_created_at", DateTime, nullable=False),
     Column("race_updated_at", DateTime, nullable=False),
-    Column("state_id_fips", String, nullable=False),
     Column(
-        "county_id_fips", String, nullable=True
+        "election_id",
+        Integer,
+        ForeignKey("data_warehouse.br_elections.election_id"),
+        nullable=False,
+    ),
+    Column(
+        "position_id",
+        Integer,
+        ForeignKey("data_warehouse.br_positions.position_id"),
+        nullable=False,
+    ),
+    schema=schema,
+)
+
+br_positions_counties_assoc = Table(
+    "br_positions_counties_assoc",
+    metadata,
+    Column(
+        "position_id",
+        Integer,
+        ForeignKey("data_warehouse.br_positions.position_id"),
+        nullable=False,
+        primary_key=True,
+    ),
+    Column(
+        "raw_county", String, nullable=False, primary_key=True
+    ),  # Can't use county_id_fips because Connecticut changed it's county system recently
+    Column("raw_state", String, nullable=False),
+    Column(
+        "state_id_fips",
+        String,
+        ForeignKey("data_warehouse.state_fips.state_id_fips"),
+        nullable=False,
+    ),
+    Column(
+        "county_id_fips",
+        String,
+        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        nullable=True,
     ),  # Should not be nullable in future updates
     schema=schema,
 )

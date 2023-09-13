@@ -345,7 +345,7 @@ def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     #     sum(co2e_tonnes_per_year) as co2e_tonnes_per_year,
     #     sum(pm2_5_tonnes_per_year) as pm2_5_tonnes_per_year,
     #     sum(nox_tonnes_per_year) as nox_tonnes_per_year,
-    #     'power plant' as facility_type,
+    #     'fossil infrastructure' as facility_type,
     #     'proposed' as status
     # from data_mart.fossil_infrastructure_projects
     # group by 1, 2
