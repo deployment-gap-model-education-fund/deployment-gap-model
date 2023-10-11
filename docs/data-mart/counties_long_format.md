@@ -17,6 +17,7 @@ This table is mostly a restructured version of counties_wide_format. It provides
 ||`state_id_fips`|State FIPS ID|Census||
 ||`facility_count`|Total number of facilities of the given type, resource, and status in the given county|LBNL (proposed power), PUDL (existing power) or EIP (infrastructure)||
 ||`capacity_mw`|Total generation capacity of power plants (in Megawatts).|LBNL (proposed power except offshore wind), original research (offshore wind), PUDL (existing power), EIP (infrastructure)||
+||`actionable_mw_fraction`|For proposed power plants, what fraction of MW are "actionable".|LBNL (except offshore wind), original research (offshore wind)||
 |Emissions|`co2e_tonnes_per_year`|Metric tonnes of CO2 equivalent emitted per year (100 year warming potential)|derived from PUDL (power) or EIP (infrastructure)||
 ||`nox_tonnes_per_year`|Metric tonnes of Nitrous Oxides emitted per year|EIP||
 ||`pm2_5_tonnes_per_year`|Metric tonnes of Particulate Matter (2.5 micron) emitted per year|EIP||
