@@ -1,6 +1,8 @@
 """Small helper functions for dbcp etl."""
+import csv
 import logging
 import os
+from io import StringIO
 from pathlib import Path
 
 import boto3
@@ -173,3 +175,57 @@ def upload_schema_to_bigquery(schema: str, dev: bool = True) -> None:
             table_schema=get_bq_schema_from_metadata(table_name, schema, dev),
         )
         logger.info(f"Finished: {full_table_name}")
+
+
+def psql_insert_copy(table, conn, keys, data_iter):
+    """
+    Execute SQL statement inserting data
+
+    Parameters
+    ----------
+    table : pandas.io.sql.SQLTable
+    conn : sqlalchemy.engine.Engine or sqlalchemy.engine.Connection
+    keys : list of str
+        Column names
+    data_iter : Iterable that iterates the values to be inserted
+    """
+    # gets a DBAPI connection that can provide a cursor
+    dbapi_conn = conn.connection
+    with dbapi_conn.cursor() as cur:
+        s_buf = StringIO()
+        writer = csv.writer(s_buf)
+        writer.writerows(data_iter)
+        s_buf.seek(0)
+
+        columns = ", ".join(['"{}"'.format(k) for k in keys])
+        if table.schema:
+            table_name = "{}.{}".format(table.schema, table.name)
+        else:
+            table_name = table.name
+
+        sql = "COPY {} ({}) FROM STDIN WITH CSV".format(table_name, columns)
+        cur.copy_expert(sql=sql, file=s_buf)
+        dbapi_conn.commit()
+
+
+SA_TO_PD_TYPES = {
+    "BOOLEAN": "boolean",
+    "DATETIME": "datetime64[ns]",
+    "FLOAT": "float64",
+    "INTEGER": "Int64",
+    "VARCHAR": "string",
+}
+
+
+def enforce_dtypes(
+    df: pd.DataFrame, table_name: str, schema: str, metadata: sa.sql.schema.MetaData
+) -> pd.DataFrame:
+    """Enforce datatypes on a dataframe based on column types specified in the dbcp.metadata. sqlalchemy schemas"""
+    full_table_name = f"{schema}.{table_name}"
+    return df.astype(
+        {
+            column_name: SA_TO_PD_TYPES[str(col.type)]
+            for column_name, col in metadata.tables[full_table_name].columns.items()
+            if column_name in df.columns
+        }
+    )
