@@ -1,4 +1,24 @@
-"""Module to create a county-level table for DBCP to use in spreadsheet tools."""
+"""Module to create a county-level table for DBCP to use in spreadsheet tools.
+
+This module creates two tables: county_wide_format and county_long_format.
+The long format primary key is (county, resource), while the wide format
+key is simply county.
+
+The long format table is used primarily by tableau, while the wide format
+is most useful for spreadsheet tools. The wide format table is easier to
+understand for non-data people because 1 row = 1 county, and gets more
+use by the clients themselves. The long format table, via tableau, gets
+more use by the client's clients.
+
+The two tables began with the same data, but over time the wide format has
+accumulated ad hoc requests from the client, so they have diverged somewhat.
+
+For the sake of maintainability, the wide format table is generated from the
+long format table as much as possible. But some columns must be calculated
+separately, such as non-commutative aggregations over nested groupings, eg
+`count(distinct my_column)) group by county, resource` cannot have another
+`count(distinct my_column) group by county` on top of it.
+"""
 from io import StringIO
 from typing import Dict, Optional
 
@@ -21,7 +41,7 @@ from dbcp.data_mart.helpers import (
     _get_state_fips_df,
     _subset_db_columns,
 )
-from dbcp.data_mart.projects import create_data_mart as create_iso_data_mart
+from dbcp.data_mart.projects import create_long_format as create_iso_data_mart
 from dbcp.helpers import get_pudl_engine, get_sql_engine
 
 JUSTICE40_AGGREGATES = pd.read_csv(
@@ -38,33 +58,36 @@ JUSTICE40_AGGREGATES = pd.read_csv(
 total_tracts,
 justice40_dbcp_index,
 n_distinct_qualifying_tracts,
-n_tracts_agriculture_loss_low_income_not_students,climate
-n_tracts_asthma_low_income_not_students,health
+n_tracts_agriculture_loss_low_income,climate
+n_tracts_asthma_low_income,health
 n_tracts_below_poverty_and_low_high_school,workforce
 n_tracts_below_poverty_line_less_than_high_school_islands,workforce
-n_tracts_building_loss_low_income_not_students,climate
-n_tracts_diabetes_low_income_not_students,health
-n_tracts_diesel_particulates_low_income_not_students,transit
-n_tracts_energy_burden_low_income_not_students,energy
-n_tracts_hazardous_waste_proximity_low_income_not_students,pollution
-n_tracts_heart_disease_low_income_not_students,health
-n_tracts_housing_burden_low_income_not_students,housing
-n_tracts_lead_paint_and_median_home_price_low_income_not_studen,housing
-n_tracts_life_expectancy_low_income_not_students,health
+n_tracts_building_loss_low_income,climate
+n_tracts_diabetes_low_income,health
+n_tracts_diesel_particulates_low_income,transit
+n_tracts_energy_burden_low_income,energy
+n_tracts_hazardous_waste_proximity_low_income,pollution
+n_tracts_heart_disease_low_income,health
+n_tracts_housing_burden_low_income,housing
+n_tracts_lead_paint_and_median_home_price_low_income,housing
+n_tracts_life_expectancy_low_income,health
 n_tracts_linguistic_isolation_and_low_high_school,workforce
 n_tracts_local_to_area_income_ratio_and_low_high_school,workforce
 n_tracts_local_to_area_income_ratio_less_than_high_school_islan,workforce
-n_tracts_pm2_5_low_income_not_students,energy
-n_tracts_population_loss_low_income_not_students,climate
-n_tracts_risk_management_plan_proximity_low_income_not_students,pollution
-n_tracts_superfund_proximity_low_income_not_students,pollution
-n_tracts_traffic_low_income_not_students,transit
+n_tracts_pm2_5_low_income,energy
+n_tracts_population_loss_low_income,climate
+n_tracts_superfund_proximity_low_income,pollution
+n_tracts_traffic_low_income,transit
 n_tracts_unemployment_and_low_high_school,workforce
 n_tracts_unemployment_less_than_high_school_islands,workforce
-n_tracts_wastewater_low_income_not_students,water
+n_tracts_wastewater_low_income,water
 """
     )
 )
+
+
+RENEWABLE_TYPES = ("Solar", "Offshore Wind", "Onshore Wind", "Battery Storage")
+FOSSIL_TYPES = ("Coal", "Oil", "Gas")
 
 
 def _create_dbcp_ej_index(j40_df: pd.DataFrame) -> pd.Series:
@@ -116,30 +139,29 @@ def _get_env_justice_df(engine: sa.engine.Engine) -> pd.DataFrame:
         SUBSTRING("tract_id_fips", 1, 5) as county_id_fips,
         COUNT("tract_id_fips") as total_tracts,
         SUM("is_disadvantaged"::INTEGER) as n_distinct_qualifying_tracts,
-        SUM("expected_agriculture_loss_and_low_income_and_not_students"::INTEGER) as n_tracts_agriculture_loss_low_income_not_students,
-        SUM("expected_building_loss_and_low_income_and_not_students"::INTEGER) as n_tracts_building_loss_low_income_not_students,
-        SUM("expected_population_loss_and_low_income_and_not_students"::INTEGER) as n_tracts_population_loss_low_income_not_students,
-        SUM("diesel_particulates_and_low_income_and_not_students"::INTEGER) as n_tracts_diesel_particulates_low_income_not_students,
-        SUM("energy_burden_and_low_income_and_not_students"::INTEGER) as n_tracts_energy_burden_low_income_not_students,
-        SUM("pm2_5_and_low_income_and_not_students"::INTEGER) as n_tracts_pm2_5_low_income_not_students,
-        SUM("traffic_and_low_income_and_not_students"::INTEGER) as n_tracts_traffic_low_income_not_students,
-        SUM("lead_paint_and_median_home_price_and_low_income_and_not_student"::INTEGER) as n_tracts_lead_paint_and_median_home_price_low_income_not_students,
-        SUM("housing_burden_and_low_income_and_not_students"::INTEGER) as n_tracts_housing_burden_low_income_not_students,
-        SUM("risk_management_plan_proximity_and_low_income_and_not_students"::INTEGER) as n_tracts_risk_management_plan_proximity_low_income_not_students,
-        SUM("superfund_proximity_and_low_income_and_not_students"::INTEGER) as n_tracts_superfund_proximity_low_income_not_students,
-        SUM("wastewater_and_low_income_and_not_students"::INTEGER) as n_tracts_wastewater_low_income_not_students,
-        SUM("asthma_and_low_income_and_not_students"::INTEGER) as n_tracts_asthma_low_income_not_students,
-        SUM("heart_disease_and_low_income_and_not_students"::INTEGER) as n_tracts_heart_disease_low_income_not_students,
-        SUM("diabetes_and_low_income_and_not_students"::INTEGER) as n_tracts_diabetes_low_income_not_students,
-        SUM("local_to_area_income_ratio_and_less_than_high_school_and_not_st"::INTEGER) as n_tracts_local_to_area_income_ratio_and_low_high_school,
-        SUM("linguistic_isolation_and_less_than_high_school_and_not_students"::INTEGER) as n_tracts_linguistic_isolation_and_low_high_school,
-        SUM("below_poverty_line_and_less_than_high_school_and_not_students"::INTEGER) as n_tracts_below_poverty_and_low_high_school,
-        SUM("unemployment_and_less_than_high_school_and_not_students"::INTEGER) as n_tracts_unemployment_and_low_high_school,
-        SUM("hazardous_waste_proximity_and_low_income_and_not_students"::INTEGER) as n_tracts_hazardous_waste_proximity_low_income_not_students,
-        SUM("unemployment_and_less_than_high_school_islands"::INTEGER) as n_tracts_unemployment_less_than_high_school_islands,
-        SUM("local_to_area_income_ratio_and_less_than_high_school_islands"::INTEGER) as n_tracts_local_to_area_income_ratio_less_than_high_school_islands,
-        SUM("below_poverty_line_and_less_than_high_school_islands"::INTEGER) as n_tracts_below_poverty_line_less_than_high_school_islands,
-        SUM("life_expectancy_and_low_income_and_not_students"::INTEGER) as n_tracts_life_expectancy_low_income_not_students
+        SUM("expected_agriculture_loss_rate_is_low_income"::INTEGER) as n_tracts_agriculture_loss_low_income,
+        SUM("expected_building_loss_rate_is_low_income"::INTEGER) as n_tracts_building_loss_low_income,
+        SUM("expected_population_loss_rate_is_low_income"::INTEGER) as n_tracts_population_loss_low_income,
+        SUM("diesel_particulates_is_low_income"::INTEGER) as n_tracts_diesel_particulates_low_income,
+        SUM("energy_burden_is_low_income"::INTEGER) as n_tracts_energy_burden_low_income,
+        SUM("pm2_5_is_low_income"::INTEGER) as n_tracts_pm2_5_low_income,
+        SUM("traffic_proximity_is_low_income"::INTEGER) as n_tracts_traffic_low_income,
+        SUM("lead_paint_and_median_house_value_is_low_income"::INTEGER) as n_tracts_lead_paint_and_median_home_price_low_income,
+        SUM("housing_burden_is_low_income"::INTEGER) as n_tracts_housing_burden_low_income,
+        SUM("proximity_to_superfund_sites_is_low_income"::INTEGER) as n_tracts_superfund_proximity_low_income,
+        SUM("wastewater_discharge_is_low_income"::INTEGER) as n_tracts_wastewater_low_income,
+        SUM("asthma_is_low_income"::INTEGER) as n_tracts_asthma_low_income,
+        SUM("heart_disease_is_low_income"::INTEGER) as n_tracts_heart_disease_low_income,
+        SUM("diabetes_is_low_income"::INTEGER) as n_tracts_diabetes_low_income,
+        SUM("low_median_household_income_and_low_hs_attainment"::INTEGER) as n_tracts_local_to_area_income_ratio_and_low_high_school,
+        SUM("households_in_linguistic_isolation_and_low_hs_attainment"::INTEGER) as n_tracts_linguistic_isolation_and_low_high_school,
+        SUM("households_below_federal_poverty_level_low_hs_attainment"::INTEGER) as n_tracts_below_poverty_and_low_high_school,
+        SUM("unemployment_and_low_hs_attainment"::INTEGER) as n_tracts_unemployment_and_low_high_school,
+        SUM("proximity_to_hazardous_waste_facilities_is_low_income"::INTEGER) as n_tracts_hazardous_waste_proximity_low_income,
+        SUM("unemployment_and_low_hs_edu_islands"::INTEGER) as n_tracts_unemployment_less_than_high_school_islands,
+        SUM("low_median_household_income_and_low_hs_edu_islands"::INTEGER) as n_tracts_local_to_area_income_ratio_less_than_high_school_islands,
+        SUM("households_below_federal_poverty_level_low_hs_edu_islands"::INTEGER) as n_tracts_below_poverty_line_less_than_high_school_islands,
+        SUM("low_life_expectancy_is_low_income"::INTEGER) as n_tracts_life_expectancy_low_income
     FROM "data_warehouse"."justice40_tracts"
     GROUP BY 1;
     """
@@ -150,6 +172,21 @@ def _get_env_justice_df(engine: sa.engine.Engine) -> pd.DataFrame:
 
 def _get_existing_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
     # get plant_id, fuel_type, capacity_mw
+
+    # The query here relies on the fact that each generator has only one fuel_type_pudl.
+    # I confirmed that this is true because the following query returns 1:
+    # WITH
+    # gen_fuels as (
+    #     SELECT
+    #         plant_id_eia,
+    #         generator_id,
+    #         count(fuel_type_code_pudl) as fuel_type_count
+    #     FROM "data_warehouse"."mcoe"
+    #     GROUP BY 1, 2
+    # )
+    # SELECT max(fuel_type_count) as max_fuel_type_count
+    # FROM gen_fuels
+
     query = """
     WITH
     plant_fuel_aggs as (
@@ -215,7 +252,7 @@ def _get_existing_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
 
 def _get_existing_fossil_plant_co2e_estimates(
     pudl_engine: sa.engine.Engine,
-) -> pd.DataFrame:
+) -> pd.Series:
     gen_fuel_923 = _get_existing_plant_fuel_data(pudl_engine)
     plant_co2e = _estimate_existing_co2e(gen_fuel_923)
     return plant_co2e
@@ -263,6 +300,7 @@ def _existing_plants_counties(
     state_fips_table: Optional[pd.DataFrame] = None,
     county_fips_table: Optional[pd.DataFrame] = None,
 ) -> pd.DataFrame:
+    """Create existing plant county-plant aggs for the long-format county table."""
     plants = _get_existing_plants(
         pudl_engine=pudl_engine,
         postgres_engine=postgres_engine,
@@ -300,20 +338,18 @@ def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
 
     # equivalent SQL query that I translated to pandas to avoid dependency
     # on the data_mart schema (which doesn't yet exist when this function runs)
-    """
-    SELECT
-        county_id_fips,
-        industry_sector as resource_or_sector,
-        count(project_id) as facility_count,
-        sum(co2e_tonnes_per_year) as co2e_tonnes_per_year,
-        sum(pm2_5_tonnes_per_year) as pm2_5_tonnes_per_year,
-        sum(nox_tonnes_per_year) as nox_tonnes_per_year,
-        'power plant' as facility_type,
-        'proposed' as status
-    from data_mart.fossil_infrastructure_projects
-    group by 1, 2
-    ;
-    """
+    # SELECT
+    #     county_id_fips,
+    #     industry_sector as resource_or_sector,
+    #     count(project_id) as facility_count,
+    #     sum(co2e_tonnes_per_year) as co2e_tonnes_per_year,
+    #     sum(pm2_5_tonnes_per_year) as pm2_5_tonnes_per_year,
+    #     sum(nox_tonnes_per_year) as nox_tonnes_per_year,
+    #     'fossil infrastructure' as facility_type,
+    #     'proposed' as status
+    # from data_mart.fossil_infrastructure_projects
+    # group by 1, 2
+
     grp = infra.groupby(["county_id_fips", "industry_sector"])
     aggs = grp.agg(
         {
@@ -342,7 +378,7 @@ def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
 def _iso_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     # Avoid db dependency order by recreating the df.
     # Could also make an orchestration script.
-    iso = create_iso_data_mart(engine)["iso_projects_long_format"]
+    iso = create_iso_data_mart(engine)
 
     # equivalent SQL query that I translated to pandas to avoid dependency
     # on the data_mart schema (which doesn't yet exist when this function runs)
@@ -351,18 +387,29 @@ def _iso_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
         county_id_fips,
         resource_clean as resource_or_sector,
         count(project_id) as facility_count,
-        sum(co2e_tonnes_per_year) as co2e_tonnes_per_year,
-        sum(capacity_mw) as capacity_mw,
+        sum(co2e_tonnes_per_year * frac_locations_in_county) as co2e_tonnes_per_year,
+        sum(capacity_mw::float * frac_locations_in_county) as capacity_mw,
         'power plant' as facility_type,
         'proposed' as status
     from data_mart.iso_projects_long_format
+    where county_id_fips is not null -- 9 rows as of 6/4/2023
     group by 1, 2
     ;
     """
+    # Distribute project-level quantities across locations, when there are multiple.
+    # A handful of ISO projects are in multiple counties and the proprietary offshore
+    # wind projects have an entry for each cable landing.
+    # This approximation assumes an equal distribution between sites.
+    # Also note that this model represents everything relevant to each county,
+    # so multi-county projects are intentionally double-counted; for each relevant county.
+    iso.loc[:, ["capacity_mw", "co2e_tonnes_per_year"]] = iso.loc[
+        :, ["capacity_mw", "co2e_tonnes_per_year"]
+    ].mul(iso["frac_locations_in_county"], axis=0)
+
     grp = iso.groupby(["county_id_fips", "resource_clean"])
     aggs = grp.agg(
         {
-            "co2e_tonnes_per_year": "sum",
+            "co2e_tonnes_per_year": "sum",  # type: ignore
             "capacity_mw": "sum",
             "project_id": "count",
         }
@@ -396,161 +443,47 @@ def _get_ncsl_wind_permitting_df(engine: sa.engine.Engine) -> pd.DataFrame:
     return df
 
 
-def _agg_iso_projects_to_counties(iso_df: pd.DataFrame) -> pd.DataFrame:
-    # filter for active projects
-    is_active = iso_df.loc[:, "queue_status"] == "active"
-    projects = iso_df.loc[is_active, :].copy()
-
-    # Calulate renewable/fossil aggregates
-    # define categories
-    renewable_fossil_dict = {
-        "Solar": "renewable",
-        # 'Battery Storage': '',
-        "Onshore Wind": "renewable",
-        "Natural Gas": "fossil",
-        "Offshore Wind": "renewable",
-        # 'Other Storage': '',
-        # 'Other': '',
-        # 'Hydro': '',  # remove by client request
-        # 'Nuclear': '',
-        # 'Pumped Storage': '',
-        "Geothermal": "renewable",
-        "Coal": "fossil",
-        # 'Waste Heat': '',
-    }
-
-    projects["renew_fossil"] = projects.loc[:, "resource_clean"].map(
-        renewable_fossil_dict
-    )
-    category_groups = projects.groupby(["county_id_fips", "renew_fossil"])
-    category_aggs = category_groups["capacity_mw"].sum().to_frame()
-    # count ignores missing capacity values, so have to join size() in separately
-    category_aggs = category_aggs.join(
-        category_groups.size().rename("count_plants").to_frame()
-    )
-    category_aggs = category_aggs.unstack()
-
-    # calculate fuel breakout aggregates
-    projects["breakout_fuels"] = projects.loc[:, "resource_clean"].replace(
-        {"Natural Gas": "Gas"}
-    )
-    projects.loc[:, "breakout_fuels"] = projects.loc[:, "breakout_fuels"].str.lower()
-    fuels_to_breakout = {
-        "solar",
-        "onshore wind",
-        "offshore wind",
-        "gas",
-        "battery storage",
-    }
-    to_breakout = projects.loc[:, "breakout_fuels"].isin(fuels_to_breakout)
-    projects = projects.loc[to_breakout, :]
-
-    fuel_groups = projects.groupby(["county_id_fips", "breakout_fuels"])
-    per_fuel_aggs = fuel_groups["capacity_mw"].sum().to_frame()
-    # count ignores missing capacity values, so have to join size() in separately
-    per_fuel_aggs = per_fuel_aggs.join(
-        fuel_groups.size().rename("count_plants").to_frame()
-    )
-    per_fuel_aggs = per_fuel_aggs.unstack()
-
-    output = pd.concat([per_fuel_aggs, category_aggs], axis=1)
-    output.columns = output.columns.swaplevel()
-
-    return output
-
-
-def _agg_pudl_to_counties(pudl_df: pd.DataFrame) -> pd.DataFrame:
-    plants = pudl_df.copy()
-    # Calulate renewable/fossil aggregates
-    # define categories
-    renewable_fossil_dict = {
-        "gas": "fossil",
-        # 'hydro': '',  # remove by client request
-        "oil": "fossil",
-        # 'nuclear': '',
-        "coal": "fossil",
-        # 'other': '',
-        "wind": "renewable",
-        "solar": "renewable",
-        # 'waste': '',
-    }
-
-    plants["renew_fossil"] = plants.loc[:, "fuel_type_code_pudl"].map(
-        renewable_fossil_dict
-    )
-    category_groups = plants.groupby(["county_id_fips", "renew_fossil"])
-    category_aggs = category_groups["capacity_mw"].sum().to_frame()
-    # count ignores missing capacity values, so have to join size() in separately
-    category_aggs = category_aggs.join(
-        category_groups.size().rename("count_plants").to_frame()
-    )
-    category_aggs = category_aggs.unstack()
-
-    # calculate fuel breakout aggregates
-    # relabel battery storage (this ignores pumped hydro)
-    plants["breakout_fuels"] = plants.loc[:, "fuel_type_code_pudl"].replace(
-        {"wind": "onshore wind"}
-    )  # copy
-    is_battery = plants.loc[:, "technology_description"] == "Batteries"
-    plants.loc[is_battery, "breakout_fuels"] = "battery storage"
-
-    fuels_to_breakout = {"solar", "onshore wind", "gas", "battery storage", "coal"}
-    to_breakout = plants.loc[:, "breakout_fuels"].isin(fuels_to_breakout)
-    plants = plants.loc[to_breakout, :]
-
-    fuel_groups = plants.groupby(["county_id_fips", "breakout_fuels"])
-    per_fuel_aggs = fuel_groups["capacity_mw"].sum().to_frame()
-    # count ignores missing capacity values, so have to join size() in separately
-    per_fuel_aggs = per_fuel_aggs.join(
-        fuel_groups.size().rename("count_plants").to_frame()
-    )
-    per_fuel_aggs = per_fuel_aggs.unstack()
-
-    output = pd.concat([per_fuel_aggs, category_aggs], axis=1)
-    output.columns = output.columns.swaplevel()
-
-    return output
-
-
 def _add_derived_columns(mart: pd.DataFrame) -> pd.DataFrame:
     out = mart.copy()
-    out["has_ordinance"] = out["ordinance"].notna()
+    out["ordinance_via_reldi"] = out["ordinance_text"].notna()
+    ban_cols = [
+        "ordinance_via_reldi",
+        "ordinance_via_solar_nrel",
+        "ordinance_via_wind_nrel",
+    ]
+    out["ordinance_is_restrictive"] = out[ban_cols].fillna(False).any(axis=1)
 
     return out
 
 
-def _flatten_multiindex(multi_index: pd.MultiIndex, prefix: str) -> pd.Index:
-    flattened = [
-        "_".join([levels[0], prefix, *levels[1:]]).replace(" ", "_")
-        for levels in multi_index
-    ]
-    return pd.Index(flattened)
-
-
 def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
+    # I try to source as much wide-format content as possible from the long-format data.
+    # This is to reduce the number of places that need to be updated when the data changes.
+    # The tradeoff for that reduced maintenance is the complexity of this function.
     long = long_format.copy()
-    resources_to_drop = {
-        # "Battery Storage",
-        # "Solar",
-        # "Natural Gas",
-        "Nuclear",
-        # "Onshore Wind",
-        "CSP",
-        "Other",
-        "Unknown",
-        "Geothermal",
-        "Other Storage",
-        # "Offshore Wind",
-        "Hydro",
-        "Pumped Storage",
-        # "Coal",
-        # "Oil",
-        # "Liquefied Natural Gas",
-        # "Synthetic Fertilizers",
-        # "Petrochemicals and Plastics",
+    resources_to_keep = {
+        "Battery Storage",
+        "Solar",
+        "Natural Gas",  # this name is shared between both power and infra
+        # "Nuclear",
+        "Onshore Wind",
+        # "CSP",
+        # "Other",
+        # "Unknown",
+        # "Biomass",
+        # "Geothermal",
+        # "Other Storage",
+        "Offshore Wind",
+        # "Hydro",
+        # "Pumped Storage",
+        "Coal",
+        "Oil",  # this name is shared between both power and infra
+        "Liquefied Natural Gas",
+        "Synthetic Fertilizers",
+        "Petrochemicals and Plastics",
     }
-    to_drop = long["resource_or_sector"].isin(resources_to_drop)
-    long = long.loc[~to_drop, :]
+    to_keep = long["resource_or_sector"].isin(resources_to_keep)
+    long = long.loc[to_keep, :]
 
     # prep values that will become part of column names after pivoting
     long.loc[:, "facility_type"] = long.loc[:, "facility_type"].map(
@@ -577,19 +510,13 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "pm2_5_tonnes_per_year",
         "nox_tonnes_per_year",
     ]
-    county_level_cols = [  # not part of pivot
-        "state_id_fips",
-        "state",
-        "county",
-        "has_ordinance",
-        "ordinance_jurisdiction_name",
-        "ordinance_jurisdiction_type",
-        "ordinance",
-        "ordinance_earliest_year_mentioned",
-        "state_permitting_type",
-        "state_permitting_text",
-    ] + JUSTICE40_AGGREGATES["name"].to_list()
+    # county level cols are not part of the pivot and get dropped here.
+    # They are added back in with _join_all_counties_to_wide_format()
+    # because that function contains all counties instead of only
+    # counties with power infrastructure in them
+
     wide = long.pivot(index=idx_cols, columns=col_cols, values=val_cols)
+    wide.reset_index(inplace=True)
 
     wide.columns = wide.columns.rename(
         {None: "measures"}
@@ -598,10 +525,6 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     wide.columns = [
         "_".join(col).strip("_") for col in wide.columns
     ]  # flatten multiindex
-
-    # this is equivalent to left joining _get_county_properties()
-    county_stuff = long.groupby("county_id_fips")[county_level_cols].first()
-    wide = wide.join(county_stuff).reset_index()
 
     # co2e total
     co2e_cols_to_sum = [
@@ -612,8 +535,8 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     )
 
     # fossil and renewable category totals
-    renewables = ["solar", "offshore_wind", "onshore_wind", "battery_storage"]
-    fossils = ["coal", "oil", "gas"]
+    renewables = [type_.lower().replace(" ", "_") for type_ in RENEWABLE_TYPES]
+    fossils = [type_.lower().replace(" ", "_") for type_ in FOSSIL_TYPES]
     measures = [
         "existing_capacity_mw",
         "existing_co2e_tonnes_per_year",
@@ -662,96 +585,20 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         # They produce tiny amounts of CO2 but large amounts of confusion.
         "onshore_wind_existing_co2e_tonnes_per_year",
         "battery_storage_existing_co2e_tonnes_per_year",
+        "renewable_and_battery_proposed_co2e_tonnes_per_year",  # not currently modeled
+        # No superset proposed_facility_counts due to double-counting multi-resource projects.
+        # I recalculate those from the project data in _get_category_project_counts()
+        "renewable_and_battery_proposed_facility_count",
+        "fossil_proposed_facility_count",
     ]
     wide.drop(columns=cols_to_drop, inplace=True)
 
-    col_order = [
-        "state_id_fips",
-        "county_id_fips",
-        "state",
-        "county",
-        "has_ordinance",
-        "state_permitting_type",
-        "county_total_co2e_tonnes_per_year",
-        "fossil_existing_capacity_mw",
-        "fossil_existing_co2e_tonnes_per_year",
-        "fossil_existing_facility_count",
-        "fossil_proposed_capacity_mw",
-        "fossil_proposed_co2e_tonnes_per_year",
-        "fossil_proposed_facility_count",
-        "renewable_and_battery_existing_capacity_mw",
-        "renewable_and_battery_existing_co2e_tonnes_per_year",  # left in because of hybrid plants like solar thermal
-        "renewable_and_battery_existing_facility_count",
-        "renewable_and_battery_proposed_capacity_mw",
-        "renewable_and_battery_proposed_facility_count",
-        "infra_total_proposed_co2e_tonnes_per_year",
-        "infra_total_proposed_facility_count",
-        "infra_total_proposed_nox_tonnes_per_year",
-        "infra_total_proposed_pm2_5_tonnes_per_year",
-        "battery_storage_existing_capacity_mw",
-        "battery_storage_existing_facility_count",
-        "battery_storage_proposed_capacity_mw",
-        "battery_storage_proposed_facility_count",
-        "coal_existing_capacity_mw",
-        "coal_existing_co2e_tonnes_per_year",
-        "coal_existing_facility_count",
-        "coal_proposed_capacity_mw",
-        "coal_proposed_co2e_tonnes_per_year",
-        "coal_proposed_facility_count",
-        "gas_existing_capacity_mw",
-        "gas_existing_co2e_tonnes_per_year",
-        "gas_existing_facility_count",
-        "gas_proposed_capacity_mw",
-        "gas_proposed_co2e_tonnes_per_year",
-        "gas_proposed_facility_count",
-        "offshore_wind_existing_capacity_mw",
-        "offshore_wind_existing_facility_count",
-        "offshore_wind_proposed_capacity_mw",
-        "offshore_wind_proposed_facility_count",
-        "oil_existing_capacity_mw",
-        "oil_existing_co2e_tonnes_per_year",
-        "oil_existing_facility_count",
-        "onshore_wind_existing_capacity_mw",
-        "onshore_wind_existing_facility_count",
-        "onshore_wind_proposed_capacity_mw",
-        "onshore_wind_proposed_facility_count",
-        "solar_existing_capacity_mw",
-        "solar_existing_co2e_tonnes_per_year",
-        "solar_existing_facility_count",
-        "solar_proposed_capacity_mw",
-        "solar_proposed_facility_count",
-        "infra_gas_proposed_co2e_tonnes_per_year",
-        "infra_gas_proposed_facility_count",
-        "infra_gas_proposed_nox_tonnes_per_year",
-        "infra_gas_proposed_pm2_5_tonnes_per_year",
-        "infra_lng_proposed_co2e_tonnes_per_year",
-        "infra_lng_proposed_facility_count",
-        "infra_lng_proposed_nox_tonnes_per_year",
-        "infra_lng_proposed_pm2_5_tonnes_per_year",
-        "infra_oil_proposed_co2e_tonnes_per_year",
-        "infra_oil_proposed_facility_count",
-        "infra_oil_proposed_nox_tonnes_per_year",
-        "infra_oil_proposed_pm2_5_tonnes_per_year",
-        "infra_petrochemicals_and_plastics_proposed_co2e_tonnes_per_year",
-        "infra_petrochemicals_and_plastics_proposed_facility_count",
-        "infra_petrochemicals_and_plastics_proposed_nox_tonnes_per_year",
-        "infra_petrochemicals_and_plastics_proposed_pm2_5_tonnes_per_year",
-        "infra_synthetic_fertilizers_proposed_co2e_tonnes_per_year",
-        "infra_synthetic_fertilizers_proposed_facility_count",
-        "infra_synthetic_fertilizers_proposed_nox_tonnes_per_year",
-        "infra_synthetic_fertilizers_proposed_pm2_5_tonnes_per_year",
-        "ordinance",
-        "ordinance_earliest_year_mentioned",
-        "ordinance_jurisdiction_name",
-        "ordinance_jurisdiction_type",
-        "state_permitting_text",
-    ] + JUSTICE40_AGGREGATES["name"].to_list()
-    return wide.loc[:, col_order].copy()
+    return wide
 
 
 def create_long_format(
-    postgres_engine: Optional[sa.engine.Engine] = None,
-    pudl_engine: Optional[sa.engine.Engine] = None,
+    postgres_engine: sa.engine.Engine,
+    pudl_engine: sa.engine.Engine,
 ) -> pd.DataFrame:
     """Create the long format county datamart dataframe."""
     all_counties = _get_county_fips_df(postgres_engine)
@@ -770,28 +617,150 @@ def create_long_format(
     out = pd.concat([iso, existing, infra], axis=0, ignore_index=True)
     out = out.merge(county_properties, on="county_id_fips", how="left")
     out = _add_derived_columns(out)
-    col_order = [
-        "state_id_fips",
-        "county_id_fips",
-        "state",
-        "county",
-        "facility_type",
-        "resource_or_sector",
-        "status",
-        "facility_count",
-        "capacity_mw",
-        "co2e_tonnes_per_year",
-        "pm2_5_tonnes_per_year",
-        "nox_tonnes_per_year",
-        "has_ordinance",
-        "ordinance_jurisdiction_name",
-        "ordinance_jurisdiction_type",
-        "ordinance",
-        "ordinance_earliest_year_mentioned",
-        "state_permitting_type",
-        "state_permitting_text",
-    ] + JUSTICE40_AGGREGATES["name"].to_list()
-    return out.loc[:, col_order]
+    return out
+
+
+def _get_offshore_wind_extra_cols(engine: sa.engine.Engine) -> pd.DataFrame:
+    # create columns that count how much offshore wind capacity is associated
+    # with a particular county:
+    #   1. comes from ports (m:m)
+    #   2. is attributed to a particular interest type (m:1)
+
+    # Note that these aggregates do NOT divide capacity across the counties. Instead,
+    # they intentionally double-count capacity. The theory is that the loss
+    # of any port could block the whole associated project, so we want
+    # to know how much total capacity is at stake in each port county.
+    query = """
+    WITH
+    proj_ports AS (
+        SELECT
+            proj."project_id",
+            port.location_id,
+            locs.county_id_fips,
+            proj."capacity_mw"
+        FROM "data_warehouse"."offshore_wind_projects" as proj
+        INNER JOIN data_warehouse.offshore_wind_port_association as port
+        USING(project_id)
+        INNER JOIN data_warehouse.offshore_wind_locations as locs
+        USING(location_id)
+    ),
+    -- select * from proj_ports
+    -- order by project_id, location_id
+    port_aggs AS (
+        SELECT
+            county_id_fips,
+            -- intentional double-counting here. The theory is that the loss
+            -- of any port could block the whole associated project, so we want
+            -- to know how much total capacity is at stake in each port county.
+            SUM(capacity_mw) as offshore_wind_capacity_mw_via_ports
+        FROM proj_ports
+        GROUP BY 1
+        order by 1
+    ),
+    interest AS (
+        SELECT
+            county_id_fips,
+            string_agg(distinct(why_of_interest), ',' order by why_of_interest) as offshore_wind_interest_type
+        FROM data_warehouse.offshore_wind_locations as locs
+        GROUP BY 1
+        ORDER BY 1
+    )
+    SELECT
+        county_id_fips,
+        offshore_wind_capacity_mw_via_ports,
+        offshore_wind_interest_type
+    FROM interest
+    LEFT JOIN port_aggs
+    USING(county_id_fips)
+    where county_id_fips is not NULL;
+    """
+    df = pd.read_sql(query, engine)
+    df.set_index("county_id_fips", inplace=True)
+    return df
+
+
+def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
+    query = """
+    select
+        county_id_fips,
+        gap_status,
+        manager_type,
+        intersection_area_padus_km2,
+        county_area_coast_clipped_km2
+    from data_warehouse.protected_area_by_county
+    """
+    pad = pd.read_sql(query, postgres_engine)
+    # county_area_coast_clipped is consistent with clipped PAD-US but
+    # the county_fips.land_area_km2 is more accurate and preferred for
+    # downstream analysis.
+    # I use the consistent value to calculate ratio, then pair that ratio
+    #  with the accurate land area in the data mart
+    county_areas = pad.groupby("county_id_fips")[
+        "county_area_coast_clipped_km2"
+    ].first()
+    is_developable = pad["gap_status"].str.match("^[34]")
+    is_federally_managed = pad["manager_type"] == "Federal"
+
+    federal_developable = (
+        pad.loc[is_developable & is_federally_managed, :]
+        .groupby("county_id_fips")["intersection_area_padus_km2"]
+        .sum()
+        .rename("fed_dev")
+    )
+    un_developable = (
+        pad.loc[~is_developable, :]
+        .groupby("county_id_fips")["intersection_area_padus_km2"]
+        .sum()
+        .rename("protected")
+    )
+    areas = pd.concat(
+        [county_areas, federal_developable, un_developable], axis=1, join="outer"
+    )
+    areas.loc[:, ["fed_dev", "protected"]].fillna(0, inplace=True)
+    areas["unprotected_land_area_km2"] = (
+        areas["county_area_coast_clipped_km2"] - areas["protected"]
+    )
+    areas["federal_fraction_unprotected_land"] = (
+        areas["fed_dev"] / areas["unprotected_land_area_km2"]
+    )
+    out_cols = [
+        "unprotected_land_area_km2",
+        "federal_fraction_unprotected_land",
+    ]
+    correlated_rounding_errors = areas["federal_fraction_unprotected_land"].gt(1)
+    assert (
+        correlated_rounding_errors.sum() == 1
+    ), f"Expected 1 bad rounding error, got {correlated_rounding_errors.sum()}"
+    areas.loc[
+        correlated_rounding_errors, "federal_fraction_unprotected_land"
+    ] = 1.0  # manually clip
+
+    return areas.loc[:, out_cols].copy()
+
+
+def _get_energy_community_qualification(postgres_engine: sa.engine.Engine):
+    # NOTE: this query contains hardcoded parameters for the
+    # energy communities qualification criteria
+    query = """
+    WITH
+    ec as (
+        SELECT
+            ec.county_id_fips,
+            coal_qualifying_area_fraction as energy_community_coal_closures_area_fraction,
+            qualifies_by_employment_criteria as energy_community_qualifies_via_employment
+        FROM data_warehouse.energy_communities_by_county AS ec
+        LEFT JOIN data_warehouse.county_fips AS fips
+        USING (county_id_fips)
+    )
+    SELECT
+        *,
+        (energy_community_coal_closures_area_fraction > 0.5 OR
+        energy_community_qualifies_via_employment) as energy_community_qualifies
+    FROM ec
+    """
+    ec = pd.read_sql(query, postgres_engine)
+
+    return ec
 
 
 def _get_county_properties(
@@ -808,23 +777,33 @@ def _get_county_properties(
             "permitting_type": "state_permitting_type",
             "state_name": "state",
             "county_name": "county",
+            "land_area_km2": "county_land_area_km2",
         }
     ncsl = _get_ncsl_wind_permitting_df(postgres_engine)
     all_counties = _get_county_fips_df(postgres_engine)
     all_states = _get_state_fips_df(postgres_engine)
     env_justice = _get_env_justice_df(postgres_engine)
+    fed_lands = _get_federal_land_fraction(postgres_engine)
+    energy_community_counties = _get_energy_community_qualification(postgres_engine)
+
     # model local opposition
     aggregator = CountyOpposition(
         engine=postgres_engine, county_fips_df=all_counties, state_fips_df=all_states
     )
     combined_opp = aggregator.agg_to_counties(
-        include_state_policies=include_state_policies
+        include_state_policies=include_state_policies,
+        include_nrel_bans=True,
     )
 
-    county_properties = all_counties[["county_name", "county_id_fips"]].merge(
-        combined_opp, on="county_id_fips", how="left"
-    )
-    county_properties["state_id_fips"] = county_properties["county_id_fips"].str[:2]
+    county_properties = all_counties[
+        [
+            "county_name",
+            "county_id_fips",
+            "state_id_fips",
+            "land_area_km2",
+            "tribal_land_frac",
+        ]
+    ].merge(combined_opp, on="county_id_fips", how="left")
     county_properties = county_properties.merge(
         ncsl, on="state_id_fips", how="left", validate="m:1"
     )
@@ -837,6 +816,29 @@ def _get_county_properties(
     county_properties = county_properties.merge(
         env_justice, on="county_id_fips", how="left", validate="1:1"
     )
+    # NOTE: the federal lands dataset uses 2022 FIPS codes.
+    # Some (02063) are not present in the rest of the datasets.
+    # Non-matching FIPS are currently dropped.
+    county_properties = county_properties.merge(
+        fed_lands, on="county_id_fips", how="left", validate="1:1"
+    )
+
+    # NOTE: the ec dataset uses 2010 FIPS codes.
+    # Some (02261) are not present in the rest of the datasets.
+    # Non-matching FIPS are currently dropped.
+    county_properties = county_properties.merge(
+        energy_community_counties, on="county_id_fips", how="left", validate="1:1"
+    )
+    #  EC data currently only includes counties that have qualifying features.
+    #  Fill in nulls for counties that do not qualify.
+    county_properties.fillna(
+        {
+            "energy_community_coal_closures_area_fraction": 0.0,
+            "energy_community_qualifies_via_employment": False,
+            "energy_community_qualifies": False,
+        },
+        inplace=True,
+    )
 
     county_properties = county_properties.rename(columns=rename_dict)
     return county_properties
@@ -845,28 +847,246 @@ def _get_county_properties(
 def _join_all_counties_to_wide_format(
     wide_format: pd.DataFrame, county_properties: pd.DataFrame
 ):
+    # this exists to create a row for every county, even if it is all nulls.
+    # The long format data does not include rows for all counties, so
+    # _convert_long_to_wide does not produce a row for each county.
     county_properties = _add_derived_columns(county_properties)
-    wide_format_column_order = wide_format.columns.copy()
 
-    county_columns = [
-        "state_id_fips",
-        "state",
-        "county",
-        "has_ordinance",
-        "state_permitting_type",
-        "ordinance",
-        "ordinance_earliest_year_mentioned",
-        "ordinance_jurisdiction_name",
-        "ordinance_jurisdiction_type",
-        "state_permitting_text",
-    ] + JUSTICE40_AGGREGATES["name"].to_list()
-    wide_format_subset = wide_format.drop(columns=county_columns)
     county_properties = county_properties.merge(
-        wide_format_subset,
+        wide_format,
         on="county_id_fips",
         how="left",
     )
-    return county_properties[wide_format_column_order]
+    return county_properties
+
+
+def _get_actionable_aggs_for_wide_format(engine: sa.engine.Engine) -> pd.DataFrame:
+    """Create aggregates of renewables filtered by is_actionable and is_nearly_certain."""
+    # Had to do this separately because including the is_actionable condition in
+    # the long format data would be too ugly.
+    iso = create_iso_data_mart(engine)
+    iso = _add_avoided_co2e(iso, engine)
+
+    # Distribute project-level quantities across locations, when there are multiple.
+    # A handful of ISO projects are in multiple counties and the proprietary offshore
+    # wind projects have an entry for each cable landing.
+    # This approximation assumes an equal distribution.
+    iso.loc[:, "capacity_mw"] = iso.loc[:, "capacity_mw"].mul(
+        iso["frac_locations_in_county"]
+    )
+    iso.loc[:, "avoided_co2e_tonnes_per_year"] = iso.loc[
+        :, "avoided_co2e_tonnes_per_year"
+    ].mul(iso["frac_locations_in_county"])
+
+    resources = ["Onshore Wind", "Offshore Wind", "Solar", "renewable_and_battery"]
+    aggs = []
+    for resource in resources:
+        if resource == "renewable_and_battery":
+            resource_filter = iso["resource_clean"].isin(set(RENEWABLE_TYPES))
+        else:
+            resource_filter = iso["resource_clean"] == resource
+        resource_name = resource.lower().replace(" ", "_")
+        for status in ["actionable", "nearly_certain"]:
+            filter_ = resource_filter & iso[f"is_{status}"]
+            rename_dict = {
+                "capacity_mw": f"{resource_name}_proposed_capacity_mw_{status}",
+                "project_id": f"{resource_name}_proposed_facility_count_{status}",
+                "avoided_co2e_tonnes_per_year": f"{resource_name}_proposed_avoided_co2e_{status}",
+            }
+            agg = (
+                iso.loc[filter_, :]
+                .groupby("county_id_fips")
+                .agg(
+                    {
+                        "capacity_mw": "sum",
+                        "project_id": "nunique",  # "count" would over-count multi-resource projects
+                        "avoided_co2e_tonnes_per_year": "sum",
+                    }
+                )
+            )
+            agg.rename(columns=rename_dict, inplace=True)
+            aggs.append(agg)
+        # and avoided co2 totals. This doesn't belong in this function but c'est la vie.
+        agg = (
+            iso.loc[resource_filter, :]
+            .groupby("county_id_fips")["avoided_co2e_tonnes_per_year"]
+            .sum()
+            .rename(f"{resource_name}_proposed_avoided_co2e_tonnes_per_year")
+        )
+        aggs.append(agg)
+
+    aggs = pd.concat(aggs, axis=1, join="outer")
+
+    return aggs
+
+
+def _get_actionable_aggs_for_long_format(engine: sa.engine.Engine) -> pd.DataFrame:
+    """Calculate fraction of MW considered actionable."""
+    # This should be refactored and combined with the wide format version above.
+    iso = create_iso_data_mart(engine)
+
+    # Distribute project-level quantities across locations, when there are multiple.
+    # A handful of ISO projects are in multiple counties and the proprietary offshore
+    # wind projects have an entry for each cable landing.
+    # This approximation assumes an equal distribution.
+    iso["capacity_mw"] = iso.loc[:, "capacity_mw"].mul(iso["frac_locations_in_county"])
+    grp = iso.groupby(["county_id_fips", "resource_clean", "is_actionable"])
+    actionable_sums = grp["capacity_mw"].sum().unstack(level=-1)
+    frac_actionable = (
+        actionable_sums[True].div(actionable_sums.sum(axis=1), axis=0).to_frame()
+    )
+    frac_actionable["facility_type"] = "power plant"
+    frac_actionable["status"] = "proposed"
+    frac_actionable.reset_index(inplace=True)
+    frac_actionable.rename(
+        columns={0: "actionable_mw_fraction", "resource_clean": "resource_or_sector"},
+        inplace=True,
+    )
+
+    return frac_actionable
+
+
+def _add_avoided_co2e(iso: pd.DataFrame, engine: sa.engine.Engine) -> pd.DataFrame:
+    emiss_fac_by_county = _get_avoided_emissions_by_county_resource(engine)
+    emiss_fac_by_county["resource_type"].replace(
+        {
+            "onshore_wind": "Onshore Wind",
+            "offshore_wind": "Offshore Wind",
+            "utility_pv": "Solar",
+        },
+        inplace=True,
+    )
+    emiss_fac_by_county.rename(
+        columns={"resource_type": "resource_clean"}, inplace=True
+    )
+
+    iso = iso.merge(
+        emiss_fac_by_county, on=["county_id_fips", "resource_clean"], how="left"
+    )
+    iso["avoided_co2e_tonnes_per_year"] = (
+        iso["capacity_mw"] * iso["co2e_tonnes_per_year_per_mw"]
+    )
+    return iso
+
+
+def _get_avoided_emissions_by_county_resource(engine: sa.engine.Engine) -> pd.DataFrame:
+    query = """
+    select
+        avert_region,
+        resource_type,
+        co2e_tonnes_per_year_per_mw
+    from data_warehouse.avert_avoided_emissions_factors
+    -- drop distributed_pv
+    WHERE resource_type in ('onshore_wind', 'offshore_wind', 'utility_pv')
+    """
+    emiss_fac = pd.read_sql(query, engine)
+    crosswalk = pd.read_sql_table(
+        "avert_county_region_assoc", engine, schema="data_warehouse"
+    )
+    emiss_fac_by_county = crosswalk.merge(emiss_fac, on="avert_region", how="left")
+
+    # fill in AK and HI with national averages
+    national_avgs = (
+        emiss_fac.groupby("resource_type")["co2e_tonnes_per_year_per_mw"]
+        .mean()
+        .rename("avg_co2")
+    )
+    emiss_fac_by_county = emiss_fac_by_county.merge(
+        national_avgs, on="resource_type", how="left"
+    )
+    emiss_fac_by_county["co2e_tonnes_per_year_per_mw"].fillna(
+        emiss_fac_by_county["avg_co2"], inplace=True
+    )
+    emiss_fac_by_county.drop(columns=["avg_co2", "avert_region"], inplace=True)
+    return emiss_fac_by_county
+
+
+def create_wide_format(
+    postgres_engine: Optional[sa.engine.Engine] = None,
+    pudl_engine: Optional[sa.engine.Engine] = None,
+    long_format: Optional[pd.DataFrame] = None,
+) -> pd.DataFrame:
+    """Create wide format county aggregates."""
+    if postgres_engine is None:
+        postgres_engine = get_sql_engine()
+    if pudl_engine is None:
+        pudl_engine = get_pudl_engine()
+    if long_format is None:
+        long_format = create_long_format(
+            postgres_engine=postgres_engine, pudl_engine=pudl_engine
+        )
+    wide_format = _convert_long_to_wide(long_format)
+    # add aggregates that have to be recreated from the project-level data
+    proposed_counts = _get_category_project_counts(postgres_engine)
+    # client requested joining all counties onto wide format table, even if all values are NULL
+    county_properties = _get_county_properties(postgres_engine)
+    wide_format = _join_all_counties_to_wide_format(wide_format, county_properties)
+    # client requested two additional columns relating to offshore wind
+    offshore_bits = _get_offshore_wind_extra_cols(postgres_engine)
+    actionable_bits = _get_actionable_aggs_for_wide_format(postgres_engine)
+
+    wide_format = pd.concat(
+        [
+            wide_format.set_index("county_id_fips"),
+            proposed_counts,
+            offshore_bits,
+            actionable_bits,
+        ],
+        axis=1,
+        join="outer",
+    )
+    wide_format.reset_index(inplace=True)
+    assert (
+        wide_format["renewable_and_battery_proposed_facility_count"]
+        .fillna(0)
+        .ge(
+            wide_format[
+                "renewable_and_battery_proposed_facility_count_actionable"
+            ].fillna(0)
+        )
+        .all()
+    ), "actionable count should be less than or equal to total count"
+    return wide_format
+
+
+def _get_category_project_counts(engine: sa.engine.Engine) -> pd.DataFrame:
+    """Count projects by resource class.
+
+    Necessary because aggregating by resource_class in the long format would
+    double-count projects that have multiple resources, like Solar + Storage.
+    """
+    # Avoid db dependency order by recreating the df.
+    # Could also make an orchestration script.
+    iso = create_iso_data_mart(engine)
+    iso["surrogate_project_id"] = iso["project_id"].astype(str) + iso["source"]
+    # equivalent SQL query that I translated to pandas to avoid dependency
+    # on the data_mart schema (which doesn't yet exist when this function runs)
+    """
+    SELECT
+        county_id_fips,
+        count(DISTINCT (project_id, source)) as facility_count,
+    FROM data_mart.iso_projects_long_format
+    WHERE resource_clean IN ('Solar', 'Offshore Wind', 'Onshore Wind', 'Battery Storage')
+    -- and repeat for fossil types
+    group by 1
+    ;
+    """
+    is_renewable_and_battery = iso["resource_clean"].isin(set(RENEWABLE_TYPES))
+    is_fossil = iso["resource_clean"].isin(set(FOSSIL_TYPES))
+    aggs = []
+    for name, filter_ in {
+        "renewable_and_battery": is_renewable_and_battery,
+        "fossil": is_fossil,
+    }.items():
+        agg = (
+            iso.loc[filter_, :]
+            .groupby("county_id_fips")["surrogate_project_id"]
+            .nunique()  # "count" would over-count multi-resource projects
+            .rename(f"{name}_proposed_facility_count")
+        )
+        aggs.append(agg)
+    aggs = pd.concat(aggs, axis=1, join="outer")  # fillna(0) later, after all joins
+    return aggs
 
 
 def create_data_mart(
@@ -891,13 +1111,27 @@ def create_data_mart(
     long_format = create_long_format(
         postgres_engine=postgres_engine, pudl_engine=pudl_engine
     )
-    wide_format = _convert_long_to_wide(long_format)
-    # client requested joining all counties onto wide format table, even if all values are NULL
-    county_properties = _get_county_properties(postgres_engine)
-    wide_format = _join_all_counties_to_wide_format(wide_format, county_properties)
-
+    wide_format = create_wide_format(
+        postgres_engine=postgres_engine,
+        pudl_engine=pudl_engine,
+        long_format=long_format,
+    )
+    actionable_col = _get_actionable_aggs_for_long_format(postgres_engine)
+    long_format = long_format.merge(
+        actionable_col,
+        on=["county_id_fips", "resource_or_sector", "facility_type", "status"],
+        how="left",
+    )
     out = {
         "counties_long_format": long_format,
         "counties_wide_format": wide_format,
     }
     return out
+
+
+if __name__ == "__main__":
+    # debugging entry point
+    engine = get_sql_engine()
+    pudl_engine = get_pudl_engine()
+    marts = create_data_mart(engine=engine, pudl_engine=pudl_engine)
+    print("hooray")

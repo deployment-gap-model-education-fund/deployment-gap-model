@@ -1,37 +1,121 @@
 """Tranform raw FIPS tables to a database-ready form."""
 import logging
+from pathlib import Path
 from typing import Dict, Sequence
 
+import geopandas as gpd
 import pandas as pd
+from joblib import Memory
 
 logger = logging.getLogger(__name__)
 
+# cache needs to be accessed outside this module to call .clear()
+# limit cache size to 1 MB, keeps most recently accessed first
+SPATIAL_CACHE = Memory(location=Path("/app/data/spatial_cache"), bytes_limit=2**20)
 
-def county_fips(counties: pd.DataFrame) -> pd.DataFrame:
+
+@SPATIAL_CACHE.cache()
+def _add_tribal_land_frac(
+    counties: gpd.GeoDataFrame, tribal_land: gpd.GeoDataFrame
+) -> gpd.GeoDataFrame:
     """
-    Apply transformations to county FIPS table.
+    Add tribal_land_frac column to the counties table.
 
     Args:
-        counties: raw county_fips table.
+        counties: clean county fips table.
+        tribal_land: raw tribal land geodataframe.
+
+    Return:
+        counties: clean county fips table with tribal_land_frac column.
+    """
+    logger.info("Add tribal_land_frac to counties table.")
+    # Convert to a project we can use to calculate areas and perform intersections
+    counties = counties.to_crs("ESRI:102008")
+    tribal_land = tribal_land.to_crs("ESRI:102008")
+
+    dissolved_tribal = tribal_land.dissolve()
+    dissolved_tribal_geometry = dissolved_tribal.geometry.iloc[0]
+
+    # Calculate intersection, convert to km
+    counties["tribal_land_intersection"] = (
+        counties.intersection(dissolved_tribal_geometry).area / 1e6
+    )
+    counties["raw_tribal_land_frac"] = (
+        counties["tribal_land_intersection"] / counties["land_area_km2"]
+    )
+
+    tribal_land_larger_than_county = counties.raw_tribal_land_frac > 1
+    logger.info(
+        f"Number of counties with where tribal land is great 100% of land area:\n{tribal_land_larger_than_county.value_counts()}"
+    )
+    counties["tribal_land_frac"] = counties.raw_tribal_land_frac.mask(
+        tribal_land_larger_than_county, 1.0
+    )
+    counties["tribal_land_frac"] = counties["tribal_land_frac"].round(2)
+    counties.drop(columns=["tribal_land_intersection", "geometry"], inplace=True)
+
+    assert (
+        counties.tribal_land_frac <= 1.0
+    ).all(), "Found a county where tribal land is greater than 100%"
+
+    return counties
+
+
+def county_fips(counties: pd.DataFrame, tribal_land: pd.DataFrame) -> pd.DataFrame:
+    """
+    Apply transformations to county table.
+
+    Args:
+        counties: raw census table.
 
     Returns:
         transformed county_fips table.
     """
-    counties = counties.copy()
-    counties = _dedupe_keep_shortest_name(counties, idx_cols=["statefp", "countyfp"])
-
-    # make 5 digit FIPS
-    counties["county_id_fips"] = counties["statefp"] + counties["countyfp"]
-
-    rename_dict = {
-        "statefp": "state_id_fips",
-        "name": "county_name",
+    rename_dict = {  # comment out columns to drop
+        "STATEFP": "state_id_fips",
+        # "COUNTYFP": "Current county FIPS code",
+        # "COUNTYNS": "ANSI feature code for the county or equivalent feature",
+        "GEOID": "county_id_fips",
+        "NAME": "county_name",
+        "NAMELSAD": "county_name_long",
+        # "LSAD": "legal_statistical_area_description_code",
+        # "CLASSFP": "fips_class_code",
+        # "MTFCC": "MAF/TIGER Feature Class Code (G4020)",
+        # "CSAFP": "Current combined statistical area code",  # all null
+        # "CBSAFP": "Current metropolitan statistical area/micropolitan statistical area code",  # all null
+        # "METDIVFP": "Current metropolitan division code",  # all null
+        "FUNCSTAT": "functional_status",
+        "ALAND": "land_area_km2",  # not in km2 yet
+        "AWATER": "water_area_km2",  # not in km2 yet
+        # "internal point" is a point closest to centroid (equal to centroid except for weird shapes)
+        "INTPTLAT": "centroid_latitude",
+        "INTPTLON": "centroid_longitude",
+        "geometry": "geometry",
     }
-    counties = counties.rename(columns=rename_dict).drop(columns="countyfp")
+    counties = counties.loc[:, rename_dict.keys()].rename(columns=rename_dict)  # type: ignore
 
-    # Validate schema
-    counties = counties.convert_dtypes()
-    assert "object" not in counties.dtypes
+    # convert units from m2 to km2
+    counties.loc[:, ["land_area_km2", "water_area_km2"]] /= 1e6
+
+    for col in ["centroid_latitude", "centroid_longitude"]:
+        counties.loc[:, col] = pd.to_numeric(counties.loc[:, col], downcast="float")
+
+    # Keep all functional_status because no objects overlap; they all cover new area.
+    # Documentation:
+    # A Active government providing primary general-purpose functions.
+    # B Active government that is partially consolidated with another government, but with
+    # separate officials providing primary general-purpose functions.
+    # C Active government consolidated with another government with a single set of officials.
+    # E Active government providing special-purpose functions.
+    # F Fictitious entity created to fill the Census Bureau’s geographic hierarchy.
+    # G Active government that is subordinate to another unit of government and thus, not
+    # considered a functioning government.
+    # I Inactive governmental unit that has the power to provide primary special-purpose
+    # functions.
+    # N Nonfunctioning legal entity.
+    # S Statistical entity.
+
+    counties = _add_tribal_land_frac(counties, tribal_land)
 
     return counties
 
@@ -68,7 +152,7 @@ def state_fips(states: pd.DataFrame) -> pd.DataFrame:
     return states
 
 
-def transform(fips_tables: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+def transform(fips_tables: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     """
     Transform state and county FIPS dataframes.
 
@@ -80,16 +164,10 @@ def transform(fips_tables: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     """
     transformed_fips_tables = {}
 
-    transform_functions = {
-        "county_fips": county_fips,
-        "state_fips": state_fips,
-    }
-
-    for table_name, transform_func in transform_functions.items():
-        logger.info(f"FIPS tables: Transforming {table_name} table.")
-
-        table_df = fips_tables[table_name].copy()
-        transformed_fips_tables[table_name] = transform_func(table_df)
+    transformed_fips_tables["county_fips"] = county_fips(
+        fips_tables["counties"], fips_tables["tribal_land"]
+    )
+    transformed_fips_tables["state_fips"] = state_fips(fips_tables["states"])
 
     return transformed_fips_tables
 

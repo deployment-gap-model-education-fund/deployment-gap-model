@@ -10,7 +10,9 @@ import dbcp
 from dbcp.constants import FIPS_CODE_VINTAGE
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.metadata.data_warehouse import metadata
-from dbcp.transform.helpers import GEOCODER_CACHE
+from dbcp.transform.fips_tables import SPATIAL_CACHE
+from dbcp.transform.helpers import GEOCODER_CACHE, bedford_addfips_fix
+from dbcp.validation.tests import validate_warehouse
 from pudl.helpers import add_fips_ids as _add_fips_ids
 from pudl.output.pudltabl import PudlTabl
 
@@ -20,7 +22,7 @@ logger = logging.getLogger(__name__)
 def etl_eip_infrastructure() -> Dict[str, pd.DataFrame]:
     """EIP Infrastructure ETL."""
     # Extract
-    source_path = Path("/app/data/raw/fossil_infrastructure.xlsx")
+    source_path = Path("/app/data/raw/2023.05.24 OGW database.xlsx")
     eip_raw_dfs = dbcp.extract.eip_infrastructure.extract(source_path)
 
     # Transform
@@ -29,11 +31,11 @@ def etl_eip_infrastructure() -> Dict[str, pd.DataFrame]:
     return eip_transformed_dfs
 
 
-def etl_lbnl_iso_queue_2021() -> Dict[str, pd.DataFrame]:
-    """LBNL ISO Queues 2021 ETL."""
-    source_path = Path("/app/data/raw/queues_2021_clean_data.xlsx")
-    lbnl_raw_dfs = dbcp.extract.lbnl_iso_queue_2021.extract(source_path)
-    lbnl_transformed_dfs = dbcp.transform.lbnl_iso_queue_2021.transform(lbnl_raw_dfs)
+def etl_lbnl_iso_queue() -> Dict[str, pd.DataFrame]:
+    """LBNL ISO Queues ETL."""
+    source_path = Path("/app/data/raw/queues_2022_clean_data.xlsx")
+    lbnl_raw_dfs = dbcp.extract.lbnl_iso_queue.extract(source_path)
+    lbnl_transformed_dfs = dbcp.transform.lbnl_iso_queue.transform(lbnl_raw_dfs)
 
     return lbnl_transformed_dfs
 
@@ -41,19 +43,15 @@ def etl_lbnl_iso_queue_2021() -> Dict[str, pd.DataFrame]:
 def etl_columbia_local_opp() -> Dict[str, pd.DataFrame]:
     """Columbia Local Opposition ETL."""
     # Extract
-    source_path = Path("/app/data/raw/RELDI report updated 9.10.21 (1).docx")
+    source_path = Path(
+        "/app/data/raw/2023.05.30 Opposition to Renewable Energy Facilities - FINAL.docx"
+    )
     extractor = dbcp.extract.local_opposition.ColumbiaDocxParser()
     extractor.load_docx(source_path)
     docx_dfs = extractor.extract()
 
-    source_path_update = Path("./data/raw/RELDI_local_opposition_2022-03-24.csv")
-    update_dfs = dbcp.extract.local_opposition._extract_march_2022_update(
-        source_path_update
-    )
-
     # Transform
-    combined = dbcp.transform.local_opposition._combine_updates(docx_dfs, update_dfs)
-    transformed_dfs = dbcp.transform.local_opposition.transform(combined)
+    transformed_dfs = dbcp.transform.local_opposition.transform(docx_dfs)
 
     return transformed_dfs
 
@@ -64,22 +62,24 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
 
     pudl_tables = {}
 
-    pudl_engine = sa.create_engine(
-        f"sqlite:////{pudl_data_path}/pudl_data/sqlite/pudl.sqlite"
-    )
+    pudl_engine = sa.create_engine(f"sqlite:////{pudl_data_path}")
     pudl_out = PudlTabl(
         pudl_engine,
-        start_date="2020-01-01",
-        end_date="2020-12-31",
+        start_date="2021-01-01",
+        end_date="2021-12-31",
         freq="AS",
         fill_fuel_cost=False,
         roll_fuel_cost=True,
         fill_net_gen=True,
     )
 
-    mcoe = pudl_out.mcoe(all_gens=True)
+    mcoe = pudl_out.mcoe(all_gens=True, gens_cols="all")
     # add FIPS
-    filled_location = mcoe.loc[:, ["state", "county"]].fillna("")
+    # workaround for addfips Bedford, VA problem
+    bedford_addfips_fix(mcoe)
+    filled_location = mcoe.loc[:, ["state", "county"]].fillna(
+        ""
+    )  # copy; don't want to fill actual table
     fips = _add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
     mcoe = pd.concat(
         [mcoe, fips[["state_id_fips", "county_id_fips"]]], axis=1, copy=False
@@ -104,7 +104,14 @@ def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
 
 def etl_fips_tables() -> Dict[str, pd.DataFrame]:
     """Master state and county FIPS table ETL."""
-    fips = dbcp.extract.fips_tables.extract(vintage=FIPS_CODE_VINTAGE)
+    census_uri = "gs://dgm-archive/census/tl_2021_us_county.zip"
+    fips = dbcp.extract.fips_tables.extract_fips(census_uri)
+
+    tribal_lands_uri = "gs://dgm-archive/census/tl_2021_us_aiannh.zip"
+    fips["tribal_land"] = dbcp.extract.fips_tables.extract_census_tribal_land(
+        tribal_lands_uri
+    )
+
     out = dbcp.transform.fips_tables.transform(fips)
 
     return out
@@ -112,7 +119,7 @@ def etl_fips_tables() -> Dict[str, pd.DataFrame]:
 
 def etl_justice40() -> dict[str, pd.DataFrame]:
     """ETL white house environmental justice dataset."""
-    source_path = Path("/app/data/raw/communities-2022-05-31-1915GMT.zip")
+    source_path = Path("/app/data/raw/1.0-communities.csv")
     raw = dbcp.extract.justice40.extract(source_path)
     out = dbcp.transform.justice40.transform(raw)
     return out
@@ -137,6 +144,56 @@ def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
     return nrel_transformed_dfs
 
 
+def etl_offshore_wind() -> dict[str, pd.DataFrame]:
+    """ETL manually curated offshore wind data."""
+    locations_path = Path("/app/data/raw/offshore_wind_locations.csv")
+    projects_path = Path("/app/data/raw/offshore_wind_projects.csv")
+    raw_offshore_dfs = dbcp.extract.offshore_wind.extract(
+        locations_path=locations_path, projects_path=projects_path
+    )
+    offshore_transformed_dfs = dbcp.transform.offshore_wind.transform(raw_offshore_dfs)
+
+    return offshore_transformed_dfs
+
+
+def etl_protected_area_by_county() -> dict[str, pd.DataFrame]:
+    """ETL the PAD-US intersection with TIGER county geometries."""
+    source_path = Path("/app/data/raw/padus_intersect_counties.parquet")
+    raw_df = dbcp.extract.protected_area_by_county.extract(source_path)
+    transformed = dbcp.transform.protected_area_by_county.transform(raw_df)
+    return transformed
+
+
+def etl_energy_communities_by_county() -> dict[str, pd.DataFrame]:
+    """ETL RMI's energy communities analysis."""
+    source_path = Path("/app/data/raw/rmi_energy_communities_counties.parquet")
+    raw_df = dbcp.extract.rmi_energy_communities.extract(source_path)
+    transformed = dbcp.transform.rmi_energy_communities.transform(raw_df)
+    return transformed
+
+
+def etl_ballot_ready() -> dict[str, pd.DataFrame]:
+    """ETL Ballot Ready election data."""
+    source_uri = "gs://dgm-archive/ballot_ready/BallotReady_upcoming_races_with_counties_08_14_2023.csv"
+    raw_df = dbcp.extract.ballot_ready.extract(source_uri)
+    transformed = dbcp.transform.ballot_ready.transform(raw_df)
+    return transformed
+
+
+def etl_epa_avert() -> dict[str, pd.DataFrame]:
+    """ETL EPA AVERT avoided emissions data."""
+    # https://github.com/USEPA/AVERT/blob/v4.1.0/utilities/data/county-fips.txt
+    path_county_region_xwalk = Path("/app/data/raw/avert_county-fips.txt")
+    # https://www.epa.gov/avert/avoided-emission-rates-generated-avert
+    path_emission_rates = Path("/app/data/raw/avert_emission_rates_04-25-23.xlsx")
+    raw_dfs = dbcp.extract.epa_avert.extract(
+        county_crosswalk_path=path_county_region_xwalk,
+        emission_rates_path=path_emission_rates,
+    )
+    transformed = dbcp.transform.epa_avert.transform(raw_dfs)
+    return transformed
+
+
 def etl_gridstatus_isoqueues():
     """ETL gridstatus ISO queues."""
     _ = dbcp.extract.gridstatus_isoqueues.extract()
@@ -149,18 +206,24 @@ def etl(args):
     with engine.connect() as con:
         engine.execute("CREATE SCHEMA IF NOT EXISTS data_warehouse")
 
-    # Reduce size of geocoder cache if necessary
+    # Reduce size of caches if necessary
     GEOCODER_CACHE.reduce_size()
+    SPATIAL_CACHE.reduce_size()
 
     etl_funcs = {
+        "epa_avert": etl_epa_avert,
+        "eip_infrastructure": etl_eip_infrastructure,
+        "columbia_local_opp": etl_columbia_local_opp,
+        "energy_communities_by_county": etl_energy_communities_by_county,
+        "fips_tables": etl_fips_tables,
+        "protected_area_by_county": etl_protected_area_by_county,
+        "offshore_wind": etl_offshore_wind,
         "justice40_tracts": etl_justice40,
         "nrel_wind_solar_ordinances": etl_nrel_ordinances,
-        "eip_infrastructure": etl_eip_infrastructure,
-        "lbnl_iso_queue_2021": etl_lbnl_iso_queue_2021,
+        "lbnl_iso_queue": etl_lbnl_iso_queue,
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
-        "columbia_local_opp": etl_columbia_local_opp,
-        "fips_tables": etl_fips_tables,
+        "ballot_ready": etl_ballot_ready,
     }
 
     # Extract and transform the data sets
@@ -183,17 +246,19 @@ def etl(args):
                 if_exists="append",
                 index=False,
                 schema="data_warehouse",
+                chunksize=1000,
             )
 
-    # TODO: Writing to CSVs is a temporary solution for getting data into Tableau
-    # This should be removed once we have cloudsql setup.
-    if args.csv:
-        logger.info("Writing tables to CSVs.")
-        output_path = Path("/app/data/output/")
-        for table_name, df in transformed_dfs.items():
-            df.to_csv(output_path / f"{table_name}.csv", index=False)
+    validate_warehouse(engine=engine)
 
     if args.upload_to_bigquery:
-        dbcp.helpers.upload_schema_to_bigquery("data_warehouse")
+        if args.bigquery_env == "dev":
+            dbcp.helpers.upload_schema_to_bigquery("data_warehouse")
+        elif args.bigquery_env == "prod":
+            dbcp.helpers.upload_schema_to_bigquery("data_warehouse", dev=False)
+        else:
+            raise ValueError(
+                f"{args.bigquery_env} is an invalid BigQuery environment value. Must be: dev or prod."
+            )
 
     logger.info("Sucessfully finished ETL.")

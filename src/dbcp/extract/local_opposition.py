@@ -5,17 +5,31 @@ from typing import Dict, List, Optional
 import docx
 import pandas as pd
 
-from pudl.metadata.enums import US_STATES
+from dbcp.constants import US_STATES
 
 
 class ColumbiaDocxParser(object):
     """Parser for the Columbia Local Opposition .docx file."""
 
-    POSSIBLE_STATES = set(US_STATES.values())
-    POSSIBLE_HEADERS = {"Local Laws/Ordinances", "Contested Projects", "State Policy"}
+    POSSIBLE_STATES = US_STATES
+    POSSIBLE_HEADERS = {
+        "Local Restrictions",
+        "Contested Projects",
+        "State-Level Restrictions",
+    }
+    POSSIBLE_SUBHEADINGS = {
+        "Existing Entries (Updated)",
+        "New Entries (Pre-March 2022 Developments)",
+        "New Entries (Post-March 2022 Developments)",
+        "New Restrictions (Post-March 2022 Developments)",
+        "New Entries (Post-March 2022 Updates)",
+    }
     FIRST_STATE = "Alabama"
+    NULL_STATE_POLICY = {
+        "No restrictive state laws, regulations, or policies were found at this time."
+    }
     NULL_ORDINANCE = {
-        "No ordinances were found at this time.",
+        "No restrictive local ordinances, regulations, or policies were found at this time.",
         "No local ordinances were found at this time.",
     }
     NULL_PROJECT = {
@@ -31,10 +45,11 @@ class ColumbiaDocxParser(object):
         self.previous_ordinance = ""
 
         self.state_policy_dict: Dict[str, List[str]] = {"state": [], "policy": []}
+        self.state_notes_dict: Dict[str, List[str]] = {"state": [], "notes": []}
         self.local_ordinance_dict: Dict[str, List[str]] = {
             "state": [],
             "locality": [],
-            "ordinance": [],
+            "ordinance_text": [],
         }
         self.contested_projects_dict: Dict[str, List[str]] = {
             "state": [],
@@ -77,13 +92,19 @@ class ColumbiaDocxParser(object):
         Args:
             text (str): the paragraph text content
         """
-        if self.current_header == "State Policy":
+        if self.current_header == "":  # state level notes
             # no null check required. This section is simply missing if null.
+            self.state_notes_dict["state"].append(self.current_state)
+            self.state_notes_dict["notes"].append(text)
+            return
+        elif self.current_header == "State-Level Restrictions":
+            if text in ColumbiaDocxParser.NULL_STATE_POLICY:
+                return
             self.state_policy_dict["state"].append(self.current_state)
             self.state_policy_dict["policy"].append(text)
             return
 
-        elif self.current_header == "Local Laws/Ordinances":
+        elif self.current_header == "Local Restrictions":
             if text in ColumbiaDocxParser.NULL_ORDINANCE:
                 return
             locality, ordinance = text.split(":", maxsplit=1)
@@ -97,7 +118,7 @@ class ColumbiaDocxParser(object):
 
             self.local_ordinance_dict["state"].append(self.current_state)
             self.local_ordinance_dict["locality"].append(locality)
-            self.local_ordinance_dict["ordinance"].append(ordinance.strip())
+            self.local_ordinance_dict["ordinance_text"].append(ordinance.strip())
             return
 
         elif self.current_header == "Contested Projects":
@@ -113,7 +134,9 @@ class ColumbiaDocxParser(object):
             self.contested_projects_dict["description"].append(description.strip())
             return
         else:
-            raise ValueError(f"Unexpected header: {self.current_header}")
+            raise ValueError(
+                f"Unexpected header in {self.current_state}: {self.current_header}"
+            )
 
     def extract(self) -> Dict[str, pd.DataFrame]:
         """Parse the text of the Columbia Local Opposition docx file into tabular dataframes.
@@ -145,77 +168,31 @@ class ColumbiaDocxParser(object):
                 self.current_header = paragraph.text.strip()
                 assert (
                     self.current_header in ColumbiaDocxParser.POSSIBLE_HEADERS
-                ), f"Unexpected header: {self.current_header}"
+                ), f"Unexpected header in {self.current_state}: {self.current_header}"
+            elif (
+                paragraph.style.name == "Heading 3"
+            ):  # nearly meaningless subheading. skip.
+                assert (
+                    paragraph.text.strip() in ColumbiaDocxParser.POSSIBLE_SUBHEADINGS
+                ), f"Unexpected subheading in {self.current_state}: {paragraph.text.strip()}"
+                continue
             elif paragraph.style.name in {
                 "Normal",
                 "List Paragraph",
                 "Normal1",
             }:  # values
-                # This hardcoded style checking is slightly less brittle than it seems.
-                # Any mis-styled states or headers would be obvious from the table of contents.
-                # A future improvement could be to ensure that is true, but I think this data is static
-                # so will defer that work.
+                # This hardcoded style checking is brittle. If the docx changes, this will break.
                 self._parse_values(paragraph.text.strip())
             else:
-                raise ValueError(f"Unexpected paragraph style: {paragraph.style.name}")
+                raise ValueError(
+                    f"Unexpected paragraph style in {self.current_state}: {paragraph.style.name}"
+                )
 
         output = {
             "state_policy": pd.DataFrame(self.state_policy_dict),
+            "state_notes": pd.DataFrame(self.state_notes_dict),
             "local_ordinance": pd.DataFrame(self.local_ordinance_dict),
             "contested_project": pd.DataFrame(self.contested_projects_dict),
         }
-        # manual correction for Brownsville and Benbrook TX, which have an extra level of hierarchy
-        # that produces an extra empty row
-        query_str = (
-            "state == 'Texas' and (locality == 'Brownsville' or locality == 'Benbrook')"
-        )
-        subset = output["local_ordinance"].query(query_str).reset_index()
-        if not subset.empty:
-            if subset["ordinance"].iat[0] != "Enacted July 9, 2020:":
-                raise ValueError(
-                    "Data has changed and Brownsville correction is no longer valid"
-                )
-        indices_to_delete = pd.Index(
-            subset.groupby(["state", "locality"], as_index=False).first()["index"]
-        )
-        output["local_ordinance"].drop(index=indices_to_delete, inplace=True)
+
         return output
-
-
-def _extract_march_2022_update(
-    source_path=Path("/app/data/raw/RELDI_local_opposition_2022-03-24.csv"),
-) -> Dict[str, pd.DataFrame]:
-    """Read the update file and rename the columns to be backwards compatible.
-
-    Args:
-        source_path (pathlib.Path, optional): path to csv. Defaults to Path("/app/data/raw/RELDI_local_opposition_2022-03-24.csv").
-
-    Returns:
-        Dict[str, pd.DataFrame]: dictionary of dataframes with keys that match the ColumbiaDocxParser
-    """
-    df = pd.read_csv(source_path)
-    rename_dict = {
-        "Jurisdiction": "locality",
-        "State": "state",
-        "Type": "opposition_type",
-        "Year": "year_enacted",
-        # "Description": "", different for each type
-        "Energy type": "energy_type",
-        "Source": "source",
-        "Date entered": "date_entered",
-    }
-    df.rename(columns=rename_dict, inplace=True)
-    df.drop(columns="date_entered", inplace=True)
-    # the following string equality checks are reliable because the source google sheet uses a dropdown Enum
-    output = {
-        "state_policy": df.query("opposition_type == 'State Law'").rename(
-            columns={"Description": "policy"}
-        ),
-        "local_ordinance": df.query("opposition_type == 'Local Ordinance'").rename(
-            columns={"Description": "ordinance"}
-        ),
-        "contested_project": df.query("opposition_type == 'Contested project'").rename(
-            columns={"Description": "description"}
-        ),
-    }
-    return output

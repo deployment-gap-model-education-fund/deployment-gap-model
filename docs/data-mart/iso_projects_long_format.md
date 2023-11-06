@@ -1,14 +1,18 @@
 # iso\_projects\_long\_format
 
-This table gives insight into proposed ISO projects by type. Each row represents a combination of project\_id/resource\_clean with other information joined on for convenience (county, ordinance, and project information). The data source is primarily the LBNL compiled ISO queues, plus local ordinances (via Columbia), state wind permitting types (via NCSL), and standard state/county IDs (from the Census). The last sheet of the raw ISO data contains a list of columns and their definitions for comparison to this table.
+This table gives insight into proposed ISO projects by type and location. The rows are rather abstract: each row represents a combination of project\_id, resource\_clean, and county\_id\_fips with other information joined on for convenience (county, ordinance, and project information). The data sources are primarily the LBNL compiled ISO queues and our proprietary offshore wind data, plus local ordinances (via Columbia), state wind permitting types (via NCSL), and standard state/county IDs (from the Census). The last sheet of the raw ISO data contains a list of columns and their definitions for comparison to this table.
+
+Note that **this duplicates projects with multiple prospective locations.** Use the frac_locations_in_county column to allocate capacity and co2e estimates to counties when aggregating. Otherwise they will be double-counted.
 
 ## Column Descriptions
 
-**Unique Key Column(s):** (`project_id`, `resource_clean`)
+**Unique Key Column(s):** (`source`, `project_id`, `resource_clean`, `county_id_fips`)
 
 |Subject|Column|Description|Source|Notes|
 |----|----|----|----|----|
-|Identifiers|`project_id`|A unique ID assigned to each project.|derived||
+|Identifiers|`project_id`|A ID assigned to each project. Unique within each source.|derived||
+||`source`|"iso" or "proprietary" (for offshore wind projects)|derived||
+||`surrogate_id`|An incrementing number as a convenient alternative to the 4-member compound key.|derived||
 ||`resource_clean`|Fuel type|LBNL||
 |Location|`state`|US State name|Census||
 ||`county`|County name|Census||
@@ -16,6 +20,8 @@ This table gives insight into proposed ISO projects by type. Each row represents
 ||`county_id_fips`|County FIPS ID|Census||
 |Properties|`project_name`|Name of the project|LBNL||
 ||`is_hybrid`|True/False indicator of whether the project has both generation and storage|derived from LBNL||
+||`is_actionable`|True/False indicator of whether the project development process is in the actionable zone.|derived from LBNL||
+||`is_nearly_certain`|True/False indicator of whether the project development process is in the actionable zone or nearly completed.|derived from LBNL||
 ||`resource_class`|Renewable, fossil, or storage|derived from LBNL||
 ||`iso_region`|Name of the ISO region containing the project. Non-ISO projects are categorized as either Northwest or Southeast by LBNL|LBNL||
 ||`entity`|Similar to iso_region, but non-ISO projects are identified by utility|LBNL||
@@ -26,13 +32,18 @@ This table gives insight into proposed ISO projects by type. Each row represents
 ||`queue_status`|These project have already been filtered to proposed projects, so this column is all "active".|LBNL||
 |Dates|`date_proposed_online`|The date the developer expects the project to be completed.|LBNL||
 ||`date_entered_queue`|The date the project entered the ISO queue.|LBNL||
-|Technical|`capacity_mw`|Export capacity of the generator or storage facility, in megawatts|LBNL||
+|Technical|`capacity_mw`|Export capacity of the generator or storage facility, in megawatts. |LBNL||
 ||`co2e_tonnes_per_year`|Estimate of annual equivalent CO2 emissions of proposed gas plants, in metric tonnes.|derived from LBNL||
-|Regulatory|`ordinance`|Summary text of the local ordinances in the given county, if any.|RELDI||
-||`has_ordinance`|True/false indicator of the presence of any local ordinances in the county.|derived from RELDI||
+||`frac_locations_in_county`|Fraction of this project's total locations in this county.|derived||
+|Regulatory|`ordinance_text`|Summary text of the local ordinances in the given county, if any.|RELDI||
+||`ordinance_via_reldi`|True when a county has banned wind or solar development according to RELDI's ordinance database.|derived from RELDI||
 ||`ordinance_earliest_year_mentioned`|Approximate year the local ordinance was enacted. This was automatically extracted from the ordinance text so is not perfectly accurate.|derived from RELDI||
 ||`ordinance_jurisdiction_name`|Name of the jurisdiction with a local ordinance. This is usually a county or town within that county. "multiple" if more than one jurisdiction within the county has an ordinance.|RELDI||
 ||`ordinance_jurisdiction_type`|Category of jurisdiction: county, town, or city. "multiple" if more than one jurisdiction type within the county has an ordinance.|derived from RELDI||
+||`ordinance_via_solar_nrel`|True when a county has banned solar development according to NREL's ordinance database.|NREL|See 'NREL Ordinance Interpretation' section below|
+||`ordinance_via_wind_nrel`|True when a county has banned wind development according to NREL's ordinance database.|NREL|See 'NREL Ordinance Interpretation' section below|
+||`ordinance_via_nrel_is_de_facto`|True when a wind/solar ban is based on technical criteria like setback distances, as opposed to an outright ban.|NREL|See 'NREL Ordinance Interpretation' section below|
+||`ordinance_is_restrictive`|True when any of `ordinance_via_solar_nrel`, `ordinance_via_wind_nrel`, or `ordinance_via_reldi` are True|NREL/RELDI||
 ||`state_permitting_text`|Summary text of the wind permitting rules of the given state.|NCSL||
 ||`state_permitting_type`|Category of the state's wind permitting jurisdiction: state, local, or hybrid.|NCSL||
 
@@ -78,6 +89,16 @@ The maps in Tableau also reflect this conservative assumption. A more accurate m
 
 Furthermore, there are 6 state-level laws affecting RE siting in some capacity, but these laws are not included in the scope of local ordinances. The law in NY is pro-RE and the law in ME was repealed. The law in OH simply adds a level of veto power to county jurisdictions. Laws in KS, OR, and CT restrict development on certain types of land; their severity can only be assessed by an expert.
 
+### NREL Ordinance Interpretation
+
+See the description in the NREL_ordinance section for details.
+
+{% content-ref url="../NREL_ordinance_bans.md" %}
+[NREL_ordinance_bans.md](../NREL_ordinance_bans.md)
+{% endcontent-ref %}
+
+Additionally, as with the RELDI local ordinance dataset above, some ordinances belong to sub-county level jurisdictions such as townships. In those cases, the ban is propagated up to the entire county when represented in this county-level table.
+
 ### CO2e Estimates
 
 We estimated annual CO2e production for proposed gas and coal plants. See the page on CO2 estimation for details:
@@ -85,3 +106,33 @@ We estimated annual CO2e production for proposed gas and coal plants. See the pa
 {% content-ref url="../co2-estimation.md" %}
 [co2-estimation.md](../co2-estimation.md)
 {% endcontent-ref %}
+
+### "Actionable" and "Nearly Certain" Projects
+
+These values are based on where a project is in the interconnection process. An "actionable" project is one that meets the following criteria:
+
+* proposed operating date in the latest year queue data or later (forward looking)
+* is active in the queue
+* is in one of the following stages of interconnection, as classified by LBNL:
+  * Facility Study
+  * System Impact Study
+  * Phase 4 Study
+  * "IA Pending"
+  * "IA in Progress"
+Offshore wind projects come from a separate source, so their only "actionable" qualification is to have a `construction_status` of "Site assessment underway" or "Not started".
+
+A "nearly certain" project is one that meets the "actionable" criteria but with the following additional allowable interconnection stages:
+
+* Construction
+* IA Executed
+* Operational
+Offshore wind projects come from a separate source, so their only "nearly certain" qualification is to have a `construction_status` of "Construction underway".
+
+### Avoided CO2e Emissons
+
+Avoided emissions estimates are based on the EPA's AVERT model. In this model, the avoided emissions are calculated as the difference between the emissions of the proposed generator (zero for renewables) and the emissions of the existing generator that would be displaced by the proposed generator. This gives an esimate of the short term emissions impact of the proposed generator.
+
+The marginal generator is determined by the proposed generator's location and the time of day/year. Avoided emissions are scaled by the capacity of the proposed generator times an average capacity factor for the proposed generator's resource type and location.
+
+The equation for avoided emissions is:
+(Capacity of proposed generator [MW]) * (Average capacity factor of proposed generator [MWh/hour/MW]) * (8766 [average hours/year]) * (Emissions factor of marginal generator [tonnes/MWh])

@@ -1,6 +1,7 @@
 """SQL Alchemy metadata for the datawarehouse tables."""
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     Float,
@@ -15,6 +16,30 @@ metadata = MetaData()
 schema = "data_warehouse"
 
 ###############################
+# EPA AVERT Avoided Emissions #
+###############################
+
+avert_capacity_factors = Table(
+    "avert_avoided_emissions_factors",
+    metadata,
+    Column("avert_region", String, primary_key=True),
+    Column("resource_type", String, primary_key=True),
+    Column("capacity_factor", Float, nullable=True),
+    Column("tonnes_co2_per_mwh", Float, nullable=True),
+    Column("co2e_tonnes_per_year_per_mw", Float, nullable=True),
+    schema=schema,
+)
+
+avert_county_region_assoc = Table(
+    "avert_county_region_assoc",
+    metadata,
+    Column("avert_region", String, primary_key=True),
+    Column("county_id_fips", String, primary_key=True),
+    schema=schema,
+)
+
+
+###############################
 # State and County Fips Codes #
 ###############################
 county_fips = (
@@ -24,6 +49,24 @@ county_fips = (
         Column("county_id_fips", String, nullable=False, primary_key=True),
         Column("state_id_fips", String, nullable=False),
         Column("county_name", String, nullable=False),
+        Column("county_name_long", String, nullable=False),
+        Column("functional_status", String, nullable=False),
+        Column("land_area_km2", Float, nullable=False),
+        Column("water_area_km2", Float, nullable=False),
+        Column("centroid_latitude", Float, nullable=False),
+        Column("centroid_longitude", Float, nullable=False),
+        Column(
+            "raw_tribal_land_frac",
+            Float,
+            CheckConstraint("raw_tribal_land_frac >= 0.0"),
+            nullable=False,
+        ),
+        Column(
+            "tribal_land_frac",
+            Float,
+            CheckConstraint("tribal_land_frac >= 0.0 AND tribal_land_frac <= 1.0"),
+            nullable=False,
+        ),
         schema=schema,
     ),
 )
@@ -38,11 +81,11 @@ state_fips = (
     ),
 )
 
-###################
-# ISO Queues 2021 #
-###################
-iso_projects_2021 = Table(
-    "iso_projects_2021",
+##############
+# ISO Queues #
+##############
+iso_projects = Table(
+    "iso_projects",
     metadata,
     Column("project_id", Integer, primary_key=True, autoincrement=False),
     Column("date_proposed_raw", String),
@@ -65,15 +108,15 @@ iso_projects_2021 = Table(
     Column("interconnection_date_raw", String),
     Column("interconnection_service_type", String),
     Column("queue_date_raw", String),
+    Column("is_actionable", Boolean),
+    Column("is_nearly_certain", Boolean),
     schema=schema,
 )
 
-iso_locations_2021 = Table(
-    "iso_locations_2021",
+iso_locations = Table(
+    "iso_locations",
     metadata,
-    Column(
-        "project_id", Integer, ForeignKey("data_warehouse.iso_projects_2021.project_id")
-    ),
+    Column("project_id", Integer, ForeignKey("data_warehouse.iso_projects.project_id")),
     Column("raw_county_name", String),
     Column("raw_state_name", String),
     Column(
@@ -94,12 +137,10 @@ iso_locations_2021 = Table(
     schema=schema,
 )
 
-iso_resource_capacity_2021 = Table(
-    "iso_resource_capacity_2021",
+iso_resource_capacity = Table(
+    "iso_resource_capacity",
     metadata,
-    Column(
-        "project_id", Integer, ForeignKey("data_warehouse.iso_projects_2021.project_id")
-    ),
+    Column("project_id", Integer, ForeignKey("data_warehouse.iso_projects.project_id")),
     Column("resource", String),
     Column("resource_clean", String),
     Column("capacity_mw", Float),
@@ -124,6 +165,7 @@ eip_projects = Table(
     Column("raw_is_ally_target", String),
     Column("raw_industry_sector", String),
     Column("raw_project_type", String),
+    Column("raw_product_type", String),
     Column("raw_air_construction_id", String),
     Column("raw_air_operating_id", String),
     Column("raw_nga_id", String),
@@ -133,22 +175,19 @@ eip_projects = Table(
     Column("particulate_matter_pm2_5_tpy", Float),
     Column("nitrogen_oxides_nox_tpy", Float),
     Column("volatile_organic_compounds_voc_tpy", Float),
-    Column("raw_sulfur_dioxide_so2", Float),
     Column("carbon_monoxide_co_tpy", Float),
+    Column("sulfur_dioxide_so2_tpy", Float),
     Column("hazardous_air_pollutants_haps_tpy", Float),
-    Column("raw_total_wetlands_affected_temporarily_acres", String),
+    Column("total_wetlands_affected_temporarily_acres", Float),
     Column("total_wetlands_affected_permanently_acres", Float),
     Column("detailed_permitting_history", String),
     Column("raw_emission_accounting_notes", String),
     Column("raw_construction_status_last_updated", String),
     Column("raw_operating_status", String),
     Column("raw_actual_or_expected_completion_year", String),
-    Column("raw_project_cost_millions", Float),
     Column("raw_number_of_jobs_promised", String),
     Column("is_ccs", Boolean),
     Column("is_ally_target", Boolean),
-    Column("sulfur_dioxide_so2_tpy", Float),
-    Column("total_wetlands_affected_temporarily_acres", String),
     Column("cost_millions", Float),
     Column("date_modified", DateTime, nullable=False),
     Column("operating_status", String),
@@ -163,7 +202,7 @@ eip_facilities = Table(
     Column("raw_created_on", String, nullable=False),
     Column("raw_modified_on", String, nullable=False),
     Column("raw_is_ccs", String),
-    Column("ccs_id", Float),
+    Column("ccs_id", String),
     Column("raw_company_id", String),
     Column("raw_project_id", String),
     Column("raw_state", String),
@@ -181,7 +220,7 @@ eip_facilities = Table(
     Column("raw_pipelines_id", String),
     Column("raw_air_operating_id", String),
     Column("raw_cwa_npdes_id", String),
-    Column("raw_cwa_wetland_id", Float),
+    Column("raw_cwa_wetland_id", String),
     Column("cwa_wetland", String),
     Column("raw_other_permits_id", String),
     Column("raw_congressional_representatives", String),
@@ -195,11 +234,11 @@ eip_facilities = Table(
     Column("raw_respiratory_hazard_index", Float),
     Column("raw_pm2_5_ug_per_m3", Float),
     Column("raw_o3_ppb", Float),
-    Column("raw_wastewater_discharge_indicator", Float),
+    Column("raw_wastewater_discharge_indicator", String),
     Column("raw_location", String),
     Column("raw_facility_footprint", String),
     Column("raw_epa_frs_id", String),
-    Column("unknown_id", Float),
+    Column("unknown_id", String),
     Column("is_ccs", Boolean),
     Column(
         "state_id_fips",
@@ -213,9 +252,9 @@ eip_facilities = Table(
         ForeignKey("data_warehouse.county_fips.county_id_fips"),
         nullable=True,
     ),
-    Column("geocoded_locality_name", String, nullable=False),
-    Column("geocoded_locality_type", String, nullable=False),
-    Column("geocoded_containing_county", String, nullable=False),
+    Column("geocoded_locality_name", String, nullable=True),
+    Column("geocoded_locality_type", String, nullable=True),
+    Column("geocoded_containing_county", String, nullable=True),
     Column("longitude", Float),
     Column("latitude", Float),
     Column("date_modified", DateTime, nullable=False),
@@ -297,7 +336,7 @@ local_ordinance = Table(
     metadata,
     Column("raw_state_name", String, nullable=False),
     Column("raw_locality_name", String, nullable=False),
-    Column("ordinance", String, nullable=False),
+    Column("ordinance_text", String, nullable=False),
     Column("year_enacted", Integer),
     Column("energy_type", String),
     Column("source", String),
@@ -330,9 +369,27 @@ state_policy = Table(
     Column(
         "state_id_fips", String, ForeignKey("data_warehouse.state_fips.state_id_fips")
     ),
-    Column("earliest_year_mentioned", Integer, nullable=False),
+    Column("earliest_year_mentioned", Integer),
     Column("latest_year_mentioned", Integer),
-    Column("n_years_mentioned", Integer, nullable=False),
+    Column("n_years_mentioned", Integer),
+    schema=schema,
+)
+
+
+state_notes = Table(
+    "state_notes",
+    metadata,
+    Column("raw_state_name", String, nullable=False),
+    Column("notes", String, nullable=False),
+    Column("year_enacted", Integer),
+    Column("energy_type", String),
+    Column("source", String),
+    Column(
+        "state_id_fips", String, ForeignKey("data_warehouse.state_fips.state_id_fips")
+    ),
+    Column("earliest_year_mentioned", Integer),
+    Column("latest_year_mentioned", Integer),
+    Column("n_years_mentioned", Integer),
     schema=schema,
 )
 
@@ -387,6 +444,7 @@ mcoe = Table(
     Column("data_source", String),
     Column("deliver_power_transgrid", Boolean),
     Column("distributed_generation", Boolean),
+    Column("data_maturity", String),
     Column("duct_burners", Boolean),
     Column("energy_source_1_transport_1", String),
     Column("energy_source_1_transport_2", String),
@@ -400,8 +458,10 @@ mcoe = Table(
     Column("energy_source_code_4", String),
     Column("energy_source_code_5", String),
     Column("energy_source_code_6", String),
+    Column("energy_storage_capacity_mwh", Float),
     Column("ferc_cogen_status", Boolean),
     Column("ferc_exempt_wholesale_generator", Boolean),
+    Column("ferc_qualifying_facility", Boolean),
     Column("ferc_small_power_producer", Boolean),
     Column("fluidized_bed_tech", Boolean),
     Column("fuel_cost_from_eiaapi", Boolean),
@@ -419,6 +479,7 @@ mcoe = Table(
     Column("minimum_load_mw", Float),
     Column("multiple_fuels", Boolean),
     Column("nameplate_power_factor", Float),
+    Column("net_capacity_mwdc", Float),
     Column("net_generation_mwh", Float),
     Column("operating_date", DateTime),
     Column("operating_switch", String),
@@ -483,7 +544,12 @@ mcoe = Table(
     Column("winter_estimated_capability_mw", Float),
     Column("zip_code", Integer),
     Column("state_id_fips", String),
-    Column("county_id_fips", String),
+    Column(
+        "county_id_fips",
+        String,
+        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        nullable=True,
+    ),
     schema=schema,
 )
 
@@ -496,86 +562,469 @@ justice40_tracts = Table(
     "justice40_tracts",
     metadata,
     Column("tract_id_fips", String, primary_key=True),
+    Column(
+        "black_percent",
+        Float,
+        CheckConstraint("black_percent >= 0 AND black_percent <= 1"),
+    ),
+    Column(
+        "aian_percent",
+        Float,
+        CheckConstraint("aian_percent >= 0 AND aian_percent <= 1"),
+    ),
+    Column(
+        "asian_percent",
+        Float,
+        CheckConstraint("asian_percent >= 0 AND asian_percent <= 1"),
+    ),
+    Column(
+        "native_hawaiian_or_pacific_percent",
+        Float,
+        CheckConstraint(
+            "native_hawaiian_or_pacific_percent >= 0 AND native_hawaiian_or_pacific_percent <= 1"
+        ),
+    ),
+    Column(
+        "two_or_more_races_percent",
+        Float,
+        CheckConstraint(
+            "two_or_more_races_percent >= 0 AND two_or_more_races_percent <= 1"
+        ),
+    ),
+    Column(
+        "white_percent",
+        Float,
+        CheckConstraint("white_percent >= 0 AND white_percent <= 1"),
+    ),
+    Column(
+        "hispanic_or_latino_percent",
+        Float,
+        CheckConstraint(
+            "hispanic_or_latino_percent >= 0 AND hispanic_or_latino_percent <= 1"
+        ),
+    ),
+    Column(
+        "other_races_percent",
+        Float,
+        CheckConstraint("other_races_percent >= 0 AND other_races_percent <= 1"),
+    ),
+    Column(
+        "age_under_10_percent",
+        Float,
+        CheckConstraint("age_under_10_percent >= 0 AND age_under_10_percent <= 1"),
+    ),
+    Column(
+        "age_10_to_64_percent",
+        Float,
+        CheckConstraint("age_10_to_64_percent >= 0 AND age_10_to_64_percent <= 1"),
+    ),
+    Column(
+        "age_over_64_percent",
+        Float,
+        CheckConstraint("age_over_64_percent >= 0 AND age_over_64_percent <= 1"),
+    ),
     Column("n_thresholds_exceeded", Integer),
     Column("n_categories_exceeded", Integer),
+    Column("is_disadvantaged_without_considering_neighbors", Boolean),
+    Column("is_disadvantaged_based_on_neighbors_and_low_income_threshold", Boolean),
+    Column("is_disadvantaged_due_to_tribal_overlap", Boolean),
     Column("is_disadvantaged", Boolean),
+    Column(
+        "tract_area_disadvantaged_percent",
+        Integer,
+        CheckConstraint(
+            "tract_area_disadvantaged_percent >= 0 AND tract_area_disadvantaged_percent <= 1"
+        ),
+    ),
+    Column(
+        "disadvantaged_neighbors_percent",
+        Integer,
+        CheckConstraint(
+            "disadvantaged_neighbors_percent >= 0 AND disadvantaged_neighbors_percent <= 1"
+        ),
+    ),
     Column("population", Integer),
-    Column("low_income_and_not_students", Boolean),
-    Column("expected_agriculture_loss_and_low_income_and_not_students", Boolean),
-    Column("expected_agriculture_loss_percentile", Integer),
+    Column(
+        "individuals_below_2x_federal_poverty_line_percentile",
+        Float,
+        CheckConstraint(
+            "individuals_below_2x_federal_poverty_line_percentile >= 0 AND individuals_below_2x_federal_poverty_line_percentile <= 100"
+        ),
+    ),
+    Column(
+        "individuals_below_2x_federal_poverty_line_percent",
+        Float,
+        CheckConstraint(
+            "individuals_below_2x_federal_poverty_line_percent >= 0 AND individuals_below_2x_federal_poverty_line_percent <= 1"
+        ),
+    ),
+    Column("is_low_income", Boolean),
+    Column("is_income_data_imputed", Boolean),
+    Column("expected_agriculture_loss_rate_is_low_income", Boolean),
+    Column(
+        "expected_agriculture_loss_percentile",
+        Integer,
+        CheckConstraint(
+            "expected_agriculture_loss_percentile >= 0 AND expected_agriculture_loss_percentile <= 100"
+        ),
+    ),
     Column("expected_agriculture_loss", Float),
-    Column("expected_building_loss_and_low_income_and_not_students", Boolean),
-    Column("expected_building_loss_percentile", Integer),
+    Column("expected_building_loss_rate_is_low_income", Boolean),
+    Column(
+        "expected_building_loss_percentile",
+        Integer,
+        CheckConstraint(
+            "expected_building_loss_percentile >= 0 AND expected_building_loss_percentile <= 100"
+        ),
+    ),
     Column("expected_building_loss", Float),
-    Column("expected_population_loss_and_low_income_and_not_students", Boolean),
-    Column("expected_population_loss_percentile", Integer),
+    Column("expected_population_loss_rate_is_low_income", Boolean),
+    Column(
+        "expected_population_loss_percentile",
+        Integer,
+        CheckConstraint(
+            "expected_population_loss_percentile >= 0 AND expected_population_loss_percentile <= 100"
+        ),
+    ),
     Column("expected_population_loss", Float),
-    Column("energy_burden_and_low_income_and_not_students", Boolean),
-    Column("energy_burden_percentile", Integer),
+    Column(
+        "props_30year_flood_risk_percentile",
+        Integer,
+        CheckConstraint(
+            "props_30year_flood_risk_percentile >= 0 AND props_30year_flood_risk_percentile <= 100"
+        ),
+    ),
+    Column(
+        "props_30year_flood_risk_percent",
+        Integer,
+        CheckConstraint(
+            "props_30year_flood_risk_percent >= 0 AND props_30year_flood_risk_percent <= 1"
+        ),
+    ),
+    Column("is_props_30year_flood_risk", Boolean),
+    Column("is_props_30year_flood_risk_is_low_income", Boolean),
+    Column(
+        "props_30year_fire_risk_percentile",
+        Integer,
+        CheckConstraint(
+            "props_30year_fire_risk_percentile >= 0 AND props_30year_fire_risk_percentile <= 100"
+        ),
+    ),
+    Column(
+        "props_30year_fire_risk_percent",
+        Integer,
+        CheckConstraint(
+            "props_30year_fire_risk_percent >= 0 AND props_30year_fire_risk_percent <= 1"
+        ),
+    ),
+    Column(
+        "is_props_30year_fire_risk_percent",
+        Boolean,
+    ),
+    Column(
+        "is_props_30year_fire_risk_percent_is_low_income",
+        Boolean,
+    ),
+    Column("energy_burden_is_low_income", Boolean),
+    Column(
+        "energy_burden_percentile",
+        Integer,
+        CheckConstraint(
+            "energy_burden_percentile >= 0 AND energy_burden_percentile <= 100"
+        ),
+    ),
     Column("energy_burden", Integer),
-    Column("pm2_5_and_low_income_and_not_students", Boolean),
-    Column("pm2_5_percentile", Integer),
+    Column("pm2_5_is_low_income", Boolean),
+    Column(
+        "pm2_5_percentile",
+        Integer,
+        CheckConstraint("pm2_5_percentile >= 0 AND pm2_5_percentile <= 100"),
+    ),
     Column("pm2_5", Float),
-    Column("diesel_particulates_and_low_income_and_not_students", Boolean),
-    Column("diesel_particulates_percentile", Integer),
+    Column("diesel_particulates_is_low_income", Boolean),
+    Column(
+        "diesel_particulates_percentile",
+        Integer,
+        CheckConstraint(
+            "diesel_particulates_percentile >= 0 AND diesel_particulates_percentile <= 100"
+        ),
+    ),
     Column("diesel_particulates", Float),
-    Column("traffic_and_low_income_and_not_students", Boolean),
-    Column("traffic_percentile", Integer),
+    Column("traffic_proximity_is_low_income", Boolean),
+    Column(
+        "traffic_percentile",
+        Integer,
+        CheckConstraint("traffic_percentile >= 0 AND traffic_percentile <= 100"),
+    ),
     Column("traffic", Float),
-    Column("housing_burden_and_low_income_and_not_students", Boolean),
-    Column("housing_burden_percentile", Integer),
-    Column("housing_burden_percent", Integer),
-    Column("lead_paint_and_median_home_price_and_low_income_and_not_student", Boolean),
-    Column("lead_paint_houses_percentile", Integer),
-    Column("lead_paint_houses_percent", Integer),
-    Column("median_home_price_percentile", Integer),
+    Column("dot_transit_barriers_is_low_income", Boolean),
+    Column(
+        "dot_travel_barriers_score_percentile",
+        Integer,
+        CheckConstraint(
+            "dot_travel_barriers_score_percentile >= 0 AND dot_travel_barriers_score_percentile <= 100"
+        ),
+    ),
+    Column("housing_burden_is_low_income", Boolean),
+    Column(
+        "housing_burden_percentile",
+        Integer,
+        CheckConstraint(
+            "housing_burden_percentile >= 0 AND housing_burden_percentile <= 100"
+        ),
+    ),
+    Column(
+        "housing_burden_percent",
+        Integer,
+        CheckConstraint("housing_burden_percent >= 0 AND housing_burden_percent <= 1"),
+    ),
+    Column("lead_paint_and_median_house_value_is_low_income", Boolean),
+    Column(
+        "lead_paint_houses_percentile",
+        Integer,
+        CheckConstraint(
+            "lead_paint_houses_percentile >= 0 AND lead_paint_houses_percentile <= 100"
+        ),
+    ),
+    Column(
+        "lead_paint_houses_percent",
+        Integer,
+        CheckConstraint(
+            "lead_paint_houses_percent >= 0 AND lead_paint_houses_percent <= 1"
+        ),
+    ),
+    Column(
+        "median_home_price_percentile",
+        Integer,
+        CheckConstraint(
+            "median_home_price_percentile >= 0 AND median_home_price_percentile <= 100"
+        ),
+    ),
     Column("median_home_price", Integer),
-    Column("hazardous_waste_proximity_and_low_income_and_not_students", Boolean),
-    Column("hazardous_waste_proximity_percentile", Integer),
+    Column("tract_area_covered_by_impervious_surface_is_low_income", Boolean),
+    Column("tract_area_covered_by_impervious_surface", Boolean),
+    Column(
+        "tract_area_covered_by_impervious_surface_percent",
+        Integer,
+    ),
+    Column(
+        "tract_area_covered_by_impervious_surface_percentile",
+        Integer,
+        CheckConstraint(
+            "tract_area_covered_by_impervious_surface_percentile >= 0 AND tract_area_covered_by_impervious_surface_percentile <= 100"
+        ),
+    ),
+    Column("has_35_acres", Boolean),
+    Column("experienced_historic_underinvestment_and_remains_low_income", Boolean),
+    Column("experienced_historic_underinvestment", Boolean),
+    Column(
+        "homes_with_no_kitchen_or_indoor_plumbing_percentile",
+        Float,
+        CheckConstraint(
+            "homes_with_no_kitchen_or_indoor_plumbing_percentile >= 0 AND homes_with_no_kitchen_or_indoor_plumbing_percentile <= 100"
+        ),
+    ),
+    Column(
+        "homes_with_no_kitchen_or_indoor_plumbing_percent",
+        Float,
+        CheckConstraint(
+            "homes_with_no_kitchen_or_indoor_plumbing_percent >= 0 AND homes_with_no_kitchen_or_indoor_plumbing_percent <= 1"
+        ),
+    ),
+    Column("proximity_to_hazardous_waste_facilities_is_low_income", Boolean),
+    Column(
+        "hazardous_waste_proximity_percentile",
+        Integer,
+        CheckConstraint(
+            "hazardous_waste_proximity_percentile >= 0 AND hazardous_waste_proximity_percentile <= 100"
+        ),
+    ),
     Column("hazardous_waste_proximity", Float),
-    Column("superfund_proximity_and_low_income_and_not_students", Boolean),
-    Column("superfund_proximity_percentile", Integer),
+    Column("proximity_to_superfund_sites_is_low_income", Boolean),
+    Column(
+        "superfund_proximity_percentile",
+        Integer,
+        CheckConstraint(
+            "superfund_proximity_percentile >= 0 AND superfund_proximity_percentile <= 100"
+        ),
+    ),
     Column("superfund_proximity", Float),
-    Column("risk_management_plan_proximity_and_low_income_and_not_students", Boolean),
-    Column("risk_management_plan_proximity_percentile", Integer),
+    Column("proximity_to_RMP_sites_is_low_income", Boolean),
+    Column(
+        "risk_management_plan_proximity_percentile",
+        Integer,
+        CheckConstraint(
+            "risk_management_plan_proximity_percentile >= 0 AND risk_management_plan_proximity_percentile <= 100"
+        ),
+    ),
     Column("risk_management_plan_proximity", Float),
-    Column("wastewater_and_low_income_and_not_students", Boolean),
-    Column("wastewater_percentile", Integer),
+    Column("has_one_FUDS", Boolean),
+    Column("has_one_abandoned_mine", Boolean),
+    Column("has_one_abandoned_mine_is_low_income", Boolean),
+    Column("has_one_FUDS_is_low_income", Boolean),
+    Column("has_one_FUDS_missing_data_treated_as_False", Boolean),
+    Column("has_one_abandoned_mine_missing_data_treated_as_False", Boolean),
+    Column("wastewater_discharge_is_low_income", Boolean),
+    Column(
+        "wastewater_percentile",
+        Integer,
+        CheckConstraint("wastewater_percentile >= 0 AND wastewater_percentile <= 100"),
+    ),
     Column("wastewater", Float),
-    Column("asthma_and_low_income_and_not_students", Boolean),
-    Column("asthma_percentile", Integer),
+    Column("leaky_underground_storage_tanks_is_low_income", Boolean),
+    Column(
+        "leaky_underground_storage_tanks_percentile",
+        Integer,
+        CheckConstraint(
+            "leaky_underground_storage_tanks_percentile >= 0 AND leaky_underground_storage_tanks_percentile <= 100"
+        ),
+    ),
+    Column("leaky_underground_storage_tanks", Float),
+    Column("asthma_is_low_income", Boolean),
+    Column(
+        "asthma_percentile",
+        Integer,
+        CheckConstraint("asthma_percentile >= 0 AND asthma_percentile <= 100"),
+    ),
     Column("asthma", Integer),
-    Column("diabetes_and_low_income_and_not_students", Boolean),
-    Column("diabetes_percentile", Integer),
+    Column("diabetes_is_low_income", Boolean),
+    Column(
+        "diabetes_percentile",
+        Integer,
+        CheckConstraint("diabetes_percentile >= 0 AND diabetes_percentile <= 100"),
+    ),
     Column("diabetes", Integer),
-    Column("heart_disease_and_low_income_and_not_students", Boolean),
-    Column("heart_disease_percentile", Integer),
+    Column("heart_disease_is_low_income", Boolean),
+    Column(
+        "heart_disease_percentile",
+        Integer,
+        CheckConstraint(
+            "heart_disease_percentile >= 0 AND heart_disease_percentile <= 100"
+        ),
+    ),
     Column("heart_disease", Integer),
-    Column("life_expectancy_and_low_income_and_not_students", Boolean),
-    Column("life_expectancy_percentile", Integer),
+    Column("low_life_expectancy_is_low_income", Boolean),
+    Column(
+        "life_expectancy_percentile",
+        Integer,
+        CheckConstraint(
+            "life_expectancy_percentile >= 0 AND life_expectancy_percentile <= 100"
+        ),
+    ),
     Column("life_expectancy", Float),
-    Column("local_to_area_income_ratio_and_less_than_high_school_and_not_st", Boolean),
-    Column("local_to_area_income_ratio_percentile", Integer),
+    Column("low_median_household_income_and_low_hs_attainment", Boolean),
+    Column(
+        "local_to_area_income_ratio_percentile",
+        Integer,
+        CheckConstraint(
+            "local_to_area_income_ratio_percentile >= 0 AND local_to_area_income_ratio_percentile <= 100"
+        ),
+    ),
     Column("local_to_area_income_ratio", Integer),
-    Column("linguistic_isolation_and_less_than_high_school_and_not_students", Boolean),
-    Column("linguistic_isolation_percentile", Integer),
-    Column("linguistic_isolation_percent", Integer),
-    Column("unemployment_and_less_than_high_school_and_not_students", Boolean),
-    Column("unemployment_percentile", Integer),
-    Column("unemployment_percent", Integer),
-    Column("below_poverty_line_and_less_than_high_school_and_not_students", Boolean),
-    Column("below_2x_poverty_line_percentile", Integer),
-    Column("below_2x_poverty_line_percent", Integer),
-    Column("below_poverty_line_percentile", Integer),
-    Column("below_poverty_line_percent", Integer),
-    Column("less_than_high_school_percentile", Integer),
-    Column("less_than_high_school_percent", Integer),
-    Column("unemployment_2010_percent", Integer),
-    Column("below_poverty_line_2010_percent", Integer),
-    Column("unemployment_and_less_than_high_school_islands", Boolean),
-    Column("below_poverty_line_and_less_than_high_school_islands", Boolean),
-    Column("local_to_area_income_ratio_and_less_than_high_school_islands", Boolean),
-    Column("non_college_students_percent", Integer),
+    Column("households_in_linguistic_isolation_and_low_hs_attainment", Boolean),
+    Column(
+        "linguistic_isolation_percentile",
+        Integer,
+        CheckConstraint(
+            "linguistic_isolation_percentile >= 0 AND linguistic_isolation_percentile <= 100"
+        ),
+    ),
+    Column(
+        "linguistic_isolation_percent",
+        Integer,
+        CheckConstraint(
+            "linguistic_isolation_percent >= 0 AND linguistic_isolation_percent <= 1"
+        ),
+    ),
+    Column("unemployment_and_low_hs_attainment", Boolean),
+    Column(
+        "unemployment_percentile",
+        Integer,
+        CheckConstraint(
+            "unemployment_percentile >= 0 AND unemployment_percentile <= 100"
+        ),
+    ),
+    Column(
+        "unemployment_percent",
+        Integer,
+        CheckConstraint("unemployment_percent >= 0 AND unemployment_percent <= 1"),
+    ),
+    Column("households_below_federal_poverty_level_low_hs_attainment", Boolean),
+    Column(
+        "below_2x_poverty_line_percentile",
+        Integer,
+        CheckConstraint(
+            "below_2x_poverty_line_percentile >= 0 AND below_2x_poverty_line_percentile <= 100"
+        ),
+    ),
+    Column(
+        "below_2x_poverty_line_percent",
+        Integer,
+        CheckConstraint(
+            "below_2x_poverty_line_percent >= 0 AND below_2x_poverty_line_percent <= 1"
+        ),
+    ),
+    Column(
+        "below_poverty_line_percentile",
+        Integer,
+        CheckConstraint(
+            "below_poverty_line_percentile >= 0 AND below_poverty_line_percentile <= 100"
+        ),
+    ),
+    Column(
+        "below_poverty_line_percent",
+        Integer,
+        CheckConstraint(
+            "below_poverty_line_percent >= 0 AND below_poverty_line_percent <= 1"
+        ),
+    ),
+    Column(
+        "less_than_high_school_percentile",
+        Integer,
+        CheckConstraint(
+            "less_than_high_school_percentile >= 0 AND less_than_high_school_percentile <= 100"
+        ),
+    ),
+    Column(
+        "less_than_high_school_percent",
+        Integer,
+        CheckConstraint(
+            "less_than_high_school_percent >= 0 AND less_than_high_school_percent <= 1"
+        ),
+    ),
+    Column(
+        "non_college_students_percent",
+        Integer,
+        CheckConstraint(
+            "non_college_students_percent >= 0 AND non_college_students_percent <= 1"
+        ),
+    ),
+    Column(
+        "unemployment_2010_percent",
+        Integer,
+        CheckConstraint(
+            "unemployment_2010_percent >= 0 AND unemployment_2010_percent <= 1"
+        ),
+    ),
+    Column(
+        "below_poverty_line_2010_percent",
+        Integer,
+        CheckConstraint(
+            "below_poverty_line_2010_percent >= 0 AND below_poverty_line_2010_percent <= 1"
+        ),
+    ),
+    Column("unemployment_and_low_hs_edu_islands", Boolean),
+    Column("households_below_federal_poverty_level_low_hs_edu_islands", Boolean),
+    Column("low_median_household_income_and_low_hs_edu_islands", Boolean),
+    Column("number_of_tribal_areas_within_tract_for_alaska", Integer),
+    Column("names_of_tribal_areas_within_tract", String),
+    Column(
+        "tract_within_tribal_areas_percent",
+        Integer,
+        CheckConstraint(
+            "tract_within_tribal_areas_percent >= 0 AND tract_within_tribal_areas_percent <= 1"
+        ),
+    ),
     schema=schema,
 )
 
@@ -607,9 +1056,229 @@ nrel_local_ordinances = Table(
     Column("value", Float),
     Column("energy_type", String),
     Column("state_id_fips", String),
-    Column("county_id_fips", String),
+    Column(
+        "county_id_fips",
+        String,
+        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        nullable=True,
+    ),
     Column("geocoded_locality_name", String),
     Column("geocoded_locality_type", String),
     Column("geocoded_containing_county", String),
+    Column("standardized_units", String),
+    Column("standardized_value", Float),
+    Column("is_ban", Boolean),
+    Column("is_de_facto_ban", Boolean),
+    schema=schema,
+)
+
+
+##########################
+# Offshore Wind Projects #
+##########################
+
+
+offshore_wind_projects = Table(
+    "offshore_wind_projects",
+    metadata,
+    Column("project_id", Integer, primary_key=True),
+    Column("name", String),
+    Column("recipient_state", String),
+    Column("developer", String),
+    Column("capacity_mw", Float),
+    Column("proposed_completion_year", Integer),
+    Column("notes", String),
+    Column("permitting_status", String),
+    Column("contracting_status", String),
+    Column("construction_status", String),
+    Column("overall_project_status", String),
+    Column("lease_areas", String),
+    Column("is_actionable", Boolean),
+    Column("is_nearly_certain", Boolean),
+    schema=schema,
+)
+offshore_wind_locations = Table(
+    "offshore_wind_locations",
+    metadata,
+    Column("location_id", Integer, primary_key=True),
+    Column("raw_city", String),
+    Column("raw_state_abbrev", String),
+    Column("raw_county", String),
+    Column("raw_county_fips", String),
+    Column("why_of_interest", String),
+    Column("priority", String),
+    Column("notes", String),
+    Column(
+        "county_id_fips",
+        String,
+        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        nullable=True,
+    ),
+    Column("geocoded_locality_name", String),
+    Column("geocoded_locality_type", String),
+    Column("geocoded_containing_county", String),
+    schema=schema,
+)
+offshore_wind_cable_landing_association = Table(
+    "offshore_wind_cable_landing_association",
+    metadata,
+    Column("location_id", Integer, primary_key=True),
+    Column("project_id", Integer, primary_key=True),
+    schema=schema,
+)
+offshore_wind_port_association = Table(
+    "offshore_wind_port_association",
+    metadata,
+    Column("location_id", Integer, primary_key=True),
+    Column("project_id", Integer, primary_key=True),
+    schema=schema,
+)
+
+
+#################
+# Federal Lands #
+#################
+
+protected_area_by_county = Table(
+    "protected_area_by_county",
+    metadata,
+    # primary key should be (county_id_fips, id_padus) but PAD-US has no key.
+    # TODO: make a surrogate and assign PK
+    Column(
+        "county_id_fips",
+        String,
+        # This FK should hold but addfips is out of date, even with "2020" data
+        # ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        nullable=False,
+    ),
+    Column("county_area_coast_clipped_km2", Float),
+    # PAD columns
+    Column("protection_mechanism", String),
+    Column("owner_type", String),
+    Column("owner_name", String),
+    Column("manager_type", String),
+    Column("manager_name", String),
+    Column("designation_type_standardized", String),
+    Column("designation_type_local", String),
+    Column("name_padus", String),
+    Column("gap_status", String),
+    # join columns
+    Column("intersection_area_padus_km2", Float),
+    schema=schema,
+)
+
+
+######################
+# Energy Communities #
+######################
+
+energy_communities = Table(
+    "energy_communities_by_county",
+    metadata,
+    Column(
+        "county_id_fips",
+        String,
+        # should have FK on county_fips but EC currently uses 2010 county geometry
+        # ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        primary_key=True,
+    ),
+    Column("raw_county_id_fips", String),
+    Column("raw_county_name", String),
+    Column("raw_state_name", String),
+    Column("n_brownfields", Integer),
+    Column("brownfield_acreage", Float),
+    Column("brownfield_acreage_mean_fill", Float),
+    Column("brownfield_acreage_median_fill", Float),
+    Column("n_coal_qualifying_tracts", Integer),
+    Column("coal_qualifying_area_fraction", Float),
+    Column("qualifies_by_employment_criteria", Boolean),
+    Column("geocoded_locality_name", String),
+    schema=schema,
+)
+
+################
+# Ballot Ready #
+################
+br_elections = Table(
+    "br_elections",
+    metadata,
+    Column("election_id", Integer, nullable=False, primary_key=True),
+    Column("election_name", String, nullable=False),
+    Column("election_day", DateTime, nullable=False),
+    schema=schema,
+)
+
+br_positions = Table(
+    "br_positions",
+    metadata,
+    Column("position_id", Integer, nullable=False, primary_key=True),
+    Column("position_name", String, nullable=False),
+    Column("reference_year", Integer, nullable=False),
+    Column("sub_area_name", String),
+    Column("sub_area_value", String),
+    Column("sub_area_name_secondary", String),
+    Column("sub_area_value_secondary", String),
+    Column("level", String, nullable=False),
+    Column("tier", Integer, nullable=False),
+    Column("is_judicial", Boolean, nullable=False),
+    Column("is_retention", Boolean, nullable=False),
+    Column("normalized_position_id", Integer, nullable=False),
+    Column("normalized_position_name", String, nullable=False),
+    Column("frequency", String, nullable=False),
+    Column("partisan_type", String),
+    schema=schema,
+)
+
+br_races = Table(
+    "br_races",
+    metadata,
+    Column("race_id", Integer, nullable=False, primary_key=True),
+    Column("is_primary", Boolean, nullable=False),
+    Column("is_runoff", Boolean, nullable=False),
+    Column("is_unexpired", Boolean, nullable=False),
+    Column("number_of_seats", Integer, nullable=False),
+    Column("race_created_at", DateTime, nullable=False),
+    Column("race_updated_at", DateTime, nullable=False),
+    Column(
+        "election_id",
+        Integer,
+        ForeignKey("data_warehouse.br_elections.election_id"),
+        nullable=False,
+    ),
+    Column(
+        "position_id",
+        Integer,
+        ForeignKey("data_warehouse.br_positions.position_id"),
+        nullable=False,
+    ),
+    schema=schema,
+)
+
+br_positions_counties_assoc = Table(
+    "br_positions_counties_assoc",
+    metadata,
+    Column(
+        "position_id",
+        Integer,
+        ForeignKey("data_warehouse.br_positions.position_id"),
+        nullable=False,
+        primary_key=True,
+    ),
+    Column(
+        "raw_county", String, nullable=False, primary_key=True
+    ),  # Can't use county_id_fips because Connecticut changed it's county system recently
+    Column("raw_state", String, nullable=False),
+    Column(
+        "state_id_fips",
+        String,
+        ForeignKey("data_warehouse.state_fips.state_id_fips"),
+        nullable=False,
+    ),
+    Column(
+        "county_id_fips",
+        String,
+        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        nullable=True,
+    ),  # Should not be nullable in future updates
     schema=schema,
 )

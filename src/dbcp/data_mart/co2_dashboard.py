@@ -8,13 +8,17 @@ from typing import Optional
 import pandas as pd
 import sqlalchemy as sa
 
+from dbcp.constants import PUDL_LATEST_YEAR
 from dbcp.data_mart.helpers import _get_county_fips_df, _get_state_fips_df
 from dbcp.helpers import download_pudl_data, get_sql_engine
-from dbcp.transform.helpers import add_county_fips_with_backup_geocoding
+from dbcp.transform.helpers import (
+    add_county_fips_with_backup_geocoding,
+    bedford_addfips_fix,
+)
 
 
 def _get_existing_plant_fuel_data(pudl_engine: sa.engine.Engine) -> pd.DataFrame:
-    query = """
+    query = f"""
     select
         plant_id_eia,
         fuel_type_code_pudl,
@@ -23,7 +27,9 @@ def _get_existing_plant_fuel_data(pudl_engine: sa.engine.Engine) -> pd.DataFrame
         net_generation_mwh as mwh,
         fuel_consumed_for_electricity_mmbtu as mmbtu
     from generation_fuel_eia923
-    where report_date >= date('2020-01-01') -- this is monthly data
+    -- select one calendar year of monthly data
+    where report_date >= date('{PUDL_LATEST_YEAR}-01-01')
+        and report_date < date('{PUDL_LATEST_YEAR+1}-01-01')
     AND fuel_type_code_pudl in ('coal', 'gas', 'oil')
     ;
     """
@@ -124,7 +130,7 @@ def _co2_from_mwh(
     return
 
 
-def _estimate_existing_co2e(gen_fuel_923: pd.DataFrame) -> pd.DataFrame:
+def _estimate_existing_co2e(gen_fuel_923: pd.DataFrame) -> pd.Series:
     co2e = _combine_cc_parts(gen_fuel_923)
     _co2_from_mmbtu(co2e)
     _co2_from_mwh(co2e)
@@ -156,6 +162,7 @@ def _get_plant_location_data(pudl_engine: sa.engine.Engine) -> pd.DataFrame:
 def _transfrom_plant_location_data(
     plant_locations: pd.DataFrame, state_table: pd.DataFrame, county_table: pd.DataFrame
 ) -> pd.DataFrame:
+    bedford_addfips_fix(plant_locations)
     plant_locations = add_county_fips_with_backup_geocoding(
         plant_locations, state_col="state", locality_col="county"
     )
@@ -220,8 +227,8 @@ def _get_proposed_fossil_plants(engine: sa.engine.Engine) -> pd.DataFrame:
         select
             proj.project_id,
             loc.county_id_fips
-        from data_warehouse.iso_projects_2021 as proj
-        left join data_warehouse.iso_locations_2021 as loc
+        from data_warehouse.iso_projects as proj
+        left join data_warehouse.iso_locations as loc
             on loc.project_id = proj.project_id
         where proj.queue_status = 'active'
     ),
@@ -232,7 +239,7 @@ def _get_proposed_fossil_plants(engine: sa.engine.Engine) -> pd.DataFrame:
             res.capacity_mw,
             res.resource_clean as resource
         from active_loc as loc
-        left join data_warehouse.iso_resource_capacity_2021 as res
+        left join data_warehouse.iso_resource_capacity as res
             on res.project_id = loc.project_id
         where res.capacity_mw is not NULL
         and res.resource_clean in ('Natural Gas', 'Coal', 'Oil')

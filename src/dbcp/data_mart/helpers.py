@@ -31,7 +31,9 @@ def _get_state_fips_df(engine: sa.engine.Engine) -> pd.DataFrame:
 
 
 class CountyOpposition(object):
-    """Now that I'm writing this docstring I have no idea why this is a class."""
+    """Combine ordinance information from NREL and Columbia at the county level."""
+
+    # I think this is only a class because of some misguided attempt at caching. Future refactor.
 
     def __init__(  # noqa: D107
         self,
@@ -62,7 +64,7 @@ class CountyOpposition(object):
             "geocoded_locality_name",
             "geocoded_locality_type",
             # 'n_years_mentioned',  # for simplicity, only include one year metric (earliest_year_mentioned)
-            "ordinance",
+            "ordinance_text",
             # 'raw_locality_name',  # drop raw name in favor of canonical one
             # 'raw_state_name',  # drop raw name in favor of canonical one
             # 'state_id_fips',  # will join on 5-digit county FIPS, which includes state
@@ -115,7 +117,7 @@ class CountyOpposition(object):
         states_as_counties["geocoded_locality_type"] = "state"
         rename_dict = {
             "state_name": "geocoded_locality_name",
-            "policy": "ordinance",
+            "policy": "ordinance_text",
         }
         states_as_counties = states_as_counties.rename(columns=rename_dict).drop(
             columns=["state_id_fips"]
@@ -149,8 +151,8 @@ class CountyOpposition(object):
         dupes = ordinances.loc[dupe_counties, :].copy()
         not_dupes = ordinances.loc[~dupe_counties, :].copy()
 
-        dupes["ordinance"] = (
-            dupes["geocoded_locality_name"] + ": " + dupes["ordinance"] + r"\n"
+        dupes["ordinance_text"] = (
+            dupes["geocoded_locality_name"] + ": " + dupes["ordinance_text"] + r"\n"
         )
         grp = dupes.groupby("county_id_fips")
 
@@ -163,7 +165,7 @@ class CountyOpposition(object):
             .mask(n_unique > 1, other="multiple")
         )
 
-        descriptions = grp["ordinance"].sum().str.strip()
+        descriptions = grp["ordinance_text"].sum().str.strip()
 
         agg_dupes = pd.concat([years, localities, descriptions], axis=1).reset_index()
         recombined = pd.concat(
@@ -172,7 +174,28 @@ class CountyOpposition(object):
 
         return recombined
 
-    def agg_to_counties(self, include_state_policies=True) -> pd.DataFrame:
+    def _get_nrel_bans(self) -> pd.DataFrame:
+        # As of 3/14/2023:
+        # 43/707 localities in the dataset are smaller than counties, eg towns.
+        # 14/687 counties in the NREL dataset contain more than one jurisdiction with an ordinance.
+        # 7/114 for counties with a ban.
+        query = """
+        SELECT
+            county_id_fips,
+            bool_or(is_ban AND energy_type = 'solar') as ordinance_via_solar_nrel,
+            bool_or(is_ban AND energy_type = 'wind') as ordinance_via_wind_nrel,
+            bool_or(is_de_facto_ban) as ordinance_via_nrel_is_de_facto
+        FROM "data_warehouse"."nrel_local_ordinances"
+        -- NOTE: this upscales town-level bans to their containing counties to be consistent with the Columbia dataset.
+        -- Use WHERE geocoded_locality_type = 'county' to restrict to whole-county bans.
+        GROUP BY county_id_fips
+        """
+        df = pd.read_sql(query, self._engine)
+        return df
+
+    def agg_to_counties(
+        self, include_state_policies=True, include_nrel_bans=False
+    ) -> pd.DataFrame:
         """Aggregate local policies, and optionally state policies, to the county level.
 
         Args:
@@ -186,7 +209,10 @@ class CountyOpposition(object):
             states_as_counties = self._represent_state_policy_as_local_ordinances()
             opposition = pd.concat([opposition, states_as_counties], axis=0)
         aggregated = self._agg_local_ordinances_to_counties(opposition)
-        aggregated["has_ordinance"] = True
+        aggregated["ordinance_via_reldi"] = True
+        if include_nrel_bans:
+            nrel = self._get_nrel_bans()
+            aggregated = aggregated.merge(nrel, on="county_id_fips", how="outer")
         return aggregated
 
 

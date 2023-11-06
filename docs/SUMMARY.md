@@ -8,7 +8,6 @@
   * [counties\_wide\_format](data-mart/counties\_wide\_format.md)
   * [fossil\_infrastructure\_projects](data-mart/fossil\_infrastructure\_projects.md)
   * [existing\_plants](data-mart/existing\_plants.md)
-  * [co2\_dashboard](data-mart/co2\_dashboard.md)
-  * [proposed\_power\_dash\_xxx](data-mart/proposed\_power\_dash\_xxx.md)
 * [CO2 Estimation](co2-estimation.md)
+* [NREL Ordinance Interpretation](NREL\_ordinance\_bans.md)
 * [Data Sources](sources/README.md)

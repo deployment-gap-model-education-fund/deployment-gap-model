@@ -1,15 +1,15 @@
 """Small helper functions for dbcp etl."""
-
 import logging
 import os
-import tarfile
 from pathlib import Path
 
+import boto3
 import pandas as pd
 import pandas_gbq
 import pydata_google_auth
-import requests
 import sqlalchemy as sa
+from botocore import UNSIGNED
+from botocore.config import Config
 from tqdm import tqdm
 
 import dbcp
@@ -43,7 +43,9 @@ def get_schema_sql_alchemy_metadata(schema: str) -> sa.MetaData:
         raise ValueError(f"{schema} is not a valid schema.")
 
 
-def get_bq_schema_from_metadata(table_name: str, schema: str) -> list[dict[str, str]]:
+def get_bq_schema_from_metadata(
+    table_name: str, schema: str, dev: bool = True
+) -> list[dict[str, str]]:
     """
     Create a BigQuery schema from SQL Alchemy metadata.
 
@@ -76,34 +78,28 @@ def get_sql_engine() -> sa.engine.Engine:
 def get_pudl_engine() -> sa.engine.Engine:
     """Create a sql alchemy engine for the pudl database."""
     pudl_data_path = download_pudl_data()
-    pudl_engine = sa.create_engine(
-        f"sqlite:////{pudl_data_path}/pudl_data/sqlite/pudl.sqlite"
-    )
+    pudl_engine = sa.create_engine(f"sqlite:////{pudl_data_path}")
     return pudl_engine
 
 
 def download_pudl_data() -> Path:
-    """Download pudl data from Zenodo."""
-    # TODO(bendnorman): Ideally this is replaced with Intake.
+    """Download pudl data from AWS."""
     PUDL_VERSION = os.environ["PUDL_VERSION"]
 
-    input_path = Path("/app/data/data_cache")
-    pudl_data_path = input_path / PUDL_VERSION
+    pudl_cache = Path("/app/data/data_cache/pudl/")
+    pudl_cache.mkdir(exist_ok=True)
+    pudl_version_cache = pudl_cache / PUDL_VERSION
+    pudl_data_path = pudl_version_cache / "pudl.sqlite"
     if not pudl_data_path.exists():
-        logger.info("PUDL data directory does not exist, downloading from Zenodo.")
-        response = requests.get(
-            f"https://zenodo.org/record/5701406/files/{PUDL_VERSION}.tgz", stream=True
+        logger.info("PUDL data directory does not exist, downloading from AWS.")
+        pudl_version_cache.mkdir()
+
+        s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
+        s3.download_file(
+            "intake.catalyst.coop",
+            f"{PUDL_VERSION}/pudl.sqlite",
+            str(pudl_data_path),
         )
-        tgz_file_path = input_path / f"{PUDL_VERSION}.tgz"
-
-        tgz_file = open(tgz_file_path, "wb")
-        for chunk in tqdm(response.iter_content(chunk_size=1024)):
-            tgz_file.write(chunk)
-        logger.info("Finished downloading PUDL data.")
-
-        logger.info("Extracting PUDL tgz file.")
-        with tarfile.open(f"{pudl_data_path}.tgz") as tar:
-            tar.extractall(path=input_path, members=track_tar_progress(tar))
 
     return pudl_data_path
 
@@ -136,7 +132,7 @@ def get_db_schema_tables(engine: sa.engine.Engine, schema: str) -> list[str]:
     return table_names
 
 
-def upload_schema_to_bigquery(schema: str) -> None:
+def upload_schema_to_bigquery(schema: str, dev: bool = True) -> None:
     """Upload a postgres schema to BigQuery."""
     logger.info("Loading tables to BigQuery.")
 
@@ -161,16 +157,19 @@ def upload_schema_to_bigquery(schema: str) -> None:
         "https://www.googleapis.com/auth/cloud-platform",
     ]
 
-    credentials = pydata_google_auth.get_user_credentials(SCOPES)
+    credentials = pydata_google_auth.get_user_credentials(
+        SCOPES, use_local_webserver=False
+    )
 
     for table_name, df in loaded_tables.items():
+        full_table_name = f"{schema}{'_dev' if dev else ''}.{table_name}"
         logger.info(f"Loading: {table_name}")
         pandas_gbq.to_gbq(
             df,
-            f"{schema}.{table_name}",
+            full_table_name,
             project_id=GCP_PROJECT_ID,
             if_exists="replace",
             credentials=credentials,
-            table_schema=get_bq_schema_from_metadata(table_name, schema),
+            table_schema=get_bq_schema_from_metadata(table_name, schema, dev),
         )
-        logger.info(f"Finished: {table_name}")
+        logger.info(f"Finished: {full_table_name}")

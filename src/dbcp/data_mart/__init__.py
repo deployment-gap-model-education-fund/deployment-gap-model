@@ -8,6 +8,7 @@ import pandas as pd
 
 import dbcp
 from dbcp.metadata.data_mart import metadata
+from dbcp.validation.tests import validate_data_mart
 
 logger = logging.getLogger(__name__)
 
@@ -66,5 +67,14 @@ def create_data_marts(args):
                 index=False,
                 schema="data_mart",
             )
+    validate_data_mart(engine=engine)
+
     if args.upload_to_bigquery:
-        dbcp.helpers.upload_schema_to_bigquery("data_mart")
+        if args.bigquery_env == "dev":
+            dbcp.helpers.upload_schema_to_bigquery("data_mart")
+        elif args.bigquery_env == "prod":
+            dbcp.helpers.upload_schema_to_bigquery("data_mart", dev=False)
+        else:
+            raise ValueError(
+                f"{args.bigquery_env} is an invalid BigQuery environment value. Must be: dev or prod."
+            )
