@@ -11,4 +11,5 @@ jupyterlab~=3.2.8
 pandas~=1.4.0
 joblib~=1.2.0
 beautifulsoup4~=4.11
+gridstatus~=0.20.0
 plotly~=5.15.0

@@ -356,6 +356,7 @@ counties_long_format = Table(
     Column("status", String, primary_key=True),
     Column("facility_count", Integer, nullable=False),
     Column("capacity_mw", Float),
+    Column("actionable_mw_fraction", Float),
     Column("co2e_tonnes_per_year", Float),
     Column("pm2_5_tonnes_per_year", Float),
     Column("nox_tonnes_per_year", Float),
