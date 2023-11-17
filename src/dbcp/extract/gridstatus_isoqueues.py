@@ -27,11 +27,11 @@ ISO_QUEUE_VERSIONS: dict[str, str] = {
 }
 
 
-def extract():
+def extract(iso_queue_versions: dict[str, str] = ISO_QUEUE_VERSIONS):
     """Extract gridstatus ISO Queue data."""
     iso_queues: dict[str, pd.DataFrame] = {}
     credentials = dbcp.extract.helpers.get_gcp_credentials()
-    for iso, revision_num in ISO_QUEUE_VERSIONS.items():
+    for iso, revision_num in iso_queue_versions.items():
         uri = f"gs://gridstatus-archive/interconnection_queues/{iso}.parquet"
         path = dbcp.extract.helpers.cache_gcs_archive_file_locally(
             uri=uri, revision_num=revision_num, credentials=credentials
