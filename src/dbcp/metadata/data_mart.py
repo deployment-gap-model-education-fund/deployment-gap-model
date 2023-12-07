@@ -236,7 +236,7 @@ fossil_infrastructure_projects = Table(
     Column("project_description", String),
     Column("facility_description", String),
     Column("permit_description", String),
-    Column("cost_millions", Integer),
+    Column("cost_millions", Float),
     Column("raw_number_of_jobs_promised", String),
     Column("date_modified", DateTime),
     Column("co2e_tonnes_per_year", Float),
