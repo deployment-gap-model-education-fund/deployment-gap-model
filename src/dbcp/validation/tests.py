@@ -242,6 +242,21 @@ def test_county_long_vs_wide(engine: Engine):
     ), "counties_long_format has fewer projects than counties_wide_format"
 
 
+def test_manual_ordinance_fips_coverage(engine: Engine):
+    """Check that manual_ordinances and county_fips have identical FIPS."""
+    query = """
+    SELECT
+        m.county_id_fips as manual_fips,
+        c.county_id_fips as county_fips
+    FROM data_mart.manual_ordinances as m
+    FULL OUTER JOIN data_warehouse.county_fips as c
+    USING (county_id_fips)
+    WHERE m.county_id_fips is null OR c.county_id_fips is null
+    """
+    actual = pd.read_sql(query, engine)
+    assert actual.empty, "Found mismatched FIPS in manual_ordinances"
+
+
 @lru_cache(maxsize=1)
 def _get_non_county_cols_from_wide_format(engine: Engine) -> pd.Index:
     """Get the columns from counties_wide_format that are not derived from county-level data."""

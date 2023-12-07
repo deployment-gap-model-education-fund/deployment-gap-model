@@ -1282,3 +1282,15 @@ br_positions_counties_assoc = Table(
     ),  # Should not be nullable in future updates
     schema=schema,
 )
+
+#####################
+# MANUAL ORDINANCES #
+#####################
+
+manual_ordinances = Table(
+    "manual_ordinances",
+    metadata,
+    Column("county_id_fips", String, nullable=False, primary_key=True),
+    Column("ordinance_via_self_maintained", Boolean),
+    schema=schema,
+)

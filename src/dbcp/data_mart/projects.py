@@ -308,12 +308,15 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
 
 def _add_derived_columns(mart: pd.DataFrame) -> None:
     mart["ordinance_via_reldi"] = mart["ordinance_text"].notna()
-    ban_cols = [
+    priority_ban = mart["ordinance_via_self_maintained"]
+    secondary_ban_cols = [
         "ordinance_via_reldi",
         "ordinance_via_solar_nrel",
         "ordinance_via_wind_nrel",
     ]
-    mart["ordinance_is_restrictive"] = mart[ban_cols].fillna(False).any(axis=1)
+    mart["ordinance_is_restrictive"] = priority_ban.fillna(
+        mart[secondary_ban_cols].fillna(False).any(axis=1)
+    )
     # This categorizes any project with multiple generation or storage types as 'hybrid'
     mart["is_hybrid"] = (
         mart.groupby(["source", "project_id", "county_id_fips"])["resource_clean"]
@@ -391,7 +394,9 @@ def create_long_format(engine: sa.engine.Engine) -> pd.DataFrame:
         engine=engine, county_fips_df=all_counties, state_fips_df=all_states
     )
     combined_opp = aggregator.agg_to_counties(
-        include_state_policies=False, include_nrel_bans=True
+        include_state_policies=False,
+        include_nrel_bans=True,
+        include_manual_ordinances=True,
     )
     rename_dict = {
         "geocoded_locality_name": "ordinance_jurisdiction_name",
