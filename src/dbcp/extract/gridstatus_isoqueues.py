@@ -16,15 +16,15 @@ import dbcp
 
 logger = logging.getLogger(__name__)
 
-# These are the latest revision numbers as of 11/21/23
+# These are the latest revision numbers as of 12/04/23
 ISO_QUEUE_VERSIONS: dict[str, str] = {
-    "miso": "1700421299874397",
-    "caiso": "1700421300276308",
-    "pjm": "1700020724428445",
-    "ercot": "1700421300661013",
-    "spp": "1700421301054116",
-    "nyiso": "1700421301493460",
-    "isone": "1700421301888688",
+    "miso": "1701730379212665",
+    "caiso": "1701730379782773",
+    "pjm": "1701730380346804",
+    "ercot": "1701730380870486",
+    "spp": "1701730381410448",
+    "nyiso": "1701730381901584",
+    "isone": "1701730382409516",
 }
 
 

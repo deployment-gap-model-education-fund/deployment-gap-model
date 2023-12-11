@@ -278,7 +278,7 @@ RESOURCE_DICT = {
                 "Photovoltaic + Storage + Wind Turbine",
             ],
             "pjm": ["Solar", "Solar; Storage", "Solar; Wind"],
-            "ercot": ["Solar - Photovoltaic Solar"],
+            "ercot": ["Solar - Photovoltaic Solar", "Other - Photovoltaic Solar"],
             "spp": [
                 "Solar",
                 "Hybrid - Solar/Storage",
@@ -330,7 +330,7 @@ RESOURCE_DICT = {
 }
 
 
-def clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
+def _clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
     """Harmonize resource type for all ISO queues."""
     resource_df = resource_df.copy()
     long_dict = {}
@@ -350,9 +350,196 @@ def clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
 
     unmapped = resource_df["resource_clean"].isna()
     if unmapped.sum() != 0:
-        debug = resource_df.loc[unmapped, "resource"].value_counts(dropna=False)
-        raise AssertionError(f"Unmapped resource types: {debug}")
+        debug = resource_df[unmapped][["resource", "region"]].value_counts(dropna=False)
+        raise AssertionError(f"Unmapped resource types in: {debug}")
     return resource_df
+
+
+def _create_project_status_classification_from_single_column(
+    iso_df: pd.DataFrame,
+    status_col: str,
+    nearly_certain_cols: tuple[str],
+    actionable_cols: tuple[str],
+) -> pd.DataFrame:
+    """Add columns is_actionable and is_nearly_certain that classify each project.
+
+    This function handles data from ISOs that report project status information in
+    a single column.
+
+    This model was created by a consultant in Excel and translated to python.
+    """
+    iso_df["is_actionable"] = iso_df[status_col].isin(actionable_cols).fillna(False)
+    iso_df["is_nearly_certain"] = (
+        iso_df[status_col].isin(nearly_certain_cols).fillna(False)
+    )
+
+    assert (
+        ~iso_df[["is_actionable", "is_nearly_certain"]].all(axis=1)
+    ).all(), "Some projects are marked marked actionable and nearly certain."
+
+    return iso_df
+
+
+def _create_project_status_classification_from_multiple_columns(
+    iso_df: pd.DataFrame,
+    system_impact_study_col: str,
+    facilities_study_status_col: str,
+    ia_col: str,
+    completed_strings: tuple[str],
+):
+    """Add columns is_actionable and is_nearly_certain that classify each project.
+
+    This function handles data from ISOs that report project status information in
+    a multiple columns.
+
+    This model was created by a consultant in Excel and translated to python.
+    """
+    status_cols = {}
+    status_cols[system_impact_study_col] = "completed_system_impact_study"
+    status_cols[facilities_study_status_col] = "completed_facilities_study_status"
+    status_cols[ia_col] = "executed_ia"
+
+    status_df = pd.DataFrame()
+    for col, comp_col in status_cols.items():
+        status_df[comp_col] = iso_df[col].isin(completed_strings).fillna(False).copy()
+
+    iso_df["is_nearly_certain"] = status_df["executed_ia"].copy()
+    iso_df["is_actionable"] = (
+        status_df.completed_system_impact_study
+        | status_df.completed_facilities_study_status
+    ) & ~status_df.executed_ia
+
+    assert (
+        ~iso_df[["is_actionable", "is_nearly_certain"]].all(axis=1)
+    ).all(), "Some projects are marked marked actionable and nearly certain."
+    return iso_df
+
+
+def _transform_miso(iso_df: pd.DataFrame) -> pd.DataFrame:
+    """Make miso specific transformations."""
+    actionable_cols = (
+        "PHASE 2",
+        "PHASE 3",
+    )
+    nearly_certain_cols = ("GIA",)
+    iso_df = _create_project_status_classification_from_single_column(
+        iso_df,
+        "studyPhase",
+        nearly_certain_cols,
+        actionable_cols,
+    )
+
+    # There are about 30 projects that are duplciated because there is an
+    # addition record where studyPhase == "Network Upgrade". I don't fully
+    # understand why but it seems like a reasonable drop
+    iso_df = iso_df.drop_duplicates(subset="queue_id")
+    return iso_df
+
+
+def _transform_caiso(iso_df: pd.DataFrame) -> pd.DataFrame:
+    """Make caiso specific transformations."""
+    iso_df = _create_project_status_classification_from_multiple_columns(
+        iso_df,
+        facilities_study_status_col="Facilities Study (FAS) or Phase II Cluster Study",
+        system_impact_study_col="System Impact Study or Phase I Cluster Study",
+        ia_col="Interconnection Agreement Status",
+        completed_strings=("Executed", "Completed"),
+    )
+    return iso_df
+
+
+def _transform_pjm(iso_df: pd.DataFrame) -> pd.DataFrame:
+    """Make pjm specific transformations."""
+    iso_df = _create_project_status_classification_from_multiple_columns(
+        iso_df,
+        facilities_study_status_col="Facilities Study Status",
+        system_impact_study_col="System Impact Study Status",
+        ia_col="Interim/Interconnection Service Agreement Status",
+        completed_strings=("Document Posted",),
+    )
+
+    # winter_capacity_mw in pjm aligns with the LBNL data
+    iso_df["capacity_mw"] = iso_df["winter_capacity_mw"]
+    return iso_df
+
+
+def _transform_ercot(iso_df: pd.DataFrame) -> pd.DataFrame:
+    """Make ercot specific transformations."""
+    actionable_cols = (
+        "SS Completed, FIS Started, No IA",
+        "SS Completed, FIS Completed, No IA",
+    )
+    nearly_certain_cols = (
+        "SS Completed, FIS Completed, IA",
+        "SS Completed, FIS Started, IA",
+        "SS Completed, FIS Not Started, IA",
+    )
+    iso_df = _create_project_status_classification_from_single_column(
+        iso_df,
+        "GIM Study Phase",
+        nearly_certain_cols,
+        actionable_cols,
+    )
+    return iso_df
+
+
+def _transform_spp(iso_df: pd.DataFrame) -> pd.DataFrame:
+    """Make spp specific transformations."""
+    actionable_cols = ("DISIS STAGE", "FACILITY STUDY STAGE")
+    nearly_certain_cols = (
+        "IA FULLY EXECUTED/COMMERCIAL OPERATION",
+        "IA FULLY EXECUTED/ON SCHEDULE",
+        "IA FULLY EXECUTED/ON SUSPENSION",
+        "IA PENDING",
+    )
+    iso_df = _create_project_status_classification_from_single_column(
+        iso_df,
+        "Status (Original)",
+        nearly_certain_cols,
+        actionable_cols,
+    )
+    return iso_df
+
+
+def _transform_nyiso(iso_df: pd.DataFrame) -> pd.DataFrame:
+    """Make nyiso specific transformations.
+
+    NYISO Status Key:
+        * 0=Withdrawn
+        * 1=Scoping Meeting Pending
+        * 2=FES Pending
+        * 3=FES in Progress
+        * 4=SRIS/SIS Pending
+        * 5=SRIS/SIS in Progress
+        * 6=SRIS/SIS Approved
+        * 7=FS Pending
+        * 8=Rejected Cost Allocation/Next FS Pending
+        * 9=FS in Progress
+        * 10=Accepted Cost Allocation/IA in Progress
+        * 11=IA Completed
+        * 12=Under Construction
+        * 13=In Service for Test
+        * 14=In Service Commercial
+        * 15=Partial In-Service
+    """
+    iso_df["is_actionable"] = (iso_df["S"].ge(6) & iso_df["S"].lt(11)).fillna(False)
+    iso_df["is_nearly_certain"] = iso_df["S"].ge(11).fillna(False)
+    assert (
+        ~iso_df[["is_actionable", "is_nearly_certain"]].all(axis=1)
+    ).all(), "Some projects are marked marked actionable and nearly certain."
+    return iso_df
+
+
+def _transform_isone(iso_df: pd.DataFrame) -> pd.DataFrame:
+    """Make isone specific transformations."""
+    iso_df = _create_project_status_classification_from_multiple_columns(
+        iso_df,
+        facilities_study_status_col="Facilities Study Status",
+        system_impact_study_col="System Impact Study Status",
+        ia_col="Interconnection Agreement Status",
+        completed_strings=("Document Posted", "Executed"),
+    )
+    return iso_df
 
 
 def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
@@ -383,23 +570,35 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         "Winter Capacity (MW)": "winter_capacity_mw",
         "Withdrawal Comment": "withdrawal_comment",
         "Withdrawn Date": "withdrawn_date",
+        "is_actionable": "is_actionable",
+        "is_nearly_certain": "is_nearly_certain",
+        "region": "region",
     }
+
+    iso_cleaning_functions = {
+        "miso": _transform_miso,
+        "caiso": _transform_caiso,
+        "pjm": _transform_pjm,
+        "ercot": _transform_ercot,
+        "spp": _transform_spp,
+        "nyiso": _transform_nyiso,
+        "isone": _transform_isone,
+    }
+
     projects = []
     for iso, df in raw_dfs.items():
-        renamed_df = (
-            df[shared_columns_mapping.keys()]
-            .rename(columns=shared_columns_mapping)
-            .copy()
-        )
-        # winter_capacity_mw in pjm aligns with the LBNL data
-        if iso == "pjm":
-            renamed_df["capacity_mw"] = renamed_df["winter_capacity_mw"]
+        # Apply rename
+        renamed_df = df.rename(columns=shared_columns_mapping).copy()
+
+        # Apply iso specific cleaning functions
+        renamed_df = iso_cleaning_functions[iso](renamed_df)
 
         renamed_df["region"] = iso
+        renamed_df = renamed_df[shared_columns_mapping.values()]
         projects.append(renamed_df)
+
     projects = pd.concat(projects)
     projects["status"] = projects.status.str.lower()
-    print(projects.status.value_counts())  # TODO: What should we count as active?
     active_projects = projects.query("status == 'active'").copy()
 
     # parse dates
@@ -415,8 +614,14 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     active_projects = add_county_fips_with_backup_geocoding(
         active_projects, state_col="state", locality_col="county"
     )
+    # correct some fips codes
+    active_projects.loc[
+        active_projects.county_id_fips.eq("51515"), "county_id_fips"
+    ] = "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
 
     # harmonize types
-    active_projects = clean_resource_type(active_projects)
+    active_projects = _clean_resource_type(active_projects)
 
-    return active_projects
+    dfs = {}
+    dfs["gridstatus_projects"] = active_projects
+    return dfs
