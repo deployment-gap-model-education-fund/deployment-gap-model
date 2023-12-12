@@ -15,6 +15,56 @@ from dbcp.data_mart.helpers import (
 from dbcp.helpers import get_sql_engine
 
 
+def _merge_with_gridstatus(
+    lbnl: pd.DataFrame, engine: sa.engine.Engine
+) -> pd.DataFrame:
+    is_iso = ~lbnl.iso_region.str.contains("non-ISO")
+    lbnl_non_isos = lbnl[~is_iso].copy()
+
+    with engine.connect() as con:
+        query = """
+            WITH
+            gs AS (
+                SELECT
+                    county_id_fips,
+                    is_nearly_certain,
+                    county,
+                    state_id_fips,
+                    project_id,
+                    project_name,
+                    capacity_mw,
+                    proposed_completion_date AS date_proposed_online,
+                    point_of_interconnection,
+                    UPPER(iso_region) AS iso_region,
+                    is_actionable,
+                    resource_clean,
+                    state,
+                    queue_status,
+                    queue_date AS date_entered_queue,
+                    UPPER(iso_region) AS entity
+                FROM data_warehouse.gridstatus_projects
+            )
+            SELECT
+                gs.*,
+                1.0 AS frac_locations_in_county,
+                ncsl.permitting_type as state_permitting_type FROM gs
+            left join data_warehouse.ncsl_state_permitting as ncsl
+                on gs.state_id_fips = ncsl.state_id_fips
+        """
+        gs = pd.read_sql(query, con)
+
+    # TODO (bendnorman): How should we handle project_ids? This hack
+    # isn't ideal because the GS data warehouse and data mart project
+    # ids aren't consistent
+    max_lbnl_id = lbnl_non_isos.project_id.max() + 1
+    gs["project_id"] = list(range(max_lbnl_id, max_lbnl_id + len(gs)))
+
+    shared_ids = set(gs.project_id).intersection(set(lbnl_non_isos.project_id))
+    assert len(shared_ids) == 0, f"Found duplicate ids between GS and LBNL {shared_ids}"
+
+    return pd.concat([gs, lbnl_non_isos])
+
+
 def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
     """Get ISO projects.
 
@@ -92,6 +142,7 @@ def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
         df.loc[dupes, "project_id"].eq(9118).all()
     ), f"Duplicate counties: {df.loc[dupes, ['project_id', 'county']]}"
     df = df.loc[~dupes]
+    df = _merge_with_gridstatus(df, engine)
     _estimate_proposed_power_co2e(df)
     return df
 
@@ -349,6 +400,7 @@ def _add_derived_columns(mart: pd.DataFrame) -> None:
         "Solar; Storage": "renewable",
         "Solar": "renewable",
         "Steam": np.nan,
+        "Transmission": "transmission",
         "Unknown": np.nan,
         "Waste Heat": "fossil",
         "Wind; Storage": "renewable",

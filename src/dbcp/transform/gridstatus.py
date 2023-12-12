@@ -558,13 +558,13 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         "County": "county",
         "Generation Type": "resource",
         "Interconnecting Entity": "interconnecting_entity",
-        "Interconnection Location": "interconnection_location",
+        "Interconnection Location": "point_of_interconnection",
         "Project Name": "project_name",
         "Proposed Completion Date": "proposed_completion_date",
         "Queue Date": "queue_date",
         "Queue ID": "queue_id",
         "State": "state",
-        "Status": "status",
+        "Status": "queue_status",
         "Summer Capacity (MW)": "summer_capacity_mw",
         "Transmission Owner": "transmission_owner",
         "Winter Capacity (MW)": "winter_capacity_mw",
@@ -572,7 +572,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         "Withdrawn Date": "withdrawn_date",
         "is_actionable": "is_actionable",
         "is_nearly_certain": "is_nearly_certain",
-        "region": "region",
+        "iso_region": "iso_region",
     }
 
     iso_cleaning_functions = {
@@ -593,13 +593,13 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         # Apply iso specific cleaning functions
         renamed_df = iso_cleaning_functions[iso](renamed_df)
 
-        renamed_df["region"] = iso
+        renamed_df["iso_region"] = iso
         renamed_df = renamed_df[shared_columns_mapping.values()]
         projects.append(renamed_df)
 
     projects = pd.concat(projects)
-    projects["status"] = projects.status.str.lower()
-    active_projects = projects.query("status == 'active'").copy()
+    projects["queue_status"] = projects.queue_status.str.lower()
+    active_projects = projects.query("queue_status == 'active'").copy()
 
     # parse dates
     date_cols = [col for col in list(projects) if "date" in col]
@@ -621,6 +621,11 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     # harmonize types
     active_projects = _clean_resource_type(active_projects)
+
+    active_projects = active_projects.reset_index()
+    assert (
+        "project_id" in active_projects.columns
+    ), "project_id not present in clean gridstatus data."
 
     dfs = {}
     dfs["gridstatus_projects"] = active_projects
