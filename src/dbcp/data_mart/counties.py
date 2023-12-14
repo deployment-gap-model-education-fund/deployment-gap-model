@@ -446,12 +446,15 @@ def _get_ncsl_wind_permitting_df(engine: sa.engine.Engine) -> pd.DataFrame:
 def _add_derived_columns(mart: pd.DataFrame) -> pd.DataFrame:
     out = mart.copy()
     out["ordinance_via_reldi"] = out["ordinance_text"].notna()
-    ban_cols = [
+    priority_ban = mart["ordinance_via_self_maintained"]
+    secondary_ban_cols = [
         "ordinance_via_reldi",
         "ordinance_via_solar_nrel",
         "ordinance_via_wind_nrel",
     ]
-    out["ordinance_is_restrictive"] = out[ban_cols].fillna(False).any(axis=1)
+    out["ordinance_is_restrictive"] = priority_ban.fillna(
+        mart[secondary_ban_cols].fillna(False).any(axis=1)
+    )
 
     return out
 
@@ -793,6 +796,7 @@ def _get_county_properties(
     combined_opp = aggregator.agg_to_counties(
         include_state_policies=include_state_policies,
         include_nrel_bans=True,
+        include_manual_ordinances=True,
     )
 
     county_properties = all_counties[

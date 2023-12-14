@@ -43,7 +43,8 @@ Note that **this duplicates projects with multiple prospective locations.** Use 
 ||`ordinance_via_solar_nrel`|True when a county has banned solar development according to NREL's ordinance database.|NREL|See 'NREL Ordinance Interpretation' section below|
 ||`ordinance_via_wind_nrel`|True when a county has banned wind development according to NREL's ordinance database.|NREL|See 'NREL Ordinance Interpretation' section below|
 ||`ordinance_via_nrel_is_de_facto`|True when a wind/solar ban is based on technical criteria like setback distances, as opposed to an outright ban.|NREL|See 'NREL Ordinance Interpretation' section below|
-||`ordinance_is_restrictive`|True when any of `ordinance_via_solar_nrel`, `ordinance_via_wind_nrel`, or `ordinance_via_reldi` are True|NREL/RELDI||
+||`ordinance_via_self_maintained`|True when a county has banned wind development according to internal data.|proprietary||
+||`ordinance_is_restrictive`|Same as `ordinance_via_self_maintained`, but replace `NULL` values with True when *any* of `ordinance_via_solar_nrel`, `ordinance_via_wind_nrel`, or `ordinance_via_reldi` are True|proprietary/NREL/RELDI||
 ||`state_permitting_text`|Summary text of the wind permitting rules of the given state.|NCSL||
 ||`state_permitting_type`|Category of the state's wind permitting jurisdiction: state, local, or hybrid.|NCSL||
 
@@ -135,4 +136,4 @@ Avoided emissions estimates are based on the EPA's AVERT model. In this model, t
 The marginal generator is determined by the proposed generator's location and the time of day/year. Avoided emissions are scaled by the capacity of the proposed generator times an average capacity factor for the proposed generator's resource type and location.
 
 The equation for avoided emissions is:
-(Capacity of proposed generator [MW]) * (Average capacity factor of proposed generator [MWh/hour/MW]) * (8766 [average hours/year]) * (Emissions factor of marginal generator [tonnes/MWh])
+(Capacity of proposed generator [MW]) *(Average capacity factor of proposed generator [MWh/hour/MW])* (8766 [average hours/year]) * (Emissions factor of marginal generator [tonnes/MWh])

@@ -195,6 +195,13 @@ def etl_epa_avert() -> dict[str, pd.DataFrame]:
     return transformed
 
 
+def etl_manual_ordinances() -> dict[str, pd.DataFrame]:
+    """ETL manually maintained ordinances."""
+    raw_dfs = dbcp.extract.manual_ordinances.extract()
+    transformed = dbcp.transform.manual_ordinances.transform(raw_dfs)
+    return transformed
+
+
 def etl(args):
     """Run dbc ETL."""
     # Setup postgres
@@ -207,6 +214,7 @@ def etl(args):
     SPATIAL_CACHE.reduce_size()
 
     etl_funcs = {
+        "manual_ordinances": etl_manual_ordinances,
         "epa_avert": etl_epa_avert,
         "eip_infrastructure": etl_eip_infrastructure,
         "columbia_local_opp": etl_columbia_local_opp,

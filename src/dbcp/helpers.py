@@ -26,6 +26,7 @@ SA_TO_BQ_TYPES = {
     "DATETIME": "DATETIME",
 }
 SA_TO_BQ_MODES = {True: "NULLABLE", False: "REQUIRED"}
+GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
 
 
 def get_schema_sql_alchemy_metadata(schema: str) -> sa.MetaData:
@@ -134,6 +135,14 @@ def get_db_schema_tables(engine: sa.engine.Engine, schema: str) -> list[str]:
     return table_names
 
 
+def _get_bigquery_credentials():
+    SCOPES = [
+        "https://www.googleapis.com/auth/cloud-platform",
+    ]
+    creds = pydata_google_auth.get_user_credentials(SCOPES, use_local_webserver=False)
+    return creds
+
+
 def upload_schema_to_bigquery(schema: str, dev: bool = True) -> None:
     """Upload a postgres schema to BigQuery."""
     logger.info("Loading tables to BigQuery.")
@@ -153,15 +162,7 @@ def upload_schema_to_bigquery(schema: str, dev: bool = True) -> None:
             loaded_tables[table_name] = loaded_tables[table_name].convert_dtypes()
 
     # load to big query
-    GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
-
-    SCOPES = [
-        "https://www.googleapis.com/auth/cloud-platform",
-    ]
-
-    credentials = pydata_google_auth.get_user_credentials(
-        SCOPES, use_local_webserver=False
-    )
+    credentials = _get_bigquery_credentials()
 
     for table_name, df in loaded_tables.items():
         full_table_name = f"{schema}{'_dev' if dev else ''}.{table_name}"
@@ -178,8 +179,7 @@ def upload_schema_to_bigquery(schema: str, dev: bool = True) -> None:
 
 
 def psql_insert_copy(table, conn, keys, data_iter):
-    """
-    Execute SQL statement inserting data
+    """Insert data via COPY statement, which is much faster than INSERT.
 
     Parameters
     ----------
@@ -197,13 +197,13 @@ def psql_insert_copy(table, conn, keys, data_iter):
         writer.writerows(data_iter)
         s_buf.seek(0)
 
-        columns = ", ".join(['"{}"'.format(k) for k in keys])
+        columns = ", ".join([f'"{k}"' for k in keys])
         if table.schema:
-            table_name = "{}.{}".format(table.schema, table.name)
+            table_name = f"{table.schema}.{table.name}"
         else:
             table_name = table.name
 
-        sql = "COPY {} ({}) FROM STDIN WITH CSV".format(table_name, columns)
+        sql = f"COPY {table_name} ({columns}) FROM STDIN WITH CSV"
         cur.copy_expert(sql=sql, file=s_buf)
         dbapi_conn.commit()
 
@@ -220,7 +220,7 @@ SA_TO_PD_TYPES = {
 def enforce_dtypes(
     df: pd.DataFrame, table_name: str, schema: str, metadata: sa.sql.schema.MetaData
 ) -> pd.DataFrame:
-    """Enforce datatypes on a dataframe based on column types specified in the dbcp.metadata. sqlalchemy schemas"""
+    """Enforce datatypes specified in the dbcp.metadata.sqlalchemy schemas."""
     full_table_name = f"{schema}.{table_name}"
     return df.astype(
         {
