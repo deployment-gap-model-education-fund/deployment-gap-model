@@ -2,6 +2,7 @@
 import numpy as np
 import pandas as pd
 
+from dbcp.helpers import apply_dtypes_from_metadata
 from dbcp.transform.lbnl_iso_queue import add_county_fips_with_backup_geocoding
 
 RESOURCE_DICT = {
@@ -604,7 +605,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     # parse dates
     date_cols = [col for col in list(projects) if "date" in col]
     for col in date_cols:
-        active_projects[col] = pd.to_datetime(active_projects[col])
+        active_projects[col] = pd.to_datetime(active_projects[col], utc=True)
 
     # create project_id
     active_projects["project_id"] = np.arange(len(active_projects), dtype=np.int32)
@@ -626,6 +627,17 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     assert (
         "project_id" in active_projects.columns
     ), "project_id not present in clean gridstatus data."
+
+    # Correct dtypes
+    active_projects["summer_capacity_mw"] = pd.to_numeric(
+        active_projects.summer_capacity_mw
+    )
+    active_projects["winter_capacity_mw"] = pd.to_numeric(
+        active_projects.winter_capacity_mw
+    )
+    active_projects = apply_dtypes_from_metadata(
+        active_projects, table_name="gridstatus_projects", schema="data_warehouse"
+    )
 
     dfs = {}
     dfs["gridstatus_projects"] = active_projects

@@ -23,6 +23,13 @@ SA_TO_BQ_TYPES = {
     "BOOLEAN": "BOOL",
     "DATETIME": "DATETIME",
 }
+SA_TO_PD_TYPES = {
+    "VARCHAR": "string",
+    "INTEGER": "Int64",
+    "FLOAT": "float64",
+    "BOOLEAN": "boolean",
+    "DATETIME": "datetime64[ns]",
+}
 SA_TO_BQ_MODES = {True: "NULLABLE", False: "REQUIRED"}
 
 
@@ -65,6 +72,19 @@ def get_bq_schema_from_metadata(
         col_schema["mode"] = SA_TO_BQ_MODES[column.nullable]
         bq_schema.append(col_schema)
     return bq_schema
+
+
+def apply_dtypes_from_metadata(df: pd.DataFrame, table_name: str, schema: str):
+    """Apply dtypes to a dataframe using the sqlalchemy metadata."""
+    table_name = f"{schema}.{table_name}"
+    metadata = get_schema_sql_alchemy_metadata(schema)
+    try:
+        table = metadata.tables[table_name]
+    except KeyError:
+        raise KeyError(f"{table_name} does not exist in metadata.")
+
+    dtypes = {col.name: SA_TO_PD_TYPES[str(col.type)] for col in table.columns}
+    return df.astype(dtypes)
 
 
 def get_sql_engine() -> sa.engine.Engine:
