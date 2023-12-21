@@ -81,14 +81,14 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         .all()
         .squeeze()
     )
-    assert "Alaska" not in avert_factors["avert_region"].unique()
-    assert "Hawaii" not in avert_factors["avert_region"].unique()
+    avert_regions = set(avert_factors["avert_region"].unique())
+    assert "Alaska" not in avert_regions
+    assert "Hawaii" not in avert_regions
     avert_factors["co2e_tonnes_per_year_per_mw"] = (
         avert_factors["tonnes_co2_per_mwh"] * avert_factors["capacity_factor"] * 8766
     )
 
     crosswalk = _crosswalk_transform(raw_dfs["avert_county_region_assoc"])
-    avert_regions = set(avert_factors["avert_region"].unique())
     assert set(crosswalk["avert_region"].unique()).symmetric_difference(
         avert_regions
     ) == set(["Alaska", "Hawaii"])

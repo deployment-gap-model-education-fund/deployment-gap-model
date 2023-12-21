@@ -446,12 +446,15 @@ def _get_ncsl_wind_permitting_df(engine: sa.engine.Engine) -> pd.DataFrame:
 def _add_derived_columns(mart: pd.DataFrame) -> pd.DataFrame:
     out = mart.copy()
     out["ordinance_via_reldi"] = out["ordinance_text"].notna()
-    ban_cols = [
+    priority_ban = mart["ordinance_via_self_maintained"]
+    secondary_ban_cols = [
         "ordinance_via_reldi",
         "ordinance_via_solar_nrel",
         "ordinance_via_wind_nrel",
     ]
-    out["ordinance_is_restrictive"] = out[ban_cols].fillna(False).any(axis=1)
+    out["ordinance_is_restrictive"] = priority_ban.fillna(
+        mart[secondary_ban_cols].fillna(False).any(axis=1)
+    )
 
     return out
 
@@ -793,6 +796,7 @@ def _get_county_properties(
     combined_opp = aggregator.agg_to_counties(
         include_state_policies=include_state_policies,
         include_nrel_bans=True,
+        include_manual_ordinances=True,
     )
 
     county_properties = all_counties[
@@ -918,6 +922,32 @@ def _get_actionable_aggs_for_wide_format(engine: sa.engine.Engine) -> pd.DataFra
     aggs = pd.concat(aggs, axis=1, join="outer")
 
     return aggs
+
+
+def _get_actionable_aggs_for_long_format(engine: sa.engine.Engine) -> pd.DataFrame:
+    """Calculate fraction of MW considered actionable."""
+    # This should be refactored and combined with the wide format version above.
+    iso = create_iso_data_mart(engine)
+
+    # Distribute project-level quantities across locations, when there are multiple.
+    # A handful of ISO projects are in multiple counties and the proprietary offshore
+    # wind projects have an entry for each cable landing.
+    # This approximation assumes an equal distribution.
+    iso["capacity_mw"] = iso.loc[:, "capacity_mw"].mul(iso["frac_locations_in_county"])
+    grp = iso.groupby(["county_id_fips", "resource_clean", "is_actionable"])
+    actionable_sums = grp["capacity_mw"].sum().unstack(level=-1)
+    frac_actionable = (
+        actionable_sums[True].div(actionable_sums.sum(axis=1), axis=0).to_frame()
+    )
+    frac_actionable["facility_type"] = "power plant"
+    frac_actionable["status"] = "proposed"
+    frac_actionable.reset_index(inplace=True)
+    frac_actionable.rename(
+        columns={0: "actionable_mw_fraction", "resource_clean": "resource_or_sector"},
+        inplace=True,
+    )
+
+    return frac_actionable
 
 
 def _add_avoided_co2e(iso: pd.DataFrame, engine: sa.engine.Engine) -> pd.DataFrame:
@@ -1089,6 +1119,12 @@ def create_data_mart(
         postgres_engine=postgres_engine,
         pudl_engine=pudl_engine,
         long_format=long_format,
+    )
+    actionable_col = _get_actionable_aggs_for_long_format(postgres_engine)
+    long_format = long_format.merge(
+        actionable_col,
+        on=["county_id_fips", "resource_or_sector", "facility_type", "status"],
+        how="left",
     )
     out = {
         "counties_long_format": long_format,
