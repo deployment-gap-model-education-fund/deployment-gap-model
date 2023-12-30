@@ -7,6 +7,7 @@ import pkgutil
 import pandas as pd
 
 import dbcp
+from dbcp.helpers import enforce_dtypes, psql_insert_copy
 from dbcp.metadata.data_mart import metadata
 from dbcp.validation.tests import validate_data_mart
 
@@ -60,13 +61,18 @@ def create_data_marts(args):
     with engine.connect() as con:
         for table in metadata.sorted_tables:
             logger.info(f"Load {table.name} to postgres.")
-            data_marts[table.name].to_sql(
+            df = enforce_dtypes(
+                data_marts[table.name], table.name, "data_mart", metadata
+            )
+            df.to_sql(
                 name=table.name,
                 con=con,
                 if_exists="append",
                 index=False,
                 schema="data_mart",
+                method=psql_insert_copy,
             )
+
     validate_data_mart(engine=engine)
 
     if args.upload_to_bigquery:

@@ -9,6 +9,7 @@ import sqlalchemy as sa
 import dbcp
 from dbcp.constants import FIPS_CODE_VINTAGE
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
+from dbcp.helpers import enforce_dtypes, psql_insert_copy
 from dbcp.metadata.data_warehouse import metadata
 from dbcp.transform.fips_tables import SPATIAL_CACHE
 from dbcp.transform.helpers import GEOCODER_CACHE, bedford_addfips_fix
@@ -201,6 +202,13 @@ def etl_gridstatus_isoqueues():
     return transformed
 
 
+def etl_manual_ordinances() -> dict[str, pd.DataFrame]:
+    """ETL manually maintained ordinances."""
+    raw_dfs = dbcp.extract.manual_ordinances.extract()
+    transformed = dbcp.transform.manual_ordinances.transform(raw_dfs)
+    return transformed
+
+
 def etl(args):
     """Run dbc ETL."""
     # Setup postgres
@@ -214,6 +222,7 @@ def etl(args):
 
     etl_funcs = {
         "gridstatus": etl_gridstatus_isoqueues,
+        "manual_ordinances": etl_manual_ordinances,
         "epa_avert": etl_epa_avert,
         "eip_infrastructure": etl_eip_infrastructure,
         "columbia_local_opp": etl_columbia_local_opp,
@@ -243,13 +252,17 @@ def etl(args):
     with engine.connect() as con:
         for table in metadata.sorted_tables:
             logger.info(f"Load {table.name} to postgres.")
-            transformed_dfs[table.name].to_sql(
+            df = enforce_dtypes(
+                transformed_dfs[table.name], table.name, "data_warehouse", metadata
+            )
+            df.to_sql(
                 name=table.name,
                 con=con,
                 if_exists="append",
                 index=False,
                 schema="data_warehouse",
                 chunksize=1000,
+                method=psql_insert_copy,
             )
 
     validate_warehouse(engine=engine)

@@ -523,8 +523,9 @@ def _transform_nyiso(iso_df: pd.DataFrame) -> pd.DataFrame:
         * 14=In Service Commercial
         * 15=Partial In-Service
     """
-    iso_df["is_actionable"] = (iso_df["S"].ge(6) & iso_df["S"].lt(11)).fillna(False)
-    iso_df["is_nearly_certain"] = iso_df["S"].ge(11).fillna(False)
+    status = pd.to_numeric(iso_df["S"])
+    iso_df["is_actionable"] = (status.ge(6) & status.lt(11)).fillna(False)
+    iso_df["is_nearly_certain"] = status.ge(11).fillna(False)
     assert (
         ~iso_df[["is_actionable", "is_nearly_certain"]].all(axis=1)
     ).all(), "Some projects are marked marked actionable and nearly certain."

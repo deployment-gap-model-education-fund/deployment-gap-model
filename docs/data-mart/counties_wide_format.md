@@ -68,12 +68,12 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 ||`offshore_wind_proposed_avoided_co2e_tonnes_per_year`|Estimated avoided CO2 equivalent emissions of all proposed offshore wind projects, in metric tonnes per year.|EPA AVERT||
 ||`offshore_wind_capacity_mw_via_ports`|Total generation capacity, in megawatts, of propsed offshore wind power plants with an assembly/manufacturing port in this county. Capacity has NOT been split between multiple port locations, so the sum of this column is deliberately greater than total proposed offshore wind capacity.|original work||
 ||`offshore_wind_interest_type`|Describes the relationship of this county to offshore wind. One of `Proposed lease area`, `Contracted project`,  `Lease area in proximity`, or NULL.|original work||
-||`offshore_wind_proposed_capacity_mw_actionable`|Total capacity, in megawatts, of proposed offshore wind facilities in the actionable stage of development.|EPA AVERT||
-||`offshore_wind_proposed_facility_count_actionable`|Number of proposed offshore wind projects in the actionable stage of development.|EPA AVERT||
-||`offshore_wind_proposed_avoided_co2e_actionable`|Estimated avoided CO2 equivalent emissions of proposed offshore wind projects in the actionable stage of development, in metric tonnes per year.|EPA AVERT||
-||`offshore_wind_proposed_capacity_mw_nearly_certain`|Total capacity, in megawatts, of nearly completed offshore wind facilities.|EPA AVERT||
-||`offshore_wind_proposed_facility_count_nearly_certain`|Number of nearly completed offshore wind facilities.|EPA AVERT||
-||`offshore_wind_proposed_avoided_co2e_nearly_certain`|Estimated avoided CO2 equivalent emissions of nearly completed offshore wind projects, in metric tonnes per year.|EPA AVERT||
+||`offshore_wind_proposed_capacity_mw_actionable`|Total capacity, in megawatts, of proposed offshore wind facilities in the actionable stage of development.|original work||
+||`offshore_wind_proposed_facility_count_actionable`|Number of proposed offshore wind projects in the actionable stage of development.|original work||
+||`offshore_wind_proposed_avoided_co2e_actionable`|Estimated avoided CO2 equivalent emissions of proposed offshore wind projects in the actionable stage of development, in metric tonnes per year.|original work, EPA AVERT||
+||`offshore_wind_proposed_capacity_mw_nearly_certain`|Total capacity, in megawatts, of nearly completed offshore wind facilities.|original work||
+||`offshore_wind_proposed_facility_count_nearly_certain`|Number of nearly completed offshore wind facilities.|original work||
+||`offshore_wind_proposed_avoided_co2e_nearly_certain`|Estimated avoided CO2 equivalent emissions of nearly completed offshore wind projects, in metric tonnes per year.|original work, EPA AVERT||
 ||`oil_existing_capacity_mw`|Generation capacity, in megawatts, of existing oil and diesel power plants.|PUDL||
 ||`oil_existing_co2e_tonnes_per_year`|Annual CO2 equivalent emissions from existing oil power plants, in metric tonnes.|derived from PUDL||
 ||`oil_proposed_facility_count`|Number of proposed oil power plants.|LBNL||
@@ -85,24 +85,24 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 ||`onshore_wind_proposed_capacity_mw`|Generation capacity, in megawatts, of proposed onshore wind power plants.|LBNL||
 ||`onshore_wind_proposed_facility_count`|Number of proposed onshore wind power plants.|LBNL||
 ||`onshore_wind_proposed_avoided_co2e_tonnes_per_year`|Estimated avoided CO2 equivalent emissions of all proposed onshore wind projects, in metric tonnes per year.|EPA AVERT||
-||`onshore_wind_proposed_capacity_mw_actionable`|Total capacity, in megawatts, of proposed onshore wind facilities in the actionable stage of development.|EPA AVERT||
-||`onshore_wind_proposed_facility_count_actionable`|Number of proposed onshore wind projects in the actionable stage of development.|EPA AVERT||
-||`onshore_wind_proposed_avoided_co2e_actionable`|Estimated avoided CO2 equivalent emissions of proposed onshore wind projects in the actionable stage of development, in metric tonnes per year.|EPA AVERT||
-||`onshore_wind_proposed_capacity_mw_nearly_certain`|Total capacity, in megawatts, of nearly completed onshore wind facilities.|EPA AVERT||
-||`onshore_wind_proposed_facility_count_nearly_certain`|Number of nearly completed onshore wind facilities.|EPA AVERT||
-||`onshore_wind_proposed_avoided_co2e_nearly_certain`|Estimated avoided CO2 equivalent emissions of nearly completed onshore wind projects, in metric tonnes per year.|EPA AVERT||
+||`onshore_wind_proposed_capacity_mw_actionable`|Total capacity, in megawatts, of proposed onshore wind facilities in the actionable stage of development.|LBNL||
+||`onshore_wind_proposed_facility_count_actionable`|Number of proposed onshore wind projects in the actionable stage of development.|LBNL||
+||`onshore_wind_proposed_avoided_co2e_actionable`|Estimated avoided CO2 equivalent emissions of proposed onshore wind projects in the actionable stage of development, in metric tonnes per year.|LBNL, EPA AVERT||
+||`onshore_wind_proposed_capacity_mw_nearly_certain`|Total capacity, in megawatts, of nearly completed onshore wind facilities.|LBNL||
+||`onshore_wind_proposed_facility_count_nearly_certain`|Number of nearly completed onshore wind facilities.|LBNL||
+||`onshore_wind_proposed_avoided_co2e_nearly_certain`|Estimated avoided CO2 equivalent emissions of nearly completed onshore wind projects, in metric tonnes per year.|LBNL, EPA AVERT||
 ||`solar_existing_capacity_mw`|Generation capacity, in megawatts, of existing solar power plants.|PUDL||
 ||`solar_existing_co2e_tonnes_per_year`|Annual CO2 equivalent emissions from existing solar power plants, in metric tonnes. The few non-zero values of this column come from solar thermal facilities that also burn gas.|derived from PUDL||
 ||`solar_existing_facility_count`|Number of existing solar power plants.|PUDL||
 ||`solar_proposed_capacity_mw`|Generation capacity, in megawatts, of proposed solar power plants.|LBNL||
 ||`solar_proposed_facility_count`|Number of proposed solar power plants.|LBNL||
-||`solar_proposed_avoided_co2e_tonnes_per_year`|Estimated avoided CO2 equivalent emissions of all proposed solar projects, in metric tonnes per year.|EPA AVERT||
-||`solar_proposed_capacity_mw_actionable`|Total capacity, in megawatts, of proposed solar facilities in the actionable stage of development.|EPA AVERT||
-||`solar_proposed_facility_count_actionable`|Number of proposed solar projects in the actionable stage of development.|EPA AVERT||
-||`solar_proposed_avoided_co2e_actionable`|Estimated avoided CO2 equivalent emissions of proposed solar projects in the actionable stage of development, in metric tonnes per year.|EPA AVERT||
-||`solar_proposed_capacity_mw_nearly_certain`|Total capacity, in megawatts, of nearly completed solar facilities.|EPA AVERT||
-||`solar_proposed_facility_count_nearly_certain`|Number of nearly completed solar facilities.|EPA AVERT||
-||`solar_proposed_avoided_co2e_nearly_certain`|Estimated avoided CO2 equivalent emissions of nearly completed solar projects, in metric tonnes per year.|EPA AVERT||
+||`solar_proposed_avoided_co2e_tonnes_per_year`|Estimated avoided CO2 equivalent emissions of all proposed solar projects, in metric tonnes per year.|LBNL, EPA AVERT||
+||`solar_proposed_capacity_mw_actionable`|Total capacity, in megawatts, of proposed solar facilities in the actionable stage of development.|LBNL||
+||`solar_proposed_facility_count_actionable`|Number of proposed solar projects in the actionable stage of development.|LBNL||
+||`solar_proposed_avoided_co2e_actionable`|Estimated avoided CO2 equivalent emissions of proposed solar projects in the actionable stage of development, in metric tonnes per year.|LBNL, EPA AVERT||
+||`solar_proposed_capacity_mw_nearly_certain`|Total capacity, in megawatts, of nearly completed solar facilities.|LBNL||
+||`solar_proposed_facility_count_nearly_certain`|Number of nearly completed solar facilities.|LBNL||
+||`solar_proposed_avoided_co2e_nearly_certain`|Estimated avoided CO2 equivalent emissions of nearly completed solar projects, in metric tonnes per year.|LBNL, EPA AVERT||
 ||`infra_gas_proposed_co2e_tonnes_per_year`|Annual CO2 equivalent emissions from proposed gas infrastructure, in metric tonnes.|EIP||
 ||`infra_gas_proposed_facility_count`|Number of existing infrastructure facilities in the gas sector, excluding LNG.|EIP||
 ||`infra_gas_proposed_nox_tonnes_per_year`|Annual NOx emissions from all proposed gas infrastructure projects, in metric tonnes.|EIP||
@@ -131,7 +131,8 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 ||`ordinance_via_solar_nrel`|True when a county has banned solar development according to NREL's ordinance database.|NREL|See 'NREL Ordinance Interpretation' section below|
 ||`ordinance_via_wind_nrel`|True when a county has banned wind development according to NREL's ordinance database.|NREL|See 'NREL Ordinance Interpretation' section below|
 ||`ordinance_via_nrel_is_de_facto`|True when a wind/solar ban is based on technical criteria like setback distances, as opposed to an outright ban.|NREL|See 'NREL Ordinance Interpretation' section below|
-||`ordinance_is_restrictive`|True when any of `ordinance_via_solar_nrel`, `ordinance_via_wind_nrel`, or `ordinance_via_reldi` are True|NREL/RELDI||
+||`ordinance_via_self_maintained`|True when a county has banned wind development according to internal data.|proprietary||
+||`ordinance_is_restrictive`|Same as `ordinance_via_self_maintained`, but replace `NULL` values with True when *any* of `ordinance_via_solar_nrel`, `ordinance_via_wind_nrel`, or `ordinance_via_reldi` are True|proprietary/NREL/RELDI||
 ||`state_permitting_text`|Summary text of the wind permitting rules of the given state.|NCSL||
 ||`state_permitting_type`|Category of the state's wind permitting jurisdiction: state, local, or hybrid.|NCSL||
 ||`energy_community_qualifies`|True if the county qualifies via employment OR the fraction of qualifying area from coal closures is >= 50%|derived from RMI||
@@ -144,35 +145,30 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 |Environmental Justice|`total_tracts`|Number of Census tracts contained in this county|Justice40||
 ||`justice40_dbcp_index`|Proprietary environmental justice score. See Justice40 section below.|Justice40||
 ||`n_distinct_qualifying_tracts`|Number of distinct tracts that meet Justice40's criterion for "disadvantaged" within this county|Justice40||
-||`n_tracts_agriculture_loss_low_income_not_students`|Number of tracts with high predicted climate-driven agriculture loss and low income (excepting students)|Justice40||
-||`n_tracts_asthma_low_income_not_students`|Number of tracts with high asthma rates and low income (excepting students)|Justice40||
+||`n_tracts_agriculture_loss_low_income`|Number of tracts with high predicted climate-driven agriculture loss and low income (excepting students)|Justice40||
+||`n_tracts_asthma_low_income`|Number of tracts with high asthma rates and low income (excepting students)|Justice40||
 ||`n_tracts_below_poverty_and_low_high_school`|Number of tracts with high poverty rates and low high school graduation rates|Justice40||
 ||`n_tracts_below_poverty_line_less_than_high_school_islands`|Number of tracts with high poverty rates and low high school graduation rates (island territories only)|Justice40||
-||`n_tracts_building_loss_low_income_not_students`|Number of tracts with high predicted climate-driven building loss and low income (excepting students)|Justice40||
-||`n_tracts_diabetes_low_income_not_students`|Number of tracts with high diabetes rates and low income (excepting students)|Justice40||
-||`n_tracts_diesel_particulates_low_income_not_students`|Number of tracts with high diesel emissions and low income (excepting students)|Justice40||
-||`n_tracts_energy_burden_low_income_not_students`|Number of tracts with high energy burden and low income (excepting students)|Justice40||
-||`n_tracts_hazardous_waste_proximity_low_income_not_students`|Number of tracts with close proximity to hazardous waste sites and low income (excepting students)|Justice40||
-||`n_tracts_heart_disease_low_income_not_students`|Number of tracts with high heart disease rates and low income (excepting students)|Justice40||
-||`n_tracts_housing_burden_low_income_not_students`|Number of tracts with high housing burden and low income (excepting students)|Justice40||
-||`n_tracts_lead_paint_and_median_home_price_low_income_not_studen`|Number of tracts with high lead paint exposure, high home prices, and low income (excepting students)|Justice40||
-||`n_tracts_life_expectancy_low_income_not_students`|Number of tracts with low life expectancy and low income (excepting students)|Justice40||
+||`n_tracts_building_loss_low_income`|Number of tracts with high predicted climate-driven building loss and low income (excepting students)|Justice40||
+||`n_tracts_diabetes_low_income`|Number of tracts with high diabetes rates and low income (excepting students)|Justice40||
+||`n_tracts_diesel_particulates_low_income`|Number of tracts with high diesel emissions and low income (excepting students)|Justice40||
+||`n_tracts_energy_burden_low_income`|Number of tracts with high energy burden and low income (excepting students)|Justice40||
+||`n_tracts_hazardous_waste_proximity_low_income`|Number of tracts with close proximity to hazardous waste sites and low income (excepting students)|Justice40||
+||`n_tracts_heart_disease_low_income`|Number of tracts with high heart disease rates and low income (excepting students)|Justice40||
+||`n_tracts_housing_burden_low_income`|Number of tracts with high housing burden and low income (excepting students)|Justice40||
+||`n_tracts_lead_paint_and_median_home_price_low_income`|Number of tracts with high lead paint exposure, high home prices, and low income (excepting students)|Justice40||
+||`n_tracts_life_expectancy_low_income`|Number of tracts with low life expectancy and low income (excepting students)|Justice40||
 ||`n_tracts_linguistic_isolation_and_low_high_school`|Number of tracts with high linguistic isolation and low high school graduation rates|Justice40||
 ||`n_tracts_local_to_area_income_ratio_and_low_high_school`|Number of tracts with low ratios of local to regional income and low high school graduation rates|Justice40||
 ||`n_tracts_local_to_area_income_ratio_less_than_high_school_islan`|Number of tracts with low ratios of local to regional income and low high school graduation rates (island territories only)|Justice40||
-||`n_tracts_pm2_5_low_income_not_students`|Number of tracts with high particulate matter pollution and low income (excepting students)|Justice40||
-||`n_tracts_population_loss_low_income_not_students`|Number of tracts with high predicted climate-driven population loss and low income (excepting students)|Justice40||
-||`n_tracts_risk_management_plan_proximity_low_income_not_students`|Number of tracts with close proximity to RMP sites and low income (excepting students)|Justice40||
-||`n_tracts_superfund_proximity_low_income_not_students`|Number of tracts with close proximity to superfund sites and low income (excepting students)|Justice40||
-||`n_tracts_traffic_low_income_not_students`|Number of tracts with high traffic exposure and low income (excepting students)|Justice40||
+||`n_tracts_pm2_5_low_income`|Number of tracts with high particulate matter pollution and low income (excepting students)|Justice40||
+||`n_tracts_population_loss_low_income`|Number of tracts with high predicted climate-driven population loss and low income (excepting students)|Justice40||
+||`n_tracts_risk_management_plan_proximity_low_income`|Number of tracts with close proximity to RMP sites and low income (excepting students)|Justice40||
+||`n_tracts_superfund_proximity_low_income`|Number of tracts with close proximity to superfund sites and low income (excepting students)|Justice40||
+||`n_tracts_traffic_low_income`|Number of tracts with high traffic exposure and low income (excepting students)|Justice40||
 ||`n_tracts_unemployment_and_low_high_school`|Number of tracts with high unemployment and low high school graduation rates|Justice40||
 ||`n_tracts_unemployment_less_than_high_school_islands`|Number of tracts with high unemployment and low high school graduation rates (island territories only)|Justice40||
-||`n_tracts_wastewater_low_income_not_students`|Number of tracts with high wastewater pollution and low income (excepting students)|Justice40||
-|Elections|`next_election_date`|The date of closest upcoming election in the county.|Ballot Ready||
-||`next_election_reference_year`|Refers to a base year that the election frequency can be calculated from, either into the future or the past|Ballot Ready|For example, a position with a reference_year of 2022 and frequency of 4 has scheduled elections in 2018, 2022, 2026, etc.|
-||`next_election_frequency`|How often the position is regularly scheduled for election|Ballot Ready|Certain positions are scheduled for election on non-standard frequences, such as 4 years then 2 years then 4 years (4-2-4) to align with 10 year redistricting cycles. Thus the field is returned as an array of frequncies rather than a single integer.|
-||`next_election_position_name`|The name of the position that encompasses both official ballot and BallotReady position naming conventions|Ballot Ready||
-||`next_election_number_of_seats`|The maximum number of people who will be elected to that position during a given race.|Ballot Ready|Note that staggered term positions will have seats on a board split over multiple positions. For example, a 5 member board that elects 2 members in 2022 and 3 members in 2024 will have two separate position records, one with 2 seats and one with 3 seats.|
+||`n_tracts_wastewater_low_income`|Number of tracts with high wastewater pollution and low income (excepting students)|Justice40||
 
 ## Modeling Decisions
 

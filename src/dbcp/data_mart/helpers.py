@@ -193,8 +193,17 @@ class CountyOpposition(object):
         df = pd.read_sql(query, self._engine)
         return df
 
+    def _get_manual_ordinances(self) -> pd.DataFrame:
+        df = pd.read_sql_table(
+            "manual_ordinances", self._engine, schema="data_warehouse"
+        )
+        return df
+
     def agg_to_counties(
-        self, include_state_policies=True, include_nrel_bans=False
+        self,
+        include_state_policies=True,
+        include_nrel_bans=False,
+        include_manual_ordinances=False,
     ) -> pd.DataFrame:
         """Aggregate local policies, and optionally state policies, to the county level.
 
@@ -213,6 +222,9 @@ class CountyOpposition(object):
         if include_nrel_bans:
             nrel = self._get_nrel_bans()
             aggregated = aggregated.merge(nrel, on="county_id_fips", how="outer")
+        if include_manual_ordinances:
+            manual = self._get_manual_ordinances()
+            aggregated = aggregated.merge(manual, on="county_id_fips", how="outer")
         return aggregated
 
 
