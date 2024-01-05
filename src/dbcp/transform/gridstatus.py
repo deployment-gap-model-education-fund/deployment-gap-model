@@ -121,7 +121,7 @@ RESOURCE_DICT = {
     },
     "Municipal Solid Waste": {
         "codes": {
-            "miso": [],
+            "miso": ["Waste Heat Recovery"],
             "caiso": [],
             "pjm": [],
             "ercot": [],
@@ -212,7 +212,7 @@ RESOURCE_DICT = {
                 "Wind Turbine + Photovoltaic + Storage",
                 "Wind Turbine + Storage + Photovoltaic",
             ],
-            "pjm": ["Wind", "Wind; Solar", "Solar; Storage; Wind"],
+            "pjm": ["Wind", "Wind; Solar", "Solar; Storage; Wind", "Wind; Storage"],
             "ercot": ["Wind - Wind Turbine"],
             "spp": ["Wind", "Hybrid - Wind/Storage", "Hybrid - Wind/Solar"],
             "nyiso": ["Wind"],
@@ -234,7 +234,7 @@ RESOURCE_DICT = {
     },
     "Unknown": {
         "codes": {
-            "miso": ["Hybrid"],
+            "miso": ["Hybrid", "Co-Gen"],
             "caiso": [],
             "pjm": [],
             "ercot": [],
@@ -344,6 +344,7 @@ def _clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
                     long_dict[code] = clean_name
 
     # There are a couple of empty string values
+    resource_df["resource"] = resource_df["resource"].astype("string")
     resource_df["resource"] = resource_df["resource"].str.strip().replace("", pd.NA)
 
     resource_df["resource_clean"] = resource_df["resource"].fillna("Unknown")
@@ -351,7 +352,9 @@ def _clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
 
     unmapped = resource_df["resource_clean"].isna()
     if unmapped.sum() != 0:
-        debug = resource_df[unmapped][["resource", "region"]].value_counts(dropna=False)
+        debug = resource_df[unmapped][["resource", "iso_region"]].value_counts(
+            dropna=False
+        )
         raise AssertionError(f"Unmapped resource types in: {debug}")
     return resource_df
 
@@ -418,6 +421,12 @@ def _create_project_status_classification_from_multiple_columns(
 
 def _transform_miso(iso_df: pd.DataFrame) -> pd.DataFrame:
     """Make miso specific transformations."""
+    # Grab all projects that are "Active" and "Done" that are under construction or about to be.
+    is_active_project = iso_df["Post Generator Interconnection Agreement Status"].isin(
+        ("Under Construction", "Not Started")
+    ) & iso_df["queue_status"].isin(("Active", "Done"))
+    iso_df = iso_df[is_active_project].copy()
+
     actionable_cols = (
         "PHASE 2",
         "PHASE 3",
@@ -439,18 +448,30 @@ def _transform_miso(iso_df: pd.DataFrame) -> pd.DataFrame:
 
 def _transform_caiso(iso_df: pd.DataFrame) -> pd.DataFrame:
     """Make caiso specific transformations."""
+    iso_df = iso_df.query("queue_status == 'ACTIVE'")
+
     iso_df = _create_project_status_classification_from_multiple_columns(
         iso_df,
         facilities_study_status_col="Facilities Study (FAS) or Phase II Cluster Study",
         system_impact_study_col="System Impact Study or Phase I Cluster Study",
         ia_col="Interconnection Agreement Status",
-        completed_strings=("Executed", "Completed"),
+        completed_strings=("Executed", "Complete"),
     )
     return iso_df
 
 
 def _transform_pjm(iso_df: pd.DataFrame) -> pd.DataFrame:
     """Make pjm specific transformations."""
+    is_active_project = iso_df.queue_status.isin(
+        (
+            "Engineering and Procurement",
+            "Partially in Service - Under Construction",
+            "Under Construction",
+            "Active",
+        )
+    )
+    iso_df = iso_df[is_active_project].copy()
+
     iso_df = _create_project_status_classification_from_multiple_columns(
         iso_df,
         facilities_study_status_col="Facilities Study Status",
@@ -475,6 +496,7 @@ def _transform_ercot(iso_df: pd.DataFrame) -> pd.DataFrame:
         "SS Completed, FIS Started, IA",
         "SS Completed, FIS Not Started, IA",
     )
+
     iso_df = _create_project_status_classification_from_single_column(
         iso_df,
         "GIM Study Phase",
@@ -486,9 +508,31 @@ def _transform_ercot(iso_df: pd.DataFrame) -> pd.DataFrame:
 
 def _transform_spp(iso_df: pd.DataFrame) -> pd.DataFrame:
     """Make spp specific transformations."""
+    # SPP queue does not include withdrawn projects.
+    # Grab all projects that aren't operational.
+    is_active_project = ~iso_df["Status (Original)"].isin(
+        ("IA FULLY EXECUTED/COMMERCIAL OPERATION",)
+    )
+    iso_df = iso_df[is_active_project].copy()
+    # Impute missing status values
+    # If queue_status is missing and withdrawn date is not missing, mark
+    # the project as withdrawn
+    iso_df["queue_status"] = iso_df["queue_status"].mask(
+        iso_df["queue_status"].isna() & ~iso_df["withdrawn_date"].isna(), "Withdrawn"
+    )
+    # If queue_status is missing and commercial operation date is not missing, mark
+    # the project as completed
+    iso_df["queue_status"] = iso_df["queue_status"].mask(
+        iso_df["queue_status"].isna() & ~iso_df["Commercial Operation Date"].isna(),
+        "Completed",
+    )
+    assert (
+        ~iso_df["queue_status"].isna().any()
+    ), f"{iso_df['queue_status'].isna().sum()} SPP projects are missing queue_status"
+
+    # Categorize certain and actionable projects
     actionable_cols = ("DISIS STAGE", "FACILITY STUDY STAGE")
     nearly_certain_cols = (
-        "IA FULLY EXECUTED/COMMERCIAL OPERATION",
         "IA FULLY EXECUTED/ON SCHEDULE",
         "IA FULLY EXECUTED/ON SUSPENSION",
         "IA PENDING",
@@ -523,9 +567,20 @@ def _transform_nyiso(iso_df: pd.DataFrame) -> pd.DataFrame:
         * 14=In Service Commercial
         * 15=Partial In-Service
     """
-    status = pd.to_numeric(iso_df["S"])
-    iso_df["is_actionable"] = (status.ge(6) & status.lt(11)).fillna(False)
-    iso_df["is_nearly_certain"] = status.ge(11).fillna(False)
+    # Some projects have multiple values listed. Grab the largest value.
+    iso_df["S"] = (
+        iso_df["S"]
+        .str.split(",")
+        .apply(lambda lst: max([pd.to_numeric(x) for x in lst]))
+    )
+    iso_df["S"] = pd.to_numeric(iso_df["S"])
+
+    # Remove all withdrawn and in service projects
+    iso_df = iso_df[iso_df["S"].ne(0) & iso_df["S"].ne(14)]
+
+    # Categorize project status
+    iso_df["is_actionable"] = (iso_df["S"].ge(6) & iso_df["S"].lt(11)).fillna(False)
+    iso_df["is_nearly_certain"] = iso_df["S"].ge(11).fillna(False)
     assert (
         ~iso_df[["is_actionable", "is_nearly_certain"]].all(axis=1)
     ).all(), "Some projects are marked marked actionable and nearly certain."
@@ -534,6 +589,9 @@ def _transform_nyiso(iso_df: pd.DataFrame) -> pd.DataFrame:
 
 def _transform_isone(iso_df: pd.DataFrame) -> pd.DataFrame:
     """Make isone specific transformations."""
+    # Grab all active projects
+    iso_df = iso_df.query("queue_status == 'Active'")
+
     iso_df = _create_project_status_classification_from_multiple_columns(
         iso_df,
         facilities_study_status_col="Facilities Study Status",
@@ -601,7 +659,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     projects = pd.concat(projects)
     projects["queue_status"] = projects.queue_status.str.lower()
-    active_projects = projects.query("queue_status == 'active'").copy()
+    active_projects = projects.copy()
 
     # parse dates
     date_cols = [col for col in list(projects) if "date" in col]
@@ -636,6 +694,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     active_projects["winter_capacity_mw"] = pd.to_numeric(
         active_projects.winter_capacity_mw
     )
+    active_projects["capacity_mw"] = pd.to_numeric(active_projects.capacity_mw)
     active_projects = apply_dtypes_from_metadata(
         active_projects, table_name="gridstatus_projects", schema="data_warehouse"
     )
