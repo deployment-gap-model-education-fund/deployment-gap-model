@@ -3,7 +3,33 @@ import numpy as np
 import pandas as pd
 
 from dbcp.helpers import apply_dtypes_from_metadata
-from dbcp.transform.lbnl_iso_queue import add_county_fips_with_backup_geocoding
+from dbcp.transform.helpers import (
+    add_county_fips_with_backup_geocoding,
+    normalize_multicolumns_to_rows,
+)
+
+COLUMN_RENAME_DICT = {
+    "Actual Completion Date": "actual_completion_date",
+    "Capacity (MW)": "capacity_mw",
+    "County": "county",
+    "Generation Type": "resource",
+    "Interconnecting Entity": "interconnecting_entity",
+    "Interconnection Location": "point_of_interconnection",
+    "Project Name": "project_name",
+    "Proposed Completion Date": "proposed_completion_date",
+    "Queue Date": "queue_date",
+    "Queue ID": "queue_id",
+    "State": "state",
+    "Status": "queue_status",
+    "Summer Capacity (MW)": "summer_capacity_mw",
+    "Transmission Owner": "transmission_owner",
+    "Winter Capacity (MW)": "winter_capacity_mw",
+    "Withdrawal Comment": "withdrawal_comment",
+    "Withdrawn Date": "withdrawn_date",
+    "is_actionable": "is_actionable",
+    "is_nearly_certain": "is_nearly_certain",
+    "iso_region": "iso_region",
+}
 
 RESOURCE_DICT = {
     "Battery Storage": {
@@ -14,6 +40,7 @@ RESOURCE_DICT = {
                 "Storage + Other",
                 "Storage + Storage",
                 "Storage + Photovoltaic + Wind Turbine",
+                "Battery",
             ],
             "pjm": ["Storage", "Storage; Solar", "Storage; Wind"],
             "ercot": ["Other - Battery Energy Storage", "Other - Energy Storage"],
@@ -235,7 +262,7 @@ RESOURCE_DICT = {
     "Unknown": {
         "codes": {
             "miso": ["Hybrid", "Co-Gen"],
-            "caiso": [],
+            "caiso": ["Water", "Gravity via Rail"],
             "pjm": [],
             "ercot": [],
             "spp": [],
@@ -259,7 +286,7 @@ RESOURCE_DICT = {
     "Pumped Storage": {
         "codes": {
             "miso": [],
-            "caiso": [],
+            "caiso": ["Pumped-Storage hydro"],
             "pjm": [],
             "ercot": [],
             "spp": [],
@@ -352,9 +379,7 @@ def _clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
 
     unmapped = resource_df["resource_clean"].isna()
     if unmapped.sum() != 0:
-        debug = resource_df[unmapped][["resource", "iso_region"]].value_counts(
-            dropna=False
-        )
+        debug = resource_df[unmapped]["resource"].value_counts(dropna=False)
         raise AssertionError(f"Unmapped resource types in: {debug}")
     return resource_df
 
@@ -590,7 +615,7 @@ def _transform_nyiso(iso_df: pd.DataFrame) -> pd.DataFrame:
 def _transform_isone(iso_df: pd.DataFrame) -> pd.DataFrame:
     """Make isone specific transformations."""
     # Grab all active projects
-    iso_df = iso_df.query("queue_status == 'Active'")
+    iso_df = iso_df.query("queue_status == 'Active'").copy()
 
     iso_df = _create_project_status_classification_from_multiple_columns(
         iso_df,
@@ -599,7 +624,72 @@ def _transform_isone(iso_df: pd.DataFrame) -> pd.DataFrame:
         ia_col="Interconnection Agreement Status",
         completed_strings=("Document Posted", "Executed"),
     )
+
     return iso_df
+
+
+def _normalize_projects(iso_df: pd.DataFrame) -> tuple[pd.DataFrame]:
+    """
+    Normalize Gridstatus projects into projects and capacities.
+
+    CAISO is the only ISO that has multiple "capacities" per project.
+
+    """
+    project_cols = [
+        "project_id",
+        "actual_completion_date",
+        "county",
+        "interconnecting_entity",
+        "point_of_interconnection",
+        "project_name",
+        "proposed_completion_date",
+        "queue_date",
+        "queue_id",
+        "state",
+        "queue_status",
+        "transmission_owner",
+        "withdrawal_comment",
+        "withdrawn_date",
+        "is_actionable",
+        "is_nearly_certain",
+        "iso_region",
+        "state_id_fips",
+        "county_id_fips",
+        "geocoded_locality_name",
+        "geocoded_locality_type",
+        "geocoded_containing_county",
+    ]
+
+    capacity_cols = ["project_id", "resource", "capacity_mw"]
+
+    is_caiso = iso_df.iso_region.eq("caiso")
+    caiso = iso_df[is_caiso]
+
+    n_multicolumns = 3
+    caiso_capacity_cols = ["MW-" + str(n) for n in range(1, n_multicolumns + 1)]
+    attr_columns = {
+        "resource": ["Fuel-" + str(n) for n in range(1, n_multicolumns + 1)],
+        "capacity_mw": caiso_capacity_cols,
+    }
+    caiso_capacity_df = normalize_multicolumns_to_rows(
+        caiso,
+        attribute_columns_dict=attr_columns,
+        preserve_original_names=False,
+        index_cols=("project_id"),
+        dropna=True,
+    )
+    assert (
+        ~caiso_capacity_df[["project_id", "resource"]].duplicated().any()
+    ), "Found duplicate CAISO capacities."
+    assert (
+        caiso[caiso_capacity_cols].sum().sum() == caiso_capacity_df["capacity_mw"].sum()
+    ), "Total CAISO capacity not preserved after normaliztion."
+
+    capacity_df = pd.concat(
+        [iso_df[~is_caiso][capacity_cols], caiso_capacity_df[capacity_cols]]
+    )
+
+    return iso_df[project_cols], capacity_df
 
 
 def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
@@ -612,29 +702,6 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         A dictionary of cleaned Grid Status data queus.
     """
     # create one dataframe
-    shared_columns_mapping = {
-        "Actual Completion Date": "actual_completion_date",
-        "Capacity (MW)": "capacity_mw",
-        "County": "county",
-        "Generation Type": "resource",
-        "Interconnecting Entity": "interconnecting_entity",
-        "Interconnection Location": "point_of_interconnection",
-        "Project Name": "project_name",
-        "Proposed Completion Date": "proposed_completion_date",
-        "Queue Date": "queue_date",
-        "Queue ID": "queue_id",
-        "State": "state",
-        "Status": "queue_status",
-        "Summer Capacity (MW)": "summer_capacity_mw",
-        "Transmission Owner": "transmission_owner",
-        "Winter Capacity (MW)": "winter_capacity_mw",
-        "Withdrawal Comment": "withdrawal_comment",
-        "Withdrawn Date": "withdrawn_date",
-        "is_actionable": "is_actionable",
-        "is_nearly_certain": "is_nearly_certain",
-        "iso_region": "iso_region",
-    }
-
     iso_cleaning_functions = {
         "miso": _transform_miso,
         "caiso": _transform_caiso,
@@ -648,21 +715,19 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     projects = []
     for iso, df in raw_dfs.items():
         # Apply rename
-        renamed_df = df.rename(columns=shared_columns_mapping).copy()
+        renamed_df = df.rename(columns=COLUMN_RENAME_DICT).copy()
 
         # Apply iso specific cleaning functions
         renamed_df = iso_cleaning_functions[iso](renamed_df)
 
         renamed_df["iso_region"] = iso
-        renamed_df = renamed_df[shared_columns_mapping.values()]
         projects.append(renamed_df)
 
-    projects = pd.concat(projects)
-    projects["queue_status"] = projects.queue_status.str.lower()
-    active_projects = projects.copy()
+    active_projects = pd.concat(projects)
+    active_projects["queue_status"] = active_projects.queue_status.str.lower()
 
     # parse dates
-    date_cols = [col for col in list(projects) if "date" in col]
+    date_cols = [col for col in list(active_projects) if "date" in col]
     for col in date_cols:
         active_projects[col] = pd.to_datetime(active_projects[col], utc=True)
 
@@ -679,26 +744,31 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         active_projects.county_id_fips.eq("51515"), "county_id_fips"
     ] = "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
 
-    # harmonize types
-    active_projects = _clean_resource_type(active_projects)
-
     active_projects = active_projects.reset_index()
     assert (
         "project_id" in active_projects.columns
     ), "project_id not present in clean gridstatus data."
 
+    # Normalize data
+    normalized_projects, normalized_capacities = _normalize_projects(active_projects)
+
+    # harmonize types
+    normalized_capacities = _clean_resource_type(normalized_capacities)
+
     # Correct dtypes
-    active_projects["summer_capacity_mw"] = pd.to_numeric(
-        active_projects.summer_capacity_mw
+    normalized_capacities["capacity_mw"] = pd.to_numeric(
+        normalized_capacities.capacity_mw
     )
-    active_projects["winter_capacity_mw"] = pd.to_numeric(
-        active_projects.winter_capacity_mw
+    normalized_projects = apply_dtypes_from_metadata(
+        normalized_projects, table_name="gridstatus_projects", schema="data_warehouse"
     )
-    active_projects["capacity_mw"] = pd.to_numeric(active_projects.capacity_mw)
-    active_projects = apply_dtypes_from_metadata(
-        active_projects, table_name="gridstatus_projects", schema="data_warehouse"
+    normalized_capacities = apply_dtypes_from_metadata(
+        normalized_capacities,
+        table_name="gridstatus_resource_capacity",
+        schema="data_warehouse",
     )
 
     dfs = {}
-    dfs["gridstatus_projects"] = active_projects
+    dfs["gridstatus_projects"] = normalized_projects
+    dfs["gridstatus_resource_capacity"] = normalized_capacities
     return dfs

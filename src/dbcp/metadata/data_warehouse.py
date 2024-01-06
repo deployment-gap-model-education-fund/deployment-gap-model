@@ -1291,9 +1291,7 @@ gridstatus_projects = Table(
     metadata,
     Column("project_id", Integer, primary_key=True, autoincrement=False),
     Column("actual_completion_date", DateTime, nullable=True),
-    Column("capacity_mw", Float, nullable=True),
     Column("county", String, nullable=True),
-    Column("resource", String, nullable=True),
     Column("interconnecting_entity", String, nullable=True),
     Column("point_of_interconnection", String, nullable=True),
     Column("project_name", String, nullable=True),
@@ -1302,9 +1300,7 @@ gridstatus_projects = Table(
     Column("queue_id", String, nullable=True),
     Column("state", String, nullable=True),
     Column("queue_status", String, nullable=True),
-    Column("summer_capacity_mw", Float, nullable=True),
     Column("transmission_owner", String, nullable=True),
-    Column("winter_capacity_mw", Float, nullable=True),
     Column("withdrawal_comment", String, nullable=True),
     Column("withdrawn_date", DateTime, nullable=True),
     Column("is_actionable", Boolean, nullable=True),
@@ -1325,7 +1321,20 @@ gridstatus_projects = Table(
     Column("geocoded_locality_name", String, nullable=True),
     Column("geocoded_locality_type", String, nullable=True),
     Column("geocoded_containing_county", String, nullable=True),
-    Column("resource_clean", String, nullable=True),
+    schema=schema,
+)
+
+gridstatus_resource_capacity = Table(
+    "gridstatus_resource_capacity",
+    metadata,
+    Column(
+        "project_id",
+        Integer,
+        ForeignKey("data_warehouse.gridstatus_projects.project_id"),
+    ),
+    Column("resource", String),
+    Column("resource_clean", String),
+    Column("capacity_mw", Float),
     schema=schema,
 )
 

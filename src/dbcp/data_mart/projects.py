@@ -43,6 +43,7 @@ def _merge_with_gridstatus(
                     queue_date AS date_entered_queue,
                     UPPER(iso_region) AS entity
                 FROM data_warehouse.gridstatus_projects
+                LEFT JOIN data_warehouse.gridstatus_resource_capacity USING (project_id)
             )
             SELECT
                 gs.*,
