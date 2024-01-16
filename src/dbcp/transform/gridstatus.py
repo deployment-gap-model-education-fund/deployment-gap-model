@@ -22,13 +22,13 @@ COLUMN_RENAME_DICT = {
     "State": "state",
     "Status": "queue_status",
     "Summer Capacity (MW)": "summer_capacity_mw",
-    "Transmission Owner": "transmission_owner",
     "Winter Capacity (MW)": "winter_capacity_mw",
     "Withdrawal Comment": "withdrawal_comment",
     "Withdrawn Date": "withdrawn_date",
+    "Transmission Owner": "utility",
     "is_actionable": "is_actionable",
     "is_nearly_certain": "is_nearly_certain",
-    "iso_region": "iso_region",
+    "region": "region",
 }
 
 RESOURCE_DICT = {
@@ -528,6 +528,10 @@ def _transform_ercot(iso_df: pd.DataFrame) -> pd.DataFrame:
         nearly_certain_cols,
         actionable_cols,
     )
+
+    iso_df = iso_df.rename(
+        columns={"interconnecting_entity": "developer"}, errors="raise"
+    )
     return iso_df
 
 
@@ -647,12 +651,14 @@ def _normalize_projects(iso_df: pd.DataFrame) -> tuple[pd.DataFrame]:
         "queue_id",
         "state",
         "queue_status",
-        "transmission_owner",
+        "utility",
         "withdrawal_comment",
         "withdrawn_date",
         "is_actionable",
         "is_nearly_certain",
-        "iso_region",
+        "region",
+        "entity",
+        "developer",
         "state_id_fips",
         "county_id_fips",
         "geocoded_locality_name",
@@ -662,7 +668,7 @@ def _normalize_projects(iso_df: pd.DataFrame) -> tuple[pd.DataFrame]:
 
     capacity_cols = ["project_id", "resource", "capacity_mw"]
 
-    is_caiso = iso_df.iso_region.eq("caiso")
+    is_caiso = iso_df.region.eq("caiso")
     caiso = iso_df[is_caiso]
 
     n_multicolumns = 3
@@ -720,7 +726,8 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         # Apply iso specific cleaning functions
         renamed_df = iso_cleaning_functions[iso](renamed_df)
 
-        renamed_df["iso_region"] = iso
+        renamed_df["region"] = iso
+        renamed_df["entity"] = iso.upper()
         projects.append(renamed_df)
 
     active_projects = pd.concat(projects)

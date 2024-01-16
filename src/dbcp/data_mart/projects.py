@@ -33,15 +33,17 @@ def _merge_with_gridstatus(
                     project_id,
                     project_name,
                     capacity_mw,
+                    developer,
+                    entity,
+                    utility,
                     proposed_completion_date AS date_proposed_online,
                     point_of_interconnection,
-                    UPPER(iso_region) AS iso_region,
+                    UPPER(region) AS iso_region,
                     is_actionable,
                     resource_clean,
                     state,
                     queue_status,
-                    queue_date AS date_entered_queue,
-                    UPPER(iso_region) AS entity
+                    queue_date AS date_entered_queue
                 FROM data_warehouse.gridstatus_projects
                 LEFT JOIN data_warehouse.gridstatus_resource_capacity USING (project_id)
             )
