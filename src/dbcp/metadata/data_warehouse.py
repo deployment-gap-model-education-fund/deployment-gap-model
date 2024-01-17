@@ -1291,14 +1291,12 @@ gridstatus_projects = Table(
     metadata,
     Column("project_id", Integer, primary_key=True, autoincrement=False),
     Column("actual_completion_date", DateTime, nullable=True),
-    Column("county", String, nullable=True),
     Column("interconnecting_entity", String, nullable=True),
     Column("point_of_interconnection", String, nullable=True),
     Column("project_name", String, nullable=True),
     Column("proposed_completion_date", DateTime, nullable=True),
     Column("queue_date", DateTime, nullable=True),
     Column("queue_id", String, nullable=True),
-    Column("state", String, nullable=True),
     Column("queue_status", String, nullable=True),
     Column("utility", String, nullable=True),
     Column("withdrawal_comment", String, nullable=True),
@@ -1308,21 +1306,6 @@ gridstatus_projects = Table(
     Column("region", String, nullable=False),
     Column("entity", String, nullable=False),
     Column("developer", String, nullable=True),
-    Column(
-        "state_id_fips",
-        String,
-        ForeignKey("data_warehouse.state_fips.state_id_fips"),
-        nullable=True,
-    ),
-    Column(
-        "county_id_fips",
-        String,
-        ForeignKey("data_warehouse.county_fips.county_id_fips"),
-        nullable=True,
-    ),
-    Column("geocoded_locality_name", String, nullable=True),
-    Column("geocoded_locality_type", String, nullable=True),
-    Column("geocoded_containing_county", String, nullable=True),
     schema=schema,
 )
 
@@ -1337,6 +1320,34 @@ gridstatus_resource_capacity = Table(
     Column("resource", String),
     Column("resource_clean", String),
     Column("capacity_mw", Float),
+    schema=schema,
+)
+
+gridstatus_locations = Table(
+    "gridstatus_locations",
+    metadata,
+    Column(
+        "project_id",
+        Integer,
+        ForeignKey("data_warehouse.gridstatus_projects.project_id"),
+    ),
+    Column("raw_county_name", String),
+    Column("raw_state_name", String),
+    Column(
+        "state_id_fips",
+        String,
+        ForeignKey("data_warehouse.state_fips.state_id_fips"),
+        nullable=True,
+    ),
+    Column(
+        "county_id_fips",
+        String,
+        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        nullable=True,
+    ),
+    Column("geocoded_locality_name", String),
+    Column("geocoded_locality_type", String),
+    Column("geocoded_containing_county", String),
     schema=schema,
 )
 

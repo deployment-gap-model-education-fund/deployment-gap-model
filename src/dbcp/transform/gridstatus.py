@@ -632,33 +632,22 @@ def _transform_isone(iso_df: pd.DataFrame) -> pd.DataFrame:
     return iso_df
 
 
-def _normalize_projects(iso_df: pd.DataFrame) -> tuple[pd.DataFrame]:
-    """
-    Normalize Gridstatus projects into projects and capacities.
+def _normalize_project_locations(iso_df: pd.DataFrame) -> pd.DataFrame:
+    """Create a dataframe of project loctions.
 
-    CAISO is the only ISO that has multiple "capacities" per project.
+    Some projects list multiple counties in the `county` field. This funciton
+    explodes and geocodes the county names.
+
+    Args:
+        iso_df: the complete denormalized iso dataframe.
+    Returns:
+        geocoded_locations: a dataframe of geocoded project locations.
 
     """
-    project_cols = [
+    location_cols = [
         "project_id",
-        "actual_completion_date",
-        "county",
-        "interconnecting_entity",
-        "point_of_interconnection",
-        "project_name",
-        "proposed_completion_date",
-        "queue_date",
-        "queue_id",
-        "state",
-        "queue_status",
-        "utility",
-        "withdrawal_comment",
-        "withdrawn_date",
-        "is_actionable",
-        "is_nearly_certain",
-        "region",
-        "entity",
-        "developer",
+        "raw_county_name",
+        "raw_state_name",
         "state_id_fips",
         "county_id_fips",
         "geocoded_locality_name",
@@ -666,6 +655,45 @@ def _normalize_projects(iso_df: pd.DataFrame) -> tuple[pd.DataFrame]:
         "geocoded_containing_county",
     ]
 
+    # Create a location table.
+    locations = iso_df.assign(
+        county=iso_df["county"].str.split(",|/|-|&| and ")
+    ).explode("county")
+    # geocode the projects
+    locations["county_project_id"] = range(0, len(locations))
+    locations = locations.set_index("county_project_id")
+
+    geocoded_locations = add_county_fips_with_backup_geocoding(
+        locations, state_col="state", locality_col="county"
+    )
+    geocoded_locations["raw_county_name"] = locations["county"]
+    geocoded_locations["raw_state_name"] = locations["state"]
+    geocoded_locations = geocoded_locations.reset_index(drop=True)
+    # correct some fips codes
+    geocoded_locations.loc[
+        geocoded_locations.county_id_fips.eq("51515"), "county_id_fips"
+    ] = "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
+
+    geocoded_locations = geocoded_locations[location_cols].copy()
+    duplicate_locations = geocoded_locations[
+        geocoded_locations[["county_id_fips", "project_id"]].duplicated(keep=False)
+    ]
+    assert (
+        len(duplicate_locations) < 30
+    ), f"Found more duplicate locations in Grid Status location table than expected:\n {duplicate_locations}"
+    return geocoded_locations
+
+
+def _normalize_project_capacity(iso_df: pd.DataFrame) -> pd.DataFrame:
+    """Create a dataframe of project capacities.
+
+    California lists multiple fuel types and capacity values for a single project.
+
+    Args:
+        iso_df: the complete denormalized iso dataframe.
+    Returns:
+        capacity_df: a dataframe of project capacities.
+    """
     capacity_cols = ["project_id", "resource", "capacity_mw"]
 
     is_caiso = iso_df.region.eq("caiso")
@@ -694,8 +722,40 @@ def _normalize_projects(iso_df: pd.DataFrame) -> tuple[pd.DataFrame]:
     capacity_df = pd.concat(
         [iso_df[~is_caiso][capacity_cols], caiso_capacity_df[capacity_cols]]
     )
+    return capacity_df
 
-    return iso_df[project_cols], capacity_df
+
+def _normalize_projects(iso_df: pd.DataFrame) -> tuple[pd.DataFrame]:
+    """
+    Normalize Gridstatus projects into projects and capacities.
+
+    CAISO is the only ISO that has multiple "capacities" per project.
+
+    """
+    project_cols = [
+        "project_id",
+        "actual_completion_date",
+        "interconnecting_entity",
+        "point_of_interconnection",
+        "project_name",
+        "proposed_completion_date",
+        "queue_date",
+        "queue_id",
+        "queue_status",
+        "utility",
+        "withdrawal_comment",
+        "withdrawn_date",
+        "is_actionable",
+        "is_nearly_certain",
+        "region",
+        "entity",
+        "developer",
+    ]
+    location_df = _normalize_project_locations(iso_df)
+    # Create a capacity table
+    capacity_df = _normalize_project_capacity(iso_df)
+
+    return iso_df[project_cols], capacity_df, location_df
 
 
 def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
@@ -740,24 +800,13 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     # create project_id
     active_projects["project_id"] = np.arange(len(active_projects), dtype=np.int32)
-    active_projects = active_projects.set_index("project_id")
-
-    # geocode the projects
-    active_projects = add_county_fips_with_backup_geocoding(
-        active_projects, state_col="state", locality_col="county"
-    )
-    # correct some fips codes
-    active_projects.loc[
-        active_projects.county_id_fips.eq("51515"), "county_id_fips"
-    ] = "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
-
-    active_projects = active_projects.reset_index()
-    assert (
-        "project_id" in active_projects.columns
-    ), "project_id not present in clean gridstatus data."
 
     # Normalize data
-    normalized_projects, normalized_capacities = _normalize_projects(active_projects)
+    (
+        normalized_projects,
+        normalized_capacities,
+        normalized_locations,
+    ) = _normalize_projects(active_projects)
 
     # harmonize types
     normalized_capacities = _clean_resource_type(normalized_capacities)
@@ -778,4 +827,5 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     dfs = {}
     dfs["gridstatus_projects"] = normalized_projects
     dfs["gridstatus_resource_capacity"] = normalized_capacities
+    dfs["gridstatus_locations"] = normalized_locations
     return dfs

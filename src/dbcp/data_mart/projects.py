@@ -18,6 +18,12 @@ from dbcp.helpers import get_sql_engine
 def _merge_with_gridstatus(
     lbnl: pd.DataFrame, engine: sa.engine.Engine
 ) -> pd.DataFrame:
+    """Merge non ISO LBNL projects with ISO projects in GridStatus.
+
+    Args:
+        lbnl: lbnl ISO queue projects
+        engine: engine to connect to the local postgres data warehouse
+    """
     is_iso = ~lbnl.iso_region.str.contains("non-ISO")
     lbnl_non_isos = lbnl[~is_iso].copy()
 
@@ -28,7 +34,6 @@ def _merge_with_gridstatus(
                 SELECT
                     county_id_fips,
                     is_nearly_certain,
-                    county,
                     state_id_fips,
                     project_id,
                     project_name,
@@ -41,18 +46,29 @@ def _merge_with_gridstatus(
                     UPPER(region) AS iso_region,
                     is_actionable,
                     resource_clean,
-                    state,
                     queue_status,
-                    queue_date AS date_entered_queue
+                    queue_date AS date_entered_queue,
+                    '' AS interconnection_status
+                    -- We don't have interconnection_status for GS because we map
+                    -- the messy status columns for each ISO directly to
+                    -- is_actionable and is_nearly_certain columns
                 FROM data_warehouse.gridstatus_projects
                 LEFT JOIN data_warehouse.gridstatus_resource_capacity USING (project_id)
+                LEFT JOIN data_warehouse.gridstatus_locations USING (project_id)
             )
             SELECT
+                sfip.state_name AS state,
+                cfip.county_name AS county,
                 gs.*,
                 1.0 AS frac_locations_in_county,
-                ncsl.permitting_type as state_permitting_type FROM gs
-            left join data_warehouse.ncsl_state_permitting as ncsl
+                ncsl.permitting_type AS state_permitting_type FROM gs
+            LEFT JOIN data_warehouse.ncsl_state_permitting AS ncsl
                 on gs.state_id_fips = ncsl.state_id_fips
+            LEFT JOIN data_warehouse.state_fips AS sfip
+                ON gs.state_id_fips = sfip.state_id_fips
+            LEFT JOIN data_warehouse.county_fips AS cfip
+                ON gs.county_id_fips = cfip.county_id_fips
+
         """
         gs = pd.read_sql(query, con)
 
@@ -64,6 +80,15 @@ def _merge_with_gridstatus(
 
     shared_ids = set(gs.project_id).intersection(set(lbnl_non_isos.project_id))
     assert len(shared_ids) == 0, f"Found duplicate ids between GS and LBNL {shared_ids}"
+
+    fields_in_gs_not_in_lbnl = set(gs.columns) - set(lbnl.columns)
+    fields_in_lbnl_not_in_gs = set(lbnl.columns) - set(gs.columns)
+    assert (
+        not fields_in_gs_not_in_lbnl
+    ), f"These columns are in Grid Status but not LBNL: {fields_in_gs_not_in_lbnl}"
+    assert (
+        not fields_in_lbnl_not_in_gs
+    ), f"These columns are in LBNL but not Grid Status: {fields_in_lbnl_not_in_gs}"
 
     return pd.concat([gs, lbnl_non_isos])
 
@@ -230,6 +255,9 @@ def _replace_iso_offshore_with_proprietary(
         ignore_index=True,
     )
     out["source"].fillna("iso", inplace=True)
+    assert out.source.str.contains(
+        "proprietary"
+    ).any(), "Did not find any proprietary offshore wind data."
     return out
 
 

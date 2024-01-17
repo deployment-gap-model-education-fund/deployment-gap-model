@@ -170,7 +170,7 @@ def test_county_wide_coverage(engine: Engine):
     ), "counties_wide_format does not contain all counties"
     notnull = df.notnull()
     assert (
-        notnull.any(axis=1).sum() == 2383  # Was 2380 before GS integration
+        notnull.any(axis=1).sum() == 2387  # Was 2380 before GS integration
     ), f"counties_wide_format has unexpected county coverage: {notnull[notnull.any(axis=1)]}"
 
 
