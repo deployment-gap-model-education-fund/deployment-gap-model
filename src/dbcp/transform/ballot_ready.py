@@ -1,9 +1,13 @@
 """Module for cleaning Ballot Ready data."""
+import logging
+
 import pandas as pd
 
 from pudl.helpers import add_fips_ids
 
 DATETIME_COLUMNS = ["race_created_at", "race_updated_at", "election_day"]
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_entities(ballot_ready: pd.DataFrame) -> dict[str, pd.DataFrame]:
@@ -57,19 +61,44 @@ def _normalize_entities(ballot_ready: pd.DataFrame) -> dict[str, pd.DataFrame]:
         "frequency",
         "partisan_type",
     ]
-    # position_id == 156594 is the only position with two frequencies and reference_years
-    # Create a new index for it
-    new_index = ballot_ready.position_id.max() + 1
-    assert new_index not in ballot_ready.position_id
-    ballot_ready.loc[ballot_ready.race_id == 2020783, "position_id"] = new_index
-    assert (
-        (ballot_ready.groupby(position_pk_fields)[position_fields].nunique() <= 1)
-        .all()
-        .all()
-    ), "There is duplicate entity information in the positions dataframe."
+    # A small number of positions have multiple records where frequencies and referece_year
+    # differ. This is because of edge cases where a position has changed its election year
+    # or frequency due to redistricting or an election law. The old position_election_frequency
+    # and the future/current one are reflected in the data.
+
+    # check if position_id is unique
+    deduplicated_positions = ballot_ready[position_fields].drop_duplicates()
+    is_duplciate_position = deduplicated_positions.position_id.duplicated(keep=False)
+
+    # If position_id is not unique, generate new position ids for the duplicates
+    if is_duplciate_position.any():
+        n_duplicates = is_duplciate_position.sum()
+        logger.info(
+            f"{n_duplicates / len(deduplicated_positions) * 100} % of positions have duplicates. Generating new position_ids for duplicates."
+        )
+
+        # Create a mapping of the old position_ids to the new position_ids
+        new_index = ballot_ready.position_id.max() + 1
+        duplicate_position_ids = deduplicated_positions[
+            is_duplciate_position
+        ].position_id.to_frame()
+        duplicate_position_ids["new_position_id"] = range(
+            new_index, new_index + n_duplicates
+        )
+        new_position_id_mapping = duplicate_position_ids.set_index(
+            "position_id"
+        ).to_dict()["new_position_id"]
+
+        ballot_ready["position_id"] = ballot_ready["position_id"].replace(
+            new_position_id_mapping
+        )
+
     br_positions = ballot_ready.drop_duplicates(subset=position_pk_fields)[
         position_fields
     ].copy()
+    assert (
+        br_positions.position_id.is_unique
+    ), "position_id is not unique. Deduplication did not work as expected."
     trns_dfs["br_positions"] = br_positions
 
     # Races
@@ -155,11 +184,12 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
 
     # Valdez-Cordova Census Area was split into two areas in 2019
     # https://www.census.gov/programs-surveys/geography/technical-documentation/county-changes/2010.html
-    # All elections are state and federal level so I will duplicate the races for the two new census areas
+    # It is reasonable to split State and Federal elections between the two areas.
+    # However, adding local elections to both counties is not appropriate. I'm going to do it
+    # anyways because there aren't any great options for accurately geocoding the local elections.
     valdez = ballot_ready.query("county_id_fips == '02261'")
-    assert valdez.level.isin(
-        ["state", "federal"]
-    ).all(), "Found a local election in the Valdez-Cordova Census Area!"
+    if valdez.level.isin(["state", "federal"]).all():
+        logger.info("Found a local election in the Valdez-Cordova Census Area!")
 
     ballot_ready = ballot_ready[ballot_ready.county_id_fips != "02261"].copy()
 
@@ -178,10 +208,15 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
     ballot_ready = pd.concat(valdez_corrections_dfs + [ballot_ready])
 
     # Drop unused columns
-    ballot_ready = ballot_ready.drop(columns=["position_description", "id"])
+    ballot_ready = ballot_ready.drop(columns=["position_description"])
     ballot_ready = ballot_ready.rename(
         columns={"county": "raw_county", "state": "raw_state"}
     )
+
+    # Clean up boolean columns
+    bool_columns = [col for col in ballot_ready.columns if col.startswith("is_")]
+    for col in bool_columns:
+        ballot_ready[col] = ballot_ready[col].map({"t": True, "f": False})
     return ballot_ready
 
 
