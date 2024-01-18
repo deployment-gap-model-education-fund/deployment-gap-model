@@ -2,7 +2,7 @@
 import numpy as np
 import pandas as pd
 
-from dbcp.helpers import apply_dtypes_from_metadata
+from dbcp.helpers import enforce_dtypes
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     normalize_multicolumns_to_rows,
@@ -825,10 +825,10 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     normalized_capacities["capacity_mw"] = pd.to_numeric(
         normalized_capacities.capacity_mw
     )
-    normalized_projects = apply_dtypes_from_metadata(
+    normalized_projects = enforce_dtypes(
         normalized_projects, table_name="gridstatus_projects", schema="data_warehouse"
     )
-    normalized_capacities = apply_dtypes_from_metadata(
+    normalized_capacities = enforce_dtypes(
         normalized_capacities,
         table_name="gridstatus_resource_capacity",
         schema="data_warehouse",

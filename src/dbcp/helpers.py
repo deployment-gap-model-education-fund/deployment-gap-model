@@ -76,7 +76,7 @@ def get_bq_schema_from_metadata(
     return bq_schema
 
 
-def apply_dtypes_from_metadata(df: pd.DataFrame, table_name: str, schema: str):
+def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str):
     """Apply dtypes to a dataframe using the sqlalchemy metadata."""
     table_name = f"{schema}.{table_name}"
     metadata = get_schema_sql_alchemy_metadata(schema)
@@ -85,7 +85,11 @@ def apply_dtypes_from_metadata(df: pd.DataFrame, table_name: str, schema: str):
     except KeyError:
         raise KeyError(f"{table_name} does not exist in metadata.")
 
-    dtypes = {col.name: SA_TO_PD_TYPES[str(col.type)] for col in table.columns}
+    dtypes = {
+        col.name: SA_TO_PD_TYPES[str(col.type)]
+        for col in table.columns
+        if col.name in df.columns
+    }
     return df.astype(dtypes)
 
 
@@ -217,26 +221,3 @@ def psql_insert_copy(table, conn, keys, data_iter):
         sql = f"COPY {table_name} ({columns}) FROM STDIN WITH CSV"
         cur.copy_expert(sql=sql, file=s_buf)
         dbapi_conn.commit()
-
-
-SA_TO_PD_TYPES = {
-    "BOOLEAN": "boolean",
-    "DATETIME": "datetime64[ns]",
-    "FLOAT": "float64",
-    "INTEGER": "Int64",
-    "VARCHAR": "string",
-}
-
-
-def enforce_dtypes(
-    df: pd.DataFrame, table_name: str, schema: str, metadata: sa.sql.schema.MetaData
-) -> pd.DataFrame:
-    """Enforce datatypes specified in the dbcp.metadata.sqlalchemy schemas."""
-    full_table_name = f"{schema}.{table_name}"
-    return df.astype(
-        {
-            column_name: SA_TO_PD_TYPES[str(col.type)]
-            for column_name, col in metadata.tables[full_table_name].columns.items()
-            if column_name in df.columns
-        }
-    )
