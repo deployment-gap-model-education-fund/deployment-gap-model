@@ -43,6 +43,41 @@ conda activate dbcp-dev
 
 This conda environment has python, pip and pre-commit installed in it. This env is just for running pre-commits, the actual ETL development happens in docker.
 
+## GCP Authentication
+The ETL requires access to some data stored in Google Cloud Platform (GCP).
+To authenticate the docker container with GCP install the [gcloud utilities](https://cloud.google.com/sdk/docs/install) on your
+computer. There are several ways to do this. We recommend using ``conda`` or its faster
+sibling ``mamba``. If you're not using ``conda`` environments, there are other
+ways to install the Google Cloud SDK explained in the link above.
+
+```
+conda install -c conda-forge google-cloud-sdk
+```
+
+Finally, use ``gcloud`` to establish application default credentials
+
+```
+  gcloud auth application-default login
+```
+
+This will send you to an authentication page in your default browser. Once
+authenticated, the command should print out a message:
+
+```
+Credentials saved to file: <path/to/your_credentials.json>
+```
+
+Set this path to the `GOOGLE_APPLICATION_CREDENTIALS_PATH`:
+
+```
+export GOOGLE_APPLICATION_CREDENTIALS_PATH=<path/to/your_credentials.json>
+```
+
+`GOOGLE_APPLICATION_CREDENTIALS_PATH` will be mounted into the container so
+the GCP APIs in the container can access the data stored in GCP.
+
+
+
 ## Git Pre-commit Hooks
 
 Git hooks let you automatically run scripts at various points as you manage your source code. “Pre-commit” hook scripts are run when you try to make a new commit. These scripts can review your code and identify bugs, formatting errors, bad coding habits, and other issues before the code gets checked in. This gives you the opportunity to fix those issues before publishing them.

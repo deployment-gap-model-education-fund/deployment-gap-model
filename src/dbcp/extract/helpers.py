@@ -1,28 +1,18 @@
 """Helper functions for extracting data."""
 import logging
-import os
 import re
 from pathlib import Path
 
-import pydata_google_auth
+import google.auth
 from google.cloud import storage
 
 logger = logging.getLogger(__name__)
-
-
-def get_gcp_credentials():
-    """Get GCP credentials via pydata oauth workflow."""
-    SCOPES = [
-        "https://www.googleapis.com/auth/cloud-platform",
-    ]
-    return pydata_google_auth.get_user_credentials(SCOPES, use_local_webserver=False)
 
 
 def cache_gcs_archive_file_locally(
     uri: Path,
     local_cache_dir: str = "/app/data/data_cache",
     revision_num: str = None,
-    credentials=None,
 ) -> Path:
     """
     Cache a file stored in the GCS archive locally to a local directory.
@@ -38,6 +28,7 @@ def cache_gcs_archive_file_locally(
         Path to the local cache of the file.
     """
     bucket_url, object_name = re.match("gs://(.*?)/(.*)", str(uri)).groups()
+    credentials, project_id = google.auth.default()
 
     local_cache_dir = Path(local_cache_dir)
     filepath = local_cache_dir / object_name
@@ -48,12 +39,8 @@ def cache_gcs_archive_file_locally(
             f"{object_name} not found in {local_cache_dir}. Downloading from GCS bucket."
         )
 
-        GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
-        if credentials is None:
-            credentials = get_gcp_credentials()
-
-        bucket = storage.Client(credentials=credentials, project=GCP_PROJECT_ID).bucket(
-            bucket_url, user_project=GCP_PROJECT_ID
+        bucket = storage.Client(credentials=credentials, project=project_id).bucket(
+            bucket_url, user_project=project_id
         )
 
         if revision_num:

@@ -6,9 +6,9 @@ from io import StringIO
 from pathlib import Path
 
 import boto3
+import google.auth
 import pandas as pd
 import pandas_gbq
-import pydata_google_auth
 import sqlalchemy as sa
 from botocore import UNSIGNED
 from botocore.config import Config
@@ -33,7 +33,6 @@ SA_TO_PD_TYPES = {
     "DATETIME": "datetime64[ns]",
 }
 SA_TO_BQ_MODES = {True: "NULLABLE", False: "REQUIRED"}
-GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
 
 
 def get_schema_sql_alchemy_metadata(schema: str) -> sa.MetaData:
@@ -155,14 +154,6 @@ def get_db_schema_tables(engine: sa.engine.Engine, schema: str) -> list[str]:
     return table_names
 
 
-def _get_bigquery_credentials():
-    SCOPES = [
-        "https://www.googleapis.com/auth/cloud-platform",
-    ]
-    creds = pydata_google_auth.get_user_credentials(SCOPES, use_local_webserver=False)
-    return creds
-
-
 def upload_schema_to_bigquery(schema: str, dev: bool = True) -> None:
     """Upload a postgres schema to BigQuery."""
     logger.info("Loading tables to BigQuery.")
@@ -182,7 +173,7 @@ def upload_schema_to_bigquery(schema: str, dev: bool = True) -> None:
             loaded_tables[table_name] = loaded_tables[table_name].convert_dtypes()
 
     # load to big query
-    credentials = _get_bigquery_credentials()
+    credentials, project_id = google.auth.default()
 
     for table_name, df in loaded_tables.items():
         full_table_name = f"{schema}{'_dev' if dev else ''}.{table_name}"
@@ -190,7 +181,7 @@ def upload_schema_to_bigquery(schema: str, dev: bool = True) -> None:
         pandas_gbq.to_gbq(
             df,
             full_table_name,
-            project_id=GCP_PROJECT_ID,
+            project_id=project_id,
             if_exists="replace",
             credentials=credentials,
             table_schema=get_bq_schema_from_metadata(table_name, schema, dev),
