@@ -63,6 +63,18 @@ null,02063
     pd.testing.assert_frame_equal(actual, expected)
 
 
+def test_gridstatus_fips_coverage(engine: Engine):
+    """Make sure we have high coverage for county_id_fips codes or gridstatus_projects."""
+    with engine.connect() as con:
+        gridstatus_locations = pd.read_sql_table(
+            "gridstatus_locations", con, schema="data_warehouse"
+        )
+    assert (
+        gridstatus_locations.county_id_fips.isna().sum() / len(gridstatus_locations)
+        < 0.02
+    ), "More than 2 percent of Grid Status locations could not be geocoded."
+
+
 def test_iso_projects_data_mart_aggregates_are_close(engine: Engine):
     """Test that data mart aggregates are close to simple aggregates of the source tables.
 
@@ -170,7 +182,7 @@ def test_county_wide_coverage(engine: Engine):
     ), "counties_wide_format does not contain all counties"
     notnull = df.notnull()
     assert (
-        notnull.any(axis=1).sum() == 2387  # Was 2380 before GS integration
+        notnull.any(axis=1).sum() == 2387
     ), f"counties_wide_format has unexpected county coverage: {notnull[notnull.any(axis=1)]}"
 
 
@@ -270,6 +282,7 @@ def validate_warehouse(engine: Engine):
     """Run data warehouse validation tests."""
     logger.info("Validating data warehouse")
     test_j40_county_fips_coverage(engine)
+    test_gridstatus_fips_coverage(engine)
 
 
 def validate_data_mart(engine: Engine):
