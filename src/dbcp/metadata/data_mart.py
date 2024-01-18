@@ -311,6 +311,7 @@ iso_projects_long_format = Table(
     Column("state", String),
     Column("county", String),
     Column("county_id_fips", String),
+    Column("queue_id", String),
     Column("resource_clean", String, nullable=False),
     Column("project_id", Integer, nullable=False),
     Column("date_proposed_online", DateTime),

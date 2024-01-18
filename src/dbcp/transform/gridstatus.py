@@ -463,6 +463,7 @@ def _transform_miso(iso_df: pd.DataFrame) -> pd.DataFrame:
         nearly_certain_cols,
         actionable_cols,
     )
+    iso_df = iso_df.rename(columns={"studyPhase": "interconnection_status_raw"})
 
     # There are about 30 projects that are duplciated because there is an
     # addition record where studyPhase == "Network Upgrade". I don't fully
@@ -529,6 +530,8 @@ def _transform_ercot(iso_df: pd.DataFrame) -> pd.DataFrame:
         actionable_cols,
     )
 
+    iso_df = iso_df.rename(columns={"GIM Study Phase": "interconnection_status_raw"})
+
     iso_df = iso_df.rename(
         columns={"interconnecting_entity": "developer"}, errors="raise"
     )
@@ -572,30 +575,34 @@ def _transform_spp(iso_df: pd.DataFrame) -> pd.DataFrame:
         nearly_certain_cols,
         actionable_cols,
     )
+
+    iso_df = iso_df.rename(columns={"Status (Original)": "interconnection_status_raw"})
+
     return iso_df
 
 
 def _transform_nyiso(iso_df: pd.DataFrame) -> pd.DataFrame:
-    """Make nyiso specific transformations.
+    """Make nyiso specific transformations."""
+    # NYISO status mapping from the excel sheet
+    status_mapping = {
+        0: "Withdrawn",
+        1: "Scoping Meeting Pending",
+        2: "FES Pending",
+        3: "FES in Progress",
+        4: "SRIS/SIS Pending",
+        5: "SRIS/SIS in Progress",
+        6: "SRIS/SIS Approved",
+        7: "FS Pending",
+        8: "Rejected Cost Allocation/Next FS Pending",
+        9: "FS in Progress",
+        10: "Accepted Cost Allocation/IA in Progress",
+        11: "IA Completed",
+        12: "Under Construction",
+        13: "In Service for Test",
+        14: "In Service Commercial",
+        15: "Partial In-Service",
+    }
 
-    NYISO Status Key:
-        * 0=Withdrawn
-        * 1=Scoping Meeting Pending
-        * 2=FES Pending
-        * 3=FES in Progress
-        * 4=SRIS/SIS Pending
-        * 5=SRIS/SIS in Progress
-        * 6=SRIS/SIS Approved
-        * 7=FS Pending
-        * 8=Rejected Cost Allocation/Next FS Pending
-        * 9=FS in Progress
-        * 10=Accepted Cost Allocation/IA in Progress
-        * 11=IA Completed
-        * 12=Under Construction
-        * 13=In Service for Test
-        * 14=In Service Commercial
-        * 15=Partial In-Service
-    """
     # Some projects have multiple values listed. Grab the largest value.
     iso_df["S"] = (
         iso_df["S"]
@@ -613,6 +620,8 @@ def _transform_nyiso(iso_df: pd.DataFrame) -> pd.DataFrame:
     assert (
         ~iso_df[["is_actionable", "is_nearly_certain"]].all(axis=1)
     ).all(), "Some projects are marked marked actionable and nearly certain."
+
+    iso_df["interconnection_status_raw"] = iso_df["S"].replace(status_mapping)
     return iso_df
 
 
@@ -742,6 +751,7 @@ def _normalize_projects(iso_df: pd.DataFrame) -> tuple[pd.DataFrame]:
         "queue_date",
         "queue_id",
         "queue_status",
+        "interconnection_status_raw",
         "utility",
         "withdrawal_comment",
         "withdrawn_date",

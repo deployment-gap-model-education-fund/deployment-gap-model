@@ -33,6 +33,7 @@ def _merge_with_gridstatus(
             gs AS (
                 SELECT
                     county_id_fips,
+                    queue_id,
                     is_nearly_certain,
                     state_id_fips,
                     project_id,
@@ -48,10 +49,7 @@ def _merge_with_gridstatus(
                     resource_clean,
                     queue_status,
                     queue_date AS date_entered_queue,
-                    '' AS interconnection_status
-                    -- We don't have interconnection_status for GS because we map
-                    -- the messy status columns for each ISO directly to
-                    -- is_actionable and is_nearly_certain columns
+                    interconnection_status_raw AS interconnection_status
                 FROM data_warehouse.gridstatus_projects
                 LEFT JOIN data_warehouse.gridstatus_resource_capacity USING (project_id)
                 LEFT JOIN data_warehouse.gridstatus_locations USING (project_id)
@@ -93,7 +91,9 @@ def _merge_with_gridstatus(
     return pd.concat([gs, lbnl_non_isos])
 
 
-def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
+def _get_and_join_iso_tables(
+    engine: sa.engine.Engine, use_gridstatus: bool = True
+) -> pd.DataFrame:
     """Get ISO projects.
 
     PK should be (project_id, county_id_fips, resource_clean), but county_id_fips has nulls.
@@ -101,12 +101,20 @@ def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
     Note that this duplicates projects that have multiple prospective locations. Use the frac_locations_in_county
     column to allocate capacity and co2e estimates to counties when aggregating.
     Otherwise they will be double-counted.
+
+    Args:
+        engine: engine to connect to the local postgres data warehouse
+        use_gridstatus: use gridstatus data for ISO projects.
+
+    Returns:
+        A dataframe of ISO projects with location, capacity, estimated co2 emissions and state permitting info.
     """
     query = """
     WITH
     iso_proj_res as (
         SELECT
             proj.project_id,
+            proj.queue_id,
             proj.date_proposed as date_proposed_online,
             proj.developer,
             proj.entity,
@@ -170,7 +178,8 @@ def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
         df.loc[dupes, "project_id"].eq(9118).all()
     ), f"Duplicate counties: {df.loc[dupes, ['project_id', 'county']]}"
     df = df.loc[~dupes]
-    df = _merge_with_gridstatus(df, engine)
+    if use_gridstatus:
+        df = _merge_with_gridstatus(df, engine)
     _estimate_proposed_power_co2e(df)
     return df
 
@@ -466,7 +475,7 @@ def create_long_format(engine: sa.engine.Engine) -> pd.DataFrame:
     Returns:
         pd.DataFrame: long format table of ISO projects
     """
-    iso = _get_and_join_iso_tables(engine)
+    iso = _get_and_join_iso_tables(engine, use_gridstatus=True)
     offshore = _get_proprietary_proposed_offshore(engine)
     iso = _replace_iso_offshore_with_proprietary(iso, offshore)
     all_counties = _get_county_fips_df(engine)
