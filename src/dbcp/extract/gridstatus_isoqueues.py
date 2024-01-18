@@ -20,13 +20,13 @@ logger = logging.getLogger(__name__)
 # except for spp and ISONE because the recent versions
 # have columns the old versions don't.
 ISO_QUEUE_VERSIONS: dict[str, str] = {
-    "miso": "1681775160487863",
-    "caiso": "1681775162586588",
-    "pjm": "1681775160979859",
-    "ercot": "1681775161342766",
-    "spp": "1701730381410448",
-    "nyiso": "1681775159356063",
-    "isone": "1701730382409516",
+    "miso": "1704654953145483",
+    "caiso": "1704654953474846",
+    "pjm": "1704654953842777",
+    "ercot": "1704654954177109",
+    "spp": "1704654954488739",
+    "nyiso": "1702235705611699",
+    "isone": "1704654954804863",
 }
 
 

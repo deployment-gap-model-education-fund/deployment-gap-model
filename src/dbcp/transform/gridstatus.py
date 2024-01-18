@@ -305,7 +305,7 @@ RESOURCE_DICT = {
                 "Solar Thermal + Storage",
                 "Photovoltaic + Storage + Wind Turbine",
             ],
-            "pjm": ["Solar", "Solar; Storage", "Solar; Wind"],
+            "pjm": ["Solar", "Solar; Storage", "Solar; Wind", "Solar; Battery"],
             "ercot": ["Solar - Photovoltaic Solar", "Other - Photovoltaic Solar"],
             "spp": [
                 "Solar",
@@ -315,7 +315,7 @@ RESOURCE_DICT = {
                 "Hybrid - Solar/Battery/Wind",
             ],
             "nyiso": ["Solar"],
-            "isone": ["SUN", "SUN BAT"],
+            "isone": ["SUN", "SUN BAT", "SUN WAT"],
         },
         "type": "Renewable",
     },
@@ -380,7 +380,7 @@ def _clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
     unmapped = resource_df["resource_clean"].isna()
     if unmapped.sum() != 0:
         debug = resource_df[unmapped]["resource"].value_counts(dropna=False)
-        raise AssertionError(f"Unmapped resource types in: {debug}")
+        raise AssertionError(f"Unmapped resource types in: \n{debug}")
     return resource_df
 
 
@@ -606,6 +606,7 @@ def _transform_nyiso(iso_df: pd.DataFrame) -> pd.DataFrame:
     # Some projects have multiple values listed. Grab the largest value.
     iso_df["S"] = (
         iso_df["S"]
+        .astype("string")
         .str.split(",")
         .apply(lambda lst: max([pd.to_numeric(x) for x in lst]))
     )
