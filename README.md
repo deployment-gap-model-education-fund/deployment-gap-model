@@ -44,6 +44,7 @@ conda activate dbcp-dev
 This conda environment has python, pip and pre-commit installed in it. This env is just for running pre-commits, the actual ETL development happens in docker.
 
 ## GCP Authentication
+
 The ETL requires access to some data stored in Google Cloud Platform (GCP).
 To authenticate the docker container with GCP install the [gcloud utilities](https://cloud.google.com/sdk/docs/install) on your
 computer. There are several ways to do this. We recommend using ``conda`` or its faster
@@ -67,16 +68,13 @@ authenticated, the command should print out a message:
 Credentials saved to file: <path/to/your_credentials.json>
 ```
 
-Set this path to the `GOOGLE_APPLICATION_CREDENTIALS_PATH`:
+Add this path to the `GOOGLE_APPLICATION_CREDENTIALS_PATH` environment variable in
+your  `.env` file (see Environment Variables section below).
 
-```
-export GOOGLE_APPLICATION_CREDENTIALS_PATH=<path/to/your_credentials.json>
-```
+`GOOGLE_APPLICATION_CREDENTIALS_PATH=<path/to/your_credentials.json>``
 
 `GOOGLE_APPLICATION_CREDENTIALS_PATH` will be mounted into the container so
 the GCP APIs in the container can access the data stored in GCP.
-
-
 
 ## Git Pre-commit Hooks
 
