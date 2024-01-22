@@ -42,6 +42,8 @@ def _normalize_entities(ballot_ready: pd.DataFrame) -> dict[str, pd.DataFrame]:
     trns_dfs["br_elections"] = br_elections
 
     # Positions
+    position_pk_fields = ["position_id"]
+
     position_fields = [
         "reference_year",
         "position_id",
@@ -65,7 +67,7 @@ def _normalize_entities(ballot_ready: pd.DataFrame) -> dict[str, pd.DataFrame]:
     # and the future/current one are reflected in the data.
 
     # check if position_id is unique
-    br_positions = ballot_ready.drop_duplicates(subset=position_fields)
+    br_positions = ballot_ready.drop_duplicates(subset=position_pk_fields)
     is_duplciate_position = br_positions.position_id.duplicated(keep=False)
     duplicate_positions = br_positions[is_duplciate_position].copy()
 
