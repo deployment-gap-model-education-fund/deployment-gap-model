@@ -42,8 +42,6 @@ def _normalize_entities(ballot_ready: pd.DataFrame) -> dict[str, pd.DataFrame]:
     trns_dfs["br_elections"] = br_elections
 
     # Positions
-    position_pk_fields = ["position_id"]
-
     position_fields = [
         "reference_year",
         "position_id",
@@ -67,35 +65,29 @@ def _normalize_entities(ballot_ready: pd.DataFrame) -> dict[str, pd.DataFrame]:
     # and the future/current one are reflected in the data.
 
     # check if position_id is unique
-    deduplicated_positions = ballot_ready[position_fields].drop_duplicates()
-    is_duplciate_position = deduplicated_positions.position_id.duplicated(keep=False)
+    br_positions = ballot_ready.drop_duplicates(subset=position_fields)
+    is_duplciate_position = br_positions.position_id.duplicated(keep=False)
+    duplicate_positions = br_positions[is_duplciate_position].copy()
 
-    # If position_id is not unique, generate new position ids for the duplicates
-    if is_duplciate_position.any():
-        n_duplicates = is_duplciate_position.sum()
-        logger.info(
-            f"{n_duplicates / len(deduplicated_positions) * 100} % of positions have duplicates. Generating new position_ids for duplicates."
-        )
+    assert (
+        len(duplicate_positions) <= 52
+    ), f"Found more duplicate positions than expected: {len(duplicate_positions)}"
 
-        # Create a mapping of the old position_ids to the new position_ids
-        new_index = ballot_ready.position_id.max() + 1
-        duplicate_position_ids = deduplicated_positions[
-            is_duplciate_position
-        ].position_id.to_frame()
-        duplicate_position_ids["new_position_id"] = range(
-            new_index, new_index + n_duplicates
-        )
-        new_position_id_mapping = duplicate_position_ids.set_index(
-            "position_id"
-        ).to_dict()["new_position_id"]
+    # dropnas in frequency and reference_year
+    duplicate_positions = duplicate_positions.dropna(
+        subset=["frequency", "reference_year"]
+    )
+    # select the the position that has the most recent election day
+    latest_position_idx = duplicate_positions.groupby("position_id")[
+        "election_day"
+    ].idxmax()
+    duplicate_positions = duplicate_positions.loc[latest_position_idx]
 
-        ballot_ready["position_id"] = ballot_ready["position_id"].replace(
-            new_position_id_mapping
-        )
+    # merge with the non duplicates
+    br_positions = pd.concat(
+        [duplicate_positions, br_positions[~is_duplciate_position]]
+    )[position_fields]
 
-    br_positions = ballot_ready.drop_duplicates(subset=position_pk_fields)[
-        position_fields
-    ].copy()
     assert (
         br_positions.position_id.is_unique
     ), "position_id is not unique. Deduplication did not work as expected."
