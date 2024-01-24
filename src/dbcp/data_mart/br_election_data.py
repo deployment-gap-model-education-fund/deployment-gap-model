@@ -60,7 +60,7 @@ def _create_county_commission_elections_long(
     ]
 
     # Aggregate
-    mode = lambda x: x.value_counts().index[0]  # noqa: E731
+    mode = lambda x: x.value_counts(dropna=False).index[0]  # noqa: E731
 
     grp_fields = [
         "election_id",
