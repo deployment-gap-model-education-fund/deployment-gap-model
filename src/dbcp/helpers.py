@@ -12,6 +12,7 @@ import pydata_google_auth
 import sqlalchemy as sa
 from botocore import UNSIGNED
 from botocore.config import Config
+from google.cloud import bigquery
 from tqdm import tqdm
 
 import dbcp
@@ -158,22 +159,33 @@ def upload_schema_to_bigquery(schema: str, dev: bool = True) -> None:
             loaded_tables[table_name] = pd.read_sql_table(
                 table_name, con, schema=schema
             )
-            # Use dtypes that support pd.NA
-            loaded_tables[table_name] = loaded_tables[table_name].convert_dtypes()
+            loaded_tables[table_name] = enforce_dtypes(
+                loaded_tables[table_name], table_name, schema
+            )
 
     # load to big query
     credentials = _get_bigquery_credentials()
+    client = bigquery.Client(credentials=credentials, project=GCP_PROJECT_ID)
 
     for table_name, df in loaded_tables.items():
-        full_table_name = f"{schema}{'_dev' if dev else ''}.{table_name}"
+        schema_environment = f"{schema}{'_dev' if dev else ''}"
+        full_table_name = f"{schema_environment}.{table_name}"
+        table_schema = get_bq_schema_from_metadata(table_name, schema, dev)
         logger.info(f"Loading: {table_name}")
+
+        # Delete the table because pandas_gbq doesn't recreate the BQ
+        # table schema which leads to problems when we change the metadata.
+        table_id = f"{GCP_PROJECT_ID}.{schema_environment}.{table_name}"
+        client.delete_table(table_id, not_found_ok=True)
+
         pandas_gbq.to_gbq(
             df,
             full_table_name,
             project_id=GCP_PROJECT_ID,
             if_exists="replace",
             credentials=credentials,
-            table_schema=get_bq_schema_from_metadata(table_name, schema, dev),
+            table_schema=table_schema,
+            chunksize=5000,
         )
         logger.info(f"Finished: {full_table_name}")
 
@@ -217,10 +229,15 @@ SA_TO_PD_TYPES = {
 }
 
 
-def enforce_dtypes(
-    df: pd.DataFrame, table_name: str, schema: str, metadata: sa.sql.schema.MetaData
-) -> pd.DataFrame:
+def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str) -> pd.DataFrame:
     """Enforce datatypes specified in the dbcp.metadata.sqlalchemy schemas."""
+    schema_sa_metadata = {
+        "data_warehouse": dbcp.metadata.data_warehouse.metadata,
+        "data_mart": dbcp.metadata.data_mart.metadata,
+    }
+    metadata = schema_sa_metadata.get(schema, None)
+    if not metadata:
+        raise KeyError(f"Metadata for schema: {schema} does not exists.")
     full_table_name = f"{schema}.{table_name}"
     return df.astype(
         {

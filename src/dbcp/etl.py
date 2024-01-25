@@ -245,7 +245,7 @@ def etl(args):
         for table in metadata.sorted_tables:
             logger.info(f"Load {table.name} to postgres.")
             df = enforce_dtypes(
-                transformed_dfs[table.name], table.name, "data_warehouse", metadata
+                transformed_dfs[table.name], table.name, "data_warehouse"
             )
             df.to_sql(
                 name=table.name,

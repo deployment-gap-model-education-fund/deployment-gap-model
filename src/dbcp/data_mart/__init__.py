@@ -14,7 +14,7 @@ from dbcp.validation.tests import validate_data_mart
 logger = logging.getLogger(__name__)
 
 
-def create_data_marts(args):
+def create_data_marts(args):  # noqa: max-complexity=11
     """Collect and load all data mart tables to data warehouse."""
     engine = dbcp.helpers.get_sql_engine()
     data_marts = {}
@@ -61,9 +61,7 @@ def create_data_marts(args):
     with engine.connect() as con:
         for table in metadata.sorted_tables:
             logger.info(f"Load {table.name} to postgres.")
-            df = enforce_dtypes(
-                data_marts[table.name], table.name, "data_mart", metadata
-            )
+            df = enforce_dtypes(data_marts[table.name], table.name, "data_mart")
             df.to_sql(
                 name=table.name,
                 con=con,
