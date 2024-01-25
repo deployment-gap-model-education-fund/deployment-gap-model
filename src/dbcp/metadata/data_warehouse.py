@@ -1213,7 +1213,9 @@ br_positions = Table(
     metadata,
     Column("position_id", Integer, nullable=False, primary_key=True),
     Column("position_name", String, nullable=False),
-    Column("reference_year", Integer, nullable=False),
+    Column(
+        "reference_year", Integer, nullable=True
+    ),  # Starting 2023-10-03 update there were a couple hundred nulls
     Column("sub_area_name", String),
     Column("sub_area_value", String),
     Column("sub_area_name_secondary", String),
@@ -1224,7 +1226,9 @@ br_positions = Table(
     Column("is_retention", Boolean, nullable=False),
     Column("normalized_position_id", Integer, nullable=False),
     Column("normalized_position_name", String, nullable=False),
-    Column("frequency", String, nullable=False),
+    Column(
+        "frequency", String, nullable=True
+    ),  # Starting 2023-10-03 update there were a couple hundred nulls
     Column("partisan_type", String),
     schema=schema,
 )

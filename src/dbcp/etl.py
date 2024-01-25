@@ -175,7 +175,7 @@ def etl_energy_communities_by_county() -> dict[str, pd.DataFrame]:
 
 def etl_ballot_ready() -> dict[str, pd.DataFrame]:
     """ETL Ballot Ready election data."""
-    source_uri = "gs://dgm-archive/ballot_ready/BallotReady_upcoming_races_with_counties_08_14_2023.csv"
+    source_uri = "gs://dgm-archive/ballot_ready/Climate Partners_Upcoming Races_All Tiers_20231013.csv"
     raw_df = dbcp.extract.ballot_ready.extract(source_uri)
     transformed = dbcp.transform.ballot_ready.transform(raw_df)
     return transformed
@@ -245,7 +245,7 @@ def etl(args):
         for table in metadata.sorted_tables:
             logger.info(f"Load {table.name} to postgres.")
             df = enforce_dtypes(
-                transformed_dfs[table.name], table.name, "data_warehouse", metadata
+                transformed_dfs[table.name], table.name, "data_warehouse"
             )
             df.to_sql(
                 name=table.name,
