@@ -1,4 +1,7 @@
 """Clean Grid Status Interconnection queue data."""
+import logging
+from typing import Sequence
+
 import numpy as np
 import pandas as pd
 
@@ -6,6 +9,10 @@ from dbcp.helpers import enforce_dtypes
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     normalize_multicolumns_to_rows,
+)
+from dbcp.transform.lbnl_iso_queue import (
+    _normalize_point_of_interconnection,
+    deduplicate_active_projects,
 )
 
 COLUMN_RENAME_DICT = {
@@ -357,6 +364,8 @@ RESOURCE_DICT = {
     },
 }
 
+logger = logging.getLogger(__name__)
+
 
 def _clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
     """Harmonize resource type for all ISO queues."""
@@ -365,17 +374,19 @@ def _clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
 
     for clean_name, code_type_dict in RESOURCE_DICT.items():
         long_dict[clean_name] = clean_name
-        for iso, codes in code_type_dict["codes"].items():
+        for _, codes in code_type_dict["codes"].items():
             for code in codes:
                 if code:
                     long_dict[code] = clean_name
 
     # There are a couple of empty string values
-    resource_df["resource"] = resource_df["resource"].astype("string")
-    resource_df["resource"] = resource_df["resource"].str.strip().replace("", pd.NA)
+    resource_df["resource"] = (
+        resource_df["resource"].astype("string").str.strip().replace("", pd.NA)
+    )
 
-    resource_df["resource_clean"] = resource_df["resource"].fillna("Unknown")
-    resource_df["resource_clean"] = resource_df["resource_clean"].map(long_dict)
+    resource_df["resource_clean"] = (
+        resource_df["resource"].fillna("Unknown").map(long_dict)
+    )
 
     unmapped = resource_df["resource_clean"].isna()
     if unmapped.sum() != 0:
@@ -387,8 +398,8 @@ def _clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
 def _create_project_status_classification_from_single_column(
     iso_df: pd.DataFrame,
     status_col: str,
-    nearly_certain_cols: tuple[str],
-    actionable_cols: tuple[str],
+    nearly_certain_vals: Sequence[str],
+    actionable_vals: Sequence[str],
 ) -> pd.DataFrame:
     """Add columns is_actionable and is_nearly_certain that classify each project.
 
@@ -397,9 +408,9 @@ def _create_project_status_classification_from_single_column(
 
     This model was created by a consultant in Excel and translated to python.
     """
-    iso_df["is_actionable"] = iso_df[status_col].isin(actionable_cols).fillna(False)
+    iso_df["is_actionable"] = iso_df[status_col].isin(actionable_vals).fillna(False)
     iso_df["is_nearly_certain"] = (
-        iso_df[status_col].isin(nearly_certain_cols).fillna(False)
+        iso_df[status_col].isin(nearly_certain_vals).fillna(False)
     )
 
     assert (
@@ -414,7 +425,7 @@ def _create_project_status_classification_from_multiple_columns(
     system_impact_study_col: str,
     facilities_study_status_col: str,
     ia_col: str,
-    completed_strings: tuple[str],
+    completed_strings: Sequence[str],
 ):
     """Add columns is_actionable and is_nearly_certain that classify each project.
 
@@ -428,11 +439,14 @@ def _create_project_status_classification_from_multiple_columns(
     status_cols[facilities_study_status_col] = "completed_facilities_study_status"
     status_cols[ia_col] = "executed_ia"
 
-    status_df = pd.DataFrame()
-    for col, comp_col in status_cols.items():
-        status_df[comp_col] = iso_df[col].isin(completed_strings).fillna(False).copy()
+    status_df = (
+        iso_df.loc[:, list(status_cols.keys())]
+        .isin(set(completed_strings))
+        .fillna(False)
+    )
+    status_df.rename(columns=status_cols, inplace=True)
 
-    iso_df["is_nearly_certain"] = status_df["executed_ia"].copy()
+    iso_df["is_nearly_certain"] = status_df.loc[:, "executed_ia"]
     iso_df["is_actionable"] = (
         status_df.completed_system_impact_study
         | status_df.completed_facilities_study_status
@@ -452,18 +466,23 @@ def _transform_miso(iso_df: pd.DataFrame) -> pd.DataFrame:
     ) & iso_df["queue_status"].isin(("Active", "Done"))
     iso_df = iso_df[is_active_project].copy()
 
-    actionable_cols = (
+    actionable_vals = (
         "PHASE 2",
         "PHASE 3",
     )
-    nearly_certain_cols = ("GIA",)
+    nearly_certain_vals = ("GIA",)
     iso_df = _create_project_status_classification_from_single_column(
         iso_df,
         "studyPhase",
-        nearly_certain_cols,
-        actionable_cols,
+        nearly_certain_vals,
+        actionable_vals,
     )
     iso_df = iso_df.rename(columns={"studyPhase": "interconnection_status_raw"})
+
+    # GridStatus wrongly sources "Proposed Completion Date" from "negInService".
+    # It should come from "inService"
+    iso_df.rename(columns={"proposed_completion_date": "negInService"}, inplace=True)
+    iso_df.rename(columns={"inService": "proposed_completion_date"}, inplace=True)
 
     # There are about 30 projects that are duplciated because there is an
     # addition record where studyPhase == "Network Upgrade". I don't fully
@@ -474,7 +493,7 @@ def _transform_miso(iso_df: pd.DataFrame) -> pd.DataFrame:
 
 def _transform_caiso(iso_df: pd.DataFrame) -> pd.DataFrame:
     """Make caiso specific transformations."""
-    iso_df = iso_df.query("queue_status == 'ACTIVE'")
+    iso_df = iso_df.query("queue_status == 'ACTIVE'").copy()
 
     iso_df = _create_project_status_classification_from_multiple_columns(
         iso_df,
@@ -489,14 +508,14 @@ def _transform_caiso(iso_df: pd.DataFrame) -> pd.DataFrame:
 def _transform_pjm(iso_df: pd.DataFrame) -> pd.DataFrame:
     """Make pjm specific transformations."""
     is_active_project = iso_df.queue_status.isin(
-        (
+        {
             "Engineering and Procurement",
             "Partially in Service - Under Construction",
             "Under Construction",
             "Active",
-        )
+        }
     )
-    iso_df = iso_df[is_active_project].copy()
+    iso_df = iso_df.loc[is_active_project, :].copy()
 
     iso_df = _create_project_status_classification_from_multiple_columns(
         iso_df,
@@ -506,6 +525,33 @@ def _transform_pjm(iso_df: pd.DataFrame) -> pd.DataFrame:
         completed_strings=("Document Posted",),
     )
 
+    # I think GridStatus wrongly assigned the raw "Name" column to "Project Name"
+    # instead of "Interconnection Location". 97% of the values for Active projects
+    # refer to transmission lines ("asdf XXX kV")
+    stats = (
+        iso_df.query('queue_status == "Active"')["project_name"]
+        .str.lower()
+        .str.contains(r"\d *kv")
+        .agg(["mean", "sum"])
+    )
+    assert (
+        stats["mean"] > 0.9
+    ), f"Only {stats['mean']:.2%} of Active project_name look like transmission lines."
+
+    iso_df.drop(columns="point_of_interconnection", inplace=True)
+    iso_df.rename(columns={"project_name": "point_of_interconnection"}, inplace=True)
+
+    # GridStatus also wrongly sources "Proposed Completion Date" from
+    # "Revised In Service Date". It should come from "Commercial Operation Milestone".
+    # Switch the column names.
+    iso_df.rename(
+        columns={"proposed_completion_date": "Revised In Service Date"}, inplace=True
+    )
+    iso_df.rename(
+        columns={"Commercial Operation Milestone": "proposed_completion_date"},
+        inplace=True,
+    )
+
     # winter_capacity_mw in pjm aligns with the LBNL data
     iso_df["capacity_mw"] = iso_df["winter_capacity_mw"]
     return iso_df
@@ -513,11 +559,11 @@ def _transform_pjm(iso_df: pd.DataFrame) -> pd.DataFrame:
 
 def _transform_ercot(iso_df: pd.DataFrame) -> pd.DataFrame:
     """Make ercot specific transformations."""
-    actionable_cols = (
+    actionable_vals = (
         "SS Completed, FIS Started, No IA",
         "SS Completed, FIS Completed, No IA",
     )
-    nearly_certain_cols = (
+    nearly_certain_vals = (
         "SS Completed, FIS Completed, IA",
         "SS Completed, FIS Started, IA",
         "SS Completed, FIS Not Started, IA",
@@ -526,8 +572,8 @@ def _transform_ercot(iso_df: pd.DataFrame) -> pd.DataFrame:
     iso_df = _create_project_status_classification_from_single_column(
         iso_df,
         "GIM Study Phase",
-        nearly_certain_cols,
-        actionable_cols,
+        nearly_certain_vals,
+        actionable_vals,
     )
 
     iso_df = iso_df.rename(columns={"GIM Study Phase": "interconnection_status_raw"})
@@ -563,8 +609,8 @@ def _transform_spp(iso_df: pd.DataFrame) -> pd.DataFrame:
     ), f"{iso_df['queue_status'].isna().sum()} SPP projects are missing queue_status"
 
     # Categorize certain and actionable projects
-    actionable_cols = ("DISIS STAGE", "FACILITY STUDY STAGE")
-    nearly_certain_cols = (
+    actionable_vals = ("DISIS STAGE", "FACILITY STUDY STAGE")
+    nearly_certain_vals = (
         "IA FULLY EXECUTED/ON SCHEDULE",
         "IA FULLY EXECUTED/ON SUSPENSION",
         "IA PENDING",
@@ -572,8 +618,8 @@ def _transform_spp(iso_df: pd.DataFrame) -> pd.DataFrame:
     iso_df = _create_project_status_classification_from_single_column(
         iso_df,
         "Status (Original)",
-        nearly_certain_cols,
-        actionable_cols,
+        nearly_certain_vals,
+        actionable_vals,
     )
 
     iso_df = iso_df.rename(columns={"Status (Original)": "interconnection_status_raw"})
@@ -604,16 +650,18 @@ def _transform_nyiso(iso_df: pd.DataFrame) -> pd.DataFrame:
     }
 
     # Some projects have multiple values listed. Grab the largest value.
-    iso_df["S"] = (
+    if pd.api.types.is_string_dtype(iso_df["S"]) or pd.api.types.is_object_dtype(
         iso_df["S"]
-        .astype("string")
-        .str.split(",")
-        .apply(lambda lst: max([pd.to_numeric(x) for x in lst]))
-    )
-    iso_df["S"] = pd.to_numeric(iso_df["S"])
+    ):
+        iso_df["S"] = (
+            iso_df["S"]
+            .str.split(",")
+            .apply(lambda lst: max([pd.to_numeric(x) for x in lst]))
+        )
+        iso_df["S"] = pd.to_numeric(iso_df["S"])
 
     # Remove all withdrawn and in service projects
-    iso_df = iso_df[iso_df["S"].ne(0) & iso_df["S"].ne(14)]
+    iso_df = iso_df.loc[iso_df["S"].ne(0) & iso_df["S"].ne(14), :].copy()
 
     # Categorize project status
     iso_df["is_actionable"] = (iso_df["S"].ge(6) & iso_df["S"].lt(11)).fillna(False)
@@ -622,7 +670,7 @@ def _transform_nyiso(iso_df: pd.DataFrame) -> pd.DataFrame:
         ~iso_df[["is_actionable", "is_nearly_certain"]].all(axis=1)
     ).all(), "Some projects are marked marked actionable and nearly certain."
 
-    iso_df["interconnection_status_raw"] = iso_df["S"].replace(status_mapping)
+    iso_df["interconnection_status_raw"] = iso_df["S"].map(status_mapping)
     return iso_df
 
 
@@ -719,7 +767,7 @@ def _normalize_project_capacity(iso_df: pd.DataFrame) -> pd.DataFrame:
         caiso,
         attribute_columns_dict=attr_columns,
         preserve_original_names=False,
-        index_cols=("project_id"),
+        index_cols=["project_id"],
         dropna=True,
     )
     assert (
@@ -735,7 +783,9 @@ def _normalize_project_capacity(iso_df: pd.DataFrame) -> pd.DataFrame:
     return capacity_df
 
 
-def _normalize_projects(iso_df: pd.DataFrame) -> tuple[pd.DataFrame]:
+def _normalize_projects(
+    iso_df: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Normalize Gridstatus projects into projects and capacities.
 
@@ -767,6 +817,14 @@ def _normalize_projects(iso_df: pd.DataFrame) -> tuple[pd.DataFrame]:
     capacity_df = _normalize_project_capacity(iso_df)
 
     return iso_df[project_cols], capacity_df, location_df
+
+
+def _prep_for_deduplication(df: pd.DataFrame) -> None:
+    df["point_of_interconnection_clean"] = _normalize_point_of_interconnection(
+        df["point_of_interconnection"]
+    )
+    df["utility_clean"] = df["utility"].fillna(df["region"])
+    return
 
 
 def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
@@ -811,6 +869,24 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     # create project_id
     active_projects["project_id"] = np.arange(len(active_projects), dtype=np.int32)
+
+    # deduplicate active projects
+    pre_dedupe = len(active_projects)
+    active_projects = deduplicate_active_projects(
+        active_projects,
+        key=[
+            "point_of_interconnection_clean",  # derived in _prep_for_deduplication
+            "capacity_mw",
+            "county",
+            "state",
+            "utility_clean",  # derived in _prep_for_deduplication
+            "resource",
+        ],
+        tiebreak_cols=["queue_date", "proposed_completion_date"],
+        intermediate_creator=_prep_for_deduplication,
+    )
+    dupes = pre_dedupe - len(active_projects)
+    logger.info(f"Deduplicated {dupes} ({dupes/pre_dedupe:.2%}) projects.")
 
     # Normalize data
     (
