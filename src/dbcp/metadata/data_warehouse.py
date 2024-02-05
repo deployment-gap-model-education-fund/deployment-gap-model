@@ -414,11 +414,11 @@ ncsl_state_permitting = Table(
 )
 
 ########
-# MCOE #
+# pudl_generators #
 ########
 
-mcoe = Table(
-    "mcoe",
+pudl_generators = Table(
+    "pudl_generators",
     metadata,
     Column("plant_id_eia", Integer, primary_key=True),
     Column("generator_id", String, primary_key=True),
@@ -440,7 +440,7 @@ mcoe = Table(
     Column("city", String),
     Column("cofire_fuels", Boolean),
     Column("county", String),
-    Column("current_planned_operating_date", DateTime),
+    Column("current_planned_generator_operating_date", DateTime),
     Column("data_source", String),
     Column("deliver_power_transgrid", Boolean),
     Column("distributed_generation", Boolean),
@@ -472,7 +472,7 @@ mcoe = Table(
     Column("grid_voltage_2_kv", Float),
     Column("grid_voltage_3_kv", Float),
     Column("grid_voltage_kv", Float),
-    Column("heat_rate_mmbtu_mwh", Float),
+    Column("unit_heat_rate_mmbtu_per_mwh", Float),
     Column("iso_rto_code", String),
     Column("latitude", Float),
     Column("longitude", Float),
@@ -481,11 +481,11 @@ mcoe = Table(
     Column("nameplate_power_factor", Float),
     Column("net_capacity_mwdc", Float),
     Column("net_generation_mwh", Float),
-    Column("operating_date", DateTime),
+    Column("generator_operating_date", DateTime),
     Column("operating_switch", String),
     Column("operational_status", String),
     Column("operational_status_code", String),
-    Column("original_planned_operating_date", DateTime),
+    Column("original_planned_generator_operating_date", DateTime),
     Column("other_combustion_tech", String),
     Column("other_modifications_date", DateTime),
     Column("other_planned_modifications", Boolean),
@@ -501,14 +501,14 @@ mcoe = Table(
     Column("planned_new_capacity_mw", Float),
     Column("planned_new_prime_mover_code", String),
     Column("planned_repower_date", DateTime),
-    Column("planned_retirement_date", DateTime),
+    Column("planned_generator_retirement_date", DateTime),
     Column("planned_uprate_date", DateTime),
     Column("previously_canceled", Boolean),
     Column("primary_purpose_id_naics", Integer),
     Column("prime_mover_code", String),
     Column("pulverized_coal_tech", Boolean),
     Column("reactive_power_output_mvar", Float),
-    Column("retirement_date", DateTime),
+    Column("generator_retirement_date", DateTime),
     Column("rto_iso_lmp_node_id", String),
     Column("rto_iso_location_wholesale_reporting_id", String),
     Column("sector_id_eia", Integer),
