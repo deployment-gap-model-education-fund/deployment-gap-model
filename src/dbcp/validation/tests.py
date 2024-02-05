@@ -63,81 +63,147 @@ null,02063
     pd.testing.assert_frame_equal(actual, expected)
 
 
-def test_iso_projects_data_mart_aggregates_are_close(engine: Engine):
+def test_gridstatus_fips_coverage(engine: Engine):
+    """Make sure we have high coverage for county_id_fips codes or gridstatus_projects."""
+    with engine.connect() as con:
+        gridstatus_locations = pd.read_sql_table(
+            "gridstatus_locations", con, schema="data_warehouse"
+        )
+    assert (
+        gridstatus_locations.county_id_fips.isna().sum() / len(gridstatus_locations)
+        < 0.02
+    ), "More than 2 percent of Grid Status locations could not be geocoded."
+
+
+def test_iso_projects_sources(engine: Engine):
+    """Check that the right resources come from the right sources."""
+    # all offshore wind projects from the proprietary source
+    proprietary_offshore = """
+    SELECT
+        source,
+        count(*) as n_offshore
+    from data_mart.iso_projects_long_format
+    where resource_clean ~* 'offshore'
+    group by 1
+    """
+    expected_source = {"proprietary"}
+    offshore_test = pd.read_sql(
+        proprietary_offshore, engine, index_col="source"
+    ).squeeze(
+        axis=1
+    )  # make series
+    actual_source = set(offshore_test.index)
+    assert (
+        actual_source == expected_source
+    ), f"Found offshore wind projects from the wrong source. {offshore_test}"
+
+    # all ISO projects from the gridstatus source
+    iso_projects = """
+    SELECT
+        source,
+        count(*) as n_iso
+    from data_mart.iso_projects_long_format
+    where iso_region ~* 'caiso|ercot|miso|nyiso|pjm|spp|isone'
+    group by 1
+    """
+    expected_source = {"gridstatus"}  # region is currently NULL for offshore wind
+    iso_test = pd.read_sql(iso_projects, engine, index_col="source").squeeze(axis=1)
+    actual_source = set(iso_test.index)
+    assert (
+        actual_source == expected_source
+    ), f"Found ISO projects from the wrong source. {iso_test}"
+    # remaining projects from LBNL (non-ISO, non-offshore)
+    return
+
+
+def test_iso_projects_capacity_aggs(engine: Engine):
+    """Check that the capacity aggregates equal the source tables."""
+    data_mart_capacity = """
+    select
+        source,
+        resource_clean,
+        count(*) as n_project_locations,
+        -- double count capacity when there are multiple locations. Simplifies the test
+        sum(capacity_mw) as capacity_double_count_county
+    from data_mart.iso_projects_long_format
+    group by 1, 2
+    order by 1, 2
+    """
+    # simplified reimplementation of the data_mart.iso_projects_long_format table.
+    # This skips over the multi-county allocation stuff for simplicity.
+    source_capacity = """
+    with
+    lbnl as (
+        select
+            'lbnl' as source,
+            res.resource_clean,
+            count(*) as n_project_locations,
+            sum(res.capacity_mw) as capacity_double_count_county
+        FROM data_warehouse.iso_projects as proj
+        LEFT JOIN data_warehouse.iso_resource_capacity as res
+        ON proj.project_id = res.project_id
+        LEFT JOIN data_warehouse.iso_locations as loc
+        ON proj.project_id = loc.project_id
+        WHERE proj.region ~ 'non-ISO'
+            AND resource_clean != 'Offshore Wind'
+        group by 1, 2
+    ),
+    gridstatus as (
+        select
+            'gridstatus' as source,
+            res.resource_clean,
+            count(*) as n_project_locations,
+            sum(res.capacity_mw) as capacity_double_count_county
+        FROM data_warehouse.gridstatus_projects as proj
+        LEFT JOIN data_warehouse.gridstatus_resource_capacity as res
+        ON proj.project_id = res.project_id
+        LEFT JOIN data_warehouse.gridstatus_locations as loc
+        ON proj.project_id = loc.project_id
+        WHERE resource_clean not in ('Offshore Wind', 'Transmission')
+        group by 1, 2
+    ),
+    offshore as (
+        select
+            'proprietary' as source,
+            'Offshore Wind' as resource_clean,
+            count(*) as n_project_locations,
+            sum(proj.capacity_mw) as capacity_double_count_county
+        FROM data_warehouse.offshore_wind_projects as proj
+        LEFT JOIN data_warehouse.offshore_wind_cable_landing_association as loc
+        ON proj.project_id = loc.project_id
+        WHERE proj.construction_status != 'Online'
+        group by 1, 2
+    )
+    select * from lbnl
+    UNION ALL
+    select * from gridstatus
+    UNION ALL
+    select * from offshore
+    order by 1, 2
+    """
+    data_mart = pd.read_sql(
+        data_mart_capacity, engine, index_col=["source", "resource_clean"]
+    )
+    source = pd.read_sql(
+        source_capacity, engine, index_col=["source", "resource_clean"]
+    )
+    absolute_diff = data_mart - source
+    relative_diff = absolute_diff / source
+    assert (
+        relative_diff.lt(1e-5).all().all()
+    ), f"Aggregate resource metrics have a large relative difference: {relative_diff}"
+    return
+
+
+def test_iso_projects_data_mart(engine: Engine):
     """Test that data mart aggregates are close to simple aggregates of the source tables.
 
     These aggregates don't exactly match (I should figure out why), but they're within 0.1%.
     Probably either null handling or join logic on multi-location projects.
     """
-    data_mart_query = """
-    SELECT
-        count(*) as n_project_location_resource,
-        sum(capacity_mw::float * frac_locations_in_county) as total_capacity
-    from data_mart.iso_projects_long_format
-    """
-    source_query = """
-    WITH
-    iso_loc as (
-        SELECT
-            project_id,
-            county_id_fips,
-            1.0 / count(*) OVER (PARTITION BY project_id) as frac_county
-        FROM data_warehouse.iso_locations
-        FULL OUTER JOIN data_warehouse.iso_projects
-        USING (project_id)
-    ),
-    iso as (
-        select
-            -- count project-county-resource items, not projects
-            count(*) as n_project_location_resource,
-            sum(capacity_mw * frac_county ) as total_capacity
-        from data_warehouse.iso_resource_capacity
-        full outer join iso_loc
-        USING (project_id)
-        where resource != 'Offshore Wind'
-    ),
-    offshore_proj as (
-        select
-            -- count project-county-resource items (only one resource here)
-            -- not project-location-resource items or projects themselves
-            count(distinct (project_id, loc.county_id_fips)) as n_project_location_resource,
-            NULL::REAL as total_capacity
-        from data_warehouse.offshore_wind_projects
-        full outer join data_warehouse.offshore_wind_cable_landing_association
-        USING (project_id)
-        full outer join data_warehouse.offshore_wind_locations as loc
-        USING (location_id)
-        where construction_status != 'Operating'
-    ),
-    offshore_cap as (
-        SELECT
-            NULL::INTEGER as n_project_location_resource,
-            -- calc total capacity separately because the capacity is split
-            -- between locations. This is an easy way to get the same total
-            -- without re-implementing the splitting logic.
-            sum(capacity_mw) as total_capacity
-        from data_warehouse.offshore_wind_projects
-        where construction_status != 'Operating'
-    ),
-    combined as (
-        select * from iso
-        UNION ALL
-        select * from offshore_proj
-        UNION ALL
-        select * from offshore_cap
-    )
-    select
-        sum(n_project_location_resource) as n_project_location_resource,
-        sum(total_capacity) as total_capacity
-    from combined
-    """
-    source_totals = pd.read_sql(source_query, engine)
-    data_mart_totals = pd.read_sql(data_mart_query, engine)
-    absolute_diff = data_mart_totals - source_totals
-    relative_diff = absolute_diff / source_totals
-    assert (
-        relative_diff.lt(0.0015).all().all()
-    ), f"relative_difference too large: {relative_diff}"
+    test_iso_projects_sources(engine)
+    test_iso_projects_capacity_aggs(engine)
+    return
 
 
 def test_county_commission_election_info(engine: Engine):
@@ -170,8 +236,8 @@ def test_county_wide_coverage(engine: Engine):
     ), "counties_wide_format does not contain all counties"
     notnull = df.notnull()
     assert (
-        notnull.any(axis=1).sum() == 2380
-    ), "counties_wide_format has unexpected county coverage"
+        notnull.any(axis=1).sum() == 2375
+    ), f"counties_wide_format has unexpected county coverage: {notnull[notnull.any(axis=1)]}"
 
 
 def test_county_long_vs_wide(engine: Engine):
@@ -270,6 +336,7 @@ def validate_warehouse(engine: Engine):
     """Run data warehouse validation tests."""
     logger.info("Validating data warehouse")
     test_j40_county_fips_coverage(engine)
+    test_gridstatus_fips_coverage(engine)
 
 
 def validate_data_mart(engine: Engine):
@@ -277,7 +344,7 @@ def validate_data_mart(engine: Engine):
     logger.info("Validating data mart")
     test_county_long_vs_wide(engine)
     test_county_wide_coverage(engine)
-    test_iso_projects_data_mart_aggregates_are_close(engine)
+    test_iso_projects_data_mart(engine)
     test_county_commission_election_info(engine)
 
 
@@ -288,5 +355,6 @@ def validate_all(engine: Engine):
 
 
 if __name__ == "__main__":
+    # debugging entry point
     engine = get_sql_engine()
     validate_all(engine)

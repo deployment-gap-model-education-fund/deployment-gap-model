@@ -15,20 +15,111 @@ from dbcp.data_mart.helpers import (
 from dbcp.helpers import get_sql_engine
 
 
-def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
-    """Get ISO projects.
-
-    PK should be (project_id, county_id_fips, resource_clean), but county_id_fips has nulls.
-
-    Note that this duplicates projects that have multiple prospective locations. Use the frac_locations_in_county
-    column to allocate capacity and co2e estimates to counties when aggregating.
-    Otherwise they will be double-counted.
-    """
+def _get_gridstatus_projects(engine: sa.engine.Engine) -> pd.DataFrame:
+    # drops transmission projects
     query = """
+    WITH
+    proj_res AS (
+        SELECT
+            queue_id,
+            is_nearly_certain,
+            project_id,
+            project_name,
+            capacity_mw,
+            developer,
+            entity,
+            entity AS iso_region, -- these are different in non-ISO data from LBNL
+            utility,
+            proposed_completion_date AS date_proposed_online,
+            point_of_interconnection,
+            is_actionable,
+            resource_clean,
+            queue_status,
+            queue_date AS date_entered_queue,
+            interconnection_status_raw AS interconnection_status
+        FROM data_warehouse.gridstatus_projects as proj
+        LEFT JOIN data_warehouse.gridstatus_resource_capacity as res
+        USING (project_id)
+        WHERE resource_clean != 'Transmission'
+    ),
+    loc as (
+        -- projects can have multiple locations, though 99 percent have only one.
+        -- Can multiply capacity by frac_locations_in_county to allocate it equally.
+        SELECT
+            project_id,
+            state_id_fips,
+            county_id_fips,
+            (1.0 / count(*) over (partition by project_id))::real as frac_locations_in_county
+        FROM data_warehouse.gridstatus_locations
+    ),
+    gs as (
+        SELECT
+            proj_res.*,
+            loc.state_id_fips,
+            loc.county_id_fips,
+            -- projects with missing location info get full capacity allocation
+            coalesce(loc.frac_locations_in_county, 1.0) as frac_locations_in_county
+        FROM proj_res
+        LEFT JOIN loc
+        USING (project_id)
+    )
+    SELECT
+        sfip.state_name AS state,
+        cfip.county_name AS county,
+        gs.*,
+        'gridstatus' AS source,
+        ncsl.permitting_type AS state_permitting_type
+    FROM gs
+    LEFT JOIN data_warehouse.ncsl_state_permitting AS ncsl
+        on gs.state_id_fips = ncsl.state_id_fips
+    LEFT JOIN data_warehouse.state_fips AS sfip
+        ON gs.state_id_fips = sfip.state_id_fips
+    LEFT JOIN data_warehouse.county_fips AS cfip
+        ON gs.county_id_fips = cfip.county_id_fips
+    """
+    gs = pd.read_sql(query, engine)
+    return gs
+
+
+def _merge_lbnl_with_gridstatus(lbnl: pd.DataFrame, gs: pd.DataFrame) -> pd.DataFrame:
+    """Merge non ISO LBNL projects with ISO projects in GridStatus.
+
+    Args:
+        lbnl: lbnl ISO queue projects
+        engine: engine to connect to the local postgres data warehouse
+    """
+    is_non_iso = lbnl.iso_region.str.contains("non-ISO")
+    lbnl_non_isos = lbnl.loc[is_non_iso, :].copy()
+
+    # TODO (bendnorman): How should we handle project_ids? This hack
+    # isn't ideal because the GS data warehouse and data mart project
+    # ids aren't consistent
+    max_lbnl_id = lbnl_non_isos.project_id.max() + 1
+    gs["project_id"] = list(range(max_lbnl_id, max_lbnl_id + len(gs)))
+
+    shared_ids = set(gs.project_id).intersection(set(lbnl_non_isos.project_id))
+    assert len(shared_ids) == 0, f"Found duplicate ids between GS and LBNL {shared_ids}"
+
+    fields_in_gs_not_in_lbnl = gs.columns.difference(lbnl.columns)
+    fields_in_lbnl_not_in_gs = lbnl.columns.difference(gs.columns)
+    assert (
+        fields_in_gs_not_in_lbnl.empty
+    ), f"These columns are in Grid Status but not LBNL: {fields_in_gs_not_in_lbnl}"
+    assert (
+        fields_in_lbnl_not_in_gs.empty
+    ), f"These columns are in LBNL but not Grid Status: {fields_in_lbnl_not_in_gs}"
+
+    return pd.concat([gs, lbnl_non_isos], axis=0, ignore_index=True)
+
+
+def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFrame:
+    where_clause = "WHERE region ~ 'non-ISO'" if non_iso_only else ""
+    query = f"""
     WITH
     iso_proj_res as (
         SELECT
             proj.project_id,
+            proj.queue_id,
             proj.date_proposed as date_proposed_online,
             proj.developer,
             proj.entity,
@@ -46,6 +137,7 @@ def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
         FROM data_warehouse.iso_projects as proj
         INNER JOIN data_warehouse.iso_resource_capacity as res
         ON proj.project_id = res.project_id
+        {where_clause}
     ),
     loc as (
         -- Remember that projects can have multiple locations, though 99 percent have only one.
@@ -62,7 +154,8 @@ def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
             iso_proj_res.*,
             loc.state_id_fips,
             loc.county_id_fips,
-            loc.frac_locations_in_county
+            -- projects with missing location info get full capacity allocation
+            coalesce(loc.frac_locations_in_county, 1.0) as frac_locations_in_county
         from iso_proj_res
         LEFT JOIN loc
         ON iso_proj_res.project_id = loc.project_id
@@ -71,6 +164,7 @@ def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
         sfip.state_name as state,
         cfip.county_name as county,
         iso.*,
+        'lbnl' as source,
         ncsl.permitting_type as state_permitting_type
     from iso
     left join data_warehouse.state_fips as sfip
@@ -82,18 +176,42 @@ def _get_and_join_iso_tables(engine: sa.engine.Engine) -> pd.DataFrame:
     ;
     """
     df = pd.read_sql(query, engine)
-    # projects with missing location info get full capacity allocation
-    df["frac_locations_in_county"].fillna(1.0, inplace=True)
     # one whole-row duplicate due to a multi-county project with missing state value.
     # Makes both county_id_fips and state_id_fips null.
     dupes = df.duplicated(keep="first")
-    assert dupes.sum() == 1, f"Expected 1 duplicate row, got {dupes.sum()}."
-    assert (
-        df.loc[dupes, "project_id"].eq(9118).all()
-    ), f"Duplicate counties: {df.loc[dupes, ['project_id', 'county']]}"
-    df = df.loc[~dupes]
-    _estimate_proposed_power_co2e(df)
+    assert dupes.sum() == 0, f"Expected 0 duplicates, found {dupes.sum()}."
     return df
+
+
+def _get_and_join_iso_tables(
+    engine: sa.engine.Engine, use_gridstatus=True, use_proprietary_offshore=True
+) -> pd.DataFrame:
+    """Get ISO projects.
+
+    PK should be (project_id, county_id_fips, resource_clean), but county_id_fips has nulls.
+
+    Note that this duplicates projects that have multiple prospective locations. Use the frac_locations_in_county
+    column to allocate capacity and co2e estimates to counties when aggregating.
+    Otherwise they will be double-counted.
+
+    Args:
+        engine: engine to connect to the local postgres data warehouse
+        use_gridstatus: use gridstatus data for ISO projects.
+
+    Returns:
+        A dataframe of ISO projects with location, capacity, estimated co2 emissions and state permitting info.
+    """
+    if use_gridstatus:
+        lbnl = _get_lbnl_projects(engine, non_iso_only=True)
+        gs = _get_gridstatus_projects(engine)
+        out = _merge_lbnl_with_gridstatus(lbnl=lbnl, gs=gs)
+    else:
+        out = _get_lbnl_projects(engine, non_iso_only=False)
+    if use_proprietary_offshore:
+        offshore = _get_proprietary_proposed_offshore(engine)
+        out = _replace_iso_offshore_with_proprietary(out, offshore)
+    _estimate_proposed_power_co2e(out)
+    return out
 
 
 def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame:
@@ -129,7 +247,13 @@ def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame
     )
     -- join the project, state, and county stuff
     SELECT
-        assoc.*,
+        assoc.project_id,
+        assoc.county_id_fips,
+        -- projects with missing location info get full capacity allocation
+        CASE WHEN assoc.frac_locations_in_county IS NULL
+            THEN 1.0
+            ELSE assoc.frac_locations_in_county
+            END as frac_locations_in_county,
         substr(assoc.county_id_fips, 1, 2) as state_id_fips,
 
         proj.name as project_name,
@@ -141,6 +265,7 @@ def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame
         0.0 as co2e_tonnes_per_year,
         proj.is_actionable,
         proj.is_nearly_certain,
+        'proprietary' as source,
 
         sfip.state_name as state,
         cfip.county_name as county,
@@ -171,11 +296,10 @@ def _replace_iso_offshore_with_proprietary(
     """
     iso_to_keep = iso_queues.loc[iso_queues["resource_clean"] != "Offshore Wind", :]
     out = pd.concat(
-        [iso_to_keep, proprietary.assign(source="proprietary")],
+        [iso_to_keep, proprietary],
         axis=0,
         ignore_index=True,
     )
-    out["source"].fillna("iso", inplace=True)
     return out
 
 
@@ -352,10 +476,11 @@ def _add_derived_columns(mart: pd.DataFrame) -> None:
         "Solar; Storage": "renewable",
         "Solar": "renewable",
         "Steam": np.nan,
+        "Transmission": "transmission",
         "Unknown": np.nan,
         "Waste Heat": "fossil",
         "Wind; Storage": "renewable",
-        np.nan: np.nan,
+        np.nan: np.nan,  # not technically necessary but make it explicit
     }
     # note that this classifies pure storage facilities as np.nan
     resources_in_data = set(mart["resource_clean"].unique())
@@ -383,9 +508,9 @@ def create_long_format(engine: sa.engine.Engine) -> pd.DataFrame:
     Returns:
         pd.DataFrame: long format table of ISO projects
     """
-    iso = _get_and_join_iso_tables(engine)
-    offshore = _get_proprietary_proposed_offshore(engine)
-    iso = _replace_iso_offshore_with_proprietary(iso, offshore)
+    iso = _get_and_join_iso_tables(
+        engine, use_gridstatus=True, use_proprietary_offshore=True
+    )
     all_counties = _get_county_fips_df(engine)
     all_states = _get_state_fips_df(engine)
 
@@ -429,3 +554,9 @@ def create_data_mart(
         "iso_projects_long_format": long_format,
         "iso_projects_wide_format": wide_format,
     }
+
+
+if __name__ == "__main__":
+    # debugging entry point
+    mart = create_data_mart()
+    print("yeehaw")

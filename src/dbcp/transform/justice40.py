@@ -160,21 +160,22 @@ def transform(raw_j40: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     percent_cols = list(filter(lambda col: col.endswith("_percent"), list(out_df)))
     for col in percent_cols:
         col_max = out_df[col].max()
-        if col_max > 1 and col_max <= 100:
-            out_df[col] = out_df[col] / 100
-        elif col_max <= 1:
-            continue
+        col_min = out_df[col].min()
+        if 0 <= col_max and 0 <= col_min:
+            if col_max <= 1:
+                continue
+            elif col_max <= 105:  # 105 to account for minor numerical errors
+                out_df[col] /= 100
+            elif col_max <= 10500:
+                # sometimes percents have been multiplied by 100 twice
+                out_df[col] /= 10000
+            else:
+                logger.info(f"{col} is not a percent")
         else:
             logger.info(f"{col} is not a percent")
 
     # tract_within_tribal_areas_percent has a couple of values that are over 100%
-    is_over_100_pct = out_df["tract_within_tribal_areas_percent"] > 100
-    out_df["tract_within_tribal_areas_percent"] = out_df[
-        "tract_within_tribal_areas_percent"
-    ].mask(is_over_100_pct, 100)
-    out_df["tract_within_tribal_areas_percent"] = (
-        out_df["tract_within_tribal_areas_percent"] / 100
-    )
+    out_df["tract_within_tribal_areas_percent"].clip(upper=1, inplace=True)
 
     # Correct percentiles
     percentile_cols = list(
