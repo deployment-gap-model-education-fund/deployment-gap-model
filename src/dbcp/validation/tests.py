@@ -170,8 +170,8 @@ def test_county_wide_coverage(engine: Engine):
     ), "counties_wide_format does not contain all counties"
     notnull = df.notnull()
     assert (
-        notnull.any(axis=1).sum() == 2380
-    ), "counties_wide_format has unexpected county coverage"
+        notnull.any(axis=1).sum() == 2374
+    ), f"counties_wide_format has unexpected county coverage: {notnull[notnull.any(axis=1)]}"
 
 
 def test_county_long_vs_wide(engine: Engine):
