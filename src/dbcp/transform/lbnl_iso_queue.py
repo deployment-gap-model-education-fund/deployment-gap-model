@@ -1,6 +1,6 @@
 """Functions to transform LBNL ISO queue tables."""
-
-from typing import Dict, List
+import logging
+from typing import Callable, Dict, List, Sequence
 
 import numpy as np
 import pandas as pd
@@ -11,6 +11,8 @@ from dbcp.transform.helpers import (
     parse_dates,
 )
 from pudl.helpers import add_fips_ids as _add_fips_ids
+
+logger = logging.getLogger(__name__)
 
 RESOURCE_DICT = {
     "Battery Storage": {
@@ -126,8 +128,31 @@ def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
     )
     # drop irrelevant columns (structurally all nan due to 'active' filter)
     active_projects.drop(columns=["date_withdrawn", "date_operational"], inplace=True)
-    active_projects = remove_duplicates(active_projects)  # sets index to project_id
     parse_date_columns(active_projects)
+    # deduplicate
+    pre_dedupe = len(active_projects)
+    active_projects = deduplicate_active_projects(
+        active_projects,
+        key=[
+            "point_of_interconnection_clean",  # derived in _prep_for_deduplication
+            "capacity_mw_resource_1",
+            "county_1",
+            "raw_state_name",
+            "utility_clean",  # derived in _prep_for_deduplication
+            "resource_type_1",
+        ],
+        tiebreak_cols=[  # first priority to last
+            "date_proposed",
+            "status_rank",  # derived in _prep_for_deduplication
+            "queue_date",
+        ],
+        intermediate_creator=_prep_for_deduplication,
+    )
+    n_dupes = pre_dedupe - len(active_projects)
+    logger.info(f"Deduplicated {n_dupes} ({n_dupes/pre_dedupe:.2%}) projects.")
+
+    active_projects.set_index("project_id", inplace=True)
+    active_projects.sort_index(inplace=True)
     # manual fix for duplicate resource type in raw data
     bad_proj_id = 1606
     assert (
@@ -324,8 +349,74 @@ def clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
     return resource_df
 
 
-def remove_duplicates(df: pd.DataFrame) -> pd.DataFrame:
-    """First draft deduplication of ISO queues.
+def _normalize_point_of_interconnection(ser: pd.Series) -> pd.Series:
+    """String normalization for point_of_interconnection.
+
+    Essentially a poor man's bag-of-words model.
+    """
+    out = (
+        ser.astype("string")
+        .str.lower()
+        .str.replace("-", " ")
+        .str.replace(r"(?:sub)station|kv| at |tbd", "", regex=True)
+        .fillna("")
+    )
+    out = pd.Series(  # make permutation invariant by sorting
+        [" ".join(sorted(x)) for x in out.str.split()],
+        index=out.index,
+        dtype="string",
+    ).str.strip()
+    out.replace("", pd.NA, inplace=True)
+    return out
+
+
+def _prep_for_deduplication(df: pd.DataFrame) -> None:
+    df["point_of_interconnection_clean"] = _normalize_point_of_interconnection(
+        df["point_of_interconnection"]
+    )
+    df["utility_clean"] = df["utility"].fillna(df["region"])
+
+    status_order = [  # from most to least advanced; will be assigned values N to 0
+        # Put withdrawn and suspended near the top (assume they are final statuses)
+        "operational",
+        "construction",
+        "withdrawn",
+        "suspended",
+        "ia executed",
+        "ia pending",
+        "facility study",
+        "system impact study",
+        "phase 4 study",
+        "feasibility study",
+        "cluster study",
+        "in progress (unknown study)",
+        "combined",
+        "not started",
+    ]
+    # assign numerical values for sorting. Largest value is prioritized.
+    status_map = dict(zip(reversed(status_order), range(len(status_order))))
+    df["status_rank"] = (
+        df["interconnection_status_lbnl"]
+        .str.strip()
+        .str.lower()
+        .map(status_map)
+        .fillna(-1)
+    ).astype(int)
+    return
+
+
+def deduplicate_active_projects(
+    df: pd.DataFrame,
+    key: Sequence[str],
+    tiebreak_cols: Sequence[str],
+    intermediate_creator: Callable[[pd.DataFrame], None],
+) -> pd.DataFrame:
+    """First draft deduplication of ISO queues (for active projects only).
+
+    The intention here is to identify rows that likely describe the same physical
+    project, but are duplicated due to different proposed start dates or IA statuses.
+    My assumption is that those kind of duplicates exist to cover contingency or by
+    mistake and that only one project can actually be built.
 
     Args:
         df (pd.DataFrame): a queue dataframe
@@ -334,51 +425,25 @@ def remove_duplicates(df: pd.DataFrame) -> pd.DataFrame:
         pd.DataFrame: queue dataframe with duplicates removed
     """
     df = df.copy()
-    # do some string cleaning on point_of_interconnection
-    # for now "tbd" is mapped to "nan"
-    df["point_of_interconnection_clean"] = (
-        df["point_of_interconnection"]
-        .astype(str)
-        .str.lower()
-        .str.replace("substation", "")
-        .str.replace("kv", "")
-        .str.replace("-", " ")
-        .str.replace("station", "")
-        .str.replace(",", "")
-        .str.replace("at", "")
-        .str.replace("tbd", "nan")
+    original_cols = df.columns
+    # create whatever derived columns are needed
+    intermediate_creator(df)
+    intermediate_cols = df.columns.difference(original_cols)
+
+    tiebreak_cols = list(tiebreak_cols)
+    key = list(key)
+    # Where there are duplicates, keep the row with the largest values in tiebreak_cols
+    # (usually date_proposed, queue_date, and interconnection_status).
+    # note that NaT is always sorted to the end, so nth(0) will always choose it last.
+    dedupe = (
+        df.sort_values(key + tiebreak_cols, ascending=False)
+        .groupby(key, as_index=False, dropna=False)
+        .nth(0)
     )
 
-    df["point_of_interconnection_clean"] = [
-        " ".join(sorted(x)) for x in df["point_of_interconnection_clean"].str.split()
-    ]
-    df["point_of_interconnection_clean"] = df[
-        "point_of_interconnection_clean"
-    ].str.strip()
-
-    key = [
-        "point_of_interconnection_clean",
-        "capacity_mw_resource_1",
-        "county_1",
-        "raw_state_name",
-        "region",
-        "resource_type_1",
-    ]
-    df["len_resource_type"] = df.resource_type_lbnl.str.len()
-    df.reset_index(drop=True, inplace=True)
-    dups = df.copy()
-    dups = dups.groupby(key, as_index=False, dropna=False).len_resource_type.max()
-    df = dups.merge(df, on=(key + ["len_resource_type"]))
-    # merge added duplicates with same len_resource_type, drop these
-    df = df[~(df.duplicated(key, keep="first"))]
-
-    # some final cleanup
-    df = (
-        df.drop(["len_resource_type", "point_of_interconnection_clean"], axis=1)
-        .set_index("project_id")
-        .sort_index()
-    )
-    return df
+    # remove whatever derived columns were created
+    dedupe.drop(columns=intermediate_cols, inplace=True)
+    return dedupe
 
 
 def _fix_independent_city_fips(location_df: pd.DataFrame) -> pd.DataFrame:

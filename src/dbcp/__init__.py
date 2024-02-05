@@ -9,6 +9,7 @@ import dbcp.extract.ballot_ready  # noqa: F401
 import dbcp.extract.eip_infrastructure  # noqa: F401
 import dbcp.extract.epa_avert  # noqa: F401
 import dbcp.extract.fips_tables  # noqa: F401
+import dbcp.extract.gridstatus_isoqueues  # noqa: F401
 import dbcp.extract.helpers  # noqa: F401
 import dbcp.extract.justice40  # noqa: F401
 import dbcp.extract.lbnl_iso_queue  # noqa: F401
@@ -24,6 +25,7 @@ import dbcp.transform.ballot_ready  # noqa: F401
 import dbcp.transform.eip_infrastructure  # noqa: F401
 import dbcp.transform.epa_avert  # noqa: F401
 import dbcp.transform.fips_tables  # noqa: F401
+import dbcp.transform.gridstatus  # noqa: F401
 import dbcp.transform.justice40  # noqa: F401
 import dbcp.transform.lbnl_iso_queue  # noqa: F401
 import dbcp.transform.local_opposition  # noqa: F401
