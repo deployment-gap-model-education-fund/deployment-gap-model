@@ -195,6 +195,13 @@ def etl_epa_avert() -> dict[str, pd.DataFrame]:
     return transformed
 
 
+def etl_gridstatus_isoqueues():
+    """ETL gridstatus ISO queues."""
+    raw_dfs = dbcp.extract.gridstatus_isoqueues.extract()
+    transformed = dbcp.transform.gridstatus.transform(raw_dfs)
+    return transformed
+
+
 def etl_manual_ordinances() -> dict[str, pd.DataFrame]:
     """ETL manually maintained ordinances."""
     raw_dfs = dbcp.extract.manual_ordinances.extract()
@@ -214,6 +221,7 @@ def etl(args):
     SPATIAL_CACHE.reduce_size()
 
     etl_funcs = {
+        "gridstatus": etl_gridstatus_isoqueues,
         "manual_ordinances": etl_manual_ordinances,
         "epa_avert": etl_epa_avert,
         "eip_infrastructure": etl_eip_infrastructure,

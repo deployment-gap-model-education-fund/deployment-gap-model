@@ -6,9 +6,9 @@ from io import StringIO
 from pathlib import Path
 
 import boto3
+import google.auth
 import pandas as pd
 import pandas_gbq
-import pydata_google_auth
 import sqlalchemy as sa
 from botocore import UNSIGNED
 from botocore.config import Config
@@ -26,8 +26,14 @@ SA_TO_BQ_TYPES = {
     "BOOLEAN": "BOOL",
     "DATETIME": "DATETIME",
 }
+SA_TO_PD_TYPES = {
+    "VARCHAR": "string",
+    "INTEGER": "Int64",
+    "FLOAT": "float64",
+    "BOOLEAN": "boolean",
+    "DATETIME": "datetime64[ns]",
+}
 SA_TO_BQ_MODES = {True: "NULLABLE", False: "REQUIRED"}
-GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
 
 
 def get_schema_sql_alchemy_metadata(schema: str) -> sa.MetaData:
@@ -69,6 +75,23 @@ def get_bq_schema_from_metadata(
         col_schema["mode"] = SA_TO_BQ_MODES[column.nullable]
         bq_schema.append(col_schema)
     return bq_schema
+
+
+def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str):
+    """Apply dtypes to a dataframe using the sqlalchemy metadata."""
+    table_name = f"{schema}.{table_name}"
+    metadata = get_schema_sql_alchemy_metadata(schema)
+    try:
+        table = metadata.tables[table_name]
+    except KeyError:
+        raise KeyError(f"{table_name} does not exist in metadata.")
+
+    dtypes = {
+        col.name: SA_TO_PD_TYPES[str(col.type)]
+        for col in table.columns
+        if col.name in df.columns
+    }
+    return df.astype(dtypes)
 
 
 def get_sql_engine() -> sa.engine.Engine:
@@ -136,14 +159,6 @@ def get_db_schema_tables(engine: sa.engine.Engine, schema: str) -> list[str]:
     return table_names
 
 
-def _get_bigquery_credentials():
-    SCOPES = [
-        "https://www.googleapis.com/auth/cloud-platform",
-    ]
-    creds = pydata_google_auth.get_user_credentials(SCOPES, use_local_webserver=False)
-    return creds
-
-
 def upload_schema_to_bigquery(schema: str, dev: bool = True) -> None:
     """Upload a postgres schema to BigQuery."""
     logger.info("Loading tables to BigQuery.")
@@ -164,8 +179,8 @@ def upload_schema_to_bigquery(schema: str, dev: bool = True) -> None:
             )
 
     # load to big query
-    credentials = _get_bigquery_credentials()
-    client = bigquery.Client(credentials=credentials, project=GCP_PROJECT_ID)
+    credentials, project_id = google.auth.default()
+    client = bigquery.Client(credentials=credentials, project=project_id)
 
     for table_name, df in loaded_tables.items():
         schema_environment = f"{schema}{'_dev' if dev else ''}"
@@ -175,13 +190,13 @@ def upload_schema_to_bigquery(schema: str, dev: bool = True) -> None:
 
         # Delete the table because pandas_gbq doesn't recreate the BQ
         # table schema which leads to problems when we change the metadata.
-        table_id = f"{GCP_PROJECT_ID}.{schema_environment}.{table_name}"
+        table_id = f"{project_id}.{schema_environment}.{table_name}"
         client.delete_table(table_id, not_found_ok=True)
 
         pandas_gbq.to_gbq(
             df,
             full_table_name,
-            project_id=GCP_PROJECT_ID,
+            project_id=project_id,
             if_exists="replace",
             credentials=credentials,
             table_schema=table_schema,
@@ -218,31 +233,3 @@ def psql_insert_copy(table, conn, keys, data_iter):
         sql = f"COPY {table_name} ({columns}) FROM STDIN WITH CSV"
         cur.copy_expert(sql=sql, file=s_buf)
         dbapi_conn.commit()
-
-
-SA_TO_PD_TYPES = {
-    "BOOLEAN": "boolean",
-    "DATETIME": "datetime64[ns]",
-    "FLOAT": "float64",
-    "INTEGER": "Int64",
-    "VARCHAR": "string",
-}
-
-
-def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str) -> pd.DataFrame:
-    """Enforce datatypes specified in the dbcp.metadata.sqlalchemy schemas."""
-    schema_sa_metadata = {
-        "data_warehouse": dbcp.metadata.data_warehouse.metadata,
-        "data_mart": dbcp.metadata.data_mart.metadata,
-    }
-    metadata = schema_sa_metadata.get(schema, None)
-    if not metadata:
-        raise KeyError(f"Metadata for schema: {schema} does not exists.")
-    full_table_name = f"{schema}.{table_name}"
-    return df.astype(
-        {
-            column_name: SA_TO_PD_TYPES[str(col.type)]
-            for column_name, col in metadata.tables[full_table_name].columns.items()
-            if column_name in df.columns
-        }
-    )

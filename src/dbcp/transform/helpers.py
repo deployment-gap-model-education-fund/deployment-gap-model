@@ -1,6 +1,6 @@
 """Common transform operations."""
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 import pandas as pd
 from joblib import Memory
@@ -31,7 +31,7 @@ GEOCODER_CACHE = Memory(location=geocoder_local_cache, bytes_limit=2**19)
 
 def normalize_multicolumns_to_rows(
     df: pd.DataFrame,
-    attribute_columns_dict: Dict[str, List[str]],
+    attribute_columns_dict: Dict[str, Sequence[str]],
     index_cols: Optional[List[str]] = None,
     preserve_original_names=True,
     dropna=True,
@@ -43,7 +43,7 @@ def normalize_multicolumns_to_rows(
 
     Args:
         df (pd.DataFrame): dataframe with multivalued column(s) encoded as multiple columns
-        attribute_columns_dict (Dict[str,List[str]]): dict mapping new value names to a list of
+        attribute_columns_dict (Dict[str,Sequence[str]]): dict mapping new value names to a list of
         columns containing that value. If there are multiple such lists, the order of associated
         columns must be the same (eg. if numbered, sorted in same order). See example below.
         index_cols (Optional[List[str]], optional): Columns to use as IDs in original dataframe. If

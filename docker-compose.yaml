@@ -3,6 +3,9 @@ services:
   app:
     build: .
     env_file: local.env
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/gcloud_application_default_credentials.json
+      - GOOGLE_CLOUD_PROJECT=dbcp-dev-350818
     depends_on:
       - postgres
     volumes:
@@ -10,6 +13,7 @@ services:
       - ./notebooks:/app/notebooks:rw
       - ./data:/app/data:rw
       - ./test:/app/test:r
+      - ${GOOGLE_APPLICATION_CREDENTIALS_PATH}:/app/gcloud_application_default_credentials.json:r
     ports:
       - ${JUPYTER_PORT}:${JUPYTER_PORT}
     command: jupyter lab --port ${JUPYTER_PORT} --ip 0.0.0.0 --no-browser
