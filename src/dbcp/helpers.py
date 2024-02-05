@@ -12,6 +12,7 @@ import pandas_gbq
 import sqlalchemy as sa
 from botocore import UNSIGNED
 from botocore.config import Config
+from google.cloud import bigquery
 from tqdm import tqdm
 
 import dbcp
@@ -173,22 +174,33 @@ def upload_schema_to_bigquery(schema: str, dev: bool = True) -> None:
             loaded_tables[table_name] = pd.read_sql_table(
                 table_name, con, schema=schema
             )
-            # Use dtypes that support pd.NA
-            loaded_tables[table_name] = loaded_tables[table_name].convert_dtypes()
+            loaded_tables[table_name] = enforce_dtypes(
+                loaded_tables[table_name], table_name, schema
+            )
 
     # load to big query
     credentials, project_id = google.auth.default()
+    client = bigquery.Client(credentials=credentials, project=project_id)
 
     for table_name, df in loaded_tables.items():
-        full_table_name = f"{schema}{'_dev' if dev else ''}.{table_name}"
+        schema_environment = f"{schema}{'_dev' if dev else ''}"
+        full_table_name = f"{schema_environment}.{table_name}"
+        table_schema = get_bq_schema_from_metadata(table_name, schema, dev)
         logger.info(f"Loading: {table_name}")
+
+        # Delete the table because pandas_gbq doesn't recreate the BQ
+        # table schema which leads to problems when we change the metadata.
+        table_id = f"{project_id}.{schema_environment}.{table_name}"
+        client.delete_table(table_id, not_found_ok=True)
+
         pandas_gbq.to_gbq(
             df,
             full_table_name,
             project_id=project_id,
             if_exists="replace",
             credentials=credentials,
-            table_schema=get_bq_schema_from_metadata(table_name, schema, dev),
+            table_schema=table_schema,
+            chunksize=5000,
         )
         logger.info(f"Finished: {full_table_name}")
 

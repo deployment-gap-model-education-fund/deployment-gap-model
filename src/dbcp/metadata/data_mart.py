@@ -445,8 +445,12 @@ br_election_data = Table(
     Column("number_of_seats", Integer, nullable=False),
     Column("normalized_position_id", Integer, nullable=False),
     Column("normalized_position_name", String, nullable=False),
-    Column("frequency", String, nullable=False),
-    Column("reference_year", Integer, nullable=False),
+    Column(
+        "frequency", String, nullable=True
+    ),  # Starting 2023-10-03 update there were a couple hundred nulls
+    Column(
+        "reference_year", String, nullable=True
+    ),  # Starting 2023-10-03 update there were a couple hundred nulls
     Column("partisan_type", String),
     Column("race_created_at", DateTime, nullable=False),
     Column("race_updated_at", DateTime, nullable=False),
