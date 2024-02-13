@@ -13,7 +13,7 @@ services:
       - ./notebooks:/app/notebooks:rw
       - ./data:/app/data:rw
       - ./test:/app/test:r
-      - ${GOOGLE_APPLICATION_CREDENTIALS_PATH}:/app/gcloud_application_default_credentials.json:r
+      # - ${GOOGLE_APPLICATION_CREDENTIALS_PATH}:/app/gcloud_application_default_credentials.json:r
     ports:
       - ${JUPYTER_PORT}:${JUPYTER_PORT}
     command: jupyter lab --port ${JUPYTER_PORT} --ip 0.0.0.0 --no-browser
@@ -22,4 +22,4 @@ services:
     image: postgis/postgis:13-3.1-alpine
     env_file: local.env
     ports:
-      - ${POSTGRES_PORT}:5432
+      - 8880:5432
