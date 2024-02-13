@@ -3,6 +3,7 @@ import pandas as pd
 import sqlalchemy as sa
 
 import dbcp
+from dbcp.constants import PUDL_LATEST_YEAR
 
 
 def _extract_pudl_generators(pudl_engine: sa.engine.base.Engine) -> pd.DataFrame:
@@ -16,7 +17,10 @@ def _extract_pudl_generators(pudl_engine: sa.engine.base.Engine) -> pd.DataFrame
     """
     with pudl_engine.connect() as con:
         pudl_generators = pd.read_sql(
-            "SELECT * FROM out_eia__yearly_generators WHERE report_date >= '2022-01-01' AND report_date < '2023-01-01'",
+            f"""SELECT *
+                FROM out_eia__yearly_generators
+                WHERE report_date >= date('{PUDL_LATEST_YEAR}-01-01')
+                    AND report_date < date('{PUDL_LATEST_YEAR+1}-01-01')""",
             con,
         )
     return pudl_generators
