@@ -1,0 +1,36 @@
+name: Docker Compose Workflow
+
+on:
+  push:
+    branches:
+      - version-outputs # for testing only
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    # services:
+    #   docker:
+    #     image: docker:latest
+    #     options: --privileged
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
+      - name: Build and run Docker Compose services
+        run: |
+          docker-compose up -d
+
+      - name: Run tests
+        run: |
+          make test
+
+      - name: Stop Docker Compose services
+        run: |
+          docker-compose down
