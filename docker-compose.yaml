@@ -6,6 +6,7 @@ services:
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/gcloud_application_default_credentials.json
       - GOOGLE_CLOUD_PROJECT=dbcp-dev-350818
+      - JUPYTER_PORT=8890
     depends_on:
       - postgres
     volumes:
