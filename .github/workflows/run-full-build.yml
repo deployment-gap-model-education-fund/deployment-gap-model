@@ -10,8 +10,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      POSTGRES_PORT: 8082
-      JUPYTER_PORT: 8890
+      API_KEY_GOOGLE_MAPS: ${{ secrets.API_KEY_GOOGLE_MAPS }}
+      API_KEY_EIA: ${{ secrets.API_KEY_EIA }}
 
     # services:
     #   docker:
