@@ -6,7 +6,6 @@ services:
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/gcloud_application_default_credentials.json
       - GOOGLE_CLOUD_PROJECT=dbcp-dev-350818
-      - JUPYTER_PORT=8890
     depends_on:
       - postgres
     volumes:
@@ -16,11 +15,11 @@ services:
       - ./test:/app/test:r
       # - ${GOOGLE_APPLICATION_CREDENTIALS_PATH}:/app/gcloud_application_default_credentials.json:r
     ports:
-      - 8890:8890
-    command: jupyter lab --port 8890 --ip 0.0.0.0 --no-browser
+      - ${JUPYTER_PORT}:${JUPYTER_PORT}
+    command: jupyter lab --port ${JUPYTER_PORT} --ip 0.0.0.0 --no-browser
 
   postgres:
     image: postgis/postgis:13-3.1-alpine
     env_file: local.env
     ports:
-      - 8880:5432
+      - ${POSTGRES_PORT}:5432

@@ -9,6 +9,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      POSTGRES_PORT: 8082
+      JUPYTER_PORT: 8890
+
     # services:
     #   docker:
     #     image: docker:latest
