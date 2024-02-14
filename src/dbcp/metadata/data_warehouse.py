@@ -13,7 +13,6 @@ from sqlalchemy import (
 )
 
 metadata = MetaData()
-schema = "data_warehouse"
 
 ###############################
 # EPA AVERT Avoided Emissions #
@@ -27,7 +26,7 @@ avert_capacity_factors = Table(
     Column("capacity_factor", Float, nullable=True),
     Column("tonnes_co2_per_mwh", Float, nullable=True),
     Column("co2e_tonnes_per_year_per_mw", Float, nullable=True),
-    schema=schema,
+
 )
 
 avert_county_region_assoc = Table(
@@ -35,7 +34,7 @@ avert_county_region_assoc = Table(
     metadata,
     Column("avert_region", String, primary_key=True),
     Column("county_id_fips", String, primary_key=True),
-    schema=schema,
+
 )
 
 
@@ -67,7 +66,7 @@ county_fips = (
             CheckConstraint("tribal_land_frac >= 0.0 AND tribal_land_frac <= 1.0"),
             nullable=False,
         ),
-        schema=schema,
+
     ),
 )
 state_fips = (
@@ -77,7 +76,7 @@ state_fips = (
         Column("state_id_fips", String, nullable=False, primary_key=True),
         Column("state_name", String, nullable=False),
         Column("state_abbrev", String, nullable=False),
-        schema=schema,
+
     ),
 )
 
@@ -110,41 +109,41 @@ iso_projects = Table(
     Column("queue_date_raw", String),
     Column("is_actionable", Boolean),
     Column("is_nearly_certain", Boolean),
-    schema=schema,
+
 )
 
 iso_locations = Table(
     "iso_locations",
     metadata,
-    Column("project_id", Integer, ForeignKey("data_warehouse.iso_projects.project_id")),
+    Column("project_id", Integer, ForeignKey("iso_projects.project_id")),
     Column("raw_county_name", String),
     Column("raw_state_name", String),
     Column(
         "state_id_fips",
         String,
-        ForeignKey("data_warehouse.state_fips.state_id_fips"),
+        ForeignKey("state_fips.state_id_fips"),
         nullable=True,
     ),
     Column(
         "county_id_fips",
         String,
-        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        ForeignKey("county_fips.county_id_fips"),
         nullable=True,
     ),
     Column("geocoded_locality_name", String),
     Column("geocoded_locality_type", String),
     Column("geocoded_containing_county", String),
-    schema=schema,
+
 )
 
 iso_resource_capacity = Table(
     "iso_resource_capacity",
     metadata,
-    Column("project_id", Integer, ForeignKey("data_warehouse.iso_projects.project_id")),
+    Column("project_id", Integer, ForeignKey("iso_projects.project_id")),
     Column("resource", String),
     Column("resource_clean", String),
     Column("capacity_mw", Float),
-    schema=schema,
+
 )
 
 ######################
@@ -192,7 +191,7 @@ eip_projects = Table(
     Column("date_modified", DateTime, nullable=False),
     Column("operating_status", String),
     Column("industry_sector", String),
-    schema=schema,
+
 )
 eip_facilities = Table(
     "eip_facilities",
@@ -243,13 +242,13 @@ eip_facilities = Table(
     Column(
         "state_id_fips",
         String,
-        ForeignKey("data_warehouse.state_fips.state_id_fips"),
+        ForeignKey("state_fips.state_id_fips"),
         nullable=True,
     ),
     Column(
         "county_id_fips",
         String,
-        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        ForeignKey("county_fips.county_id_fips"),
         nullable=True,
     ),
     Column("geocoded_locality_name", String, nullable=True),
@@ -258,19 +257,19 @@ eip_facilities = Table(
     Column("longitude", Float),
     Column("latitude", Float),
     Column("date_modified", DateTime, nullable=False),
-    schema=schema,
+
 )
 
 eip_facility_project_association = Table(
     "eip_facility_project_association",
     metadata,
     Column(
-        "facility_id", Integer, ForeignKey("data_warehouse.eip_facilities.facility_id")
+        "facility_id", Integer, ForeignKey("eip_facilities.facility_id")
     ),
     Column(
         "project_id", Integer
     ),  # TODO: This should have a fk with eip_projects.project_id. There are currently 5 ids not in eip_projects.
-    schema=schema,
+
 )
 
 eip_air_constr_permits = Table(
@@ -293,7 +292,7 @@ eip_air_constr_permits = Table(
     Column("document_url", String),
     Column("date_modified", DateTime, nullable=False),
     Column("permit_status", String),
-    schema=schema,
+    
 )
 
 eip_project_permit_association = Table(
@@ -305,7 +304,7 @@ eip_project_permit_association = Table(
     Column(
         "project_id", Integer, nullable=False
     ),  # TODO: This field contains project_ids not present in eip_projects.project_id
-    schema=schema,
+    
 )
 
 ##########################
@@ -323,12 +322,12 @@ contested_project = Table(
     Column("energy_type", String),
     Column("source", String),
     Column(
-        "state_id_fips", String, ForeignKey("data_warehouse.state_fips.state_id_fips")
+        "state_id_fips", String, ForeignKey("state_fips.state_id_fips")
     ),
     Column("earliest_year_mentioned", Integer),
     Column("latest_year_mentioned", Integer),
     Column("n_years_mentioned", Integer, nullable=False),
-    schema=schema,
+    
 )
 
 local_ordinance = Table(
@@ -341,12 +340,12 @@ local_ordinance = Table(
     Column("energy_type", String),
     Column("source", String),
     Column(
-        "state_id_fips", String, ForeignKey("data_warehouse.state_fips.state_id_fips")
+        "state_id_fips", String, ForeignKey("state_fips.state_id_fips")
     ),
     Column(
         "county_id_fips",
         String,
-        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        ForeignKey("county_fips.county_id_fips"),
         nullable=True,
     ),
     Column("geocoded_locality_name", String, nullable=False),
@@ -355,7 +354,7 @@ local_ordinance = Table(
     Column("earliest_year_mentioned", Integer),
     Column("latest_year_mentioned", Integer),
     Column("n_years_mentioned", Integer, nullable=False),
-    schema=schema,
+    
 )
 
 state_policy = Table(
@@ -367,12 +366,12 @@ state_policy = Table(
     Column("energy_type", String),
     Column("source", String),
     Column(
-        "state_id_fips", String, ForeignKey("data_warehouse.state_fips.state_id_fips")
+        "state_id_fips", String, ForeignKey("state_fips.state_id_fips")
     ),
     Column("earliest_year_mentioned", Integer),
     Column("latest_year_mentioned", Integer),
     Column("n_years_mentioned", Integer),
-    schema=schema,
+    
 )
 
 
@@ -385,12 +384,12 @@ state_notes = Table(
     Column("energy_type", String),
     Column("source", String),
     Column(
-        "state_id_fips", String, ForeignKey("data_warehouse.state_fips.state_id_fips")
+        "state_id_fips", String, ForeignKey("state_fips.state_id_fips")
     ),
     Column("earliest_year_mentioned", Integer),
     Column("latest_year_mentioned", Integer),
     Column("n_years_mentioned", Integer),
-    schema=schema,
+    
 )
 
 #########################
@@ -403,14 +402,14 @@ ncsl_state_permitting = Table(
     Column(
         "state_id_fips",
         String,
-        ForeignKey("data_warehouse.state_fips.state_id_fips"),
+        ForeignKey("state_fips.state_id_fips"),
         primary_key=True,
     ),
     Column("raw_state_name", String, nullable=False),
     Column("permitting_type", String),
     Column("description", String, nullable=False),
     Column("link", String),
-    schema=schema,
+    
 )
 
 ########
@@ -547,10 +546,10 @@ mcoe = Table(
     Column(
         "county_id_fips",
         String,
-        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        ForeignKey("county_fips.county_id_fips"),
         nullable=True,
     ),
-    schema=schema,
+    
 )
 
 
@@ -1025,7 +1024,7 @@ justice40_tracts = Table(
             "tract_within_tribal_areas_percent >= 0 AND tract_within_tribal_areas_percent <= 1"
         ),
     ),
-    schema=schema,
+    
 )
 
 
@@ -1059,7 +1058,7 @@ nrel_local_ordinances = Table(
     Column(
         "county_id_fips",
         String,
-        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        ForeignKey("county_fips.county_id_fips"),
         nullable=True,
     ),
     Column("geocoded_locality_name", String),
@@ -1069,7 +1068,7 @@ nrel_local_ordinances = Table(
     Column("standardized_value", Float),
     Column("is_ban", Boolean),
     Column("is_de_facto_ban", Boolean),
-    schema=schema,
+    
 )
 
 
@@ -1095,7 +1094,7 @@ offshore_wind_projects = Table(
     Column("lease_areas", String),
     Column("is_actionable", Boolean),
     Column("is_nearly_certain", Boolean),
-    schema=schema,
+    
 )
 offshore_wind_locations = Table(
     "offshore_wind_locations",
@@ -1111,27 +1110,27 @@ offshore_wind_locations = Table(
     Column(
         "county_id_fips",
         String,
-        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        ForeignKey("county_fips.county_id_fips"),
         nullable=True,
     ),
     Column("geocoded_locality_name", String),
     Column("geocoded_locality_type", String),
     Column("geocoded_containing_county", String),
-    schema=schema,
+    
 )
 offshore_wind_cable_landing_association = Table(
     "offshore_wind_cable_landing_association",
     metadata,
     Column("location_id", Integer, primary_key=True),
     Column("project_id", Integer, primary_key=True),
-    schema=schema,
+    
 )
 offshore_wind_port_association = Table(
     "offshore_wind_port_association",
     metadata,
     Column("location_id", Integer, primary_key=True),
     Column("project_id", Integer, primary_key=True),
-    schema=schema,
+    
 )
 
 
@@ -1148,7 +1147,7 @@ protected_area_by_county = Table(
         "county_id_fips",
         String,
         # This FK should hold but addfips is out of date, even with "2020" data
-        # ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        # ForeignKey("county_fips.county_id_fips"),
         nullable=False,
     ),
     Column("county_area_coast_clipped_km2", Float),
@@ -1164,7 +1163,7 @@ protected_area_by_county = Table(
     Column("gap_status", String),
     # join columns
     Column("intersection_area_padus_km2", Float),
-    schema=schema,
+    
 )
 
 
@@ -1179,7 +1178,7 @@ energy_communities = Table(
         "county_id_fips",
         String,
         # should have FK on county_fips but EC currently uses 2010 county geometry
-        # ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        # ForeignKey("county_fips.county_id_fips"),
         primary_key=True,
     ),
     Column("raw_county_id_fips", String),
@@ -1193,7 +1192,7 @@ energy_communities = Table(
     Column("coal_qualifying_area_fraction", Float),
     Column("qualifies_by_employment_criteria", Boolean),
     Column("geocoded_locality_name", String),
-    schema=schema,
+    
 )
 
 ################
@@ -1205,7 +1204,7 @@ br_elections = Table(
     Column("election_id", Integer, nullable=False, primary_key=True),
     Column("election_name", String, nullable=False),
     Column("election_day", DateTime, nullable=False),
-    schema=schema,
+    
 )
 
 br_positions = Table(
@@ -1230,7 +1229,7 @@ br_positions = Table(
         "frequency", String, nullable=True
     ),  # Starting 2023-10-03 update there were a couple hundred nulls
     Column("partisan_type", String),
-    schema=schema,
+    
 )
 
 br_races = Table(
@@ -1246,16 +1245,16 @@ br_races = Table(
     Column(
         "election_id",
         Integer,
-        ForeignKey("data_warehouse.br_elections.election_id"),
+        ForeignKey("br_elections.election_id"),
         nullable=False,
     ),
     Column(
         "position_id",
         Integer,
-        ForeignKey("data_warehouse.br_positions.position_id"),
+        ForeignKey("br_positions.position_id"),
         nullable=False,
     ),
-    schema=schema,
+    
 )
 
 br_positions_counties_assoc = Table(
@@ -1264,7 +1263,7 @@ br_positions_counties_assoc = Table(
     Column(
         "position_id",
         Integer,
-        ForeignKey("data_warehouse.br_positions.position_id"),
+        ForeignKey("br_positions.position_id"),
         nullable=False,
         primary_key=True,
     ),
@@ -1275,16 +1274,16 @@ br_positions_counties_assoc = Table(
     Column(
         "state_id_fips",
         String,
-        ForeignKey("data_warehouse.state_fips.state_id_fips"),
+        ForeignKey("state_fips.state_id_fips"),
         nullable=False,
     ),
     Column(
         "county_id_fips",
         String,
-        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        ForeignKey("county_fips.county_id_fips"),
         nullable=True,
     ),  # Should not be nullable in future updates
-    schema=schema,
+    
 )
 
 ###############
@@ -1311,7 +1310,7 @@ gridstatus_projects = Table(
     Column("region", String, nullable=False),
     Column("entity", String, nullable=False),
     Column("developer", String, nullable=True),
-    schema=schema,
+    
 )
 
 gridstatus_resource_capacity = Table(
@@ -1320,12 +1319,12 @@ gridstatus_resource_capacity = Table(
     Column(
         "project_id",
         Integer,
-        ForeignKey("data_warehouse.gridstatus_projects.project_id"),
+        ForeignKey("gridstatus_projects.project_id"),
     ),
     Column("resource", String),
     Column("resource_clean", String),
     Column("capacity_mw", Float),
-    schema=schema,
+    
 )
 
 gridstatus_locations = Table(
@@ -1334,26 +1333,26 @@ gridstatus_locations = Table(
     Column(
         "project_id",
         Integer,
-        ForeignKey("data_warehouse.gridstatus_projects.project_id"),
+        ForeignKey("gridstatus_projects.project_id"),
     ),
     Column("raw_county_name", String),
     Column("raw_state_name", String),
     Column(
         "state_id_fips",
         String,
-        ForeignKey("data_warehouse.state_fips.state_id_fips"),
+        ForeignKey("state_fips.state_id_fips"),
         nullable=True,
     ),
     Column(
         "county_id_fips",
         String,
-        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        ForeignKey("county_fips.county_id_fips"),
         nullable=True,
     ),
     Column("geocoded_locality_name", String),
     Column("geocoded_locality_type", String),
     Column("geocoded_containing_county", String),
-    schema=schema,
+    
 )
 
 #####################
@@ -1365,5 +1364,5 @@ manual_ordinances = Table(
     metadata,
     Column("county_id_fips", String, nullable=False, primary_key=True),
     Column("ordinance_via_self_maintained", Boolean),
-    schema=schema,
+    
 )

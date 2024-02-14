@@ -79,7 +79,6 @@ def get_bq_schema_from_metadata(
 
 def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str):
     """Apply dtypes to a dataframe using the sqlalchemy metadata."""
-    table_name = f"{schema}.{table_name}"
     metadata = get_schema_sql_alchemy_metadata(schema)
     try:
         table = metadata.tables[table_name]
@@ -94,12 +93,13 @@ def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str):
     return df.astype(dtypes)
 
 
-def get_sql_engine() -> sa.engine.Engine:
+def get_sql_engine(schema: str) -> sa.engine.Engine:
     """Create a sql alchemy engine from environment vars."""
-    user = os.environ["POSTGRES_USER"]
-    password = os.environ["POSTGRES_PASSWORD"]
-    db = os.environ["POSTGRES_DB"]
-    return sa.create_engine(f"postgresql://{user}:{password}@{db}:5432")
+    dbcp_output = os.environ["DBCP_OUTPUT"]
+    db_path = f"{dbcp_output}/{schema}.db"
+    # create db_path file if it doesn't exist
+    Path(db_path).touch(exist_ok=True)
+    return sa.create_engine(f"sqlite:////{db_path}")
 
 
 def get_pudl_engine() -> sa.engine.Engine:

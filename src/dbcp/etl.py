@@ -212,9 +212,7 @@ def etl_manual_ordinances() -> dict[str, pd.DataFrame]:
 def etl(args):
     """Run dbc ETL."""
     # Setup postgres
-    engine = dbcp.helpers.get_sql_engine()
-    with engine.connect() as con:
-        engine.execute("CREATE SCHEMA IF NOT EXISTS data_warehouse")
+    engine = dbcp.helpers.get_sql_engine("data_warehouse")
 
     # Reduce size of caches if necessary
     GEOCODER_CACHE.reduce_size()
@@ -260,9 +258,7 @@ def etl(args):
                 con=con,
                 if_exists="append",
                 index=False,
-                schema="data_warehouse",
                 chunksize=1000,
-                method=psql_insert_copy,
             )
 
     validate_warehouse(engine=engine)

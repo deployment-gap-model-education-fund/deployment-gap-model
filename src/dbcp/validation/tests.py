@@ -31,13 +31,13 @@ def test_j40_county_fips_coverage(engine: Engine):
     j40_counties as (
         SELECT
             DISTINCT SUBSTRING("tract_id_fips", 1, 5) as county_id_fips
-        FROM data_warehouse.justice40_tracts
+        FROM justice40_tracts
     )
     select
         j.county_id_fips as j40_fips,
         c.county_id_fips as c_fips
     from j40_counties as j
-    full outer join data_warehouse.county_fips as c
+    full outer join county_fips as c
     USING (county_id_fips)
     where j.county_id_fips is null
     or c.county_id_fips is null
@@ -67,7 +67,7 @@ def test_gridstatus_fips_coverage(engine: Engine):
     """Make sure we have high coverage for county_id_fips codes or gridstatus_projects."""
     with engine.connect() as con:
         gridstatus_locations = pd.read_sql_table(
-            "gridstatus_locations", con, schema="data_warehouse"
+            "gridstatus_locations", con
         )
     assert (
         gridstatus_locations.county_id_fips.isna().sum() / len(gridstatus_locations)
@@ -348,13 +348,14 @@ def validate_data_mart(engine: Engine):
     test_county_commission_election_info(engine)
 
 
-def validate_all(engine: Engine):
+def validate_all():
     """Run all validation tests."""
+    engine = get_sql_engine("data_warehouse")
     validate_warehouse(engine)
+    engine = get_sql_engine("data_mart")
     validate_data_mart(engine)
 
 
 if __name__ == "__main__":
     # debugging entry point
-    engine = get_sql_engine()
-    validate_all(engine)
+    validate_all()

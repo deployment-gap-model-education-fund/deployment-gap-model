@@ -12,7 +12,6 @@ from sqlalchemy import (
 )
 
 metadata = MetaData()
-schema = "data_mart"
 
 counties_wide_format = Table(
     "counties_wide_format",
@@ -197,7 +196,6 @@ counties_wide_format = Table(
     Column("energy_community_coal_closures_area_fraction", Float),
     Column("energy_community_qualifies_via_employment", Boolean),
     Column("energy_community_qualifies", Boolean),
-    schema=schema,
 )
 
 existing_plants = Table(
@@ -212,7 +210,6 @@ existing_plants = Table(
     Column("county_id_fips", String),
     Column("state", String),
     Column("county", String),
-    schema=schema,
 )
 
 fossil_infrastructure_projects = Table(
@@ -255,7 +252,6 @@ fossil_infrastructure_projects = Table(
     Column("raw_relative_cancer_risk_per_million_within_3_miles", Float),
     Column("raw_wastewater_discharge_indicator", Float),
     Column("is_ally_target", String, nullable=False),
-    schema=schema,
 )
 
 iso_projects_wide_format = Table(
@@ -301,7 +297,6 @@ iso_projects_wide_format = Table(
     Column("ordinance_via_self_maintained", Boolean),
     Column("ordinance_is_restrictive", Boolean),
     Column("state_permitting_type", String),
-    schema=schema,
 )
 iso_projects_long_format = Table(
     "iso_projects_long_format",
@@ -345,7 +340,6 @@ iso_projects_long_format = Table(
     Column("frac_locations_in_county", Float, nullable=False),
     Column("source", String, nullable=False),
     Column("surrogate_id", Integer, primary_key=True),
-    schema=schema,
 )
 
 counties_long_format = Table(
@@ -415,7 +409,6 @@ counties_long_format = Table(
     Column("energy_community_coal_closures_area_fraction", Float),
     Column("energy_community_qualifies_via_employment", Boolean),
     Column("energy_community_qualifies", Boolean),
-    schema=schema,
 )
 
 br_election_data = Table(
@@ -456,7 +449,6 @@ br_election_data = Table(
     Column("race_updated_at", DateTime, nullable=False),
     Column("state_id_fips", String, nullable=False),
     Column("county_id_fips", String),  # Should not be nullable in future updates
-    schema=schema,
 )
 
 county_commission_election_info = Table(
@@ -488,5 +480,4 @@ county_commission_election_info = Table(
     Column("next_run_off_all_race_names", String),
     Column("next_run_off_frequency", String),
     Column("next_run_off_reference_year", Integer),
-    schema=schema,
 )
