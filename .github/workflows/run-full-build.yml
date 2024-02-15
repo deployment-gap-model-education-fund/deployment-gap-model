@@ -22,6 +22,13 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
 
+      - name: Display workspace directory
+        run: |
+          echo "Workspace directory: $GITHUB_WORKSPACE"
+
+      - name: Set up Docker Compose
+        run: sudo chown -R 1000:1000 $GITHUB_WORKSPACE
+
       - name: Set up Docker Compose
         run: |
           sudo apt-get update

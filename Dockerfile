@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install sqlite3
 RUN apt-get -y install libgdal-dev
 
 RUN useradd -d /app/ dbcp
-# USER dbcp
+USER dbcp
 
 WORKDIR /app
 
