@@ -45,8 +45,10 @@ jobs:
           make all_local
 
       - name: Stop Docker Compose services
+        if: always()
         run: |
           docker-compose down
 
       - name: Give ownership of the workspace back to root
+        if: always()
         run: sudo chown -R root:root $GITHUB_WORKSPACE
