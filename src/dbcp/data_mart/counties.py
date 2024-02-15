@@ -181,7 +181,7 @@ def _get_existing_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
     #         plant_id_eia,
     #         generator_id,
     #         count(fuel_type_code_pudl) as fuel_type_count
-    #     FROM "data_warehouse"."mcoe"
+    #     FROM "data_warehouse"."pudl_generators"
     #     GROUP BY 1, 2
     # )
     # SELECT max(fuel_type_count) as max_fuel_type_count
@@ -201,8 +201,8 @@ def _get_existing_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
             ) as resource,
             sum(net_generation_mwh) as net_gen_by_fuel,
             sum(capacity_mw) as capacity_by_fuel,
-            max(operating_date) as max_operating_date
-        from data_warehouse.mcoe
+            max(generator_operating_date) as max_operating_date
+        from data_warehouse.pudl_generators
         where operational_status = 'existing'
         group by 1, 2
     ),
@@ -587,7 +587,6 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         # A handful of hybrid facilities with co-located diesel generators.
         # They produce tiny amounts of CO2 but large amounts of confusion.
         "onshore_wind_existing_co2e_tonnes_per_year",
-        "battery_storage_existing_co2e_tonnes_per_year",
         "renewable_and_battery_proposed_co2e_tonnes_per_year",  # not currently modeled
         # No superset proposed_facility_counts due to double-counting multi-resource projects.
         # I recalculate those from the project data in _get_category_project_counts()

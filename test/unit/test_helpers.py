@@ -19,7 +19,7 @@ class TestBQSchemaHelpers:
         """Ensure we get the expected metadata object."""
         metadata = dbcp.helpers.get_schema_sql_alchemy_metadata("data_warehouse")
         assert isinstance(metadata, sa.MetaData)
-        assert "data_warehouse.mcoe" in metadata.tables.keys()
+        assert "data_warehouse.pudl_generators" in metadata.tables.keys()
 
     def test_get_schema_sql_alchemy_metadata_exception(self):
         """Make sure an exception is raised when an invalid schema is requested."""

@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 from dbcp.constants import PUDL_LATEST_YEAR
 from dbcp.data_mart.helpers import _get_county_fips_df, _get_state_fips_df
-from dbcp.helpers import download_pudl_data, get_sql_engine
+from dbcp.helpers import get_pudl_resource, get_sql_engine
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     bedford_addfips_fix,
@@ -26,7 +26,7 @@ def _get_existing_plant_fuel_data(pudl_engine: sa.engine.Engine) -> pd.DataFrame
         report_date,
         net_generation_mwh as mwh,
         fuel_consumed_for_electricity_mmbtu as mmbtu
-    from generation_fuel_eia923
+    from core_eia923__monthly_generation_fuel
     -- select one calendar year of monthly data
     where report_date >= date('{PUDL_LATEST_YEAR}-01-01')
         and report_date < date('{PUDL_LATEST_YEAR+1}-01-01')
@@ -152,7 +152,7 @@ def _get_plant_location_data(pudl_engine: sa.engine.Engine) -> pd.DataFrame:
         plant_id_eia,
         state,
         county
-    from plants_entity_eia
+    from core_eia__entity_plants
     ;
     """
     df = pd.read_sql(query, pudl_engine)
@@ -429,7 +429,7 @@ def create_data_mart(
     if postgres_engine is None:
         postgres_engine = get_sql_engine()
     if pudl_engine is None:
-        pudl_data_path = download_pudl_data()
+        pudl_data_path = get_pudl_resource("pudl.sqlite.gz")
         pudl_engine = sa.create_engine(
             f"sqlite:////{pudl_data_path}/pudl_data/sqlite/pudl.sqlite"
         )
