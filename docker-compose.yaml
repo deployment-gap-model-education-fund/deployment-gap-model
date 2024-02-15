@@ -13,8 +13,8 @@ services:
       - ./src/dbcp:/app/dbcp:rw
       - ./notebooks:/app/notebooks:rw
       - ./data:/app/data:rw
-      - ./test:/app/test:ro
-      # - ${GOOGLE_APPLICATION_CREDENTIALS_PATH}:/app/gcloud_application_default_credentials.json:ro
+      - ./test:/app/test:rw
+      # - ${GOOGLE_GHA_CREDS_PATH}:/app/gcloud_application_default_credentials.json:ro
     ports:
       - ${JUPYTER_PORT}:${JUPYTER_PORT}
     command: jupyter lab --port ${JUPYTER_PORT} --ip 0.0.0.0 --no-browser
