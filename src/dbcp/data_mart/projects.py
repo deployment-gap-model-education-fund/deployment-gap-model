@@ -37,8 +37,8 @@ def _get_gridstatus_projects(engine: sa.engine.Engine) -> pd.DataFrame:
             queue_status,
             queue_date AS date_entered_queue,
             interconnection_status_raw AS interconnection_status
-        FROM data_warehouse.gridstatus_projects as proj
-        LEFT JOIN data_warehouse.gridstatus_resource_capacity as res
+        FROM gridstatus_projects as proj
+        LEFT JOIN gridstatus_resource_capacity as res
         USING (project_id)
         WHERE resource_clean != 'Transmission'
     ),
@@ -49,8 +49,12 @@ def _get_gridstatus_projects(engine: sa.engine.Engine) -> pd.DataFrame:
             project_id,
             state_id_fips,
             county_id_fips,
-            (1.0 / count(*) over (partition by project_id))::real as frac_locations_in_county
-        FROM data_warehouse.gridstatus_locations
+            (1.0 / (
+                SELECT COUNT(*)
+                FROM gridstatus_locations AS sub
+                WHERE sub.project_id = main.project_id
+            )) AS frac_locations_in_county
+        FROM gridstatus_locations AS main
     ),
     gs as (
         SELECT
@@ -70,11 +74,11 @@ def _get_gridstatus_projects(engine: sa.engine.Engine) -> pd.DataFrame:
         'gridstatus' AS source,
         ncsl.permitting_type AS state_permitting_type
     FROM gs
-    LEFT JOIN data_warehouse.ncsl_state_permitting AS ncsl
+    LEFT JOIN ncsl_state_permitting AS ncsl
         on gs.state_id_fips = ncsl.state_id_fips
-    LEFT JOIN data_warehouse.state_fips AS sfip
+    LEFT JOIN state_fips AS sfip
         ON gs.state_id_fips = sfip.state_id_fips
-    LEFT JOIN data_warehouse.county_fips AS cfip
+    LEFT JOIN county_fips AS cfip
         ON gs.county_id_fips = cfip.county_id_fips
     """
     gs = pd.read_sql(query, engine)
@@ -113,7 +117,7 @@ def _merge_lbnl_with_gridstatus(lbnl: pd.DataFrame, gs: pd.DataFrame) -> pd.Data
 
 
 def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFrame:
-    where_clause = "WHERE region ~ 'non-ISO'" if non_iso_only else ""
+    where_clause = "WHERE region LIKE '%non-ISO%'" if non_iso_only else ""
     query = f"""
     WITH
     iso_proj_res as (
@@ -134,8 +138,8 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
             proj.is_nearly_certain,
             res.capacity_mw,
             res.resource_clean
-        FROM data_warehouse.iso_projects as proj
-        INNER JOIN data_warehouse.iso_resource_capacity as res
+        FROM iso_projects as proj
+        INNER JOIN iso_resource_capacity as res
         ON proj.project_id = res.project_id
         {where_clause}
     ),
@@ -146,8 +150,16 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
             project_id,
             state_id_fips,
             county_id_fips,
-            (1.0 / count(*) over (partition by project_id))::real as frac_locations_in_county
-        FROM data_warehouse.iso_locations
+            (1.0 / total_count) AS frac_locations_in_county
+        FROM (
+            SELECT
+                project_id,
+                state_id_fips,
+                county_id_fips,
+                COUNT(*) AS total_count
+            FROM iso_locations
+            GROUP BY project_id
+        ) AS subquery
     ),
     iso as (
         SELECT
@@ -167,11 +179,11 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
         'lbnl' as source,
         ncsl.permitting_type as state_permitting_type
     from iso
-    left join data_warehouse.state_fips as sfip
+    left join state_fips as sfip
         on iso.state_id_fips = sfip.state_id_fips
-    left join data_warehouse.county_fips as cfip
+    left join county_fips as cfip
         on iso.county_id_fips = cfip.county_id_fips
-    left join data_warehouse.ncsl_state_permitting as ncsl
+    left join ncsl_state_permitting as ncsl
         on iso.state_id_fips = ncsl.state_id_fips
     ;
     """
@@ -230,20 +242,20 @@ def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame
             project_id,
             locs.county_id_fips,
             COUNT(*) OVER(PARTITION BY project_id) AS n_locations
-        FROM data_warehouse.offshore_wind_cable_landing_association as cable
-        INNER JOIN data_warehouse.offshore_wind_locations as locs
+        FROM offshore_wind_cable_landing_association as cable
+        INNER JOIN offshore_wind_locations as locs
         USING(location_id)
     ),
     proj_county_assoc as (
         SELECT
             project_id,
             county_id_fips,
-            -- some counties have multiple cable landings from the same
-            -- project (different towns). I allocate the capacity equally
-            -- over the landings
-            (count(*) * 1.0 / max(n_locations))::real as frac_locations_in_county
-        FROM cable_locs
-        group by 1,2
+            (COUNT(*) * 1.0 / MAX(n_locations)) AS frac_locations_in_county
+        FROM
+            cable_locs
+        GROUP BY
+            project_id,
+            county_id_fips
     )
     -- join the project, state, and county stuff
     SELECT
@@ -259,7 +271,7 @@ def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame
         proj.name as project_name,
         proj.developer,
         proj."capacity_mw",
-        date(proj.proposed_completion_year::text || '-01-01') as date_proposed_online,
+        date(proj.proposed_completion_year || '-01-01') as date_proposed_online,
         'active' as queue_status,
         'Offshore Wind' as resource_clean,
         0.0 as co2e_tonnes_per_year,
@@ -272,13 +284,13 @@ def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame
         ncsl.permitting_type as state_permitting_type
 
     FROM proj_county_assoc as assoc
-    INNER JOIN data_warehouse.offshore_wind_projects as proj
+    INNER JOIN offshore_wind_projects as proj
     USING(project_id)
-    LEFT JOIN data_warehouse.state_fips as sfip
+    LEFT JOIN state_fips as sfip
     ON substr(assoc.county_id_fips, 1, 2) = sfip.state_id_fips
-    LEFT JOIN data_warehouse.county_fips as cfip
+    LEFT JOIN county_fips as cfip
     USING(county_id_fips)
-    LEFT JOIN data_warehouse.ncsl_state_permitting as ncsl
+    LEFT JOIN ncsl_state_permitting as ncsl
     ON substr(assoc.county_id_fips, 1, 2) = ncsl.state_id_fips
     WHERE proj.construction_status != 'Online'
     ;
@@ -492,7 +504,7 @@ def _add_derived_columns(mart: pd.DataFrame) -> None:
     return
 
 
-def create_long_format(engine: sa.engine.Engine) -> pd.DataFrame:
+def create_long_format() -> pd.DataFrame:
     """Create table of ISO projects in long format.
 
     PK should be (source, project_id, county_id_fips, resource_clean), but county_id_fips has nulls.
@@ -502,21 +514,19 @@ def create_long_format(engine: sa.engine.Engine) -> pd.DataFrame:
     column to allocate capacity and co2e estimates to counties when aggregating.
     Otherwise they will be double-counted.
 
-    Args:
-        engine (sa.engine.Engine): postgres database engine
-
     Returns:
         pd.DataFrame: long format table of ISO projects
     """
+    dw_engine = get_sql_engine("data_warehouse")
     iso = _get_and_join_iso_tables(
-        engine, use_gridstatus=True, use_proprietary_offshore=True
+        dw_engine, use_gridstatus=True, use_proprietary_offshore=True
     )
-    all_counties = _get_county_fips_df(engine)
-    all_states = _get_state_fips_df(engine)
+    all_counties = _get_county_fips_df(dw_engine)
+    all_states = _get_state_fips_df(dw_engine)
 
     # model local opposition
     aggregator = CountyOpposition(
-        engine=engine, county_fips_df=all_counties, state_fips_df=all_states
+        engine=dw_engine, county_fips_df=all_counties, state_fips_df=all_states
     )
     combined_opp = aggregator.agg_to_counties(
         include_state_policies=False,
@@ -540,14 +550,9 @@ def create_long_format(engine: sa.engine.Engine) -> pd.DataFrame:
     return long_format
 
 
-def create_data_mart(
-    engine: Optional[sa.engine.Engine] = None,
-) -> dict[str, pd.DataFrame]:
+def create_data_mart() -> dict[str, pd.DataFrame]:
     """Create projects datamart dataframe."""
-    if engine is None:
-        engine = get_sql_engine()
-
-    long_format = create_long_format(engine)
+    long_format = create_long_format()
     wide_format = _convert_long_to_wide(long_format)
 
     return {

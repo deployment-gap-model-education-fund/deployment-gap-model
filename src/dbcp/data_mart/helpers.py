@@ -18,14 +18,14 @@ def _subset_db_columns(
 
 def _get_county_fips_df(engine: sa.engine.Engine) -> pd.DataFrame:
     cols = ["*"]
-    db = "data_warehouse.county_fips"
+    db = "county_fips"
     df = _subset_db_columns(cols, db, engine)
     return df
 
 
 def _get_state_fips_df(engine: sa.engine.Engine) -> pd.DataFrame:
     cols = ["*"]
-    db = "data_warehouse.state_fips"
+    db = "state_fips"
     df = _subset_db_columns(cols, db, engine)
     return df
 
@@ -69,7 +69,7 @@ class CountyOpposition(object):
             # 'raw_state_name',  # drop raw name in favor of canonical one
             # 'state_id_fips',  # will join on 5-digit county FIPS, which includes state
         ]
-        db = "data_warehouse.local_ordinance"
+        db = "local_ordinance"
         df = _subset_db_columns(cols, db, self._engine)
         return df
 
@@ -82,7 +82,7 @@ class CountyOpposition(object):
             # 'raw_state_name',  # drop raw name in favor of canonical one
             "state_id_fips",
         ]
-        table = "data_warehouse.state_policy"
+        table = "state_policy"
         states_to_exclude = (
             "23",  # Maine (repealed)
             "36",  # New York (pro-renewables policy)
@@ -182,10 +182,10 @@ class CountyOpposition(object):
         query = """
         SELECT
             county_id_fips,
-            bool_or(is_ban AND energy_type = 'solar') as ordinance_via_solar_nrel,
-            bool_or(is_ban AND energy_type = 'wind') as ordinance_via_wind_nrel,
-            bool_or(is_de_facto_ban) as ordinance_via_nrel_is_de_facto
-        FROM "data_warehouse"."nrel_local_ordinances"
+                MAX(CASE WHEN is_ban AND energy_type = 'solar' THEN 1 ELSE 0 END) AS ordinance_via_solar_nrel,
+                MAX(CASE WHEN is_ban AND energy_type = 'wind' THEN 1 ELSE 0 END) AS ordinance_via_wind_nrel,
+                MAX(CASE WHEN is_de_facto_ban THEN 1 ELSE 0 END) AS ordinance_via_nrel_is_de_facto
+        FROM nrel_local_ordinances
         -- NOTE: this upscales town-level bans to their containing counties to be consistent with the Columbia dataset.
         -- Use WHERE geocoded_locality_type = 'county' to restrict to whole-county bans.
         GROUP BY county_id_fips
@@ -195,7 +195,7 @@ class CountyOpposition(object):
 
     def _get_manual_ordinances(self) -> pd.DataFrame:
         df = pd.read_sql_table(
-            "manual_ordinances", self._engine, schema="data_warehouse"
+            "manual_ordinances", self._engine
         )
         return df
 

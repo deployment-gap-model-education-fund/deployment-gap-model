@@ -66,9 +66,7 @@ null,02063
 def test_gridstatus_fips_coverage(engine: Engine):
     """Make sure we have high coverage for county_id_fips codes or gridstatus_projects."""
     with engine.connect() as con:
-        gridstatus_locations = pd.read_sql_table(
-            "gridstatus_locations", con
-        )
+        gridstatus_locations = pd.read_sql_table("gridstatus_locations", con)
     assert (
         gridstatus_locations.county_id_fips.isna().sum() / len(gridstatus_locations)
         < 0.02

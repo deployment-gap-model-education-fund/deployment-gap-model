@@ -202,7 +202,7 @@ def _get_existing_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
             sum(net_generation_mwh) as net_gen_by_fuel,
             sum(capacity_mw) as capacity_by_fuel,
             max(operating_date) as max_operating_date
-        from data_warehouse.mcoe
+        from mcoe
         where operational_status = 'existing'
         group by 1, 2
     ),
@@ -260,14 +260,14 @@ def _get_existing_fossil_plant_co2e_estimates(
 
 def _get_existing_plant_locations(
     pudl_engine: sa.engine.Engine,
-    postgres_engine: sa.engine.Engine,
+    data_warehouse_engine: sa.engine.Engine,
     state_fips_table: Optional[pd.DataFrame] = None,
     county_fips_table: Optional[pd.DataFrame] = None,
 ):
     if state_fips_table is None:
-        state_fips_table = _get_state_fips_df(postgres_engine)
+        state_fips_table = _get_state_fips_df(data_warehouse_engine)
     if county_fips_table is None:
-        county_fips_table = _get_county_fips_df(postgres_engine)
+        county_fips_table = _get_county_fips_df(data_warehouse_engine)
     plant_locations = _get_plant_location_data(pudl_engine)
     plant_locations = _transfrom_plant_location_data(
         plant_locations, state_table=state_fips_table, county_table=county_fips_table
@@ -276,16 +276,16 @@ def _get_existing_plant_locations(
 
 
 def _get_existing_plants(
-    pudl_engine: sa.engine.Engine,
-    postgres_engine: sa.engine.Engine,
     state_fips_table: Optional[pd.DataFrame] = None,
     county_fips_table: Optional[pd.DataFrame] = None,
 ) -> pd.DataFrame:
-    plants = _get_existing_plant_attributes(engine=postgres_engine)
+    dw_engine = get_sql_engine("data_warehouse")
+    pudl_engine = get_pudl_engine()
+    plants = _get_existing_plant_attributes(engine=dw_engine)
     co2e = _get_existing_fossil_plant_co2e_estimates(pudl_engine=pudl_engine)
     locations = _get_existing_plant_locations(
         pudl_engine=pudl_engine,
-        postgres_engine=postgres_engine,
+        postgres_engine=dw_engine,
         state_fips_table=state_fips_table,
         county_fips_table=county_fips_table,
     )

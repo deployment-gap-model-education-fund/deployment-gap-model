@@ -7,23 +7,24 @@ import sqlalchemy as sa
 from dbcp.helpers import get_sql_engine
 
 
-def _create_br_election_data_mart(engine: sa.engine.Engine) -> pd.DataFrame:
+def _create_br_election_data_mart() -> pd.DataFrame:
     """Denormalize the ballot ready entities."""
+    dw_engine = get_sql_engine("data_warehouse")
     pos_county_query = """
     SELECT
         cfips.county_name,
         sfips.state_name,
         br.*
-    FROM data_warehouse.br_positions_counties_assoc as br
-    LEFT JOIN data_warehouse.county_fips as cfips
+    FROM br_positions_counties_assoc as br
+    LEFT JOIN county_fips as cfips
     USING (county_id_fips)
-    LEFT JOIN data_warehouse.state_fips as sfips
+    LEFT JOIN state_fips as sfips
     ON sfips.state_id_fips = br.state_id_fips
     """
-    with engine.connect() as con:
-        br_races = pd.read_sql_table("br_races", con, schema="data_warehouse")
-        br_elections = pd.read_sql_table("br_elections", con, schema="data_warehouse")
-        br_positions = pd.read_sql_table("br_positions", con, schema="data_warehouse")
+    with dw_engine.connect() as con:
+        br_races = pd.read_sql_table("br_races", con)
+        br_elections = pd.read_sql_table("br_elections", con)
+        br_positions = pd.read_sql_table("br_positions", con)
         br_positions_counties_assoc = pd.read_sql(pos_county_query, con)
 
     br_election_data = br_races.merge(
@@ -158,24 +159,15 @@ def _create_county_commission_elections_wide(
     return next_county_commission_elections_wide
 
 
-def create_data_mart(
-    engine: Optional[sa.engine.Engine] = None,
-    pudl_engine: Optional[sa.engine.Engine] = None,
-) -> dict[str, pd.DataFrame]:
+def create_data_mart() -> dict[str, pd.DataFrame]:
     """Create final output table.
-
-    Args:
-        engine (Optional[sa.engine.Engine], optional): postgres engine. Defaults to None.
 
     Returns:
         pd.DataFrame: table for data mart
     """
-    if engine is None:
-        engine = get_sql_engine()
-
     dfs = {}
 
-    dfs["br_election_data"] = _create_br_election_data_mart(engine)
+    dfs["br_election_data"] = _create_br_election_data_mart()
 
     county_commission_elections_long = _create_county_commission_elections_long(
         dfs["br_election_data"]

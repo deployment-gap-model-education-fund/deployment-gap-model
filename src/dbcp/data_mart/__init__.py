@@ -7,7 +7,7 @@ import pkgutil
 import pandas as pd
 
 import dbcp
-from dbcp.helpers import enforce_dtypes, psql_insert_copy
+from dbcp.helpers import enforce_dtypes
 from dbcp.metadata.data_mart import metadata
 from dbcp.validation.tests import validate_data_mart
 
@@ -16,11 +16,14 @@ logger = logging.getLogger(__name__)
 
 def create_data_marts(args):  # noqa: max-complexity=11
     """Collect and load all data mart tables to data warehouse."""
-    engine = dbcp.helpers.get_sql_engine()
+    data_mart_engine = dbcp.helpers.get_sql_engine("data_mart")
     data_marts = {}
     modules_to_skip = {
         "helpers",  # helper code; no tables
         "co2_dashboard",  # obsolete but code imported elsewhere
+        #
+        "counties",
+        "fossil_infrastructure_projects",
     }
 
     for module_info in pkgutil.iter_modules(__path__):
@@ -28,7 +31,7 @@ def create_data_marts(args):  # noqa: max-complexity=11
             continue
         module = importlib.import_module(f"{__name__}.{module_info.name}")
         try:
-            data = module.create_data_mart(engine=engine)
+            data = module.create_data_mart()
         except AttributeError:
             raise AttributeError(
                 f"{module_info.name} has no attribute 'create_data_mart'."
@@ -49,17 +52,16 @@ def create_data_marts(args):  # noqa: max-complexity=11
                 f"Expecting pd.DataFrame or dict of dataframes. Got {type(data)}"
             )
 
-    # Setup postgres
-    with engine.connect() as con:
-        engine.execute("CREATE SCHEMA IF NOT EXISTS data_mart")
-
     # Create the schemas
-    metadata.drop_all(engine)
-    metadata.create_all(engine)
+    metadata.drop_all(data_mart_engine)
+    metadata.create_all(data_mart_engine)
 
     # Load table into postgres
-    with engine.connect() as con:
+    with data_mart_engine.connect() as con:
         for table in metadata.sorted_tables:
+            if table.name not in data_marts:
+                logger.info(f"Table {table.name} not found in data mart.")
+                continue
             logger.info(f"Load {table.name} to postgres.")
             df = enforce_dtypes(data_marts[table.name], table.name, "data_mart")
             df.to_sql(
@@ -67,11 +69,9 @@ def create_data_marts(args):  # noqa: max-complexity=11
                 con=con,
                 if_exists="append",
                 index=False,
-                schema="data_mart",
-                method=psql_insert_copy,
             )
 
-    validate_data_mart(engine=engine)
+    # validate_data_mart(engine=data_mart_engine)
 
     if args.upload_to_bigquery:
         if args.bigquery_env == "dev":

@@ -26,7 +26,6 @@ avert_capacity_factors = Table(
     Column("capacity_factor", Float, nullable=True),
     Column("tonnes_co2_per_mwh", Float, nullable=True),
     Column("co2e_tonnes_per_year_per_mw", Float, nullable=True),
-
 )
 
 avert_county_region_assoc = Table(
@@ -34,7 +33,6 @@ avert_county_region_assoc = Table(
     metadata,
     Column("avert_region", String, primary_key=True),
     Column("county_id_fips", String, primary_key=True),
-
 )
 
 
@@ -66,7 +64,6 @@ county_fips = (
             CheckConstraint("tribal_land_frac >= 0.0 AND tribal_land_frac <= 1.0"),
             nullable=False,
         ),
-
     ),
 )
 state_fips = (
@@ -76,7 +73,6 @@ state_fips = (
         Column("state_id_fips", String, nullable=False, primary_key=True),
         Column("state_name", String, nullable=False),
         Column("state_abbrev", String, nullable=False),
-
     ),
 )
 
@@ -109,7 +105,6 @@ iso_projects = Table(
     Column("queue_date_raw", String),
     Column("is_actionable", Boolean),
     Column("is_nearly_certain", Boolean),
-
 )
 
 iso_locations = Table(
@@ -133,7 +128,6 @@ iso_locations = Table(
     Column("geocoded_locality_name", String),
     Column("geocoded_locality_type", String),
     Column("geocoded_containing_county", String),
-
 )
 
 iso_resource_capacity = Table(
@@ -143,7 +137,6 @@ iso_resource_capacity = Table(
     Column("resource", String),
     Column("resource_clean", String),
     Column("capacity_mw", Float),
-
 )
 
 ######################
@@ -191,7 +184,6 @@ eip_projects = Table(
     Column("date_modified", DateTime, nullable=False),
     Column("operating_status", String),
     Column("industry_sector", String),
-
 )
 eip_facilities = Table(
     "eip_facilities",
@@ -257,19 +249,15 @@ eip_facilities = Table(
     Column("longitude", Float),
     Column("latitude", Float),
     Column("date_modified", DateTime, nullable=False),
-
 )
 
 eip_facility_project_association = Table(
     "eip_facility_project_association",
     metadata,
-    Column(
-        "facility_id", Integer, ForeignKey("eip_facilities.facility_id")
-    ),
+    Column("facility_id", Integer, ForeignKey("eip_facilities.facility_id")),
     Column(
         "project_id", Integer
     ),  # TODO: This should have a fk with eip_projects.project_id. There are currently 5 ids not in eip_projects.
-
 )
 
 eip_air_constr_permits = Table(
@@ -292,7 +280,6 @@ eip_air_constr_permits = Table(
     Column("document_url", String),
     Column("date_modified", DateTime, nullable=False),
     Column("permit_status", String),
-    
 )
 
 eip_project_permit_association = Table(
@@ -304,7 +291,6 @@ eip_project_permit_association = Table(
     Column(
         "project_id", Integer, nullable=False
     ),  # TODO: This field contains project_ids not present in eip_projects.project_id
-    
 )
 
 ##########################
@@ -321,13 +307,10 @@ contested_project = Table(
     Column("year_enacted", Integer),
     Column("energy_type", String),
     Column("source", String),
-    Column(
-        "state_id_fips", String, ForeignKey("state_fips.state_id_fips")
-    ),
+    Column("state_id_fips", String, ForeignKey("state_fips.state_id_fips")),
     Column("earliest_year_mentioned", Integer),
     Column("latest_year_mentioned", Integer),
     Column("n_years_mentioned", Integer, nullable=False),
-    
 )
 
 local_ordinance = Table(
@@ -339,9 +322,7 @@ local_ordinance = Table(
     Column("year_enacted", Integer),
     Column("energy_type", String),
     Column("source", String),
-    Column(
-        "state_id_fips", String, ForeignKey("state_fips.state_id_fips")
-    ),
+    Column("state_id_fips", String, ForeignKey("state_fips.state_id_fips")),
     Column(
         "county_id_fips",
         String,
@@ -354,7 +335,6 @@ local_ordinance = Table(
     Column("earliest_year_mentioned", Integer),
     Column("latest_year_mentioned", Integer),
     Column("n_years_mentioned", Integer, nullable=False),
-    
 )
 
 state_policy = Table(
@@ -365,13 +345,10 @@ state_policy = Table(
     Column("year_enacted", Integer),
     Column("energy_type", String),
     Column("source", String),
-    Column(
-        "state_id_fips", String, ForeignKey("state_fips.state_id_fips")
-    ),
+    Column("state_id_fips", String, ForeignKey("state_fips.state_id_fips")),
     Column("earliest_year_mentioned", Integer),
     Column("latest_year_mentioned", Integer),
     Column("n_years_mentioned", Integer),
-    
 )
 
 
@@ -383,13 +360,10 @@ state_notes = Table(
     Column("year_enacted", Integer),
     Column("energy_type", String),
     Column("source", String),
-    Column(
-        "state_id_fips", String, ForeignKey("state_fips.state_id_fips")
-    ),
+    Column("state_id_fips", String, ForeignKey("state_fips.state_id_fips")),
     Column("earliest_year_mentioned", Integer),
     Column("latest_year_mentioned", Integer),
     Column("n_years_mentioned", Integer),
-    
 )
 
 #########################
@@ -409,7 +383,6 @@ ncsl_state_permitting = Table(
     Column("permitting_type", String),
     Column("description", String, nullable=False),
     Column("link", String),
-    
 )
 
 ########
@@ -549,7 +522,6 @@ mcoe = Table(
         ForeignKey("county_fips.county_id_fips"),
         nullable=True,
     ),
-    
 )
 
 
@@ -1024,7 +996,6 @@ justice40_tracts = Table(
             "tract_within_tribal_areas_percent >= 0 AND tract_within_tribal_areas_percent <= 1"
         ),
     ),
-    
 )
 
 
@@ -1068,7 +1039,6 @@ nrel_local_ordinances = Table(
     Column("standardized_value", Float),
     Column("is_ban", Boolean),
     Column("is_de_facto_ban", Boolean),
-    
 )
 
 
@@ -1094,7 +1064,6 @@ offshore_wind_projects = Table(
     Column("lease_areas", String),
     Column("is_actionable", Boolean),
     Column("is_nearly_certain", Boolean),
-    
 )
 offshore_wind_locations = Table(
     "offshore_wind_locations",
@@ -1116,21 +1085,18 @@ offshore_wind_locations = Table(
     Column("geocoded_locality_name", String),
     Column("geocoded_locality_type", String),
     Column("geocoded_containing_county", String),
-    
 )
 offshore_wind_cable_landing_association = Table(
     "offshore_wind_cable_landing_association",
     metadata,
     Column("location_id", Integer, primary_key=True),
     Column("project_id", Integer, primary_key=True),
-    
 )
 offshore_wind_port_association = Table(
     "offshore_wind_port_association",
     metadata,
     Column("location_id", Integer, primary_key=True),
     Column("project_id", Integer, primary_key=True),
-    
 )
 
 
@@ -1163,7 +1129,6 @@ protected_area_by_county = Table(
     Column("gap_status", String),
     # join columns
     Column("intersection_area_padus_km2", Float),
-    
 )
 
 
@@ -1192,7 +1157,6 @@ energy_communities = Table(
     Column("coal_qualifying_area_fraction", Float),
     Column("qualifies_by_employment_criteria", Boolean),
     Column("geocoded_locality_name", String),
-    
 )
 
 ################
@@ -1204,7 +1168,6 @@ br_elections = Table(
     Column("election_id", Integer, nullable=False, primary_key=True),
     Column("election_name", String, nullable=False),
     Column("election_day", DateTime, nullable=False),
-    
 )
 
 br_positions = Table(
@@ -1229,7 +1192,6 @@ br_positions = Table(
         "frequency", String, nullable=True
     ),  # Starting 2023-10-03 update there were a couple hundred nulls
     Column("partisan_type", String),
-    
 )
 
 br_races = Table(
@@ -1254,7 +1216,6 @@ br_races = Table(
         ForeignKey("br_positions.position_id"),
         nullable=False,
     ),
-    
 )
 
 br_positions_counties_assoc = Table(
@@ -1283,7 +1244,6 @@ br_positions_counties_assoc = Table(
         ForeignKey("county_fips.county_id_fips"),
         nullable=True,
     ),  # Should not be nullable in future updates
-    
 )
 
 ###############
@@ -1310,7 +1270,6 @@ gridstatus_projects = Table(
     Column("region", String, nullable=False),
     Column("entity", String, nullable=False),
     Column("developer", String, nullable=True),
-    
 )
 
 gridstatus_resource_capacity = Table(
@@ -1324,7 +1283,6 @@ gridstatus_resource_capacity = Table(
     Column("resource", String),
     Column("resource_clean", String),
     Column("capacity_mw", Float),
-    
 )
 
 gridstatus_locations = Table(
@@ -1352,7 +1310,6 @@ gridstatus_locations = Table(
     Column("geocoded_locality_name", String),
     Column("geocoded_locality_type", String),
     Column("geocoded_containing_county", String),
-    
 )
 
 #####################
@@ -1364,5 +1321,4 @@ manual_ordinances = Table(
     metadata,
     Column("county_id_fips", String, nullable=False, primary_key=True),
     Column("ordinance_via_self_maintained", Boolean),
-    
 )
