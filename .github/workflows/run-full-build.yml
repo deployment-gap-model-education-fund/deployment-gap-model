@@ -1,5 +1,5 @@
 ---
-name: pytest
+name: full-build
 
 on:
   push:
@@ -19,16 +19,16 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
 
+      - uses: "google-github-actions/auth@v2"
+        with:
+          credentials_json: "${{ secrets.DGM_GITHUB_ACTION_CREDENTIALS }}"
+
       - name: Display workspace directory
         run: |
           echo "Workspace directory: $GITHUB_WORKSPACE"
 
       - name: Give the dbcp user ownership of the workspace
         run: sudo chown -R 1000:1000 $GITHUB_WORKSPACE
-
-      - uses: "google-github-actions/auth@v2"
-        with:
-          credentials_json: "${{ secrets.DGM_GITHUB_ACTION_CREDENTIALS }}"
 
       - name: Set up Docker Compose
         run: |
