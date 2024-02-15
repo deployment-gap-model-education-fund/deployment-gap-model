@@ -40,9 +40,13 @@ jobs:
         run: |
           docker-compose up -d
 
-      - name: Run tests
+      - name: Run full ETL
         run: |
           make all_local
+
+      - name: Run all test
+        run: |
+          make test
 
       - name: Stop Docker Compose services
         if: always()
@@ -51,4 +55,4 @@ jobs:
 
       - name: Give ownership of the workspace back to root
         if: always()
-        run: sudo chown -R root:root $GITHUB_WORKSPACE
+        run: sudo chown -R 0:0 $GITHUB_WORKSPACE
