@@ -23,12 +23,13 @@ jobs:
         with:
           credentials_json: "${{ secrets.DGM_GITHUB_ACTION_CREDENTIALS }}"
 
-      - name: Display workspace directory
+      - name: Display env variables
         run: |
-          echo "Workspace directory: $GITHUB_WORKSPACE"
+          echo "Workspace directory: $GITHUB_WORKSPACE" \
+          echo "Google credentials path: $GOOGLE_GHA_CREDS_PATH" \
 
       - name: Give the dbcp user ownership of the workspace
-        run: sudo chown -R 1000:1000 $GITHUB_WORKSPACE
+        run: sudo chmod -R u+rwx 1000:1000 $GITHUB_WORKSPACE
 
       - name: Set up Docker Compose
         run: |
