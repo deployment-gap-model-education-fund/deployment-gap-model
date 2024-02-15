@@ -184,28 +184,6 @@ def get_pudl_resource(pudl_resource: str) -> Path:
     return unzipped_pudl_resource_path
 
 
-def download_pudl_data() -> Path:
-    """Download pudl data from AWS."""
-    PUDL_VERSION = os.environ["PUDL_VERSION"]
-
-    pudl_cache = Path("/app/data/data_cache/pudl/")
-    pudl_cache.mkdir(exist_ok=True)
-    pudl_version_cache = pudl_cache / PUDL_VERSION
-    pudl_data_path = pudl_version_cache / "pudl.sqlite"
-    if not pudl_data_path.exists():
-        logger.info("PUDL data directory does not exist, downloading from AWS.")
-        pudl_version_cache.mkdir()
-
-        s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
-        s3.download_file(
-            "intake.catalyst.coop",
-            f"{PUDL_VERSION}/pudl.sqlite",
-            str(pudl_data_path),
-        )
-
-    return pudl_data_path
-
-
 def track_tar_progress(members):
     """Use tqdm to track progress of tar extraction."""
     for member in tqdm(members):
