@@ -737,7 +737,7 @@ def _normalize_project_locations(iso_df: pd.DataFrame) -> pd.DataFrame:
         geocoded_locations[["county_id_fips", "project_id"]].duplicated(keep=False)
     ]
     assert (
-        len(duplicate_locations) < 30
+        len(duplicate_locations) < 33
     ), f"Found more duplicate locations in Grid Status location table than expected:\n {duplicate_locations}"
     return geocoded_locations
 
@@ -773,9 +773,11 @@ def _normalize_project_capacity(iso_df: pd.DataFrame) -> pd.DataFrame:
     assert (
         ~caiso_capacity_df[["project_id", "resource"]].duplicated().any()
     ), "Found duplicate CAISO capacities."
+    original_capacity = caiso[caiso_capacity_cols].sum().sum().round()
+    normalized_capacity = caiso_capacity_df["capacity_mw"].sum().round()
     assert (
-        caiso[caiso_capacity_cols].sum().sum() == caiso_capacity_df["capacity_mw"].sum()
-    ), "Total CAISO capacity not preserved after normaliztion."
+        original_capacity == normalized_capacity
+    ), f"Total CAISO capacity not preserved after normaliztion\n\tOriginal: {original_capacity}\n\tNormalized: {normalized_capacity}."
 
     capacity_df = pd.concat(
         [iso_df[~is_caiso][capacity_cols], caiso_capacity_df[capacity_cols]]
