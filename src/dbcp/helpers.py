@@ -127,25 +127,22 @@ def get_pudl_resource(pudl_resource: str, bucket: str) -> Path:
     remote_pudl_resource_path = f"{bucket}/{PUDL_VERSION}/{pudl_resource}"
     local_pudl_resource_path = pudl_version_cache / pudl_resource
 
-    fs = fsspec.filesystem(
-        "filecache",
-        target_protocol="gs",
-        cache_storage=str(pudl_version_cache / "fsspec"),
-    )
-    file_size = fs.size(remote_pudl_resource_path)
+    if not local_pudl_resource_path.exists():
+        fs = fsspec.filesystem("gs")
+        file_size = fs.size(remote_pudl_resource_path)
 
-    # open the remote_pudl_resource_path and track progress with tqdm
-    with fs.open(remote_pudl_resource_path) as fo:
-        with open(local_pudl_resource_path, "wb") as local_file:
-            with tqdm(
-                total=file_size, unit="B", unit_scale=True, unit_divisor=1024
-            ) as pbar:
-                while True:
-                    buf = fo.read(8192)
-                    if not buf:
-                        break
-                    local_file.write(buf)
-                    pbar.update(len(buf))
+        # open the remote_pudl_resource_path and track progress with tqdm
+        with fs.open(remote_pudl_resource_path) as fo:
+            with open(local_pudl_resource_path, "wb") as local_file:
+                with tqdm(
+                    total=file_size, unit="B", unit_scale=True, unit_divisor=1024
+                ) as pbar:
+                    while True:
+                        buf = fo.read(8192)
+                        if not buf:
+                            break
+                        local_file.write(buf)
+                        pbar.update(len(buf))
 
     return local_pudl_resource_path
 
