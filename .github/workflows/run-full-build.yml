@@ -12,7 +12,6 @@ jobs:
 
     env:
       API_KEY_GOOGLE_MAPS: ${{ secrets.API_KEY_GOOGLE_MAPS }}
-      API_KEY_EIA: ${{ secrets.API_KEY_EIA }}
       GOOGLE_GHA_CREDS_PATH: ${{ secrets.GOOGLE_GHA_CREDS_PATH }}
 
     steps:
