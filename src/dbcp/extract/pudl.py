@@ -8,9 +8,6 @@ from dbcp.constants import PUDL_LATEST_YEAR
 def _extract_pudl_generators() -> pd.DataFrame:
     """Extract pudl_generators table from pudl sqlite database.
 
-    Args:
-        pudl_engine: The pudl sqlite database engine.
-
     Returns:
         The pudl_generators table.
     """

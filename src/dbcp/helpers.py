@@ -100,13 +100,6 @@ def get_sql_engine() -> sa.engine.Engine:
     return sa.create_engine(f"postgresql://{user}:{password}@{db}:5432")
 
 
-def get_pudl_engine() -> sa.engine.Engine:
-    """Create a sql alchemy engine for the pudl database."""
-    pudl_data_path = get_pudl_resource("pudl.sqlite.gz")
-    pudl_engine = sa.create_engine(f"sqlite:////{pudl_data_path}")
-    return pudl_engine
-
-
 def get_pudl_resource(
     pudl_resource: str, bucket: str = "gs://parquet.catalyst.coop"
 ) -> Path:
