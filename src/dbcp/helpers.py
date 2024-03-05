@@ -1,9 +1,7 @@
 """Small helper functions for dbcp etl."""
 import csv
-import gzip
 import logging
 import os
-import shutil
 from io import StringIO
 from pathlib import Path
 
@@ -126,31 +124,28 @@ def get_pudl_resource(pudl_resource: str, bucket: str) -> Path:
     pudl_version_cache = pudl_cache / PUDL_VERSION
     pudl_version_cache.mkdir(exist_ok=True)
 
-    if bucket == "gs://parquet.catalyst.coop":
-        pudl_version_cache = pudl_version_cache / "parquet"
-        pudl_version_cache.mkdir(exist_ok=True)
-
     remote_pudl_resource_path = f"{bucket}/{PUDL_VERSION}/{pudl_resource}"
     local_pudl_resource_path = pudl_version_cache / pudl_resource
 
-    with fsspec.open(
-        f"filecache::{remote_pudl_resource_path}",
-        s3={"anon": True},
-        filecache={"cache_storage": str(pudl_version_cache / "fsspec")},
-    ) as fo:
-        # Write the content to the local file
-        with open(local_pudl_resource_path, "wb") as local_file:
-            local_file.write(fo.read())
+    fs = fsspec.filesystem(
+        "filecache",
+        target_protocol="gs",
+        cache_storage=str(pudl_version_cache / "fsspec"),
+    )
+    file_size = fs.size(remote_pudl_resource_path)
 
-    # if local_pudl_resource_path is a gzip file and isn't already unzipped, unzip it
-    if local_pudl_resource_path.suffix == ".gz":
-        unzipped_pudl_resource_path = local_pudl_resource_path.with_suffix("")
-        if not unzipped_pudl_resource_path.exists():
-            with gzip.open(local_pudl_resource_path, "rb") as f_in:
-                with open(unzipped_pudl_resource_path, "wb") as f_out:
-                    shutil.copyfileobj(f_in, f_out)
-        local_pudl_resource_path.unlink()
-        return unzipped_pudl_resource_path
+    # open the remote_pudl_resource_path and track progress with tqdm
+    with fs.open(remote_pudl_resource_path) as fo:
+        with open(local_pudl_resource_path, "wb") as local_file:
+            with tqdm(
+                total=file_size, unit="B", unit_scale=True, unit_divisor=1024
+            ) as pbar:
+                while True:
+                    buf = fo.read(8192)
+                    if not buf:
+                        break
+                    local_file.write(buf)
+                    pbar.update(len(buf))
 
     return local_pudl_resource_path
 
