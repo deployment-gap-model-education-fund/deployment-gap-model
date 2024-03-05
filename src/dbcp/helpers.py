@@ -107,7 +107,9 @@ def get_pudl_engine() -> sa.engine.Engine:
     return pudl_engine
 
 
-def get_pudl_resource(pudl_resource: str, bucket: str) -> Path:
+def get_pudl_resource(
+    pudl_resource: str, bucket: str = "gs://parquet.catalyst.coop"
+) -> Path:
     """Given the name of a PUDL resource, return the path to the cached file.
 
     If the file is not cached, download it from S3 and return the path.
