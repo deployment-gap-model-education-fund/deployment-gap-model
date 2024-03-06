@@ -115,15 +115,6 @@ Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docke
 
 during this step it means docker is not running.
 
-## Environment Variables
-
-Once the image is created we need to set some environment variables.
-
-```
-export API_KEY_GOOGLE_MAPS="AIzaSyDdkcWgTPLDCtzFhFpOkly3RLv1lhITUnA"
-export GOOGLE_GHA_CREDS_PATH="/Users/bendnorman/.config/gcloud/application_default_credentials.json"
-```
-
 ## Run the ETL
 
 Now that we’ve built the image and set the environment variables run:
