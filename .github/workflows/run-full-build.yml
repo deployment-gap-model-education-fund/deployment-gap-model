@@ -29,6 +29,9 @@ jobs:
           echo "Workspace directory: $GITHUB_WORKSPACE" \
           echo "Google credentials path: $GOOGLE_GHA_CREDS_PATH" \
 
+      - name: GCS
+        run: gsutil ls gs://dgm-outputs
+
       # Give the dbcp user ownership of the workspace
       # So it can read and write files to the workspace
       - name: Give the dbcp user ownership of the workspace
