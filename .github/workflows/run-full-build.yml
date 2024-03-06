@@ -45,21 +45,21 @@ jobs:
 
       - name: Run full ETL
         run: |
-          make all_local
+          make all
 
       - name: Run all test
         run: |
           make test
 
-      - name: Stop Docker Compose services
-        if: always()
-        run: |
-          docker-compose down
-
       - name: Publish publish outputs
         if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || (github.ref_name == 'version-outputs')
         run: |
           docker compose run --rm app python dbcp/publish.py --build-ref ${{ github.ref_name }}
+
+      - name: Stop Docker Compose services
+        if: always()
+        run: |
+          docker-compose down
 
       # The google-github-actions/auth step is run as runner:docker,
       # so we need to give the workspace back to runner:docker

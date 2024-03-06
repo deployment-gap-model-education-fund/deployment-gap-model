@@ -2,6 +2,7 @@
 from pathlib import Path
 
 import click
+import google.auth
 from google.cloud import bigquery, storage
 
 from dbcp.constants import OUTPUT_DIR
@@ -112,6 +113,8 @@ def publish_outputs(build_ref: str):
     """Publish outputs to Google Cloud Storage and Big Query."""
     directories = ("data_warehouse", "data_mart")
     bucket_name = "dgm-outputs"
+
+    print(f"Project ID: {google.auth.default()}")
 
     if build_ref == "version-outputs":
         for directory in directories:
