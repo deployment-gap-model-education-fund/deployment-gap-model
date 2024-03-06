@@ -17,8 +17,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
 
-      - name: Who owns the workspace
-        if: always()
+      - name: Who owns the workspace?
         run: ls -ld $GITHUB_WORKSPACE
 
       - uses: "google-github-actions/auth@v2"
@@ -30,6 +29,8 @@ jobs:
           echo "Workspace directory: $GITHUB_WORKSPACE" \
           echo "Google credentials path: $GOOGLE_GHA_CREDS_PATH" \
 
+      # Give the dbcp user ownership of the workspace
+      # So it can read and write files to the workspace
       - name: Give the dbcp user ownership of the workspace
         run: sudo chown -R 1000:1000 $GITHUB_WORKSPACE
 
@@ -42,9 +43,9 @@ jobs:
         run: |
           docker-compose up -d
 
-      # - name: Run full ETL
-      #   run: |
-      #     make all_local
+      - name: Run full ETL
+        run: |
+          make all_local
 
       - name: Run all test
         run: |
@@ -55,10 +56,12 @@ jobs:
         run: |
           docker-compose down
 
+      # The google-github-actions/auth step is run as runner:docker,
+      # so we need to give the workspace back to runner:docker
       - name: Give ownership of the workspace back to root
         if: always()
         run: sudo chown -R runner:docker $GITHUB_WORKSPACE
 
-      - name: Who owns the workspace
+      - name: Who owns the workspace?
         if: always()
         run: ls -ld $GITHUB_WORKSPACE
