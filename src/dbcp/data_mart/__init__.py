@@ -77,13 +77,3 @@ def create_data_marts(args):  # noqa: max-complexity=11
             df.to_parquet(parquet_dir / f"{table.name}.parquet", index=False)
 
     validate_data_mart(engine=engine)
-
-    if args.upload_to_bigquery:
-        if args.bigquery_env == "dev":
-            dbcp.helpers.upload_schema_to_bigquery("data_mart")
-        elif args.bigquery_env == "prod":
-            dbcp.helpers.upload_schema_to_bigquery("data_mart", dev=False)
-        else:
-            raise ValueError(
-                f"{args.bigquery_env} is an invalid BigQuery environment value. Must be: dev or prod."
-            )

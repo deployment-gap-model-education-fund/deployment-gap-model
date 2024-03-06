@@ -66,10 +66,6 @@ def load_parquet_files_to_bigquery(
     dataset_id = f"test_{destination_blob_prefix}{'_version_outputs' if version == 'version-outputs' else ''}"
     dataset_ref = client.dataset(dataset_id)
 
-    # Create the dataset if it doesn't exist
-    dataset = bigquery.Dataset(dataset_ref)
-    dataset = client.create_dataset(dataset, exists_ok=True)
-
     # Get the GCS bucket
     bucket = storage.Client().get_bucket(bucket_name)
 
