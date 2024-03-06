@@ -63,7 +63,7 @@ def load_parquet_files_to_bigquery(
     client = bigquery.Client(credentials=credentials, project=project_id)
 
     # Get the BigQuery dataset
-    dataset_id = f"test_{destination_blob_prefix}{'_version_outputs' if version == 'version-outputs' else ''}"
+    dataset_id = f"{destination_blob_prefix}{'_dev' if version == 'dev' else ''}"
     dataset_ref = client.dataset(dataset_id)
 
     # Get the GCS bucket
@@ -114,7 +114,7 @@ def publish_outputs(build_ref: str):
 
     print(f"Project ID: {google.auth.default()}")
 
-    if build_ref == "version-outputs":
+    if build_ref == "dev":
         for directory in directories:
             upload_parquet_directory_to_gcs(
                 OUTPUT_DIR / directory, bucket_name, directory, build_ref
@@ -122,7 +122,7 @@ def publish_outputs(build_ref: str):
 
         for directory in directories:
             load_parquet_files_to_bigquery(bucket_name, directory, build_ref)
-    elif build_ref.startswith("v"):
+    elif build_ref.startswith("v20"):
         for directory in directories:
             upload_parquet_directory_to_gcs(
                 OUTPUT_DIR / directory, bucket_name, directory, build_ref
@@ -134,7 +134,7 @@ def publish_outputs(build_ref: str):
         for directory in directories:
             load_parquet_files_to_bigquery(bucket_name, directory, build_ref)
     else:
-        raise ValueError("build-ref must be 'dev' or start with 'v'")
+        raise ValueError("build-ref must be 'dev' or start with 'v20'")
 
 
 if __name__ == "__main__":
