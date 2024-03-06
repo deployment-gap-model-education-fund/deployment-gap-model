@@ -60,7 +60,7 @@ def load_parquet_files_to_bigquery(
     client = bigquery.Client()
 
     # Get the BigQuery dataset
-    dataset_id = f"test_{destination_blob_prefix}{'_version-outputs' if version == 'version-outputs' else ''}"
+    dataset_id = f"test_{destination_blob_prefix}{'_version_outputs' if version == 'version-outputs' else ''}"
     dataset_ref = client.dataset(dataset_id)
 
     # Create the dataset if it doesn't exist
