@@ -17,6 +17,10 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
 
+      - name: Who owns the workspace
+        if: always()
+        run: ls -ld $GITHUB_WORKSPACE
+
       - uses: "google-github-actions/auth@v2"
         with:
           credentials_json: "${{ secrets.DGM_GITHUB_ACTION_CREDENTIALS }}"
