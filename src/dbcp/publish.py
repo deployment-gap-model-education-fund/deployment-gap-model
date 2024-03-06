@@ -1,5 +1,6 @@
 """Upload the parquet files to GCS and load them into BigQuery."""
 from pathlib import Path
+from typing import Literal
 
 import click
 import google.auth
@@ -9,18 +10,19 @@ from dbcp.constants import OUTPUT_DIR
 
 
 def upload_parquet_directory_to_gcs(
-    directory_path, bucket_name, destination_blob_prefix, version
+    directory_path: str,
+    bucket_name: str,
+    destination_blob_prefix: Literal["data_warehouse", "data_mart"],
+    version: str,
 ):
     """
     Uploads a directory of Parquet files to Google Cloud Storage.
 
     Args:
-        directory_path (str): Path to the directory containing Parquet files.
-        bucket_name (str): Name of the GCS bucket to upload files to.
-        destination_blob_prefix (str): Prefix to prepend to destination blob names.
-
-    Returns:
-        None
+        directory_path: Path to the directory containing Parquet files.
+        bucket_name: Name of the GCS bucket to upload files to.
+        destination_blob_prefix: Prefix to prepend to destination blob names.
+        version: The version of the data to upload.
     """
     # Create a storage client
     credentials, project_id = google.auth.default()
@@ -47,16 +49,17 @@ def upload_parquet_directory_to_gcs(
 
 
 def load_parquet_files_to_bigquery(
-    bucket_name: str, destination_blob_prefix: str, version: str
+    bucket_name: str,
+    destination_blob_prefix: Literal["data_warehouse", "data_mart"],
+    version: str,
 ):
     """
     Load Parquet files from GCS to BigQuery.
 
     Args:
-        None
-
-    Returns:
-        None
+        bucket_name: the name of the GCS bucket to load parquet files from.
+        destination_blob_prefix: the prefix of the GCS blobs to load.
+        version: the version of the data to load.
     """
     # Create a BigQuery client
     credentials, project_id = google.auth.default()
@@ -108,7 +111,11 @@ def load_parquet_files_to_bigquery(
 @click.command()
 @click.option("--build-ref")
 def publish_outputs(build_ref: str):
-    """Publish outputs to Google Cloud Storage and Big Query."""
+    """Publish outputs to Google Cloud Storage and Big Query.
+
+    Args:
+        build_ref (str): The github build reference to use for the outputs.
+    """
     directories = ("data_warehouse", "data_mart")
     bucket_name = "dgm-outputs"
 
