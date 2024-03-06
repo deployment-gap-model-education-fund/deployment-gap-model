@@ -23,7 +23,8 @@ def upload_parquet_directory_to_gcs(
         None
     """
     # Create a storage client
-    client = storage.Client()
+    credentials, project_id = google.auth.default()
+    client = storage.Client(credentials=credentials, project=project_id)
 
     # Get the GCS bucket
     bucket = client.get_bucket(bucket_name)
@@ -58,7 +59,8 @@ def load_parquet_files_to_bigquery(
         None
     """
     # Create a BigQuery client
-    client = bigquery.Client()
+    credentials, project_id = google.auth.default()
+    client = bigquery.Client(credentials=credentials, project=project_id)
 
     # Get the BigQuery dataset
     dataset_id = f"test_{destination_blob_prefix}{'_version_outputs' if version == 'version-outputs' else ''}"
