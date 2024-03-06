@@ -1,4 +1,6 @@
 """DBCP constants."""
+from pathlib import Path
+
 from pudl.metadata.enums import POLITICAL_SUBDIVISIONS
 
 FIPS_CODE_VINTAGE = 2020
@@ -14,3 +16,5 @@ US_TERRITORIES = set(
     ].subdivision_name
 )
 US_STATES_TERRITORIES = US_STATES.union(US_TERRITORIES)
+
+OUTPUT_DIR = Path("/app/data/output")

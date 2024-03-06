@@ -6,6 +6,7 @@ from typing import Dict
 import pandas as pd
 
 import dbcp
+from dbcp.constants import OUTPUT_DIR
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.helpers import enforce_dtypes, psql_insert_copy
 from dbcp.metadata.data_warehouse import metadata
@@ -216,7 +217,9 @@ def etl(args):
     metadata.drop_all(engine)
     metadata.create_all(engine)
 
-    # Load table into postgres
+    parquet_dir = OUTPUT_DIR / "data_warehouse"
+
+    # Load table into postgres and parquet
     with engine.connect() as con:
         for table in metadata.sorted_tables:
             logger.info(f"Load {table.name} to postgres.")
@@ -232,6 +235,7 @@ def etl(args):
                 chunksize=1000,
                 method=psql_insert_copy,
             )
+            df.to_parquet(parquet_dir / f"{table.name}.parquet", index=False)
 
     validate_warehouse(engine=engine)
 

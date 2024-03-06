@@ -56,6 +56,11 @@ jobs:
         run: |
           docker-compose down
 
+      - name: Publish publish outputs
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || (github.ref_name == 'version-outputs')
+        run: |
+          docker compose run --rm app python dbcp/publish.py --build-ref ${{ github.ref_name }}
+
       # The google-github-actions/auth step is run as runner:docker,
       # so we need to give the workspace back to runner:docker
       - name: Give ownership of the workspace back to root
