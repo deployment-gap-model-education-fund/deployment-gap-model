@@ -57,7 +57,7 @@ jobs:
 
       - name: Give ownership of the workspace back to root
         if: always()
-        run: sudo chown -R 0:0 $GITHUB_WORKSPACE
+        run: sudo chown -R runner:docker $GITHUB_WORKSPACE
 
       - name: Who owns the workspace
         if: always()
