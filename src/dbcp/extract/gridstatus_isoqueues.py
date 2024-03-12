@@ -20,13 +20,13 @@ logger = logging.getLogger(__name__)
 # except for spp and ISONE because the recent versions
 # have columns the old versions don't.
 ISO_QUEUE_VERSIONS: dict[str, str] = {
-    "miso": "1704654953145483",
-    "caiso": "1704654953474846",
-    "pjm": "1704654953842777",
-    "ercot": "1704654954177109",
-    "spp": "1704654954488739",
-    "nyiso": "1702235705611699",
-    "isone": "1704654954804863",
+    "miso": "1709776341526904",
+    "caiso": "1709776259365612",
+    "pjm": "1709776387308475",
+    "ercot": "1709776286037540",
+    "spp": "1709776417253050",
+    "nyiso": "1709776369660949",
+    "isone": "1709776310995150",
 }
 
 
@@ -34,7 +34,9 @@ def extract(iso_queue_versions: dict[str, str] = ISO_QUEUE_VERSIONS):
     """Extract gridstatus ISO Queue data."""
     iso_queues: dict[str, pd.DataFrame] = {}
     for iso, revision_num in iso_queue_versions.items():
-        uri = f"gs://gridstatus-archive/interconnection_queues/{iso}.parquet"
+        uri = (
+            f"gs://dgm-archive/gridstatus/interconnection_queues/parquet/{iso}.parquet"
+        )
         path = dbcp.extract.helpers.cache_gcs_archive_file_locally(
             uri=uri, revision_num=revision_num
         )
