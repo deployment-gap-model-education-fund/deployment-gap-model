@@ -26,12 +26,13 @@ RESOURCE_DICT = {
     "Fuel Cell": {"codes": ["Fuel Cell", "FC"], "type": "Fossil"},
     "Geothermal": {"codes": [], "type": "Renewable"},
     "Hydro": {"codes": ["WAT", "H", "Water"], "type": "Renewable"},
-    "Landfill Gas": {"codes": ["LFG", "L"], "type": "Fossil"},
+    "Landfill Gas": {"codes": ["LFG", "L", "Landfill", "Waste"], "type": "Fossil"},
     "Municipal Solid Waste": {"codes": ["MSW"], "type": "Fossil"},
     "Natural Gas": {
         "codes": [
             "NG",
             "Methane",
+            "Methane Gas",
             "CT-NG",
             "CC",
             "CC-NG",
@@ -59,7 +60,10 @@ RESOURCE_DICT = {
     },
     "Onshore Wind": {"codes": ["Wind", "WND", "Wind Turbine"], "type": "Renewable"},
     "Other": {"codes": [], "type": "Unknown Resource"},
-    "Unknown": {"codes": ["Wo", "F", "Hybrid", "M"], "type": "Unknown Resource"},
+    "Unknown": {
+        "codes": ["Wo", "F", "Hybrid", "M", "Byproduct"],
+        "type": "Unknown Resource",
+    },
     "Other Storage": {
         "codes": ["Flywheel", "Storage", "CAES", "Gravity Rail", "Hydrogen"],
         "type": "Renewable",
@@ -83,6 +87,7 @@ RESOURCE_DICT = {
 
 def _harmonize_interconnection_status_lbnl(statuses: pd.Series) -> pd.Series:
     """Harmonize the interconnection_status_lbnl values."""
+    statuses = statuses.str.strip()
     mapping = {
         "Feasability Study": "Feasibility Study",
         "Feasibility": "Feasibility Study",
@@ -90,6 +95,7 @@ def _harmonize_interconnection_status_lbnl(statuses: pd.Series) -> pd.Series:
         "IA in Progress": "In Progress (unknown study)",
         "Unknown": "In Progress (unknown study)",
         "Withdrawn, Feasibility Study": "Withdrawn",
+        "operational": "Operational",
     }
     allowed_statuses = {
         "Cluster Study",
@@ -108,8 +114,8 @@ def _harmonize_interconnection_status_lbnl(statuses: pd.Series) -> pd.Series:
         "Withdrawn",
     }
     out = statuses.replace(mapping)
-    bad = out.loc[~out.isin(allowed_statuses)]
-    assert len(bad) == 0, f"Unknown interconnection status(es): {bad.value_counts()}"
+    bad = out.loc[~out.isin(allowed_statuses) & out.notna()]
+    assert len(bad) == 0, f"Unknown interconnection status(es):\n{bad.value_counts()}"
     return out
 
 
@@ -154,7 +160,7 @@ def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
     active_projects.set_index("project_id", inplace=True)
     active_projects.sort_index(inplace=True)
     # manual fix for duplicate resource type in raw data
-    bad_proj_id = 1606
+    bad_proj_id = 5372
     assert (
         active_projects.loc[bad_proj_id, "project_name"] == "Coleto Creek ESS Addition"
     ), "Manual correction is misidentified."
@@ -179,8 +185,9 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     Returns:
         lbnl_transformed_dfs: Dictionary of the transformed tables.
     """
-    active = lbnl_raw_dfs["lbnl_iso_queue"].query("queue_status == 'active'").copy()
-    transformed = active_iso_queue_projects(active)  # sets index to project_id
+    transformed = active_iso_queue_projects(
+        lbnl_raw_dfs["lbnl_iso_queue"]
+    )  # sets index to project_id
 
     # Combine and normalize iso queue tables
     lbnl_normalized_dfs = normalize_lbnl_dfs(transformed)
@@ -209,6 +216,13 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     if lbnl_normalized_dfs["iso_resource_capacity"].resource_clean.isna().any():
         raise AssertionError("Missing Resources!")
     lbnl_normalized_dfs["iso_projects"].reset_index(inplace=True)
+
+    assert (
+        lbnl_normalized_dfs["iso_projects"]["queue_status"].isna().sum() <= 51
+    ), "Unexpected number of projects missing queue status."
+    lbnl_normalized_dfs["iso_projects"]["queue_status"] = lbnl_normalized_dfs[
+        "iso_projects"
+    ]["queue_status"].fillna("withdrawn")
 
     return lbnl_normalized_dfs
 
@@ -553,8 +567,6 @@ def _add_actionable_and_nearly_certain_classification(
 
     This model was created by a consultant in Excel and translated to python.
     """
-    if not queue["queue_status"].eq("active").all():
-        raise ValueError("This function only applies to active projects.")
     if (
         queue["interconnection_status_lbnl"]
         .isin(
