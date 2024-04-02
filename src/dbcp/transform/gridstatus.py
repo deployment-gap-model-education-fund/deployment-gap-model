@@ -316,7 +316,7 @@ RESOURCE_DICT = {
     },
     "Unknown": {
         "codes": {
-            "miso": ["Hybrid", "Co-Gen"],
+            "miso": ["Co-Gen"],
             "caiso": ["Water", "Gravity via Rail", "Cogeneration"],
             "pjm": ["Methane; Solar", "Solar; Biomass"],
             "ercot": [],
@@ -352,7 +352,7 @@ RESOURCE_DICT = {
     },
     "Solar": {
         "codes": {
-            "miso": ["Solar"],
+            "miso": ["Solar", "Hybrid"],
             "caiso": [
                 "Storage + Photovoltaic",
                 "Photovoltaic + Storage",
@@ -451,8 +451,8 @@ def _clean_resource_type(
     unmapped = resource_df["resource_clean"].isna()
     if unmapped.sum() != 0:
         unmapped = resource_df[unmapped]
-        unmapped = normalized_projects.merge(
-            unmapped, on="project_id", how="left", validate="1:m"
+        unmapped = unmapped.merge(
+            normalized_projects, on="project_id", how="left", validate="m:1"
         )
         debug = unmapped[["region", "resource"]].value_counts(dropna=False).sort_index()
         raise AssertionError(f"Unmapped resource types in: \n{debug}")
@@ -571,6 +571,10 @@ def _transform_miso(iso_df: pd.DataFrame) -> pd.DataFrame:
     # addition record where studyPhase == "Network Upgrade". I don't fully
     # understand why but it seems like a reasonable drop
     iso_df = iso_df.drop_duplicates(subset="queue_id")
+
+    # There is a project with junk information: project name and resource type are just random collections of words: "rabit fish horse"
+    ids_to_remove = ("AA1234",)
+    iso_df = iso_df[~iso_df["queue_id"].isin(ids_to_remove)]
     return iso_df
 
 
@@ -716,6 +720,8 @@ def _transform_spp(iso_df: pd.DataFrame) -> pd.DataFrame:
 
 def _transform_nyiso(iso_df: pd.DataFrame) -> pd.DataFrame:
     """Make nyiso specific transformations."""
+    # pad queue_id with 0 to 4 characters
+    iso_df["queue_id"] = iso_df["queue_id"].str.zfill(4)
     # NYISO status mapping from the excel sheet
     status_mapping = {
         0: "Withdrawn",
