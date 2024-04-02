@@ -40,7 +40,7 @@ def _get_gridstatus_projects(engine: sa.engine.Engine) -> pd.DataFrame:
         FROM data_warehouse.gridstatus_projects as proj
         LEFT JOIN data_warehouse.gridstatus_resource_capacity as res
         USING (project_id)
-        WHERE resource_clean != 'Transmission'
+        WHERE resource_clean != 'Transmission' AND queue_status = 'active'
     ),
     loc as (
         -- projects can have multiple locations, though 99 percent have only one.
@@ -113,7 +113,8 @@ def _merge_lbnl_with_gridstatus(lbnl: pd.DataFrame, gs: pd.DataFrame) -> pd.Data
 
 
 def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFrame:
-    where_clause = "WHERE region ~ 'non-ISO'" if non_iso_only else ""
+    where_clause = "WHERE proj.queue_status = 'active'"
+    where_clause += "AND region ~ 'non-ISO'" if non_iso_only else ""
     query = f"""
     WITH
     iso_proj_res as (
