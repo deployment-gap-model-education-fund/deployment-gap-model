@@ -582,6 +582,12 @@ def _transform_caiso(iso_df: pd.DataFrame) -> pd.DataFrame:
     """Make caiso specific transformations."""
     iso_df["queue_status"] = iso_df["queue_status"].str.title()
 
+    # Use Proposed On-line Date (as filed with IR) for operational projects
+    iso_df["proposed_completion_date"] = iso_df["proposed_completion_date"].mask(
+        iso_df.queue_status.eq("Completed"),
+        iso_df["Proposed On-line Date (as filed with IR)"],
+    )
+
     iso_df = _create_project_status_classification_from_multiple_columns(
         iso_df,
         facilities_study_status_col="Facilities Study (FAS) or Phase II Cluster Study",
@@ -632,17 +638,6 @@ def _transform_pjm(iso_df: pd.DataFrame) -> pd.DataFrame:
 
     iso_df.drop(columns="point_of_interconnection", inplace=True)
     iso_df.rename(columns={"project_name": "point_of_interconnection"}, inplace=True)
-
-    # GridStatus also wrongly sources "Proposed Completion Date" from
-    # "Revised In Service Date". It should come from "Commercial Operation Milestone".
-    # Switch the column names.
-    iso_df.rename(
-        columns={"proposed_completion_date": "Revised In Service Date"}, inplace=True
-    )
-    iso_df.rename(
-        columns={"Commercial Operation Milestone": "proposed_completion_date"},
-        inplace=True,
-    )
 
     # winter_capacity_mw in pjm aligns with the LBNL data
     iso_df["capacity_mw"] = iso_df["winter_capacity_mw"]
@@ -761,11 +756,19 @@ def _transform_nyiso(iso_df: pd.DataFrame) -> pd.DataFrame:
     ).all(), "Some projects are marked marked actionable and nearly certain."
 
     iso_df["interconnection_status_raw"] = iso_df["S"].map(status_mapping)
+
+    # iso_df = iso_df.rename(
+    #     columns={"Developer Name": "developer"}, errors="raise"
+    # )
     return iso_df
 
 
 def _transform_isone(iso_df: pd.DataFrame) -> pd.DataFrame:
     """Make isone specific transformations."""
+    # GS doesn't think there is an actual completion date but it seems like Op Date could be it.
+    iso_df["actual_completion_date"] = pd.to_datetime(
+        iso_df["Op Date"], errors="coerce"
+    )
     iso_df = _create_project_status_classification_from_multiple_columns(
         iso_df,
         facilities_study_status_col="Facilities Study Status",
@@ -881,10 +884,10 @@ def _normalize_projects(
     project_cols = [
         "project_id",
         "actual_completion_date",
+        "proposed_completion_date",
         "interconnecting_entity",
         "point_of_interconnection",
         "project_name",
-        "proposed_completion_date",
         "queue_date",
         "queue_id",
         "queue_status",
@@ -950,6 +953,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     active_projects["queue_status"] = active_projects["queue_status"].map(
         {
             "completed": "operational",
+            "operational": "operational",
             "active": "active",
             "withdrawn": "withdrawn",
             "suspended": "suspended",
