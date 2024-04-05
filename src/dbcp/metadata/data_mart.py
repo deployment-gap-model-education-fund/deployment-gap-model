@@ -418,6 +418,33 @@ counties_long_format = Table(
     schema=schema,
 )
 
+iso_change_log = Table(
+    "iso_change_log",
+    metadata,
+    Column("county_id_fips", String, primary_key=True),
+    Column("date", DateTime, primary_key=True),
+    Column("county", String),
+    Column("state_id_fips", String),
+    Column("state", String),
+    Column("withdrawn_clean_n_projects", Integer),
+    Column("new_clean_n_projects", Integer),
+    Column("operational_clean_n_projects", Integer),
+    Column("withdrawn_fossil_n_projects", Integer),
+    Column("operational_fossil_n_projects", Integer),
+    Column("new_fossil_n_projects", Integer),
+    Column("withdrawn_other_n_projects", Integer),
+    Column("operational_other_n_projects", Integer),
+    Column("withdrawn_clean_capacity_mw", Float),
+    Column("new_clean_capacity_mw", Float),
+    Column("operational_clean_capacity_mw", Float),
+    Column("withdrawn_fossil_capacity_mw", Float),
+    Column("operational_fossil_capacity_mw", Float),
+    Column("new_fossil_capacity_mw", Float),
+    Column("withdrawn_other_capacity_mw", Float),
+    Column("operational_other_capacity_mw", Float),
+    schema=schema,
+)
+
 br_election_data = Table(
     "br_election_data",
     metadata,

@@ -132,9 +132,17 @@ def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
     ] = _harmonize_interconnection_status_lbnl(
         active_projects.loc[:, "interconnection_status_lbnl"]
     )
-    # drop irrelevant columns (structurally all nan due to 'active' filter)
-    active_projects.drop(columns=["date_withdrawn", "date_operational"], inplace=True)
     parse_date_columns(active_projects)
+    # rename date_withdrawn to withdrawn_date and date_operational to actual_completion_date
+    active_projects.rename(
+        columns={
+            "date_withdrawn_raw": "withdrawn_date_raw",
+            "date_operational_raw": "actual_completion_date_raw",
+            "date_withdrawn": "withdrawn_date",
+            "date_operational": "actual_completion_date",
+        },
+        inplace=True,
+    )
     # deduplicate
     pre_dedupe = len(active_projects)
     active_projects = deduplicate_active_projects(
