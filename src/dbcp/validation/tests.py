@@ -72,7 +72,6 @@ def test_gridstatus_fips_coverage(engine: Engine):
     location_coverage = gridstatus_locations.county_id_fips.isna().sum() / len(
         gridstatus_locations
     )
-    print(location_coverage)
     assert (
         location_coverage < 0.04
     ), "More than 4 percent of Grid Status locations could not be geocoded."
@@ -241,7 +240,7 @@ def test_county_wide_coverage(engine: Engine):
     ), "counties_wide_format does not contain all counties"
     notnull = df.notnull()
     assert (
-        notnull.any(axis=1).sum() == 2609
+        notnull.any(axis=1).sum() == 2652
     ), f"counties_wide_format has unexpected county coverage: {notnull[notnull.any(axis=1)]}"
 
 

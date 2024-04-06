@@ -1305,7 +1305,7 @@ gridstatus_projects = Table(
     Column("proposed_completion_date", DateTime, nullable=True),
     Column("queue_date", DateTime, nullable=True),
     Column("queue_id", String, nullable=True),
-    Column("queue_status", String, nullable=True),
+    Column("queue_status", String),
     Column("interconnection_status_raw", String, nullable=True),
     Column("utility", String, nullable=True),
     Column("withdrawal_comment", String, nullable=True),

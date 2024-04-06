@@ -56,9 +56,8 @@ RESOURCE_DICT = {
             ],
             "pjm": ["Storage", "Storage; Solar", "Storage; Wind"],
             "ercot": ["Other - Battery Energy Storage", "Other - Energy Storage"],
-            "spp": ["Battery/Storage"],
+            "spp": ["Battery/Storage", "Battery/Storage - WERE"],
             "nyiso": ["Energy Storage"],
-            # "isone": ["BAT"],
             "isone": ["BAT"],
         },
         "type": "Renewable",
@@ -215,6 +214,11 @@ RESOURCE_DICT = {
                 "Thermal - NG/CT",
                 "Thermal - CT/ST",
                 "Thermal - CC",
+                "Thermal - Bio",
+                "Thermal - Combustion",
+                "Thermal - Combustion Turbine",
+                "Thermal - ST",
+                "Thermal - VFT",
             ],
             "nyiso": [
                 "Combined Cycle",
@@ -294,7 +298,7 @@ RESOURCE_DICT = {
             ],
             "pjm": ["Wind", "Wind; Solar", "Solar; Storage; Wind", "Wind; Storage"],
             "ercot": ["Wind - Wind Turbine"],
-            "spp": ["Wind", "Hybrid - Wind/Storage", "Hybrid - Wind/Solar"],
+            "spp": ["Wind", "Hybrid - Wind/Storage", "Hybrid - Wind/Solar", "WIND"],
             "nyiso": ["Wind"],
             "isone": ["WND", "WND BAT"],
         },
@@ -426,7 +430,9 @@ logger = logging.getLogger(__name__)
 
 
 def _clean_resource_type(
-    resource_df: pd.DataFrame, normalized_projects: pd.DataFrame
+    resource_df: pd.DataFrame,
+    normalized_projects: pd.DataFrame,
+    normalized_locations: pd.DataFrame,
 ) -> pd.DataFrame:
     """Harmonize resource type for all ISO queues."""
     resource_df = resource_df.copy()
@@ -447,6 +453,38 @@ def _clean_resource_type(
     resource_df["resource_clean"] = (
         resource_df["resource"].fillna("Unknown").map(long_dict)
     )
+
+    # The raw NYISO data does have labels for on and offshore wind.
+    # Assume all wind projects in coastal counties are offshore.
+    # This isn't the msot robust solution but it looks like all active
+    # wind projets in these counties are infact offshore. I think this
+    # is a reasonable solution because these counties don't have a ton of
+    # developable land for large wind projects.
+    coastal_county_id_fips = {
+        "36103": "Suffolk",
+        "36047": "Kings",
+        "36085": "Richmond",
+        "36059": "Nassau",
+        "36081": "Queens",
+        "36061": "New York",
+    }
+
+    resource_locations = resource_df.merge(
+        normalized_locations, on="project_id", how="left", validate="m:m"
+    )
+    nyiso_coastal_wind_project_project_ids = resource_locations[
+        resource_locations["county_id_fips"].isin(coastal_county_id_fips.keys())
+        & resource_locations.resource_clean.eq("Onshore Wind")
+    ].project_id
+    expected_n_coastal_wind_projects = 90
+    assert (
+        len(nyiso_coastal_wind_project_project_ids) == expected_n_coastal_wind_projects
+    ), f"Expected {expected_n_coastal_wind_projects} NYISO coastal wind projects but found {len(nyiso_coastal_wind_project_project_ids)}"
+    # For all project ids in nyiso_coastal_wind_project_project_ids, set the resource_clean to "Offshore Wind" in resource_df
+    resource_df.loc[
+        resource_df.project_id.isin(nyiso_coastal_wind_project_project_ids),
+        "resource_clean",
+    ] = "Offshore Wind"
 
     unmapped = resource_df["resource_clean"].isna()
     if unmapped.sum() != 0:
@@ -641,6 +679,9 @@ def _transform_pjm(iso_df: pd.DataFrame) -> pd.DataFrame:
 
     # winter_capacity_mw in pjm aligns with the LBNL data
     iso_df["capacity_mw"] = iso_df["winter_capacity_mw"]
+
+    # There is a project missing a queue status but it has a withdrawn date so mark it as withdrawn
+    iso_df.loc[iso_df.queue_id.eq("AC2-174"), "queue_status"] = "Withdrawn"
     return iso_df
 
 
@@ -687,12 +728,21 @@ def _transform_spp(iso_df: pd.DataFrame) -> pd.DataFrame:
         "FACILITY STUDY STAGE": "Active",
         "IA FULLY EXECUTED/ON SUSPENSION": "Suspended",
         "WITHDRAWN": "Withdrawn",
+        "TERMINATED": "Withdrawn",
+        pd.NA: "Active",  # There are a few projects with missing status. All of them entered the queue in the last year so I will assume they are active
     }
-    iso_df["queue_status"] = iso_df["Status (Original)"].map(status_map)
-
+    # assert no more than 22 values are missing in iso_df["Status (Original)"]
     assert (
-        ~iso_df["queue_status"].isna().any()
-    ), f"{iso_df['queue_status'].isna().sum()} SPP projects are missing queue_status"
+        iso_df["Status (Original)"].isna().sum() <= 22
+    ), f"{iso_df['Status (Original)'].isna().sum()} SPP projects are missing status"
+    # assert all values in iso_df["Status (Original)"] exist in the keys of status_map
+    projects_with_unmapped_status = iso_df[
+        ~iso_df["Status (Original)"].isin(status_map.keys())
+    ]
+    assert (
+        len(projects_with_unmapped_status) == 0
+    ), f"Some SPP projects have an unknown status {projects_with_unmapped_status['Status (Original)'].unique()}"
+    iso_df["queue_status"] = iso_df["Status (Original)"].map(status_map)
 
     # Categorize certain and actionable projects
     actionable_vals = ("DISIS STAGE", "FACILITY STUDY STAGE")
@@ -719,47 +769,43 @@ def _transform_nyiso(iso_df: pd.DataFrame) -> pd.DataFrame:
     iso_df["queue_id"] = iso_df["queue_id"].str.zfill(4)
     # NYISO status mapping from the excel sheet
     status_mapping = {
-        0: "Withdrawn",
-        1: "Scoping Meeting Pending",
-        2: "FES Pending",
-        3: "FES in Progress",
-        4: "SRIS/SIS Pending",
-        5: "SRIS/SIS in Progress",
-        6: "SRIS/SIS Approved",
-        7: "FS Pending",
-        8: "Rejected Cost Allocation/Next FS Pending",
-        9: "FS in Progress",
-        10: "Accepted Cost Allocation/IA in Progress",
-        11: "IA Completed",
-        12: "Under Construction",
-        13: "In Service for Test",
-        14: "In Service Commercial",
-        15: "Partial In-Service",
+        "1": "Scoping Meeting Pending",
+        "2": "FES Pending",
+        "3": "FES in Progress",
+        "3A": "FES Approved/Performed",
+        "4": "SRIS/SIS Pending",
+        "5": "SRIS/SIS in Progress",
+        "5P": "SRIS Commenced, Stopped and Pending  Adoption of IP",
+        "6": "SRIS/SIS Approved",
+        "7": "FS Pending",
+        "8": "Rejected Cost Allocation/Next FS Pending",
+        "9": "FS in Progress",
+        "10": "Accepted Cost Allocation/IA in Progress",
+        "11": "IA Completed",
+        "12": "Under Construction",
+        "13": "In Service for Test",
+        "14": "In Service Commercial",
+        "0": "Withdrawn",
+        "15": "Partial In-Service",
+        "P": "Pending Adoption of IP Compliance with Order 2023",  # Vast majority of projects with status 'P' don't have any studies posted yet
     }
 
-    # Some projects have multiple values listed. Grab the largest value.
-    if pd.api.types.is_string_dtype(iso_df["S"]) or pd.api.types.is_object_dtype(
-        iso_df["S"]
-    ):
-        iso_df["S"] = (
-            iso_df["S"]
-            .str.split(",")
-            .apply(lambda lst: max([pd.to_numeric(x) for x in lst]))
-        )
-        iso_df["S"] = pd.to_numeric(iso_df["S"])
-
     # Categorize project status
-    iso_df["is_actionable"] = (iso_df["S"].ge(6) & iso_df["S"].lt(11)).fillna(False)
-    iso_df["is_nearly_certain"] = iso_df["S"].ge(11).fillna(False)
+    actionable_vals = ("6", "7", "8", "9", "10")
+    nearly_certain_vals = ("11", "12", "13", "15")
+    iso_df = _create_project_status_classification_from_single_column(
+        iso_df,
+        "S",
+        nearly_certain_vals,
+        actionable_vals,
+    )
+
     assert (
         ~iso_df[["is_actionable", "is_nearly_certain"]].all(axis=1)
     ).all(), "Some projects are marked marked actionable and nearly certain."
 
     iso_df["interconnection_status_raw"] = iso_df["S"].map(status_mapping)
 
-    # iso_df = iso_df.rename(
-    #     columns={"Developer Name": "developer"}, errors="raise"
-    # )
     return iso_df
 
 
@@ -827,7 +873,7 @@ def _normalize_project_locations(iso_df: pd.DataFrame) -> pd.DataFrame:
         geocoded_locations[["county_id_fips", "project_id"]].duplicated(keep=False)
     ]
     assert (
-        len(duplicate_locations) <= 92
+        len(duplicate_locations) <= 96
     ), f"Found more duplicate locations in Grid Status location table than expected:\n {duplicate_locations}"
     return geocoded_locations
 
@@ -997,7 +1043,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     # harmonize types
     normalized_capacities = _clean_resource_type(
-        normalized_capacities, normalized_projects
+        normalized_capacities, normalized_projects, normalized_locations
     )
 
     # Correct dtypes
