@@ -503,21 +503,37 @@ def _create_project_status_classification_from_single_column(
     nearly_certain_vals: Sequence[str],
     actionable_vals: Sequence[str],
 ) -> pd.DataFrame:
-    """Add columns is_actionable and is_nearly_certain that classify each project.
+    """Add columns is_actionable and is_nearly_certain that classify each active project.
 
     This function handles data from ISOs that report project status information in
-    a single column.
+    a single column. is_actionable and is_nearly_certain are null if project is not active.
 
     This model was created by a consultant in Excel and translated to python.
     """
-    iso_df["is_actionable"] = iso_df[status_col].isin(actionable_vals).fillna(False)
-    iso_df["is_nearly_certain"] = (
-        iso_df[status_col].isin(nearly_certain_vals).fillna(False)
+    # add is_actionable and is_nearly_certain columns fill with pd.NA
+    iso_df["is_actionable"] = pd.NA
+    iso_df["is_nearly_certain"] = pd.NA
+
+    is_active = iso_df["queue_status"].eq("Active")
+    active_projects = iso_df[is_active]
+
+    active_projects["is_actionable"] = (
+        active_projects[status_col].isin(actionable_vals).fillna(False)
+    )
+    active_projects["is_nearly_certain"] = (
+        active_projects[status_col].isin(nearly_certain_vals).fillna(False)
     )
 
     assert (
-        ~iso_df[["is_actionable", "is_nearly_certain"]].all(axis=1)
+        ~active_projects[["is_actionable", "is_nearly_certain"]].all(axis=1)
     ).all(), "Some projects are marked marked actionable and nearly certain."
+
+    # assert some projects are marked actionable and nearly certain
+    assert (
+        active_projects.is_actionable.any() & active_projects.is_nearly_certain.any()
+    ), "No projects are marked actionable or nearly certain."
+
+    iso_df.loc[is_active] = active_projects
 
     return iso_df
 
@@ -532,7 +548,8 @@ def _create_project_status_classification_from_multiple_columns(
     """Add columns is_actionable and is_nearly_certain that classify each project.
 
     This function handles data from ISOs that report project status information in
-    a multiple columns.
+    a multiple columns. is_actionable and is_nearly_certain are null if project
+    is not active.
 
     This model was created by a consultant in Excel and translated to python.
     """
@@ -548,15 +565,29 @@ def _create_project_status_classification_from_multiple_columns(
     )
     status_df.rename(columns=status_cols, inplace=True)
 
-    iso_df["is_nearly_certain"] = status_df.loc[:, "executed_ia"]
-    iso_df["is_actionable"] = (
+    iso_df["is_actionable"] = pd.NA
+    iso_df["is_nearly_certain"] = pd.NA
+
+    is_active = iso_df["queue_status"].eq("Active")
+    active_projects = iso_df[is_active]
+
+    active_projects["is_nearly_certain"] = status_df.loc[:, "executed_ia"]
+    active_projects["is_actionable"] = (
         status_df.completed_system_impact_study
         | status_df.completed_facilities_study_status
     ) & ~status_df.executed_ia
 
     assert (
-        ~iso_df[["is_actionable", "is_nearly_certain"]].all(axis=1)
+        ~active_projects[["is_actionable", "is_nearly_certain"]].all(axis=1)
     ).all(), "Some projects are marked marked actionable and nearly certain."
+
+    # assert some projects are marked actionable and nearly certain
+    assert (
+        active_projects.is_actionable.any() & active_projects.is_nearly_certain.any()
+    ), "No projects are marked actionable or nearly certain."
+
+    iso_df.loc[is_active] = active_projects
+
     return iso_df
 
 
@@ -588,8 +619,8 @@ def _transform_miso(iso_df: pd.DataFrame) -> pd.DataFrame:
     )
 
     actionable_vals = (
-        "PHASE 2",
-        "PHASE 3",
+        "Phase 2",
+        "Phase 3",
     )
     nearly_certain_vals = ("GIA",)
     iso_df = _create_project_status_classification_from_single_column(
@@ -800,10 +831,6 @@ def _transform_nyiso(iso_df: pd.DataFrame) -> pd.DataFrame:
         actionable_vals,
     )
 
-    assert (
-        ~iso_df[["is_actionable", "is_nearly_certain"]].all(axis=1)
-    ).all(), "Some projects are marked marked actionable and nearly certain."
-
     iso_df["interconnection_status_raw"] = iso_df["S"].map(status_mapping)
 
     return iso_df
@@ -984,6 +1011,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     projects = []
     for iso, df in raw_dfs.items():
+        logger.info(f"Cleaning {iso} data.")
         # Apply rename
         renamed_df = df.rename(columns=COLUMN_RENAME_DICT).copy()
 

@@ -119,22 +119,22 @@ def _harmonize_interconnection_status_lbnl(statuses: pd.Series) -> pd.Series:
     return out
 
 
-def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
-    """Transform active iso queue data."""
+def _clean_all_iso_projects(projects: pd.DataFrame) -> pd.DataFrame:
+    """Transform active, operational and withdrawn iso queue projects."""
     rename_dict = {
         "state": "raw_state_name",
         "county": "raw_county_name",
     }
-    active_projects["project_id"] = np.arange(len(active_projects), dtype=np.int32)
-    active_projects = active_projects.rename(columns=rename_dict)  # copy
-    active_projects.loc[
+    projects["project_id"] = np.arange(len(projects), dtype=np.int32)
+    projects = projects.rename(columns=rename_dict)  # copy
+    projects.loc[
         :, "interconnection_status_lbnl"
     ] = _harmonize_interconnection_status_lbnl(
-        active_projects.loc[:, "interconnection_status_lbnl"]
+        projects.loc[:, "interconnection_status_lbnl"]
     )
-    parse_date_columns(active_projects)
+    parse_date_columns(projects)
     # rename date_withdrawn to withdrawn_date and date_operational to actual_completion_date
-    active_projects.rename(
+    projects.rename(
         columns={
             "date_withdrawn_raw": "withdrawn_date_raw",
             "date_operational_raw": "actual_completion_date_raw",
@@ -144,9 +144,9 @@ def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
         inplace=True,
     )
     # deduplicate
-    pre_dedupe = len(active_projects)
-    active_projects = deduplicate_active_projects(
-        active_projects,
+    pre_dedupe = len(projects)
+    projects = deduplicate_active_projects(
+        projects,
         key=[
             "point_of_interconnection_clean",  # derived in _prep_for_deduplication
             "capacity_mw_resource_1",
@@ -162,25 +162,40 @@ def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
         ],
         intermediate_creator=_prep_for_deduplication,
     )
-    n_dupes = pre_dedupe - len(active_projects)
+    n_dupes = pre_dedupe - len(projects)
     logger.info(f"Deduplicated {n_dupes} ({n_dupes/pre_dedupe:.2%}) projects.")
 
-    active_projects.set_index("project_id", inplace=True)
-    active_projects.sort_index(inplace=True)
+    projects.set_index("project_id", inplace=True)
+    projects.sort_index(inplace=True)
     # manual fix for duplicate resource type in raw data
     bad_proj_id = 5372
     assert (
-        active_projects.loc[bad_proj_id, "project_name"] == "Coleto Creek ESS Addition"
+        projects.loc[bad_proj_id, "project_name"] == "Coleto Creek ESS Addition"
     ), "Manual correction is misidentified."
-    active_projects.loc[
+    projects.loc[
         bad_proj_id, "resource_type_1"
     ] = "Coal"  # raw data has two instances of "battery storage"
     # clean up whitespace
-    for col in active_projects.columns:
-        if pd.api.types.is_object_dtype(active_projects.loc[:, col]):
-            active_projects.loc[:, col] = active_projects.loc[:, col].str.strip()
-    active_projects = _add_actionable_and_nearly_certain_classification(active_projects)
-    return active_projects
+    for col in projects.columns:
+        if pd.api.types.is_object_dtype(projects.loc[:, col]):
+            projects.loc[:, col] = projects.loc[:, col].str.strip()
+
+    # add is_actionable and is_nearly_certain classifications to active projects
+    projects["is_actionable"] = pd.NA
+    projects["is_nearly_certain"] = pd.NA
+    is_active_project = projects.queue_status.eq("active")
+    projects.loc[is_active_project] = _add_actionable_and_nearly_certain_classification(
+        projects.loc[is_active_project]
+    )
+    # assert is_actionable and is_nearly_certain are all null for operational and withdrawn projects
+    assert (
+        projects.loc[~is_active_project, ["is_actionable", "is_nearly_certain"]]
+        .isna()
+        .all()
+        .all()
+    ), "Some operational or withdrawn projects have is_actionable or is_nearly_certain values."
+
+    return projects
 
 
 def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
@@ -193,7 +208,7 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     Returns:
         lbnl_transformed_dfs: Dictionary of the transformed tables.
     """
-    transformed = active_iso_queue_projects(
+    transformed = _clean_all_iso_projects(
         lbnl_raw_dfs["lbnl_iso_queue"]
     )  # sets index to project_id
 
