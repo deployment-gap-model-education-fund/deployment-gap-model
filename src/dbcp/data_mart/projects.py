@@ -555,24 +555,72 @@ def create_long_format(engine: sa.engine.Engine) -> pd.DataFrame:
     return long_format
 
 
-def create_change_log(
-    long_format: pd.DataFrame, geography: str = "county_id_fips", freq: str = "Q"
+def create_geography_change_log(
+    change_log: pd.DataFrame, geography: str = "county_id_fips", freq: str = "Q"
 ) -> pd.DataFrame:
-    """Create a change log of GridStatus projects.
+    """Creates a change log of ISO queue projects by geography.
 
     Each row is a snap shot of the number of projects and capacity in each status and resource class for a given geography and date.
 
-    Currently only includes regions with high coveraage of operational and withdrawn dates: MISO, NYISO, ISONE, PJM, CAISO.
-    SPP will be added soon and ERCOT will require integrating multiple snapshots of data.
+    Currently only includes regions with high coveraage of operational and withdrawn dates: MISO, NYISO, ISONE, PJM, CAISO, SPP.
+    ERCOT will require integrating multiple snapshots of data.
+    """
+    group_keys = [
+        geography,
+        pd.Grouper(key="effective_date", freq=freq),
+        "queue_status",
+        "resource_class",
+    ]
+    geography_change_log = (
+        change_log.groupby(group_keys)
+        .agg({"project_id": "count", "capacity_mw": "sum"})
+        .reset_index()
+        .rename(
+            columns={
+                "project_id": "n_projects",
+                "capacity_mw": "capacity_mw",
+                "effective_date": "date",
+            }
+        )
+    )
+    geography_change_log = geography_change_log.pivot(
+        index=[geography, "date"],
+        columns=["queue_status", "resource_class"],
+        values=["n_projects", "capacity_mw"],
+    )
+    geography_change_log = geography_change_log.fillna(0)
+    geography_change_log.columns = [
+        f"{queue_status}_{resource_class}_{col}"
+        for col, queue_status, resource_class in geography_change_log.columns.values
+    ]
+    geography_change_log = geography_change_log.reset_index()
+    # add county and state information to the change log
+    if geography == "county_id_fips":
+        geography_info = (
+            change_log[["county_id_fips", "county", "state_id_fips", "state"]]
+            .drop_duplicates()
+            .dropna(subset=["county_id_fips"])
+        )
+        geography_change_log = geography_change_log.merge(
+            geography_info, on="county_id_fips", how="left", validate="m:1"
+        )
+    return geography_change_log
+
+
+def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
+    """Create a change log of GridStatus projects.
+
+    There is a row for every time the status of a project changes.
+    The effective_date column is the date the status changed and the end_date
+    column is the date the status ended. The end_date is null for current statuses
+    of projects.
 
     Args:
         long_format: long format of ISO projects
-        geography: geography to group by
-        freq: frequency to group by
     Returns:
-        chng: change log of GridStatus projects
+        chng: change log of ISO projects
     """
-    regions_with_high_date_coverage = ["MISO", "NYISO", "ISONE", "PJM", "CAISO"]
+    regions_with_high_date_coverage = ["MISO", "NYISO", "ISONE", "PJM", "CAISO", "SPP"]
     long_format = long_format[
         long_format["iso_region"].isin(regions_with_high_date_coverage)
     ]
@@ -626,60 +674,50 @@ def create_change_log(
         long_format = long_format[
             ~((long_format["queue_status"].eq(status) & long_format[date_col].isna()))
         ]
-        # set last_updated_date column to date_col for projects that == status
+
+        # set effective_date column to date_col for projects that == status
         long_format.loc[
-            long_format["queue_status"].eq(status), "last_updated_date"
+            long_format["queue_status"].eq(status), "effective_date"
         ] = long_format[date_col]
+
+    # Set end date to to null all projects.
+    long_format["end_date"] = pd.NA
+
+    # create a dataframe of withdrawn projects where the effective_date date is the date_entered_queue and the end date is the withdrawn_date
+    withdrawn_active = long_format[long_format.queue_status.eq("withdrawn")].copy()
+    withdrawn_active["queue_status"] = "active"
+    withdrawn_active["effective_date"] = withdrawn_active["date_entered_queue"]
+    withdrawn_active["end_date"] = withdrawn_active["withdrawn_date"]
+
+    # create a dataframe of operational projects where the effective_date date is the date_entered_queue and the end date is the actual_completion_date
+    operational_active = long_format[long_format.queue_status.eq("operational")].copy()
+    operational_active["queue_status"] = "active"
+    operational_active["effective_date"] = operational_active["date_entered_queue"]
+    operational_active["end_date"] = operational_active["actual_completion_date"]
+
+    # combine the withdrawn_active dataframe with the long_format dataframe
+    long_format = pd.concat([long_format, withdrawn_active, operational_active])
+
+    # drop withdrawn_date, actual_completion_date and date_entered_queue columns
+    long_format = long_format.drop(
+        columns=["withdrawn_date", "actual_completion_date", "date_entered_queue"]
+    )
 
     # map active projects to "new"
     long_format["queue_status"] = long_format["queue_status"].map(
-        {"active": "new", "withdrawn": "withdrawn", "operational": "operational"}
+        {
+            "active": "new",
+            "withdrawn": "withdrawn",
+            "operational": "operational",
+            "suspended": "suspended",
+        }
     )
 
     # Create change log
     long_format["resource_class"] = long_format["resource_class"].map(
         {"other": "other", "renewable": "clean", "fossil": "fossil", "storage": "clean"}
     )
-
-    group_keys = [
-        geography,
-        pd.Grouper(key="last_updated_date", freq=freq),
-        "queue_status",
-        "resource_class",
-    ]
-    chng = (
-        long_format.groupby(group_keys)
-        .agg({"project_id": "count", "capacity_mw": "sum"})
-        .reset_index()
-        .rename(
-            columns={
-                "project_id": "n_projects",
-                "capacity_mw": "capacity_mw",
-                "last_updated_date": "date",
-            }
-        )
-    )
-    chng = chng.pivot(
-        index=[geography, "date"],
-        columns=["queue_status", "resource_class"],
-        values=["n_projects", "capacity_mw"],
-    )
-    chng.columns = [
-        f"{queue_status}_{resource_class}_{col}"
-        for col, queue_status, resource_class in chng.columns.values
-    ]
-    chng = chng.reset_index()
-    # add county and state information to the change log
-    if geography == "county_id_fips":
-        geography_info = (
-            long_format[["county_id_fips", "county", "state_id_fips", "state"]]
-            .drop_duplicates()
-            .dropna(subset=["county_id_fips"])
-        )
-        chng = chng.merge(
-            geography_info, on="county_id_fips", how="left", validate="m:1"
-        )
-    return chng
+    return long_format
 
 
 def create_data_mart(
@@ -690,7 +728,13 @@ def create_data_mart(
         engine = get_sql_engine()
 
     long_format = create_long_format(engine)
-    iso_change_log = create_change_log(long_format)
+    iso_projects_change_log = create_project_change_log(long_format)
+    iso_counties_change_log = create_geography_change_log(
+        iso_projects_change_log, geography="county_id_fips", freq="Y"
+    )
+    iso_regions_change_log = create_geography_change_log(
+        iso_projects_change_log, geography="iso_region", freq="Y"
+    )
     # We need withdrawn and operational projects for the change log.
     # Grab active projects for long and wide format.
     active_long_format = long_format.query("queue_status == 'active'")
@@ -703,7 +747,9 @@ def create_data_mart(
     return {
         "iso_projects_long_format": active_long_format,
         "iso_projects_wide_format": active_wide_format,
-        "iso_change_log": iso_change_log,
+        "iso_projects_change_log": iso_projects_change_log,
+        "iso_regions_change_log": iso_regions_change_log,
+        "iso_counties_change_log": iso_counties_change_log,
     }
 
 
