@@ -587,12 +587,15 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         # A handful of hybrid facilities with co-located diesel generators.
         # They produce tiny amounts of CO2 but large amounts of confusion.
         "onshore_wind_existing_co2e_tonnes_per_year",
+        "battery_storage_existing_co2e_tonnes_per_year",
         "renewable_and_battery_proposed_co2e_tonnes_per_year",  # not currently modeled
         # No superset proposed_facility_counts due to double-counting multi-resource projects.
         # I recalculate those from the project data in _get_category_project_counts()
         "renewable_and_battery_proposed_facility_count",
         "fossil_proposed_facility_count",
     ]
+    # some columns pop in and out of existence based on minor fluctuations in the data
+    cols_to_drop = [col for col in cols_to_drop if col in wide.columns]
     wide.drop(columns=cols_to_drop, inplace=True)
 
     return wide
