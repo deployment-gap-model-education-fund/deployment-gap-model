@@ -17,6 +17,8 @@ from dbcp.helpers import get_sql_engine
 
 logger = logging.getLogger(__name__)
 
+CHANGE_LOG_REGIONS = ("MISO", "NYISO", "ISONE", "PJM", "CAISO", "SPP")
+
 
 def _get_gridstatus_projects(engine: sa.engine.Engine) -> pd.DataFrame:
     # drops transmission projects
@@ -488,7 +490,7 @@ def _add_derived_columns(mart: pd.DataFrame) -> None:
         "Solar": "renewable",
         "Steam": np.nan,
         "Transmission": "transmission",
-        "Unknown": np.nan,
+        "Unknown": "other",
         "Waste Heat": "fossil",
         "Wind; Storage": "renewable",
         np.nan: np.nan,  # not technically necessary but make it explicit
@@ -620,10 +622,8 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
     Returns:
         chng: change log of ISO projects
     """
-    regions_with_high_date_coverage = ["MISO", "NYISO", "ISONE", "PJM", "CAISO", "SPP"]
-    long_format = long_format[
-        long_format["iso_region"].isin(regions_with_high_date_coverage)
-    ]
+    original_long_format = long_format.copy()
+    long_format = long_format[long_format["iso_region"].isin(CHANGE_LOG_REGIONS)]
 
     # make sure we are missing less than 10% of withdrawn_date
     withdrawn = long_format.query("queue_status == 'withdrawn'")
@@ -659,21 +659,34 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
     # make sure pct_after_current_year is less than 0.001 of operational projects
     expected_missing = 0.001
     assert (
-        pct_after_current_year < 0.001
+        pct_after_current_year < expected_missing
     ), f"More than {expected_missing}% of operational projects have actual_completion_date after the current year."
+
+    # map active projects to "new"
+    long_format["queue_status"] = long_format["queue_status"].map(
+        {
+            "active": "new",
+            "withdrawn": "withdrawn",
+            "operational": "operational",
+            "suspended": "new",  # Treat suspended projects as active/new because we don't have date suspended columns
+        }
+    )
 
     # Remove projects that are missing relevant date columns
     status_dates = [
         {"status": "withdrawn", "date": "withdrawn_date"},
         {"status": "operational", "date": "actual_completion_date"},
-        {"status": "active", "date": "date_entered_queue"},
+        {"status": "new", "date": "date_entered_queue"},
     ]
     for status_date in status_dates:
         status = status_date["status"]
         date_col = status_date["date"]
+        n_projects_before = len(long_format)
         long_format = long_format[
             ~((long_format["queue_status"].eq(status) & long_format[date_col].isna()))
         ]
+        n_projects_after = len(long_format)
+        print(f"{n_projects_before - n_projects_after} {status} projects removed.")
 
         # set effective_date column to date_col for projects that == status
         long_format.loc[
@@ -685,13 +698,13 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
 
     # create a dataframe of withdrawn projects where the effective_date date is the date_entered_queue and the end date is the withdrawn_date
     withdrawn_active = long_format[long_format.queue_status.eq("withdrawn")].copy()
-    withdrawn_active["queue_status"] = "active"
+    withdrawn_active["queue_status"] = "new"
     withdrawn_active["effective_date"] = withdrawn_active["date_entered_queue"]
     withdrawn_active["end_date"] = withdrawn_active["withdrawn_date"]
 
     # create a dataframe of operational projects where the effective_date date is the date_entered_queue and the end date is the actual_completion_date
     operational_active = long_format[long_format.queue_status.eq("operational")].copy()
-    operational_active["queue_status"] = "active"
+    operational_active["queue_status"] = "new"
     operational_active["effective_date"] = operational_active["date_entered_queue"]
     operational_active["end_date"] = operational_active["actual_completion_date"]
 
@@ -703,21 +716,126 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
         columns=["withdrawn_date", "actual_completion_date", "date_entered_queue"]
     )
 
-    # map active projects to "new"
-    long_format["queue_status"] = long_format["queue_status"].map(
-        {
-            "active": "new",
-            "withdrawn": "withdrawn",
-            "operational": "operational",
-            "suspended": "suspended",
-        }
-    )
-
-    # Create change log
+    # Map storage and renewable to "clean"
     long_format["resource_class"] = long_format["resource_class"].map(
         {"other": "other", "renewable": "clean", "fossil": "fossil", "storage": "clean"}
     )
+    # Not doing the validation in dbcp.tests.validation because we
+    # need access to iso_projects_long_format with withdrawn and operational
+    # projects.
+    validate_project_change_log(long_format, original_long_format)
     return long_format
+
+
+def validate_project_change_log(
+    iso_projects_change_log: pd.DataFrame, iso_projects_long_format: pd.DataFrame
+):
+    """Test the changelog and long format values roughly align."""
+    # Grab the latest change log entry for each project
+    iso_projects_change_log = iso_projects_change_log[
+        iso_projects_change_log.end_date.isna()
+    ]
+
+    # The change log does not have all regions. Filter iso_projects_long_format to only include regions in the change log
+    iso_projects_long_format = iso_projects_long_format[
+        iso_projects_long_format["iso_region"].isin(CHANGE_LOG_REGIONS)
+    ]
+
+    # We expect some change in total projects count because not all projects have withdrawn and operational dates
+    expected_n_projects_change = 0.05
+    result_n_projects_change = abs(
+        len(iso_projects_change_log) - len(iso_projects_long_format)
+    ) / len(iso_projects_change_log)
+    assert (
+        result_n_projects_change < expected_n_projects_change
+    ), f"Found unexpected change in total projects count: {result_n_projects_change}"
+
+    # Create a dictionary of expected pct change for each iso_region
+    expected_pct_change = pd.Series(
+        {
+            "CAISO": 0.02,
+            "ISONE": 0.01,
+            "MISO": 0.01,
+            "NYISO": 0.18,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
+            "PJM": 0.04,
+            "SPP": 0.31,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
+        }
+    )
+
+    # Calculate the pct change for each iso_region
+    iso_projects_change_log_region_capacity = iso_projects_change_log.groupby(
+        "iso_region"
+    ).capacity_mw.sum()
+    long_format_region_capacity = iso_projects_long_format.groupby(
+        "iso_region"
+    ).capacity_mw.sum()
+
+    pct_change = (
+        long_format_region_capacity - iso_projects_change_log_region_capacity
+    ) / iso_projects_change_log_region_capacity
+    assert pct_change.lt(
+        expected_pct_change
+    ).all(), f"Found unexpected pct change in iso_projects_long_format: {pct_change}"
+
+
+def validate_iso_regions_change_log(
+    iso_regions_change_log: pd.DataFrame, iso_projects_long_format: pd.DataFrame
+):
+    """Test the changelog and long format values roughly align."""
+    # The change log does not have all regions. Filter iso_projects_long_format to only include regions in the change log
+    iso_projects_long_format = iso_projects_long_format[
+        iso_projects_long_format["iso_region"].isin(CHANGE_LOG_REGIONS)
+    ]
+
+    # Grab all new_*_n_project columns from the change log. All projects have "new" records in the change log
+    new_cols = [
+        col
+        for col in iso_regions_change_log.columns
+        if "n_projects" in col and "new" in col
+    ]
+    n_projects_iso_regions_change_log = iso_regions_change_log[new_cols].sum().sum()
+
+    # We expect some change in total projects count because not all projects have withdrawn and operational dates
+    # and resource_class
+    expected_n_projects_change = 0.09
+    result_n_projects_change = abs(
+        n_projects_iso_regions_change_log - len(iso_projects_long_format)
+    ) / len(iso_projects_long_format)
+    assert (
+        result_n_projects_change < expected_n_projects_change
+    ), f"Found unexpected change in total projects count: {result_n_projects_change}"
+
+    # Create a dictionary of expected pct change for each iso_region
+    expected_pct_change = pd.Series(
+        {
+            "CAISO": 0.02,
+            "ISONE": 0.01,
+            "MISO": 0.01,
+            "NYISO": 0.20,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
+            "PJM": 0.04,
+            "SPP": 0.31,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
+        }
+    )
+
+    # Calculate the pct change for each iso_region
+    new_cols = [
+        col
+        for col in iso_regions_change_log.columns
+        if "capacity_mw" in col and "new" in col
+    ]
+    iso_projects_change_log_region_capacity = (
+        iso_regions_change_log.groupby("iso_region")[new_cols].sum().sum(axis=1)
+    )
+    long_format_region_capacity = iso_projects_long_format.groupby(
+        "iso_region"
+    ).capacity_mw.sum()
+
+    pct_change = (
+        long_format_region_capacity - iso_projects_change_log_region_capacity
+    ) / iso_projects_change_log_region_capacity
+    assert pct_change.lt(
+        expected_pct_change
+    ).all(), f"Found unexpected pct change in iso_projects_long_format: {pct_change}"
 
 
 def create_data_mart(
@@ -730,11 +848,13 @@ def create_data_mart(
     long_format = create_long_format(engine)
     iso_projects_change_log = create_project_change_log(long_format)
     iso_counties_change_log = create_geography_change_log(
-        iso_projects_change_log, geography="county_id_fips", freq="Y"
+        iso_projects_change_log, geography="county_id_fips", freq="Q"
     )
     iso_regions_change_log = create_geography_change_log(
-        iso_projects_change_log, geography="iso_region", freq="Y"
+        iso_projects_change_log, geography="iso_region", freq="Q"
     )
+
+    validate_iso_regions_change_log(iso_regions_change_log, long_format)
     # We need withdrawn and operational projects for the change log.
     # Grab active projects for long and wide format.
     active_long_format = long_format.query("queue_status == 'active'")

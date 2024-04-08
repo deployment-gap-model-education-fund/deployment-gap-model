@@ -240,8 +240,10 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         raise AssertionError("Missing Resources!")
     lbnl_normalized_dfs["iso_projects"].reset_index(inplace=True)
 
+    # Most projects missing queue_status are from the early 2000s so I'm going to assume
+    # they were withrawn.
     assert (
-        lbnl_normalized_dfs["iso_projects"]["queue_status"].isna().sum() <= 51
+        lbnl_normalized_dfs["iso_projects"]["queue_status"].isna().sum() <= 42
     ), "Unexpected number of projects missing queue status."
     lbnl_normalized_dfs["iso_projects"]["queue_status"] = lbnl_normalized_dfs[
         "iso_projects"
