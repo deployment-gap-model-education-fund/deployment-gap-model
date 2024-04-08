@@ -1,11 +1,14 @@
 """Small helper functions for dbcp etl."""
 import csv
+import gzip
 import logging
 import os
+import shutil
 from io import StringIO
 from pathlib import Path
 
 import boto3
+import botocore
 import google.auth
 import pandas as pd
 import pandas_gbq
@@ -104,31 +107,81 @@ def get_sql_engine() -> sa.engine.Engine:
 
 def get_pudl_engine() -> sa.engine.Engine:
     """Create a sql alchemy engine for the pudl database."""
-    pudl_data_path = download_pudl_data()
+    pudl_data_path = get_pudl_resource("pudl.sqlite.gz")
     pudl_engine = sa.create_engine(f"sqlite:////{pudl_data_path}")
     return pudl_engine
 
 
-def download_pudl_data() -> Path:
-    """Download pudl data from AWS."""
+def get_pudl_resource(pudl_resource: str) -> Path:
+    """Given the name of a PUDL resource, return the path to the cached file.
+
+    If the file is not cached, download it from S3 and return the path.
+
+    Args:
+        pudl_resource: The name of the PUDL resource to retrieve.
+    Returns:
+        pudl_resource_path: The path to the cached PUDL resource.
+    """
     PUDL_VERSION = os.environ["PUDL_VERSION"]
+    pudl_output_bucket = "pudl.catalyst.coop"
 
     pudl_cache = Path("/app/data/data_cache/pudl/")
     pudl_cache.mkdir(exist_ok=True)
     pudl_version_cache = pudl_cache / PUDL_VERSION
-    pudl_data_path = pudl_version_cache / "pudl.sqlite"
-    if not pudl_data_path.exists():
-        logger.info("PUDL data directory does not exist, downloading from AWS.")
-        pudl_version_cache.mkdir()
+    pudl_version_cache.mkdir(exist_ok=True)
 
-        s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
-        s3.download_file(
-            "intake.catalyst.coop",
-            f"{PUDL_VERSION}/pudl.sqlite",
-            str(pudl_data_path),
+    s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
+
+    pudl_resource_path = pudl_version_cache / pudl_resource
+    # .gz files are unzipped then deleted so we need to check
+    # the unzipped file exists
+    unzipped_pudl_resource_path = Path(
+        str(pudl_resource_path).replace(".sqlite.gz", ".sqlite")
+    )
+
+    if unzipped_pudl_resource_path.exists():
+        logger.info(
+            f"{pudl_resource} exists in the cache at {unzipped_pudl_resource_path}."
         )
+    else:
+        logger.info(
+            f"{pudl_resource} does not exist in the cache, downloading from AWS."
+        )
+        # check the pudl_resource exists in s3
+        try:
+            s3.head_object(
+                Bucket=pudl_output_bucket, Key=f"{PUDL_VERSION}/{pudl_resource}"
+            )
+        except botocore.exceptions.ClientError:
+            raise ValueError(
+                f"{PUDL_VERSION}/{pudl_resource} does not exist in the s3://{pudl_output_bucket}."
+            )
 
-    return pudl_data_path
+        # download the pudl_resource from s3 with a tqdm progress bar
+        logger.info(f"Downloading {pudl_resource}.")
+        pudl_resource_size = s3.head_object(
+            Bucket=pudl_output_bucket, Key=f"{PUDL_VERSION}/{pudl_resource}"
+        )["ContentLength"]
+        with tqdm(total=100, desc=f"Downloading {pudl_resource}") as pbar:
+
+            def progress_hook(bytes_amount):
+                pbar.update(bytes_amount / pudl_resource_size * 100)
+
+            s3.download_file(
+                pudl_output_bucket,
+                f"{PUDL_VERSION}/{pudl_resource}",
+                str(pudl_resource_path),
+                Callback=progress_hook,
+            )
+
+        # if pudl_resource_path is a gzip file, unzip it
+        logger.info(f"Unzipping {pudl_resource}.")
+        if pudl_resource_path.suffix == ".gz":
+            with gzip.open(pudl_resource_path, "rb") as f_in:
+                with open(pudl_resource_path.with_suffix(""), "wb") as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+            pudl_resource_path.unlink()
+    return unzipped_pudl_resource_path
 
 
 def track_tar_progress(members):

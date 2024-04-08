@@ -4,18 +4,14 @@ from pathlib import Path
 from typing import Dict
 
 import pandas as pd
-import sqlalchemy as sa
 
 import dbcp
-from dbcp.constants import FIPS_CODE_VINTAGE
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.helpers import enforce_dtypes, psql_insert_copy
 from dbcp.metadata.data_warehouse import metadata
 from dbcp.transform.fips_tables import SPATIAL_CACHE
-from dbcp.transform.helpers import GEOCODER_CACHE, bedford_addfips_fix
+from dbcp.transform.helpers import GEOCODER_CACHE
 from dbcp.validation.tests import validate_warehouse
-from pudl.helpers import add_fips_ids as _add_fips_ids
-from pudl.output.pudltabl import PudlTabl
 
 logger = logging.getLogger(__name__)
 
@@ -59,36 +55,8 @@ def etl_columbia_local_opp() -> Dict[str, pd.DataFrame]:
 
 def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
     """Pull tables from pudl sqlite database."""
-    pudl_data_path = dbcp.helpers.download_pudl_data()
-
-    pudl_tables = {}
-
-    pudl_engine = sa.create_engine(f"sqlite:////{pudl_data_path}")
-    pudl_out = PudlTabl(
-        pudl_engine,
-        start_date="2021-01-01",
-        end_date="2021-12-31",
-        freq="AS",
-        fill_fuel_cost=False,
-        roll_fuel_cost=True,
-        fill_net_gen=True,
-    )
-
-    mcoe = pudl_out.mcoe(all_gens=True, gens_cols="all")
-    # add FIPS
-    # workaround for addfips Bedford, VA problem
-    bedford_addfips_fix(mcoe)
-    filled_location = mcoe.loc[:, ["state", "county"]].fillna(
-        ""
-    )  # copy; don't want to fill actual table
-    fips = _add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
-    mcoe = pd.concat(
-        [mcoe, fips[["state_id_fips", "county_id_fips"]]], axis=1, copy=False
-    )
-    mcoe = mcoe.convert_dtypes()
-    pudl_tables["mcoe"] = mcoe
-
-    return pudl_tables
+    raw_pudl_tables = dbcp.extract.pudl.extract()
+    return dbcp.transform.pudl.transform(raw_pudl_tables)
 
 
 def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:

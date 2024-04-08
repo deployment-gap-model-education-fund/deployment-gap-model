@@ -1,4 +1,4 @@
-"""Create table of existing plants (aggregated from MCOE generators)."""
+"""Create table of existing plants (aggregated from pudl_generators generators)."""
 from typing import Optional
 
 import pandas as pd
@@ -12,7 +12,7 @@ def create_data_mart(
     engine: Optional[sa.engine.Engine] = None,
     pudl_engine: Optional[sa.engine.Engine] = None,
 ) -> pd.DataFrame:
-    """Create table of existing plants from MCOE generators.
+    """Create table of existing plants from pudl_generators generators.
 
     Args:
         engine (Optional[sa.engine.Engine], optional): postgres engine. Defaults to None.
