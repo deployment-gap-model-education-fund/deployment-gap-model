@@ -540,6 +540,15 @@ def create_long_format(engine: sa.engine.Engine) -> pd.DataFrame:
     return long_format
 
 
+def _pudl_eia860m_changelog(engine: sa.engine.Engine) -> pd.DataFrame:
+    """Get the PUDL EIA860M changelog table."""
+    with engine.connect() as con:
+        pudl_eia860m_changelog = pd.read_sql_table(
+            "pudl_eia860m_changelog", con, schema="data_warehouse"
+        )
+    return pudl_eia860m_changelog
+
+
 def create_data_mart(
     engine: Optional[sa.engine.Engine] = None,
 ) -> dict[str, pd.DataFrame]:
@@ -550,9 +559,12 @@ def create_data_mart(
     long_format = create_long_format(engine)
     wide_format = _convert_long_to_wide(long_format)
 
+    pudl_eia860m_changelog = _pudl_eia860m_changelog(engine)
+
     return {
         "iso_projects_long_format": long_format,
         "iso_projects_wide_format": wide_format,
+        "pudl_eia860m_changelog": pudl_eia860m_changelog,
     }
 
 
