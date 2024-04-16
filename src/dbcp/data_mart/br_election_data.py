@@ -160,7 +160,6 @@ def _create_county_commission_elections_wide(
 
 def create_data_mart(
     engine: Optional[sa.engine.Engine] = None,
-    pudl_engine: Optional[sa.engine.Engine] = None,
 ) -> dict[str, pd.DataFrame]:
     """Create final output table.
 

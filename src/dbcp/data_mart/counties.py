@@ -42,7 +42,7 @@ from dbcp.data_mart.helpers import (
     _subset_db_columns,
 )
 from dbcp.data_mart.projects import create_long_format as create_iso_data_mart
-from dbcp.helpers import get_pudl_engine, get_sql_engine
+from dbcp.helpers import get_sql_engine
 
 JUSTICE40_AGGREGATES = pd.read_csv(
     # This variable exists because of Postgres character limits on column names.
@@ -250,16 +250,13 @@ def _get_existing_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
     return df
 
 
-def _get_existing_fossil_plant_co2e_estimates(
-    pudl_engine: sa.engine.Engine,
-) -> pd.Series:
-    gen_fuel_923 = _get_existing_plant_fuel_data(pudl_engine)
+def _get_existing_fossil_plant_co2e_estimates() -> pd.Series:
+    gen_fuel_923 = _get_existing_plant_fuel_data()
     plant_co2e = _estimate_existing_co2e(gen_fuel_923)
     return plant_co2e
 
 
 def _get_existing_plant_locations(
-    pudl_engine: sa.engine.Engine,
     postgres_engine: sa.engine.Engine,
     state_fips_table: Optional[pd.DataFrame] = None,
     county_fips_table: Optional[pd.DataFrame] = None,
@@ -268,7 +265,7 @@ def _get_existing_plant_locations(
         state_fips_table = _get_state_fips_df(postgres_engine)
     if county_fips_table is None:
         county_fips_table = _get_county_fips_df(postgres_engine)
-    plant_locations = _get_plant_location_data(pudl_engine)
+    plant_locations = _get_plant_location_data()
     plant_locations = _transfrom_plant_location_data(
         plant_locations, state_table=state_fips_table, county_table=county_fips_table
     )
@@ -276,15 +273,13 @@ def _get_existing_plant_locations(
 
 
 def _get_existing_plants(
-    pudl_engine: sa.engine.Engine,
     postgres_engine: sa.engine.Engine,
     state_fips_table: Optional[pd.DataFrame] = None,
     county_fips_table: Optional[pd.DataFrame] = None,
 ) -> pd.DataFrame:
     plants = _get_existing_plant_attributes(engine=postgres_engine)
-    co2e = _get_existing_fossil_plant_co2e_estimates(pudl_engine=pudl_engine)
+    co2e = _get_existing_fossil_plant_co2e_estimates()
     locations = _get_existing_plant_locations(
-        pudl_engine=pudl_engine,
         postgres_engine=postgres_engine,
         state_fips_table=state_fips_table,
         county_fips_table=county_fips_table,
@@ -295,14 +290,12 @@ def _get_existing_plants(
 
 
 def _existing_plants_counties(
-    pudl_engine: sa.engine.Engine,
     postgres_engine: sa.engine.Engine,
     state_fips_table: Optional[pd.DataFrame] = None,
     county_fips_table: Optional[pd.DataFrame] = None,
 ) -> pd.DataFrame:
     """Create existing plant county-plant aggs for the long-format county table."""
     plants = _get_existing_plants(
-        pudl_engine=pudl_engine,
         postgres_engine=postgres_engine,
         state_fips_table=state_fips_table,
         county_fips_table=county_fips_table,
@@ -587,7 +580,6 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         # A handful of hybrid facilities with co-located diesel generators.
         # They produce tiny amounts of CO2 but large amounts of confusion.
         "onshore_wind_existing_co2e_tonnes_per_year",
-        "battery_storage_existing_co2e_tonnes_per_year",
         "renewable_and_battery_proposed_co2e_tonnes_per_year",  # not currently modeled
         # No superset proposed_facility_counts due to double-counting multi-resource projects.
         # I recalculate those from the project data in _get_category_project_counts()
@@ -603,7 +595,6 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
 
 def create_long_format(
     postgres_engine: sa.engine.Engine,
-    pudl_engine: sa.engine.Engine,
 ) -> pd.DataFrame:
     """Create the long format county datamart dataframe."""
     all_counties = _get_county_fips_df(postgres_engine)
@@ -612,7 +603,6 @@ def create_long_format(
     iso = _iso_projects_counties(postgres_engine)
     infra = _fossil_infrastructure_counties(postgres_engine)
     existing = _existing_plants_counties(
-        pudl_engine=pudl_engine,
         postgres_engine=postgres_engine,
         state_fips_table=all_states,
         county_fips_table=all_counties,
@@ -1009,18 +999,13 @@ def _get_avoided_emissions_by_county_resource(engine: sa.engine.Engine) -> pd.Da
 
 def create_wide_format(
     postgres_engine: Optional[sa.engine.Engine] = None,
-    pudl_engine: Optional[sa.engine.Engine] = None,
     long_format: Optional[pd.DataFrame] = None,
 ) -> pd.DataFrame:
     """Create wide format county aggregates."""
     if postgres_engine is None:
         postgres_engine = get_sql_engine()
-    if pudl_engine is None:
-        pudl_engine = get_pudl_engine()
     if long_format is None:
-        long_format = create_long_format(
-            postgres_engine=postgres_engine, pudl_engine=pudl_engine
-        )
+        long_format = create_long_format(postgres_engine=postgres_engine)
     wide_format = _convert_long_to_wide(long_format)
     # add aggregates that have to be recreated from the project-level data
     proposed_counts = _get_category_project_counts(postgres_engine)
@@ -1097,13 +1082,11 @@ def _get_category_project_counts(engine: sa.engine.Engine) -> pd.DataFrame:
 
 def create_data_mart(
     engine: Optional[sa.engine.Engine] = None,
-    pudl_engine: Optional[sa.engine.Engine] = None,
 ) -> Dict[str, pd.DataFrame]:
     """Create county data marts.
 
     Args:
         engine (Optional[sa.engine.Engine], optional): postgres engine. Defaults to None.
-        pudl_engine (Optional[sa.engine.Engine], optional): sqlite engine. Defaults to None.
 
     Returns:
         Dict[str, pd.DataFrame]: county tables in both wide and long format
@@ -1111,15 +1094,10 @@ def create_data_mart(
     postgres_engine = engine
     if postgres_engine is None:
         postgres_engine = get_sql_engine()
-    if pudl_engine is None:
-        pudl_engine = get_pudl_engine()
 
-    long_format = create_long_format(
-        postgres_engine=postgres_engine, pudl_engine=pudl_engine
-    )
+    long_format = create_long_format(postgres_engine=postgres_engine)
     wide_format = create_wide_format(
         postgres_engine=postgres_engine,
-        pudl_engine=pudl_engine,
         long_format=long_format,
     )
     actionable_col = _get_actionable_aggs_for_long_format(postgres_engine)
@@ -1138,6 +1116,5 @@ def create_data_mart(
 if __name__ == "__main__":
     # debugging entry point
     engine = get_sql_engine()
-    pudl_engine = get_pudl_engine()
-    marts = create_data_mart(engine=engine, pudl_engine=pudl_engine)
+    marts = create_data_mart(engine=engine)
     print("hooray")

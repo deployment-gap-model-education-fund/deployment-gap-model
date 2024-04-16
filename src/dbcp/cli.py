@@ -37,26 +37,6 @@ def parse_command_line():
         help="Run the etl to produce the data warehouse.",
     )
     parser.add_argument(
-        "-c",
-        "--csv",
-        action="store_true",
-        default=False,
-        help="Write tables to csvs. This will overwrite existing csvs.",
-    )
-    parser.add_argument(
-        "-bq",
-        "--upload-to-bigquery",
-        action="store_true",
-        default=False,
-        help="Loads tables to BigQuery.",
-    )
-    parser.add_argument(
-        "-bqenv",
-        "--bigquery-env",
-        help="Select which BigQuery environment to load the data to (prod or dev).",
-        default="dev",
-    )
-    parser.add_argument(
         "--loglevel",
         help="Set logging level (DEBUG, INFO, WARNING, ERROR, or CRITICAL).",
         default="INFO",

@@ -41,6 +41,51 @@ def _transform_pudl_generators(pudl_generators) -> pd.DataFrame:
     return pudl_generators
 
 
+def _transform_pudl_eia860m_changelog(
+    pudl_eia860m_changelog: pd.DataFrame,
+) -> pd.DataFrame:
+    """Transform pudl_eia860m_changelog table."""
+    pudl_eia860m_changelog = pudl_eia860m_changelog.convert_dtypes()
+    # Convert every column with date in it to a datetime column
+    for col in pudl_eia860m_changelog.columns:
+        if "date" in col:
+            pudl_eia860m_changelog[col] = pd.to_datetime(pudl_eia860m_changelog[col])
+
+    filled_location = pudl_eia860m_changelog.loc[:, ["state", "county"]].fillna(
+        ""
+    )  # copy; don't want to fill actual table
+
+    fips = _add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
+    pudl_eia860m_changelog = pd.concat(
+        [pudl_eia860m_changelog, fips[["state_id_fips", "county_id_fips"]]],
+        axis=1,
+        copy=False,
+    )
+
+    pudl_eia860m_changelog.loc[
+        pudl_eia860m_changelog.county_id_fips.eq("51515"), "county_id_fips"
+    ] = "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
+
+    # Map operational_status_code values to numeric scale
+    operational_status_code_scale = {
+        "OT": pd.NA,
+        "P": 1,
+        "L": 2,
+        "T": 3,
+        "U": 4,
+        "V": 5,
+        "TS": 6,
+    }
+    pudl_eia860m_changelog["raw_operational_status_code"] = pudl_eia860m_changelog[
+        "operational_status_code"
+    ].copy()
+    pudl_eia860m_changelog["operational_status_code"] = pudl_eia860m_changelog[
+        "raw_operational_status_code"
+    ].map(operational_status_code_scale)
+
+    return pudl_eia860m_changelog
+
+
 def transform(raw_pudl_tables: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Transform PUDL tables.
 
@@ -51,6 +96,7 @@ def transform(raw_pudl_tables: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """
     table_transform_functions = {
         "pudl_generators": _transform_pudl_generators,
+        "pudl_eia860m_changelog": _transform_pudl_eia860m_changelog,
     }
 
     transformed_dfs = {}
