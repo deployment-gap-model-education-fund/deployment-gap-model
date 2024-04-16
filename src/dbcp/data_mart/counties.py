@@ -586,6 +586,8 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "renewable_and_battery_proposed_facility_count",
         "fossil_proposed_facility_count",
     ]
+    # some columns pop in and out of existence based on minor fluctuations in the data
+    cols_to_drop = [col for col in cols_to_drop if col in wide.columns]
     wide.drop(columns=cols_to_drop, inplace=True)
 
     return wide
