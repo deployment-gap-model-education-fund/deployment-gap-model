@@ -32,6 +32,17 @@ def _extract_pudl_generators() -> pd.DataFrame:
     return pudl_generators
 
 
+def _extract_pudl_eia860m_changelog() -> pd.DataFrame:
+    """Extract the core_eia860m__changelog_generators parquet file from the PUDL resources."""
+    pudl_resource_path = dbcp.helpers.get_pudl_resource(
+        pudl_resource="core_eia860m__changelog_generators.parquet"
+    )
+    pudl_eia860m_changelog = pd.read_parquet(
+        pudl_resource_path, engine="pyarrow", use_nullable_dtypes=True
+    )
+    return pudl_eia860m_changelog
+
+
 def extract() -> dict[str, pd.DataFrame]:
     """Pull tables from pudl sqlite database.
 
@@ -40,7 +51,10 @@ def extract() -> dict[str, pd.DataFrame]:
     """
     raw_pudl_tables = {}
     # dictionary of PUDL table names to names used in DGM data warehouse
-    tables = {"pudl_generators": _extract_pudl_generators}
+    tables = {
+        "pudl_generators": _extract_pudl_generators,
+        "pudl_eia860m_changelog": _extract_pudl_eia860m_changelog,
+    }
     for dgm_table_name, extract_func in tables.items():
         raw_pudl_tables[dgm_table_name] = extract_func()
     return raw_pudl_tables

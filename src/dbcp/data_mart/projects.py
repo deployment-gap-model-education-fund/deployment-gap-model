@@ -838,6 +838,15 @@ def validate_iso_regions_change_log(
     ).all(), f"Found unexpected pct change in iso_projects_long_format: {pct_change}"
 
 
+def _pudl_eia860m_changelog(engine: sa.engine.Engine) -> pd.DataFrame:
+    """Get the PUDL EIA860M changelog table."""
+    with engine.connect() as con:
+        pudl_eia860m_changelog = pd.read_sql_table(
+            "pudl_eia860m_changelog", con, schema="data_warehouse"
+        )
+    return pudl_eia860m_changelog
+
+
 def create_data_mart(
     engine: Optional[sa.engine.Engine] = None,
 ) -> dict[str, pd.DataFrame]:
@@ -864,12 +873,15 @@ def create_data_mart(
     )
     active_wide_format = _convert_long_to_wide(active_long_format)
 
+    pudl_eia860m_changelog = _pudl_eia860m_changelog(engine)
+
     return {
         "iso_projects_long_format": active_long_format,
         "iso_projects_wide_format": active_wide_format,
         "iso_projects_change_log": iso_projects_change_log,
         "iso_regions_change_log": iso_regions_change_log,
         "iso_counties_change_log": iso_counties_change_log,
+        "pudl_eia860m_changelog": pudl_eia860m_changelog,
     }
 
 
