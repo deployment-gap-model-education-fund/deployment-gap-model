@@ -505,7 +505,9 @@ def _add_derived_columns(mart: pd.DataFrame) -> None:
     return
 
 
-def create_long_format(engine: sa.engine.Engine) -> pd.DataFrame:
+def create_long_format(
+    engine: sa.engine.Engine, active_projects_only: bool = True
+) -> pd.DataFrame:
     """Create table of ISO projects in long format.
 
     PK should be (source, project_id, county_id_fips, resource_clean), but county_id_fips has nulls.
@@ -516,10 +518,12 @@ def create_long_format(engine: sa.engine.Engine) -> pd.DataFrame:
     Otherwise they will be double-counted.
 
     Args:
-        engine (sa.engine.Engine): postgres database engine
+        engine: postgres database engine
+        active_projects_only: If we only want active projects, grab active projects and
+            remove withdrawn_date and actual_completion_date.
 
     Returns:
-        pd.DataFrame: long format table of ISO projects
+        long format table of ISO projects
     """
     iso = _get_and_join_iso_tables(
         engine, use_gridstatus=True, use_proprietary_offshore=True
@@ -554,6 +558,15 @@ def create_long_format(engine: sa.engine.Engine) -> pd.DataFrame:
         dupes.sum() == expected_dupes
     ), f"Expected {expected_dupes} duplicates, found {dupes.sum()}."
     long_format["surrogate_id"] = range(len(long_format))
+
+    # If we only want active projects, grab active projects and remove withdrawn_date and actual_completion_date
+    if active_projects_only:
+        active_long_format = long_format.query("queue_status == 'active'")
+        # drop actual_completion_date and withdrawn_date columns
+        active_long_format = active_long_format.drop(
+            columns=["actual_completion_date", "withdrawn_date"]
+        )
+        return active_long_format
     return long_format
 
 
@@ -683,7 +696,7 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
         date_col = status_date["date"]
         n_projects_before = len(long_format)
         long_format = long_format[
-            ~((long_format["queue_status"].eq(status) & long_format[date_col].isna()))
+            ~(long_format["queue_status"].eq(status) & long_format[date_col].isna())
         ]
         n_projects_after = len(long_format)
         print(f"{n_projects_before - n_projects_after} {status} projects removed.")
@@ -854,8 +867,8 @@ def create_data_mart(
     if engine is None:
         engine = get_sql_engine()
 
-    long_format = create_long_format(engine)
-    iso_projects_change_log = create_project_change_log(long_format)
+    all_projects_long_format = create_long_format(engine, active_projects_only=False)
+    iso_projects_change_log = create_project_change_log(all_projects_long_format)
     iso_counties_change_log = create_geography_change_log(
         iso_projects_change_log, geography="county_id_fips", freq="Q"
     )
@@ -863,14 +876,9 @@ def create_data_mart(
         iso_projects_change_log, geography="iso_region", freq="Q"
     )
 
-    validate_iso_regions_change_log(iso_regions_change_log, long_format)
-    # We need withdrawn and operational projects for the change log.
-    # Grab active projects for long and wide format.
-    active_long_format = long_format.query("queue_status == 'active'")
-    # drop actual_completion_date and withdrawn_date columns
-    active_long_format = active_long_format.drop(
-        columns=["actual_completion_date", "withdrawn_date"]
-    )
+    validate_iso_regions_change_log(iso_regions_change_log, all_projects_long_format)
+
+    active_long_format = create_long_format(engine, active_projects_only=True)
     active_wide_format = _convert_long_to_wide(active_long_format)
 
     pudl_eia860m_changelog = _pudl_eia860m_changelog(engine)

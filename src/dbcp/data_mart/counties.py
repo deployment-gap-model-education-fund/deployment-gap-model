@@ -371,7 +371,7 @@ def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
 def _iso_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     # Avoid db dependency order by recreating the df.
     # Could also make an orchestration script.
-    iso = create_iso_data_mart(engine)
+    iso = create_iso_data_mart(engine, active_projects_only=True)
 
     # equivalent SQL query that I translated to pandas to avoid dependency
     # on the data_mart schema (which doesn't yet exist when this function runs)
