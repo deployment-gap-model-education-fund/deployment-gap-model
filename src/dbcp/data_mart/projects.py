@@ -695,11 +695,38 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
         status = status_date["status"]
         date_col = status_date["date"]
         n_projects_before = len(long_format)
+
+        is_long_format_of_status = long_format["queue_status"].eq(status)
+        is_long_format_of_status_and_missing_date = (
+            is_long_format_of_status & long_format[date_col].isna()
+        )
+        logger.info(f"Projects with missing {date_col} for {status}")
+        n_projects_of_status_by_region = (
+            long_format[is_long_format_of_status]
+            .groupby("iso_region")
+            .count()
+            .surrogate_id
+        )
+        n_projects_missing_date_by_region = (
+            long_format[is_long_format_of_status_and_missing_date]
+            .groupby("iso_region")
+            .count()
+            .surrogate_id
+        )
+        logger.info(
+            (n_projects_missing_date_by_region / n_projects_of_status_by_region).fillna(
+                0
+            )
+        )
+
+        # Keep all projects that are not missing the date column
         long_format = long_format[
-            ~(long_format["queue_status"].eq(status) & long_format[date_col].isna())
+            ~(is_long_format_of_status & is_long_format_of_status_and_missing_date)
         ]
         n_projects_after = len(long_format)
-        print(f"{n_projects_before - n_projects_after} {status} projects removed.")
+        logger.info(
+            f"{n_projects_before - n_projects_after} {status} projects removed."
+        )
 
         # set effective_date column to date_col for projects that == status
         long_format.loc[
