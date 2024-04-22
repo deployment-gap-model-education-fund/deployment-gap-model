@@ -490,7 +490,7 @@ def _add_derived_columns(mart: pd.DataFrame) -> None:
         "Solar": "renewable",
         "Steam": np.nan,
         "Transmission": "transmission",
-        "Unknown": "other",
+        "Unknown": np.nan,
         "Waste Heat": "fossil",
         "Wind; Storage": "renewable",
         np.nan: np.nan,  # not technically necessary but make it explicit
@@ -636,6 +636,11 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
         chng: change log of ISO projects
     """
     original_long_format = long_format.copy()
+    # for projcts where resource_clean == "Unknown", set resource_class to "other" instead of nan
+    long_format["resource_class"] = long_format.resource_class.mask(
+        long_format.resource_clean.eq("Unknown"), "other"
+    )
+
     long_format = long_format[long_format["iso_region"].isin(CHANGE_LOG_REGIONS)]
 
     # make sure we are missing less than 10% of withdrawn_date
