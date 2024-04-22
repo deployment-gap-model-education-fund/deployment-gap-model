@@ -625,3 +625,15 @@ def _add_actionable_and_nearly_certain_classification(
     )
 
     return queue
+
+
+if __name__ == "__main__":
+    # debugging entry point
+    from pathlib import Path
+    from dbcp.extract.lbnl_iso_queue import extract
+
+    source_path = Path("/app/data/raw/queues_2022_clean_data.xlsx")
+    lbnl_raw_dfs = extract(source_path)
+    lbnl_transformed_dfs = transform(lbnl_raw_dfs)
+
+    assert lbnl_transformed_dfs
