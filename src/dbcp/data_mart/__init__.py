@@ -65,6 +65,7 @@ def create_data_marts(args):  # noqa: max-complexity=11
         for table in metadata.sorted_tables:
             logger.info(f"Load {table.name} to postgres.")
             df = enforce_dtypes(data_marts[table.name], table.name, "data_mart")
+            df = dbcp.helpers.trim_columns_length(df)
             df.to_sql(
                 name=table.name,
                 con=con,

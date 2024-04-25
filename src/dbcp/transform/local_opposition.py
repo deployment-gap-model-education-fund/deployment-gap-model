@@ -99,6 +99,7 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
         "Town of Albion (Kennebec County)": "Albion (Kennebec County)",
         "Town of Lovell (Oxford County)": "Lovell (Oxford County)",
         "Town of Charlton (Worcester County)": "Charlton (Worcester County)",
+        "City of Owasso (Rogers and Tulsa Counties)": "Owasso (Rogers and Tulsa Counties)",
     }
     local.loc[:, "locality"].replace(location_corrections, inplace=True)
 

@@ -26,12 +26,13 @@ RESOURCE_DICT = {
     "Fuel Cell": {"codes": ["Fuel Cell", "FC"], "type": "Fossil"},
     "Geothermal": {"codes": [], "type": "Renewable"},
     "Hydro": {"codes": ["WAT", "H", "Water"], "type": "Renewable"},
-    "Landfill Gas": {"codes": ["LFG", "L"], "type": "Fossil"},
+    "Landfill Gas": {"codes": ["LFG", "L", "Landfill", "Waste"], "type": "Fossil"},
     "Municipal Solid Waste": {"codes": ["MSW"], "type": "Fossil"},
     "Natural Gas": {
         "codes": [
             "NG",
             "Methane",
+            "Methane Gas",
             "CT-NG",
             "CC",
             "CC-NG",
@@ -59,7 +60,10 @@ RESOURCE_DICT = {
     },
     "Onshore Wind": {"codes": ["Wind", "WND", "Wind Turbine"], "type": "Renewable"},
     "Other": {"codes": [], "type": "Unknown Resource"},
-    "Unknown": {"codes": ["Wo", "F", "Hybrid", "M"], "type": "Unknown Resource"},
+    "Unknown": {
+        "codes": ["Wo", "F", "Hybrid", "M", "Byproduct"],
+        "type": "Unknown Resource",
+    },
     "Other Storage": {
         "codes": ["Flywheel", "Storage", "CAES", "Gravity Rail", "Hydrogen"],
         "type": "Renewable",
@@ -83,6 +87,7 @@ RESOURCE_DICT = {
 
 def _harmonize_interconnection_status_lbnl(statuses: pd.Series) -> pd.Series:
     """Harmonize the interconnection_status_lbnl values."""
+    statuses = statuses.str.strip()
     mapping = {
         "Feasability Study": "Feasibility Study",
         "Feasibility": "Feasibility Study",
@@ -90,6 +95,7 @@ def _harmonize_interconnection_status_lbnl(statuses: pd.Series) -> pd.Series:
         "IA in Progress": "In Progress (unknown study)",
         "Unknown": "In Progress (unknown study)",
         "Withdrawn, Feasibility Study": "Withdrawn",
+        "operational": "Operational",
     }
     allowed_statuses = {
         "Cluster Study",
@@ -108,31 +114,39 @@ def _harmonize_interconnection_status_lbnl(statuses: pd.Series) -> pd.Series:
         "Withdrawn",
     }
     out = statuses.replace(mapping)
-    bad = out.loc[~out.isin(allowed_statuses)]
-    assert len(bad) == 0, f"Unknown interconnection status(es): {bad.value_counts()}"
+    bad = out.loc[~out.isin(allowed_statuses) & out.notna()]
+    assert len(bad) == 0, f"Unknown interconnection status(es):\n{bad.value_counts()}"
     return out
 
 
-def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
-    """Transform active iso queue data."""
+def _clean_all_iso_projects(projects: pd.DataFrame) -> pd.DataFrame:
+    """Transform active, operational and withdrawn iso queue projects."""
     rename_dict = {
         "state": "raw_state_name",
         "county": "raw_county_name",
     }
-    active_projects["project_id"] = np.arange(len(active_projects), dtype=np.int32)
-    active_projects = active_projects.rename(columns=rename_dict)  # copy
-    active_projects.loc[
+    projects["project_id"] = np.arange(len(projects), dtype=np.int32)
+    projects = projects.rename(columns=rename_dict)  # copy
+    projects.loc[
         :, "interconnection_status_lbnl"
     ] = _harmonize_interconnection_status_lbnl(
-        active_projects.loc[:, "interconnection_status_lbnl"]
+        projects.loc[:, "interconnection_status_lbnl"]
     )
-    # drop irrelevant columns (structurally all nan due to 'active' filter)
-    active_projects.drop(columns=["date_withdrawn", "date_operational"], inplace=True)
-    parse_date_columns(active_projects)
+    parse_date_columns(projects)
+    # rename date_withdrawn to withdrawn_date and date_operational to actual_completion_date
+    projects.rename(
+        columns={
+            "date_withdrawn_raw": "withdrawn_date_raw",
+            "date_operational_raw": "actual_completion_date_raw",
+            "date_withdrawn": "withdrawn_date",
+            "date_operational": "actual_completion_date",
+        },
+        inplace=True,
+    )
     # deduplicate
-    pre_dedupe = len(active_projects)
-    active_projects = deduplicate_active_projects(
-        active_projects,
+    pre_dedupe = len(projects)
+    projects = deduplicate_active_projects(
+        projects,
         key=[
             "point_of_interconnection_clean",  # derived in _prep_for_deduplication
             "capacity_mw_resource_1",
@@ -148,25 +162,40 @@ def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
         ],
         intermediate_creator=_prep_for_deduplication,
     )
-    n_dupes = pre_dedupe - len(active_projects)
+    n_dupes = pre_dedupe - len(projects)
     logger.info(f"Deduplicated {n_dupes} ({n_dupes/pre_dedupe:.2%}) projects.")
 
-    active_projects.set_index("project_id", inplace=True)
-    active_projects.sort_index(inplace=True)
+    projects.set_index("project_id", inplace=True)
+    projects.sort_index(inplace=True)
     # manual fix for duplicate resource type in raw data
-    bad_proj_id = 1606
+    bad_proj_id = 5372
     assert (
-        active_projects.loc[bad_proj_id, "project_name"] == "Coleto Creek ESS Addition"
+        projects.loc[bad_proj_id, "project_name"] == "Coleto Creek ESS Addition"
     ), "Manual correction is misidentified."
-    active_projects.loc[
+    projects.loc[
         bad_proj_id, "resource_type_1"
     ] = "Coal"  # raw data has two instances of "battery storage"
     # clean up whitespace
-    for col in active_projects.columns:
-        if pd.api.types.is_object_dtype(active_projects.loc[:, col]):
-            active_projects.loc[:, col] = active_projects.loc[:, col].str.strip()
-    active_projects = _add_actionable_and_nearly_certain_classification(active_projects)
-    return active_projects
+    for col in projects.columns:
+        if pd.api.types.is_object_dtype(projects.loc[:, col]):
+            projects.loc[:, col] = projects.loc[:, col].str.strip()
+
+    # add is_actionable and is_nearly_certain classifications to active projects
+    projects["is_actionable"] = pd.NA
+    projects["is_nearly_certain"] = pd.NA
+    is_active_project = projects.queue_status.eq("active")
+    projects.loc[is_active_project] = _add_actionable_and_nearly_certain_classification(
+        projects.loc[is_active_project]
+    )
+    # assert is_actionable and is_nearly_certain are all null for operational and withdrawn projects
+    assert (
+        projects.loc[~is_active_project, ["is_actionable", "is_nearly_certain"]]
+        .isna()
+        .all()
+        .all()
+    ), "Some operational or withdrawn projects have is_actionable or is_nearly_certain values."
+
+    return projects
 
 
 def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
@@ -179,8 +208,9 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     Returns:
         lbnl_transformed_dfs: Dictionary of the transformed tables.
     """
-    active = lbnl_raw_dfs["lbnl_iso_queue"].query("queue_status == 'active'").copy()
-    transformed = active_iso_queue_projects(active)  # sets index to project_id
+    transformed = _clean_all_iso_projects(
+        lbnl_raw_dfs["lbnl_iso_queue"]
+    )  # sets index to project_id
 
     # Combine and normalize iso queue tables
     lbnl_normalized_dfs = normalize_lbnl_dfs(transformed)
@@ -209,6 +239,15 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     if lbnl_normalized_dfs["iso_resource_capacity"].resource_clean.isna().any():
         raise AssertionError("Missing Resources!")
     lbnl_normalized_dfs["iso_projects"].reset_index(inplace=True)
+
+    # Most projects missing queue_status are from the early 2000s so I'm going to assume
+    # they were withrawn.
+    assert (
+        lbnl_normalized_dfs["iso_projects"]["queue_status"].isna().sum() <= 42
+    ), "Unexpected number of projects missing queue status."
+    lbnl_normalized_dfs["iso_projects"]["queue_status"] = lbnl_normalized_dfs[
+        "iso_projects"
+    ]["queue_status"].fillna("withdrawn")
 
     return lbnl_normalized_dfs
 
@@ -553,8 +592,6 @@ def _add_actionable_and_nearly_certain_classification(
 
     This model was created by a consultant in Excel and translated to python.
     """
-    if not queue["queue_status"].eq("active").all():
-        raise ValueError("This function only applies to active projects.")
     if (
         queue["interconnection_status_lbnl"]
         .isin(
@@ -588,3 +625,15 @@ def _add_actionable_and_nearly_certain_classification(
     )
 
     return queue
+
+
+if __name__ == "__main__":
+    # debugging entry point
+    from pathlib import Path
+    from dbcp.extract.lbnl_iso_queue import extract
+
+    source_path = Path("/app/data/raw/queues_2022_clean_data.xlsx")
+    lbnl_raw_dfs = extract(source_path)
+    lbnl_transformed_dfs = transform(lbnl_raw_dfs)
+
+    assert lbnl_transformed_dfs

@@ -244,3 +244,9 @@ def psql_insert_copy(table, conn, keys, data_iter):
         sql = f"COPY {table_name} ({columns}) FROM STDIN WITH CSV"
         cur.copy_expert(sql=sql, file=s_buf)
         dbapi_conn.commit()
+
+
+def trim_columns_length(df: pd.DataFrame, length_limit: int = 63) -> pd.DataFrame:
+    """Trim column length of a pandas dataframe to satisfy postgres column length limit."""
+    df.columns = [col[:length_limit] for col in df.columns]
+    return df

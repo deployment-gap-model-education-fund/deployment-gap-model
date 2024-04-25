@@ -226,6 +226,7 @@ def etl(args):
             df = enforce_dtypes(
                 transformed_dfs[table.name], table.name, "data_warehouse"
             )
+            df = dbcp.helpers.trim_columns_length(df)
             df.to_sql(
                 name=table.name,
                 con=con,
