@@ -787,7 +787,7 @@ def validate_project_change_log(
     ]
 
     # We expect some change in total projects count because not all projects have withdrawn and operational dates
-    expected_n_projects_change = 0.05
+    expected_n_projects_change = 0.06
     result_n_projects_change = abs(
         len(iso_projects_change_log) - len(iso_projects_long_format)
     ) / len(iso_projects_change_log)
@@ -800,7 +800,7 @@ def validate_project_change_log(
         {
             "CAISO": 0.02,
             "ISONE": 0.01,
-            "MISO": 0.01,
+            "MISO": 0.09,  # A lot of operational projects prior to 2010 are missing operational dates
             "NYISO": 0.18,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
             "PJM": 0.04,
             "SPP": 0.31,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
@@ -855,7 +855,7 @@ def validate_iso_regions_change_log(
         {
             "CAISO": 0.02,
             "ISONE": 0.01,
-            "MISO": 0.01,
+            "MISO": 0.09,  # A lot of operational projects prior to 2010 are missing operational dates
             "NYISO": 0.20,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
             "PJM": 0.04,
             "SPP": 0.31,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
