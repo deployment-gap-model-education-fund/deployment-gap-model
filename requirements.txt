@@ -1,5 +1,5 @@
 catalystcoop.pudl==2022.11.30
-psycopg2~=2.9.3
+psycopg2~=2.9.9
 pytest~=6.2.5
 tqdm>=4.64.1,<5.0.0
 python-docx~=0.8.11
