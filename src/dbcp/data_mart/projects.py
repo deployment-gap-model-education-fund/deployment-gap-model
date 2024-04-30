@@ -1,5 +1,6 @@
 """Module to create a project-level table for DBCP to use in spreadsheet tools."""
 import logging
+from datetime import datetime
 from re import IGNORECASE
 from typing import Optional
 
@@ -892,6 +893,44 @@ def _pudl_eia860m_changelog(engine: sa.engine.Engine) -> pd.DataFrame:
     return pudl_eia860m_changelog
 
 
+def create_wide_geography_change_log(
+    geography_change_log: pd.DataFrame,
+    geography: str,
+    status: str,
+    resource_class: str,
+    metric: str,
+    date_range: tuple[str, str],
+) -> pd.DataFrame:
+    """
+    Create a wide table of ISO Queue changes for a given status, resource_class and metric.
+
+    Args:
+        geography_change_log: project change log where each row is a snap shot of a geography
+        geography: geography column to pivot on: county_id_fips or iso_region
+        status: new, operational or withdrawn
+        resource_class: clean, fossil or other
+        metric: n_projects or capacity_mw
+        date_range: tuple of start and end date to filter on
+    Return:
+        wide: wide table of ISO Queue changes
+    """
+    value_column = f"{status}_{resource_class}_{metric}"
+
+    # Filter to date range
+    geography_change_log = geography_change_log[
+        geography_change_log.date.gt(date_range[0])
+        & geography_change_log.date.lt(date_range[1])
+    ]
+
+    # Create the pivot table
+    wide = geography_change_log.pivot(
+        index=geography, columns="date", values=value_column
+    )
+    wide.columns = [col.strftime("%Y-%m") for col in wide.columns]
+    wide = wide.fillna(0)
+    return wide.reset_index()
+
+
 def create_data_mart(
     engine: Optional[sa.engine.Engine] = None,
 ) -> dict[str, pd.DataFrame]:
@@ -901,28 +940,50 @@ def create_data_mart(
 
     all_projects_long_format = create_long_format(engine, active_projects_only=False)
     iso_projects_change_log = create_project_change_log(all_projects_long_format)
-    iso_counties_change_log = create_geography_change_log(
-        iso_projects_change_log, geography="county_id_fips", freq="Q"
-    )
-    iso_regions_change_log = create_geography_change_log(
-        iso_projects_change_log, geography="iso_region", freq="Q"
-    )
 
-    validate_iso_regions_change_log(iso_regions_change_log, all_projects_long_format)
+    # create counties and region change log tables
+    data_marts = {}
+    geographies = {"counties": "county_id_fips", "regions": "iso_region"}
+    for geography, geography_columns in geographies.items():
+        geography_change_log = create_geography_change_log(
+            iso_projects_change_log, geography=geography_columns, freq="Q"
+        )
+        data_marts[f"iso_{geography}_change_log"] = geography_change_log
+
+        metrics = ("n_projects", "capacity_mw")
+        date_range = ("2022-01-01", datetime.now())
+        status = "new"
+        resource_class = "clean"
+        for metric in metrics:
+            data_marts[
+                f"iso_{geography}_{status}_{resource_class}_{metric}_changelog"
+            ] = create_wide_geography_change_log(
+                geography_change_log,
+                geography=geography_columns,
+                status=status,
+                resource_class=resource_class,
+                metric=metric,
+                date_range=date_range,
+            )
+
+    validate_iso_regions_change_log(
+        data_marts["iso_regions_change_log"], all_projects_long_format
+    )
 
     active_long_format = create_long_format(engine, active_projects_only=True)
     active_wide_format = _convert_long_to_wide(active_long_format)
 
     pudl_eia860m_changelog = _pudl_eia860m_changelog(engine)
 
-    return {
-        "iso_projects_long_format": active_long_format,
-        "iso_projects_wide_format": active_wide_format,
-        "iso_projects_change_log": iso_projects_change_log,
-        "iso_regions_change_log": iso_regions_change_log,
-        "iso_counties_change_log": iso_counties_change_log,
-        "pudl_eia860m_changelog": pudl_eia860m_changelog,
-    }
+    data_marts.update(
+        {
+            "iso_projects_long_format": active_long_format,
+            "iso_projects_wide_format": active_wide_format,
+            "iso_projects_change_log": iso_projects_change_log,
+            "pudl_eia860m_changelog": pudl_eia860m_changelog,
+        }
+    )
+    return data_marts
 
 
 if __name__ == "__main__":
