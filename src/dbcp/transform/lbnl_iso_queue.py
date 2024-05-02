@@ -201,6 +201,9 @@ def _clean_all_iso_projects(projects: pd.DataFrame) -> pd.DataFrame:
 
     # S-C utilities don't list the state which prevents them from being geocoded
     projects.loc[projects.entity.eq("S-C"), "raw_state_name"] = "SC"
+
+    # Replace ISO-NE values in region with ISONE to match gridstatus
+    projects["region"] = projects["region"].replace({"ISO-NE": "ISONE"})
     return projects
 
 

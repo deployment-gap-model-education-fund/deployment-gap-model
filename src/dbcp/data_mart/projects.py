@@ -18,6 +18,7 @@ from dbcp.helpers import get_sql_engine
 logger = logging.getLogger(__name__)
 
 CHANGE_LOG_REGIONS = ("MISO", "NYISO", "ISONE", "PJM", "CAISO", "SPP")
+GS_REGIONS = ("MISO", "NYISO", "ISONE", "PJM", "ERCOT", "SPP")
 
 
 def _get_gridstatus_projects(engine: sa.engine.Engine) -> pd.DataFrame:
@@ -85,6 +86,7 @@ def _get_gridstatus_projects(engine: sa.engine.Engine) -> pd.DataFrame:
         ON gs.county_id_fips = cfip.county_id_fips
     """
     gs = pd.read_sql(query, engine)
+    gs = gs[gs.iso_region.str.upper().isin(GS_REGIONS)]
     return gs
 
 
@@ -95,7 +97,7 @@ def _merge_lbnl_with_gridstatus(lbnl: pd.DataFrame, gs: pd.DataFrame) -> pd.Data
         lbnl: lbnl ISO queue projects
         engine: engine to connect to the local postgres data warehouse
     """
-    is_non_iso = lbnl.iso_region.str.contains("non-ISO")
+    is_non_iso = ~lbnl.iso_region.isin(GS_REGIONS)
     lbnl_non_isos = lbnl.loc[is_non_iso, :].copy()
 
     # TODO (bendnorman): How should we handle project_ids? This hack
@@ -120,8 +122,7 @@ def _merge_lbnl_with_gridstatus(lbnl: pd.DataFrame, gs: pd.DataFrame) -> pd.Data
 
 
 def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFrame:
-    where_clause = "WHERE region ~ 'non-ISO'" if non_iso_only else ""
-    query = f"""
+    query = """
     WITH
     iso_proj_res as (
         SELECT
@@ -146,7 +147,6 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
         FROM data_warehouse.iso_projects as proj
         INNER JOIN data_warehouse.iso_resource_capacity as res
         ON proj.project_id = res.project_id
-        {where_clause}
     ),
     loc as (
         -- Remember that projects can have multiple locations, though 99 percent have only one.
@@ -185,11 +185,13 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
     ;
     """
     df = pd.read_sql(query, engine)
+    if non_iso_only:
+        df = df[~df.iso_region.isin(GS_REGIONS)]
     # one whole-row duplicate due to a multi-county project with missing state value.
     # Makes both county_id_fips and state_id_fips null.
     # There are two projects that are missing state values in the raw data.
     dupes = df.duplicated(keep="first")
-    expected_dupes = 0
+    expected_dupes = 3
     assert (
         dupes.sum() == expected_dupes
     ), f"Expected {expected_dupes} duplicates, found {dupes.sum()}."
@@ -552,7 +554,7 @@ def create_long_format(
     )
     _add_derived_columns(long_format)
     pk = ["source", "project_id", "county_id_fips", "resource_clean"]
-    expected_dupes = 0
+    expected_dupes = 5
     dupes = long_format.duplicated(subset=pk)
     assert (
         dupes.sum() == expected_dupes
@@ -853,7 +855,7 @@ def validate_iso_regions_change_log(
     # Create a dictionary of expected pct change for each iso_region
     expected_pct_change = pd.Series(
         {
-            "CAISO": 0.02,
+            "CAISO": 0.07,
             "ISONE": 0.01,
             "MISO": 0.01,
             "NYISO": 0.20,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
