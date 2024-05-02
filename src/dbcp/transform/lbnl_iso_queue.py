@@ -636,12 +636,10 @@ def _add_actionable_and_nearly_certain_classification(
 
 if __name__ == "__main__":
     # debugging entry point
-    from pathlib import Path
+    import dbcp
 
-    from dbcp.extract.lbnl_iso_queue import extract
-
-    source_path = Path("/app/data/raw/queues_2023_clean_data.xlsx")
-    lbnl_raw_dfs = extract(source_path)
-    lbnl_transformed_dfs = transform(lbnl_raw_dfs)
+    lbnl_uri = "gs://dgm-archive/lbnl_iso_queue/queues_2023_clean_data.xlsx"
+    lbnl_raw_dfs = dbcp.extract.lbnl_iso_queue.extract(lbnl_uri)
+    lbnl_transformed_dfs = dbcp.transform.lbnl_iso_queue.transform(lbnl_raw_dfs)
 
     assert lbnl_transformed_dfs
