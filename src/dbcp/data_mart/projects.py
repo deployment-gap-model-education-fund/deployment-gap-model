@@ -189,7 +189,7 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
     # Makes both county_id_fips and state_id_fips null.
     # There are two projects that are missing state values in the raw data.
     dupes = df.duplicated(keep="first")
-    expected_dupes = 2
+    expected_dupes = 0
     assert (
         dupes.sum() == expected_dupes
     ), f"Expected {expected_dupes} duplicates, found {dupes.sum()}."
@@ -552,7 +552,7 @@ def create_long_format(
     )
     _add_derived_columns(long_format)
     pk = ["source", "project_id", "county_id_fips", "resource_clean"]
-    expected_dupes = 2
+    expected_dupes = 0
     dupes = long_format.duplicated(subset=pk)
     assert (
         dupes.sum() == expected_dupes

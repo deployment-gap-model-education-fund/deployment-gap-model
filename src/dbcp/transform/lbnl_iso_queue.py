@@ -49,6 +49,7 @@ RESOURCE_DICT = {
             "KER NG",
             "Natural Gas; Diesel; Other; Storage",
             "Natural Gas; Oil",
+            "Thermal",
         ],
         "type": "Fossil",
     },
@@ -61,7 +62,7 @@ RESOURCE_DICT = {
     "Onshore Wind": {"codes": ["Wind", "WND", "Wind Turbine"], "type": "Renewable"},
     "Other": {"codes": [], "type": "Unknown Resource"},
     "Unknown": {
-        "codes": ["Wo", "F", "Hybrid", "M", "Byproduct"],
+        "codes": ["Wo", "F", "Hybrid", "M", "Byproduct", "Conventional"],
         "type": "Unknown Resource",
     },
     "Other Storage": {
@@ -73,7 +74,7 @@ RESOURCE_DICT = {
         "type": "Renewable",
     },
     "Solar": {"codes": ["SUN", "S"], "type": "Renewable"},
-    "Steam": {"codes": ["ST"], "type": "Fossil"},
+    "Steam": {"codes": ["ST", "Steam Turbine"], "type": "Fossil"},
     "Waste Heat": {
         "codes": [
             "Waste Heat Recovery",
@@ -96,6 +97,11 @@ def _harmonize_interconnection_status_lbnl(statuses: pd.Series) -> pd.Series:
         "Unknown": "In Progress (unknown study)",
         "Withdrawn, Feasibility Study": "Withdrawn",
         "operational": "Operational",
+        "withdrawn": "Withdrawn",
+        "IA Draft": "In Progress (unknown study)",
+        "Facility study": "Facility Study",
+        "active": "In Progress (unknown study)",
+        "suspended": "Suspended",
     }
     allowed_statuses = {
         "Cluster Study",
@@ -125,6 +131,12 @@ def _clean_all_iso_projects(projects: pd.DataFrame) -> pd.DataFrame:
         "state": "raw_state_name",
         "county": "raw_county_name",
     }
+    # manual fix for a project that doesn't have queue date, or status
+    # drop row where queue_id is 326 and entity is IP
+    projects = projects.drop(
+        projects[projects["queue_id"].eq("326") & (projects["entity"].eq("IP"))].index
+    )
+
     projects["project_id"] = np.arange(len(projects), dtype=np.int32)
     projects = projects.rename(columns=rename_dict)  # copy
     projects.loc[
@@ -167,14 +179,6 @@ def _clean_all_iso_projects(projects: pd.DataFrame) -> pd.DataFrame:
 
     projects.set_index("project_id", inplace=True)
     projects.sort_index(inplace=True)
-    # manual fix for duplicate resource type in raw data
-    bad_proj_id = 5372
-    assert (
-        projects.loc[bad_proj_id, "project_name"] == "Coleto Creek ESS Addition"
-    ), "Manual correction is misidentified."
-    projects.loc[
-        bad_proj_id, "resource_type_1"
-    ] = "Coal"  # raw data has two instances of "battery storage"
     # clean up whitespace
     for col in projects.columns:
         if pd.api.types.is_object_dtype(projects.loc[:, col]):
@@ -195,6 +199,8 @@ def _clean_all_iso_projects(projects: pd.DataFrame) -> pd.DataFrame:
         .all()
     ), "Some operational or withdrawn projects have is_actionable or is_nearly_certain values."
 
+    # S-C utilities don't list the state which prevents them from being geocoded
+    projects.loc[projects.entity.eq("S-C"), "raw_state_name"] = "SC"
     return projects
 
 
@@ -230,6 +236,10 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         .loc[:, ["raw_state_name", "raw_county_name"]]
         .copy()
     )
+    # Fix defunct county FIPS code
+    new_locs.loc[
+        new_locs.county_id_fips.eq("51515"), "county_id_fips"
+    ] = "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
     lbnl_normalized_dfs["iso_locations"] = new_locs
 
     # Clean up and categorize resources
@@ -554,7 +564,7 @@ def _manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
         ["delaware (ok)", "ok", "delaware", "ok"],
         # workaround for bug in addfips library.
         # See https://github.com/fitnr/addfips/issues/8
-        ["bedford", "va", "bedford county", "va"],
+        ["dryer", "tn", "dyer", "tn"],
     ]
     manual_county_state_name_fixes = pd.DataFrame(
         manual_county_state_name_fixes,
@@ -575,12 +585,6 @@ def _manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
     locs.loc[:, "raw_state_name"] = locs.loc[:, "clean_state"].fillna(
         locs.loc[:, "raw_state_name"]
     )
-    # one cross-state project breaks the schema, so remove the second location for now.
-    is_cross_state = locs["raw_county_name"].eq("benton (ar)") & locs.loc[
-        :, "raw_state_name"
-    ].eq("ok")
-    assert is_cross_state.sum() == 1, "Expected one match for cross-state project."
-    locs = locs.loc[~is_cross_state, :]
     locs = locs.drop(["clean_county", "clean_state"], axis=1)
     return locs
 
@@ -630,9 +634,10 @@ def _add_actionable_and_nearly_certain_classification(
 if __name__ == "__main__":
     # debugging entry point
     from pathlib import Path
+
     from dbcp.extract.lbnl_iso_queue import extract
 
-    source_path = Path("/app/data/raw/queues_2022_clean_data.xlsx")
+    source_path = Path("/app/data/raw/queues_2023_clean_data.xlsx")
     lbnl_raw_dfs = extract(source_path)
     lbnl_transformed_dfs = transform(lbnl_raw_dfs)
 
