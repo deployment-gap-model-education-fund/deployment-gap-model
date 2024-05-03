@@ -156,6 +156,7 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
             project_id,
             state_id_fips,
             county_id_fips,
+            raw_county_name, -- for validation only
             (1.0 / count(*) over (partition by project_id))::real as frac_locations_in_county
         FROM data_warehouse.iso_locations
     ),
@@ -164,6 +165,7 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
             iso_proj_res.*,
             loc.state_id_fips,
             loc.county_id_fips,
+            loc.raw_county_name, -- for validation only
             -- projects with missing location info get full capacity allocation
             coalesce(loc.frac_locations_in_county, 1.0) as frac_locations_in_county
         from iso_proj_res
@@ -186,15 +188,36 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
     ;
     """
     df = pd.read_sql(query, engine)
-    # one whole-row duplicate due to a multi-county project with missing state value.
-    # Makes both county_id_fips and state_id_fips null.
-    # There are two projects that are missing state values in the raw data.
-    dupes = df.duplicated(keep="first")
-    expected_dupes = 2
+
+    # There are two apparent whole-row duplicates, both caused by being multi-county
+    # projects with missing state values. That leads to NULL state and county FIPS
+    # values. They are not true duplicates because the raw_county_name values are
+    # different, but that column is not used in the data mart.
+
+    # Check that this remains the case:
+    apparent_dupes = df.duplicated(
+        keep=False, subset=df.columns.difference(["raw_county_name"])
+    )
+    expected_apparent_dupes = 4
+    actual_apparent_dupes = apparent_dupes.sum()
     assert (
-        dupes.sum() == expected_dupes
-    ), f"Expected {expected_dupes} duplicates, found {dupes.sum()}."
-    return df
+        expected_apparent_dupes == actual_apparent_dupes
+    ), f"Expected {expected_apparent_dupes} apparent duplicates, found {actual_apparent_dupes}."
+
+    true_dupes = df.loc[apparent_dupes, :].duplicated()  # include raw_county_name
+    expected_true_dupes = 0
+    actual_true_dupes = true_dupes.sum()
+    assert (
+        expected_true_dupes == actual_true_dupes
+    ), f"Expected {expected_true_dupes} true duplicates, found {actual_true_dupes}."
+
+    expected_projects_involved = 2
+    actual_projects_involved = df.loc[apparent_dupes, "project_id"].nunique()
+    assert (
+        expected_projects_involved == actual_projects_involved
+    ), f"Expected {expected_projects_involved} projects involved in apparent duplicates, found {actual_projects_involved}."
+
+    return df.drop(columns=["raw_county_name"])
 
 
 def _get_and_join_iso_tables(
@@ -553,7 +576,9 @@ def create_long_format(
     )
     _add_derived_columns(long_format)
     pk = ["source", "project_id", "county_id_fips", "resource_clean"]
-    expected_dupes = 2
+    expected_dupes = (
+        2  # these are not true duplicates. See _get_lbnl_projects for details.
+    )
     dupes = long_format.duplicated(subset=pk)
     assert (
         dupes.sum() == expected_dupes
