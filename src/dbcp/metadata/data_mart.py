@@ -529,6 +529,67 @@ iso_regions_change_log = Table(
     schema=schema,
 )
 
+iso_counties_new_clean_n_projects_changelog = Table(
+    "iso_counties_new_clean_n_projects_changelog",
+    metadata,
+    Column("county_id_fips", String),
+    Column("2022-03", Float),
+    Column("2022-06", Float),
+    Column("2022-09", Float),
+    Column("2022-12", Float),
+    Column("2023-03", Float),
+    Column("2023-06", Float),
+    Column("2023-09", Float),
+    Column("2023-12", Float),
+    Column("2024-03", Float),
+    schema=schema,
+)
+iso_counties_new_clean_capacity_mw_changelog = Table(
+    "iso_counties_new_clean_capacity_mw_changelog",
+    metadata,
+    Column("county_id_fips", String),
+    Column("2022-03", Float),
+    Column("2022-06", Float),
+    Column("2022-09", Float),
+    Column("2022-12", Float),
+    Column("2023-03", Float),
+    Column("2023-06", Float),
+    Column("2023-09", Float),
+    Column("2023-12", Float),
+    Column("2024-03", Float),
+    schema=schema,
+)
+iso_regions_new_clean_n_projects_changelog = Table(
+    "iso_regions_new_clean_n_projects_changelog",
+    metadata,
+    Column("iso_region", String),
+    Column("2022-03", Float),
+    Column("2022-06", Float),
+    Column("2022-09", Float),
+    Column("2022-12", Float),
+    Column("2023-03", Float),
+    Column("2023-06", Float),
+    Column("2023-09", Float),
+    Column("2023-12", Float),
+    Column("2024-03", Float),
+    schema=schema,
+)
+iso_regions_new_clean_capacity_mw_changelog = Table(
+    "iso_regions_new_clean_capacity_mw_changelog",
+    metadata,
+    Column("iso_region", String),
+    Column("2022-03", Float),
+    Column("2022-06", Float),
+    Column("2022-09", Float),
+    Column("2022-12", Float),
+    Column("2023-03", Float),
+    Column("2023-06", Float),
+    Column("2023-09", Float),
+    Column("2023-12", Float),
+    Column("2024-03", Float),
+    schema=schema,
+)
+
 br_election_data = Table(
     "br_election_data",
     metadata,

@@ -1,5 +1,6 @@
 """Module to create a project-level table for DBCP to use in spreadsheet tools."""
 import logging
+from datetime import datetime
 from re import IGNORECASE
 from typing import Optional
 
@@ -155,6 +156,7 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
             project_id,
             state_id_fips,
             county_id_fips,
+            raw_county_name, -- for validation only
             (1.0 / count(*) over (partition by project_id))::real as frac_locations_in_county
         FROM data_warehouse.iso_locations
     ),
@@ -163,6 +165,7 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
             iso_proj_res.*,
             loc.state_id_fips,
             loc.county_id_fips,
+            loc.raw_county_name, -- for validation only
             -- projects with missing location info get full capacity allocation
             coalesce(loc.frac_locations_in_county, 1.0) as frac_locations_in_county
         from iso_proj_res
@@ -185,15 +188,36 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
     ;
     """
     df = pd.read_sql(query, engine)
-    # one whole-row duplicate due to a multi-county project with missing state value.
-    # Makes both county_id_fips and state_id_fips null.
-    # There are two projects that are missing state values in the raw data.
-    dupes = df.duplicated(keep="first")
-    expected_dupes = 2
+
+    # There are two apparent whole-row duplicates, both caused by being multi-county
+    # projects with missing state values. That leads to NULL state and county FIPS
+    # values. They are not true duplicates because the raw_county_name values are
+    # different, but that column is not used in the data mart.
+
+    # Check that this remains the case:
+    apparent_dupes = df.duplicated(
+        keep=False, subset=df.columns.difference(["raw_county_name"])
+    )
+    expected_apparent_dupes = 4
+    actual_apparent_dupes = apparent_dupes.sum()
     assert (
-        dupes.sum() == expected_dupes
-    ), f"Expected {expected_dupes} duplicates, found {dupes.sum()}."
-    return df
+        expected_apparent_dupes == actual_apparent_dupes
+    ), f"Expected {expected_apparent_dupes} apparent duplicates, found {actual_apparent_dupes}."
+
+    true_dupes = df.loc[apparent_dupes, :].duplicated()  # include raw_county_name
+    expected_true_dupes = 0
+    actual_true_dupes = true_dupes.sum()
+    assert (
+        expected_true_dupes == actual_true_dupes
+    ), f"Expected {expected_true_dupes} true duplicates, found {actual_true_dupes}."
+
+    expected_projects_involved = 2
+    actual_projects_involved = df.loc[apparent_dupes, "project_id"].nunique()
+    assert (
+        expected_projects_involved == actual_projects_involved
+    ), f"Expected {expected_projects_involved} projects involved in apparent duplicates, found {actual_projects_involved}."
+
+    return df.drop(columns=["raw_county_name"])
 
 
 def _get_and_join_iso_tables(
@@ -552,7 +576,9 @@ def create_long_format(
     )
     _add_derived_columns(long_format)
     pk = ["source", "project_id", "county_id_fips", "resource_clean"]
-    expected_dupes = 2
+    expected_dupes = (
+        2  # these are not true duplicates. See _get_lbnl_projects for details.
+    )
     dupes = long_format.duplicated(subset=pk)
     assert (
         dupes.sum() == expected_dupes
@@ -892,6 +918,44 @@ def _pudl_eia860m_changelog(engine: sa.engine.Engine) -> pd.DataFrame:
     return pudl_eia860m_changelog
 
 
+def create_wide_geography_change_log(
+    geography_change_log: pd.DataFrame,
+    geography: str,
+    status: str,
+    resource_class: str,
+    metric: str,
+    date_range: tuple[str, str],
+) -> pd.DataFrame:
+    """
+    Create a wide table of ISO Queue changes for a given status, resource_class and metric.
+
+    Args:
+        geography_change_log: project change log where each row is a snap shot of a geography
+        geography: geography column to pivot on: county_id_fips or iso_region
+        status: new, operational or withdrawn
+        resource_class: clean, fossil or other
+        metric: n_projects or capacity_mw
+        date_range: tuple of start and end date to filter on
+    Return:
+        wide: wide table of ISO Queue changes
+    """
+    value_column = f"{status}_{resource_class}_{metric}"
+
+    # Filter to date range
+    geography_change_log = geography_change_log[
+        geography_change_log.date.gt(date_range[0])
+        & geography_change_log.date.lt(date_range[1])
+    ]
+
+    # Create the pivot table
+    wide = geography_change_log.pivot(
+        index=geography, columns="date", values=value_column
+    )
+    wide.columns = [col.strftime("%Y-%m") for col in wide.columns]
+    wide = wide.fillna(0)
+    return wide.reset_index()
+
+
 def create_data_mart(
     engine: Optional[sa.engine.Engine] = None,
 ) -> dict[str, pd.DataFrame]:
@@ -901,28 +965,50 @@ def create_data_mart(
 
     all_projects_long_format = create_long_format(engine, active_projects_only=False)
     iso_projects_change_log = create_project_change_log(all_projects_long_format)
-    iso_counties_change_log = create_geography_change_log(
-        iso_projects_change_log, geography="county_id_fips", freq="Q"
-    )
-    iso_regions_change_log = create_geography_change_log(
-        iso_projects_change_log, geography="iso_region", freq="Q"
-    )
 
-    validate_iso_regions_change_log(iso_regions_change_log, all_projects_long_format)
+    # create counties and region change log tables
+    data_marts = {}
+    geographies = {"counties": "county_id_fips", "regions": "iso_region"}
+    for geography, geography_columns in geographies.items():
+        geography_change_log = create_geography_change_log(
+            iso_projects_change_log, geography=geography_columns, freq="Q"
+        )
+        data_marts[f"iso_{geography}_change_log"] = geography_change_log
+
+        metrics = ("n_projects", "capacity_mw")
+        date_range = ("2022-01-01", datetime.now())
+        status = "new"
+        resource_class = "clean"
+        for metric in metrics:
+            data_marts[
+                f"iso_{geography}_{status}_{resource_class}_{metric}_changelog"
+            ] = create_wide_geography_change_log(
+                geography_change_log,
+                geography=geography_columns,
+                status=status,
+                resource_class=resource_class,
+                metric=metric,
+                date_range=date_range,
+            )
+
+    validate_iso_regions_change_log(
+        data_marts["iso_regions_change_log"], all_projects_long_format
+    )
 
     active_long_format = create_long_format(engine, active_projects_only=True)
     active_wide_format = _convert_long_to_wide(active_long_format)
 
     pudl_eia860m_changelog = _pudl_eia860m_changelog(engine)
 
-    return {
-        "iso_projects_long_format": active_long_format,
-        "iso_projects_wide_format": active_wide_format,
-        "iso_projects_change_log": iso_projects_change_log,
-        "iso_regions_change_log": iso_regions_change_log,
-        "iso_counties_change_log": iso_counties_change_log,
-        "pudl_eia860m_changelog": pudl_eia860m_changelog,
-    }
+    data_marts.update(
+        {
+            "iso_projects_long_format": active_long_format,
+            "iso_projects_wide_format": active_wide_format,
+            "iso_projects_change_log": iso_projects_change_log,
+            "pudl_eia860m_changelog": pudl_eia860m_changelog,
+        }
+    )
+    return data_marts
 
 
 if __name__ == "__main__":
