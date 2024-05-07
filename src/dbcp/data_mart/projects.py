@@ -580,6 +580,7 @@ def get_eia860m_current(
         -- net_capacity_mwdc,
         operational_status_code,
         operational_status AS operational_status_category,
+        raw_operational_status_code,
         planned_derate_date,
         planned_generator_retirement_date,
         planned_net_summer_capacity_derate_mw,
@@ -603,57 +604,51 @@ def get_eia860m_status_history(
     engine: sa.engine.Engine, end_date: Optional[str] = None
 ) -> pd.DataFrame:
     """Get the EIA860M status for each project for each of the past 12 quarters."""
-    if end_date:
+    if not end_date:  # get most recent data
+        end_date = (
+            pd.read_sql(
+                "SELECT max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog",
+                engine,
+            )
+            .iat[0, 0]
+            .strftime("%Y-%m-%d")
+        )
+    else:
         raise NotImplementedError(
             "Getting data as of a specific date is not yet implemented."
         )
-    query = """
-    WITH
-    quarterly_long_format as (
-        SELECT
-            plant_name_eia,
-            plant_id_eia,
-            generator_id,
-            CASE
-                -- I represent quarters via the first day of the last month of each quarter.
-                -- The last month because I want to use quarter-end to match the convention
-                -- used elsewhere in this repo (eg. the ISO changelog).
-                -- The first day because 860m is released monthly and PUDL convention is to
-                -- represent months via the date of the first of the month.
-                WHEN timestamp '2023-12-01' >= report_date AND (timestamp '2023-12-01' <= valid_until_date OR valid_until_date IS NULL) THEN timestamp '2023-12-01'
-                WHEN timestamp '2023-09-01' >= report_date AND (timestamp '2023-09-01' <= valid_until_date OR valid_until_date IS NULL) THEN timestamp '2023-09-01'
-                WHEN timestamp '2023-06-01' >= report_date AND (timestamp '2023-06-01' <= valid_until_date OR valid_until_date IS NULL) THEN timestamp '2023-06-01'
-                WHEN timestamp '2023-03-01' >= report_date AND (timestamp '2023-03-01' <= valid_until_date OR valid_until_date IS NULL) THEN timestamp '2023-03-01'
-                WHEN timestamp '2022-12-01' >= report_date AND (timestamp '2022-12-01' <= valid_until_date OR valid_until_date IS NULL) THEN timestamp '2022-12-01'
-                WHEN timestamp '2022-09-01' >= report_date AND (timestamp '2022-09-01' <= valid_until_date OR valid_until_date IS NULL) THEN timestamp '2022-09-01'
-                WHEN timestamp '2022-06-01' >= report_date AND (timestamp '2022-06-01' <= valid_until_date OR valid_until_date IS NULL) THEN timestamp '2022-06-01'
-                WHEN timestamp '2022-03-01' >= report_date AND (timestamp '2022-03-01' <= valid_until_date OR valid_until_date IS NULL) THEN timestamp '2022-03-01'
-                WHEN timestamp '2021-12-01' >= report_date AND (timestamp '2021-12-01' <= valid_until_date OR valid_until_date IS NULL) THEN timestamp '2021-12-01'
-                WHEN timestamp '2021-09-01' >= report_date AND (timestamp '2021-09-01' <= valid_until_date OR valid_until_date IS NULL) THEN timestamp '2021-09-01'
-                WHEN timestamp '2021-06-01' >= report_date AND (timestamp '2021-06-01' <= valid_until_date OR valid_until_date IS NULL) THEN timestamp '2021-06-01'
-                WHEN timestamp '2021-03-01' >= report_date AND (timestamp '2021-03-01' <= valid_until_date OR valid_until_date IS NULL) THEN timestamp '2021-03-01'
-                ELSE NULL
-            END AS status_date,
-            operational_status_code
-        FROM data_warehouse.pudl_eia860m_changelog
-    )
-    select
-        *
-    from quarterly_long_format
-    where status_date is not null
-    order by 2,3,4 desc
+    query = f"""
+    SELECT
+        plant_id_eia,
+        generator_id,
+        COALESCE(operational_status_code::text, operational_status) as operational_status_code,
+        min(report_date) as start_date,
+        max(COALESCE(valid_until_date, timestamp '{end_date}')) as end_date
+    FROM data_warehouse.pudl_eia860m_changelog
+    GROUP BY 1,2,3
+    ORDER BY 1,2,3
     """
     status_history = pd.read_sql(query, engine)
-    # reshape to wide format
-    status_history = status_history.pivot(
-        index=["plant_id_eia", "generator_id"],
-        columns="status_date",
-        values="operational_status_code",
+
+    date_series = pd.date_range(end=end_date, periods=12, freq="Q")
+    for date in date_series:
+        date_mask = (date >= status_history["start_date"]) & (
+            date <= status_history["end_date"]
+        )
+        col_name = "status_" + date.strftime("%Y-%m-%d")
+        status_history[col_name] = status_history["operational_status_code"].where(
+            date_mask
+        )
+    status_history["status_current"] = status_history["operational_status_code"].where(
+        status_history["end_date"] == end_date
     )
-    status_history.columns = [
-        "status" + d for d in status_history.columns.strftime("%Y-%m-%d")
-    ]
-    return status_history
+    out = status_history.groupby(["plant_id_eia", "generator_id"], as_index=False)[
+        [c for c in status_history.columns if c.startswith("status_")]
+    ].first()
+    eia860m_plant_names = _get_plant_names(engine)
+    out = out.merge(eia860m_plant_names, on="plant_id_eia", how="left")
+
+    return out
 
 
 def _get_eia860m_transition_dates(engine: sa.engine.Engine) -> pd.DataFrame:
@@ -662,9 +657,10 @@ def _get_eia860m_transition_dates(engine: sa.engine.Engine) -> pd.DataFrame:
     SELECT
         plant_id_eia,
         generator_id,
-        COALESCE(operational_status_code::text, operational_status) as operational_status_code,
+        operational_status_code,
         min(report_date) as status_date
     FROM data_warehouse.pudl_eia860m_changelog
+    WHERE operational_status_code IS NOT NULL
     group by 1,2,3
     order by 1,2,3
     """
@@ -675,8 +671,41 @@ def _get_eia860m_transition_dates(engine: sa.engine.Engine) -> pd.DataFrame:
         columns="operational_status_code",
         values="status_date",
     )
-    transition_dates.add_prefix("date_entered_", axis=1, inplace=True)
-    return transition_dates
+    transition_dates.columns = [f"date_entered_{c}" for c in transition_dates.columns]
+
+    eia860m_plant_names = _get_plant_names(engine).set_index("plant_id_eia")
+    transition_dates = transition_dates.reset_index(
+        level="generator_id", drop=False
+    ).join(eia860m_plant_names, how="left")
+    return transition_dates.reset_index(drop=False)
+
+
+def _get_plant_names(
+    engine: sa.engine.Engine, date_as_of: Optional[str] = None
+) -> pd.DataFrame:
+    """Get the most recent EIA860M data."""
+    if not date_as_of:  # get most recent data
+        date_as_of = (
+            pd.read_sql(
+                "SELECT max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog",
+                engine,
+            )
+            .iat[0, 0]
+            .strftime("%Y-%m-%d")
+        )
+    else:
+        raise NotImplementedError(
+            "Getting data as of a specific date is not yet implemented."
+        )
+    query = """
+    SELECT DISTINCT ON (plant_id_eia)
+        plant_id_eia,
+        plant_name_eia
+    FROM data_warehouse.pudl_eia860m_changelog
+    ORDER BY 1, valid_until_date DESC NULLS FIRST -- nulls are the most recent
+    """
+    plant_names = pd.read_sql(query, engine)
+    return plant_names
 
 
 def create_data_mart(
@@ -686,16 +715,16 @@ def create_data_mart(
     if engine is None:
         engine = get_sql_engine()
 
-    # long_format = create_long_format(engine)
-    # wide_format = _convert_long_to_wide(long_format)
+    long_format = create_long_format(engine)
+    wide_format = _convert_long_to_wide(long_format)
 
     eia860m_current = get_eia860m_current(engine)
     eia860m_history = get_eia860m_status_history(engine)
     eia860m_transition_dates = _get_eia860m_transition_dates(engine)
 
     return {
-        # "iso_projects_long_format": long_format,
-        # "iso_projects_wide_format": wide_format,
+        "iso_projects_long_format": long_format,
+        "iso_projects_wide_format": wide_format,
         "projects_current_860m": eia860m_current,
         "projects_history_860m": eia860m_history,
         "projects_transition_dates_860m": eia860m_transition_dates,
