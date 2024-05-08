@@ -540,23 +540,20 @@ def create_long_format(engine: sa.engine.Engine) -> pd.DataFrame:
     return long_format
 
 
-def get_eia860m_current(
-    engine: sa.engine.Engine, date_as_of: Optional[str] = None
-) -> pd.DataFrame:
-    """Get the most recent EIA860M data."""
-    if not date_as_of:  # get most recent data
-        date_as_of = (
-            pd.read_sql(
-                "SELECT max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog",
-                engine,
-            )
-            .iat[0, 0]
-            .strftime("%Y-%m-%d")
+def get_eia860m_current(engine: sa.engine.Engine) -> pd.DataFrame:
+    """Get the most recent EIA860M data.
+
+    Args:
+        engine (sa.engine.Engine): connection to the data warehouse database
+    """
+    date_as_of = (
+        pd.read_sql(
+            "SELECT max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog",
+            engine,
         )
-    else:
-        raise NotImplementedError(
-            "Getting data as of a specific date is not yet implemented."
-        )
+        .iat[0, 0]
+        .strftime("%Y-%m-%d")
+    )
     query = f"""
     SELECT
         report_date,
@@ -600,33 +597,30 @@ def get_eia860m_current(
     return current_projects
 
 
-def get_eia860m_status_history(
-    engine: sa.engine.Engine, end_date: Optional[str] = None
-) -> pd.DataFrame:
-    """Get the EIA860M status for each project for each of the past 12 quarters."""
-    if not end_date:  # get most recent data
-        end_date = (
-            pd.read_sql(
-                "SELECT max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog",
-                engine,
-            )
-            .iat[0, 0]
-            .strftime("%Y-%m-%d")
+def get_eia860m_status_history(engine: sa.engine.Engine) -> pd.DataFrame:
+    """Get the EIA860M status for each project for each of the past 12 quarters.
+
+    Args:
+        engine (sa.engine.Engine): connection to the data warehouse database
+    """
+    end_date = (
+        pd.read_sql(
+            "SELECT max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog",
+            engine,
         )
-    else:
-        raise NotImplementedError(
-            "Getting data as of a specific date is not yet implemented."
-        )
+        .iat[0, 0]
+        .strftime("%Y-%m-%d")
+    )
     query = f"""
     SELECT
         plant_id_eia,
         generator_id,
-        COALESCE(operational_status_code::text, operational_status) as operational_status_code,
+        operational_status_code,
         min(report_date) as start_date,
         max(COALESCE(valid_until_date, timestamp '{end_date}')) as end_date
     FROM data_warehouse.pudl_eia860m_changelog
     GROUP BY 1,2,3
-    ORDER BY 1,2,3
+    ORDER BY 1,2,3,4  -- must be sorted by date for the pandas groupby.first() to work
     """
     status_history = pd.read_sql(query, engine)
 
@@ -644,7 +638,8 @@ def get_eia860m_status_history(
     )
     out = status_history.groupby(["plant_id_eia", "generator_id"], as_index=False)[
         [c for c in status_history.columns if c.startswith("status_")]
-    ].first()
+    ].first()  # .first() gets the first non-null value. This relies on the groups
+    # being sorted by date.
     eia860m_plant_names = _get_plant_names(engine)
     out = out.merge(eia860m_plant_names, on="plant_id_eia", how="left")
 
@@ -652,7 +647,11 @@ def get_eia860m_status_history(
 
 
 def _get_eia860m_transition_dates(engine: sa.engine.Engine) -> pd.DataFrame:
-    """Get the dates of status transitions for each project."""
+    """Get the dates of status transitions for each project.
+
+    Args:
+        engine (sa.engine.Engine): connection to the data warehouse database
+    """
     query = """
     SELECT
         plant_id_eia,
