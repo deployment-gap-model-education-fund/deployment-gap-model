@@ -16,17 +16,14 @@ import dbcp
 
 logger = logging.getLogger(__name__)
 
-# These are the earliest version we have for ISOs
-# except for spp and ISONE because the recent versions
-# have columns the old versions don't.
 ISO_QUEUE_VERSIONS: dict[str, str] = {
-    "miso": "1709776341526904",
-    "caiso": "1709776259365612",
-    "pjm": "1709776387308475",
-    "ercot": "1709776286037540",
-    "spp": "1709776417253050",
-    "nyiso": "1709776369660949",
-    "isone": "1709776310995150",
+    "miso": "1712351594795115",
+    "caiso": "1712351595132954",
+    "pjm": "1712351595509644",
+    "ercot": "1712351595819850",
+    "spp": "1712351596142027",
+    "nyiso": "1712351596476837",
+    "isone": "1712351596798948",
 }
 
 

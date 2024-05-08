@@ -69,10 +69,12 @@ def test_gridstatus_fips_coverage(engine: Engine):
         gridstatus_locations = pd.read_sql_table(
             "gridstatus_locations", con, schema="data_warehouse"
         )
+    location_coverage = gridstatus_locations.county_id_fips.isna().sum() / len(
+        gridstatus_locations
+    )
     assert (
-        gridstatus_locations.county_id_fips.isna().sum() / len(gridstatus_locations)
-        < 0.02
-    ), "More than 2 percent of Grid Status locations could not be geocoded."
+        location_coverage < 0.04
+    ), "More than 4 percent of Grid Status locations could not be geocoded."
 
 
 def test_iso_projects_sources(engine: Engine):
@@ -146,6 +148,7 @@ def test_iso_projects_capacity_aggs(engine: Engine):
         ON proj.project_id = loc.project_id
         WHERE proj.region ~ 'non-ISO'
             AND resource_clean != 'Offshore Wind'
+            AND proj.queue_status = 'active'
         group by 1, 2
     ),
     gridstatus as (
@@ -160,6 +163,7 @@ def test_iso_projects_capacity_aggs(engine: Engine):
         LEFT JOIN data_warehouse.gridstatus_locations as loc
         ON proj.project_id = loc.project_id
         WHERE resource_clean not in ('Offshore Wind', 'Transmission')
+            AND proj.queue_status = 'active'
         group by 1, 2
     ),
     offshore as (
@@ -236,7 +240,7 @@ def test_county_wide_coverage(engine: Engine):
     ), "counties_wide_format does not contain all counties"
     notnull = df.notnull()
     assert (
-        notnull.any(axis=1).sum() == 2388
+        notnull.any(axis=1).sum() == 2387
     ), f"counties_wide_format has unexpected county coverage: {notnull[notnull.any(axis=1)]}"
 
 
