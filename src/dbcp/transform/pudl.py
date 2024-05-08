@@ -68,13 +68,21 @@ def _transform_pudl_eia860m_changelog(
 
     # Map operational_status_code values to numeric scale
     operational_status_code_scale = {
-        "OT": pd.NA,
+        # proposed statuses
+        "OT": 99,  # unknown, but use a sentinel value to differentiate from missing data
         "P": 1,
         "L": 2,
         "T": 3,
         "U": 4,
         "V": 5,
         "TS": 6,
+        # operational statuses
+        "OA": 7,
+        "OP": 7,
+        "OS": 7,
+        "SB": 7,
+        # retired
+        "RE": 8,
     }
     pudl_eia860m_changelog["raw_operational_status_code"] = pudl_eia860m_changelog[
         "operational_status_code"
