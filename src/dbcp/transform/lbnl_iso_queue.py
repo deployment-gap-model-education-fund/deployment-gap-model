@@ -125,8 +125,9 @@ def _harmonize_interconnection_status_lbnl(statuses: pd.Series) -> pd.Series:
     return out
 
 
-def _clean_all_iso_projects(projects: pd.DataFrame) -> pd.DataFrame:
+def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform active, operational and withdrawn iso queue projects."""
+    projects = raw_projects.copy()
     rename_dict = {
         "state": "raw_state_name",
         "county": "raw_county_name",
@@ -166,6 +167,7 @@ def _clean_all_iso_projects(projects: pd.DataFrame) -> pd.DataFrame:
             "raw_state_name",
             "utility_clean",  # derived in _prep_for_deduplication
             "resource_type_1",
+            "queue_status",
         ],
         tiebreak_cols=[  # first priority to last
             "date_proposed",
@@ -463,7 +465,7 @@ def deduplicate_active_projects(
     tiebreak_cols: Sequence[str],
     intermediate_creator: Callable[[pd.DataFrame], None],
 ) -> pd.DataFrame:
-    """First draft deduplication of ISO queues (for active projects only).
+    """First draft deduplication of ISO queues.
 
     The intention here is to identify rows that likely describe the same physical
     project, but are duplicated due to different proposed start dates or IA statuses.
