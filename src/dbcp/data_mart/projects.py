@@ -1,5 +1,6 @@
 """Module to create a project-level table for DBCP to use in spreadsheet tools."""
 import logging
+from datetime import datetime
 from re import IGNORECASE
 from typing import Optional
 
@@ -155,6 +156,7 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
             project_id,
             state_id_fips,
             county_id_fips,
+            raw_county_name, -- for validation only
             (1.0 / count(*) over (partition by project_id))::real as frac_locations_in_county
         FROM data_warehouse.iso_locations
     ),
@@ -163,6 +165,7 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
             iso_proj_res.*,
             loc.state_id_fips,
             loc.county_id_fips,
+            loc.raw_county_name, -- for validation only
             -- projects with missing location info get full capacity allocation
             coalesce(loc.frac_locations_in_county, 1.0) as frac_locations_in_county
         from iso_proj_res
@@ -191,11 +194,11 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
     # Makes both county_id_fips and state_id_fips null.
     # There are two projects that are missing state values in the raw data.
     dupes = df.duplicated(keep="first")
-    expected_dupes = 3
+    expected_dupes = 0
     assert (
         dupes.sum() == expected_dupes
     ), f"Expected {expected_dupes} duplicates, found {dupes.sum()}."
-    return df
+    return df.drop(columns=["raw_county_name"])
 
 
 def _get_and_join_iso_tables(
@@ -885,13 +888,209 @@ def validate_iso_regions_change_log(
     ).all(), f"Found unexpected pct change in iso_projects_long_format: {pct_change}"
 
 
-def _pudl_eia860m_changelog(engine: sa.engine.Engine) -> pd.DataFrame:
-    """Get the PUDL EIA860M changelog table."""
-    with engine.connect() as con:
-        pudl_eia860m_changelog = pd.read_sql_table(
-            "pudl_eia860m_changelog", con, schema="data_warehouse"
+def get_eia860m_current(engine: sa.engine.Engine) -> pd.DataFrame:
+    """Get the most recent EIA860M data.
+
+    Args:
+        engine (sa.engine.Engine): connection to the data warehouse database
+    """
+    date_as_of = (
+        pd.read_sql(
+            "SELECT max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog",
+            engine,
         )
-    return pudl_eia860m_changelog
+        .iat[0, 0]
+        .strftime("%Y-%m-%d")
+    )
+    query = f"""
+    SELECT
+        report_date,
+        plant_id_eia,
+        plant_name_eia,
+        utility_id_eia,
+        utility_name_eia,
+        generator_id,
+        capacity_mw,
+        state,
+        county,
+        current_planned_generator_operating_date,
+        -- data_maturity,
+        energy_source_code_1,
+        prime_mover_code,
+        energy_storage_capacity_mwh,
+        fuel_type_code_pudl,
+        generator_retirement_date,
+        latitude,
+        longitude,
+        -- net_capacity_mwdc,
+        operational_status_code,
+        operational_status AS operational_status_category,
+        raw_operational_status_code,
+        planned_derate_date,
+        planned_generator_retirement_date,
+        planned_net_summer_capacity_derate_mw,
+        planned_net_summer_capacity_uprate_mw,
+        planned_uprate_date,
+        technology_description,
+        -- summer_capacity_mw,
+        -- winter_capacity_mw,
+        -- valid_until_date
+        state_id_fips,
+        county_id_fips
+    FROM data_warehouse.pudl_eia860m_changelog
+    WHERE valid_until_date = '{date_as_of}'
+    ORDER BY plant_id_eia, generator_id
+    """
+    current_projects = pd.read_sql(query, engine)
+    return current_projects
+
+
+def get_eia860m_status_history(engine: sa.engine.Engine) -> pd.DataFrame:
+    """Get the EIA860M status for each project for each of the past 12 quarters.
+
+    Args:
+        engine (sa.engine.Engine): connection to the data warehouse database
+    """
+    end_date = (
+        pd.read_sql(
+            "SELECT max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog",
+            engine,
+        )
+        .iat[0, 0]
+        .strftime("%Y-%m-%d")
+    )
+    query = f"""
+    SELECT
+        plant_id_eia,
+        generator_id,
+        operational_status_code,
+        min(report_date) as start_date,
+        max(COALESCE(valid_until_date, timestamp '{end_date}')) as end_date
+    FROM data_warehouse.pudl_eia860m_changelog
+    GROUP BY 1,2,3
+    ORDER BY 1,2,3,4  -- must be sorted by date for the pandas groupby.first() to work
+    """
+    status_history = pd.read_sql(query, engine)
+
+    date_series = pd.date_range(end=end_date, periods=12, freq="Q")
+    for date in date_series:
+        date_mask = (date >= status_history["start_date"]) & (
+            date <= status_history["end_date"]
+        )
+        col_name = "status_" + date.strftime("%Y-%m-%d")
+        status_history[col_name] = status_history["operational_status_code"].where(
+            date_mask
+        )
+    status_history["status_current"] = status_history["operational_status_code"].where(
+        status_history["end_date"] == end_date
+    )
+    out = status_history.groupby(["plant_id_eia", "generator_id"], as_index=False)[
+        [c for c in status_history.columns if c.startswith("status_")]
+    ].first()  # .first() gets the first non-null value. This relies on the groups
+    # being sorted by date.
+    eia860m_plant_names = _get_plant_names(engine)
+    out = out.merge(eia860m_plant_names, on="plant_id_eia", how="left")
+
+    return out
+
+
+def _get_eia860m_transition_dates(engine: sa.engine.Engine) -> pd.DataFrame:
+    """Get the dates of status transitions for each project.
+
+    Args:
+        engine (sa.engine.Engine): connection to the data warehouse database
+    """
+    query = """
+    SELECT
+        plant_id_eia,
+        generator_id,
+        operational_status_code,
+        min(report_date) as status_date
+    FROM data_warehouse.pudl_eia860m_changelog
+    WHERE operational_status_code IS NOT NULL
+    group by 1,2,3
+    order by 1,2,3
+    """
+    transition_dates = pd.read_sql(query, engine)
+    # reshape to wide format
+    transition_dates = transition_dates.pivot(
+        index=["plant_id_eia", "generator_id"],
+        columns="operational_status_code",
+        values="status_date",
+    )
+    transition_dates.columns = [f"date_entered_{c}" for c in transition_dates.columns]
+
+    eia860m_plant_names = _get_plant_names(engine).set_index("plant_id_eia")
+    transition_dates = transition_dates.reset_index(
+        level="generator_id", drop=False
+    ).join(eia860m_plant_names, how="left")
+    return transition_dates.reset_index(drop=False)
+
+
+def _get_plant_names(
+    engine: sa.engine.Engine, date_as_of: Optional[str] = None
+) -> pd.DataFrame:
+    """Get the most recent EIA860M data."""
+    if not date_as_of:  # get most recent data
+        date_as_of = (
+            pd.read_sql(
+                "SELECT max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog",
+                engine,
+            )
+            .iat[0, 0]
+            .strftime("%Y-%m-%d")
+        )
+    else:
+        raise NotImplementedError(
+            "Getting data as of a specific date is not yet implemented."
+        )
+    query = """
+    SELECT DISTINCT ON (plant_id_eia)
+        plant_id_eia,
+        plant_name_eia
+    FROM data_warehouse.pudl_eia860m_changelog
+    ORDER BY 1, valid_until_date DESC NULLS FIRST -- nulls are the most recent
+    """
+    plant_names = pd.read_sql(query, engine)
+    return plant_names
+
+
+def create_wide_geography_change_log(
+    geography_change_log: pd.DataFrame,
+    geography: str,
+    status: str,
+    resource_class: str,
+    metric: str,
+    date_range: tuple[str, str],
+) -> pd.DataFrame:
+    """
+    Create a wide table of ISO Queue changes for a given status, resource_class and metric.
+
+    Args:
+        geography_change_log: project change log where each row is a snap shot of a geography
+        geography: geography column to pivot on: county_id_fips or iso_region
+        status: new, operational or withdrawn
+        resource_class: clean, fossil or other
+        metric: n_projects or capacity_mw
+        date_range: tuple of start and end date to filter on
+    Return:
+        wide: wide table of ISO Queue changes
+    """
+    value_column = f"{status}_{resource_class}_{metric}"
+
+    # Filter to date range
+    geography_change_log = geography_change_log[
+        geography_change_log.date.gt(date_range[0])
+        & geography_change_log.date.lt(date_range[1])
+    ]
+
+    # Create the pivot table
+    wide = geography_change_log.pivot(
+        index=geography, columns="date", values=value_column
+    )
+    wide.columns = [col.strftime("%Y-%m") for col in wide.columns]
+    wide = wide.fillna(0)
+    return wide.reset_index()
 
 
 def create_data_mart(
@@ -903,28 +1102,54 @@ def create_data_mart(
 
     all_projects_long_format = create_long_format(engine, active_projects_only=False)
     iso_projects_change_log = create_project_change_log(all_projects_long_format)
-    iso_counties_change_log = create_geography_change_log(
-        iso_projects_change_log, geography="county_id_fips", freq="Q"
-    )
-    iso_regions_change_log = create_geography_change_log(
-        iso_projects_change_log, geography="iso_region", freq="Q"
-    )
 
-    validate_iso_regions_change_log(iso_regions_change_log, all_projects_long_format)
+    # create counties and region change log tables
+    data_marts = {}
+    geographies = {"counties": "county_id_fips", "regions": "iso_region"}
+    for geography, geography_columns in geographies.items():
+        geography_change_log = create_geography_change_log(
+            iso_projects_change_log, geography=geography_columns, freq="Q"
+        )
+        data_marts[f"iso_{geography}_change_log"] = geography_change_log
+
+        metrics = ("n_projects", "capacity_mw")
+        date_range = ("2022-01-01", datetime.now())
+        status = "new"
+        resource_class = "clean"
+        for metric in metrics:
+            data_marts[
+                f"iso_{geography}_{status}_{resource_class}_{metric}_changelog"
+            ] = create_wide_geography_change_log(
+                geography_change_log,
+                geography=geography_columns,
+                status=status,
+                resource_class=resource_class,
+                metric=metric,
+                date_range=date_range,
+            )
+
+    validate_iso_regions_change_log(
+        data_marts["iso_regions_change_log"], all_projects_long_format
+    )
 
     active_long_format = create_long_format(engine, active_projects_only=True)
     active_wide_format = _convert_long_to_wide(active_long_format)
 
-    pudl_eia860m_changelog = _pudl_eia860m_changelog(engine)
+    eia860m_current = get_eia860m_current(engine)
+    eia860m_history = get_eia860m_status_history(engine)
+    eia860m_transition_dates = _get_eia860m_transition_dates(engine)
 
-    return {
-        "iso_projects_long_format": active_long_format,
-        "iso_projects_wide_format": active_wide_format,
-        "iso_projects_change_log": iso_projects_change_log,
-        "iso_regions_change_log": iso_regions_change_log,
-        "iso_counties_change_log": iso_counties_change_log,
-        "pudl_eia860m_changelog": pudl_eia860m_changelog,
-    }
+    data_marts.update(
+        {
+            "iso_projects_long_format": active_long_format,
+            "iso_projects_wide_format": active_wide_format,
+            "iso_projects_change_log": iso_projects_change_log,
+            "projects_current_860m": eia860m_current,
+            "projects_history_860m": eia860m_history,
+            "projects_transition_dates_860m": eia860m_transition_dates,
+        }
+    )
+    return data_marts
 
 
 if __name__ == "__main__":
