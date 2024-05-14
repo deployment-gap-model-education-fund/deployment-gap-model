@@ -476,7 +476,7 @@ def _clean_resource_type(
         resource_locations["county_id_fips"].isin(coastal_county_id_fips.keys())
         & resource_locations.resource_clean.eq("Onshore Wind")
     ].project_id
-    expected_n_coastal_wind_projects = 90
+    expected_n_coastal_wind_projects = 92
     assert (
         len(nyiso_coastal_wind_project_project_ids) == expected_n_coastal_wind_projects
     ), f"Expected {expected_n_coastal_wind_projects} NYISO coastal wind projects but found {len(nyiso_coastal_wind_project_project_ids)}"
@@ -1022,9 +1022,9 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         renamed_df["entity"] = iso.upper()
         projects.append(renamed_df)
 
-    active_projects = pd.concat(projects)
-    active_projects["queue_status"] = active_projects.queue_status.str.lower()
-    active_projects["queue_status"] = active_projects["queue_status"].map(
+    projects = pd.concat(projects)
+    projects["queue_status"] = projects.queue_status.str.lower()
+    projects["queue_status"] = projects["queue_status"].map(
         {
             "completed": "operational",
             "operational": "operational",
@@ -1035,19 +1035,17 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     )
 
     # parse dates
-    date_cols = [col for col in list(active_projects) if "date" in col]
+    date_cols = [col for col in list(projects) if "date" in col]
     for col in date_cols:
-        active_projects[col] = pd.to_datetime(
-            active_projects[col], utc=True, errors="coerce"
-        )
+        projects[col] = pd.to_datetime(projects[col], utc=True, errors="coerce")
 
     # create project_id
-    active_projects["project_id"] = np.arange(len(active_projects), dtype=np.int32)
+    projects["project_id"] = np.arange(len(projects), dtype=np.int32)
 
     # deduplicate active projects
-    pre_dedupe = len(active_projects)
-    active_projects = deduplicate_active_projects(
-        active_projects,
+    pre_dedupe = len(projects)
+    deduped_projects = deduplicate_active_projects(
+        projects,
         key=[
             "point_of_interconnection_clean",  # derived in _prep_for_deduplication
             "capacity_mw",
@@ -1055,11 +1053,12 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
             "state",
             "utility_clean",  # derived in _prep_for_deduplication
             "resource",
+            "queue_status",
         ],
         tiebreak_cols=["queue_date", "proposed_completion_date"],
         intermediate_creator=_prep_for_deduplication,
     )
-    dupes = pre_dedupe - len(active_projects)
+    dupes = pre_dedupe - len(deduped_projects)
     logger.info(f"Deduplicated {dupes} ({dupes/pre_dedupe:.2%}) projects.")
 
     # Normalize data
@@ -1067,7 +1066,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         normalized_projects,
         normalized_capacities,
         normalized_locations,
-    ) = _normalize_projects(active_projects)
+    ) = _normalize_projects(deduped_projects)
 
     # harmonize types
     normalized_capacities = _clean_resource_type(
