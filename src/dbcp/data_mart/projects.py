@@ -1,6 +1,5 @@
 """Module to create a project-level table for DBCP to use in spreadsheet tools."""
 import logging
-from datetime import datetime
 from re import IGNORECASE
 from typing import Optional
 
@@ -1076,44 +1075,6 @@ def _get_plant_names(
     return plant_names
 
 
-def create_wide_geography_change_log(
-    geography_change_log: pd.DataFrame,
-    geography: str,
-    status: str,
-    resource_class: str,
-    metric: str,
-    date_range: tuple[str, str],
-) -> pd.DataFrame:
-    """
-    Create a wide table of ISO Queue changes for a given status, resource_class and metric.
-
-    Args:
-        geography_change_log: project change log where each row is a snap shot of a geography
-        geography: geography column to pivot on: county_id_fips or iso_region
-        status: new, operational or withdrawn
-        resource_class: clean, fossil or other
-        metric: n_projects or capacity_mw
-        date_range: tuple of start and end date to filter on
-    Return:
-        wide: wide table of ISO Queue changes
-    """
-    value_column = f"{status}_{resource_class}_{metric}"
-
-    # Filter to date range
-    geography_change_log = geography_change_log[
-        geography_change_log.date.gt(date_range[0])
-        & geography_change_log.date.lt(date_range[1])
-    ]
-
-    # Create the pivot table
-    wide = geography_change_log.pivot(
-        index=geography, columns="date", values=value_column
-    )
-    wide.columns = [col.strftime("%Y-%m") for col in wide.columns]
-    wide = wide.fillna(0)
-    return wide.reset_index()
-
-
 def create_data_mart(
     engine: Optional[sa.engine.Engine] = None,
 ) -> dict[str, pd.DataFrame]:
@@ -1132,22 +1093,6 @@ def create_data_mart(
             iso_projects_change_log, geography=geography_columns, freq="Q"
         )
         data_marts[f"iso_{geography}_change_log"] = geography_change_log
-
-        metrics = ("n_projects", "capacity_mw")
-        date_range = ("2022-01-01", datetime.now())
-        status = "new"
-        resource_class = "clean"
-        for metric in metrics:
-            data_marts[
-                f"iso_{geography}_{status}_{resource_class}_{metric}_changelog"
-            ] = create_wide_geography_change_log(
-                geography_change_log,
-                geography=geography_columns,
-                status=status,
-                resource_class=resource_class,
-                metric=metric,
-                date_range=date_range,
-            )
 
     validate_iso_regions_change_log(
         data_marts["iso_regions_change_log"], all_projects_long_format
