@@ -595,6 +595,114 @@ def create_long_format(
     return long_format
 
 
+def create_total_active_project_change_logs(
+    active_iso_projects_change_log: pd.DataFrame,
+    geography: str,
+    metric: tuple[str],
+    freq: str = "Q",
+) -> pd.DataFrame:
+    """
+    This function creates a data mart table where each row contains the total active capacity of number of projects for a given region and time interval.
+
+    This is different than create_geography_change_log where each row contains the number of projects that entered the queue in a given region and time interval.
+    This function only calculates totals for active projects.
+
+    If a project entered and left the queue within the frequency it is not included in the aggregation.
+
+    Args:
+        active_iso_projects_change_log: dataframe where each row is a project that entered the queue.
+        geography: the geography to aggregate by
+        metric: the metric to aggregate by
+        freq: the frequency to aggregate by
+    Returns:
+        totals_chng_log: dataframe where each row contains the total active capacity or number of projects for a given region and time interval.
+    """
+    assert active_iso_projects_change_log.queue_status.eq(
+        "new"
+    ).all(), "Found rows with unexpected queue status."
+
+    chng_log = active_iso_projects_change_log.copy()
+    min_date = chng_log.effective_date.min()
+    max_date = chng_log.effective_date.max()
+
+    def generate_frequencies(start, end, min_date, max_date, freq="Q"):
+        """
+        Generate a list of dates between start and end at a given frequency.
+
+        If end is missing, it is set to max_date. End is null when the project is still active.
+        If start is missing, it is set to min_date. There are only 5 projects with missing start dates.
+
+        Args:
+            start: the start date
+            end: the end date
+            min_date: the minimum date in the dataset
+            max_date: the maximum date in the dataset
+            freq: the frequency to generate dates at
+        Returns:
+            periods: a list of dates between start and end at a given frequency
+        """
+        if pd.isna(start):
+            start = min_date
+        if pd.isna(end):
+            end = max_date
+
+        periods = pd.date_range(start=start, end=end, freq=freq, normalize=True)
+        return periods
+
+    chng_log["report_date"] = chng_log.apply(
+        lambda row: generate_frequencies(
+            row["effective_date"],
+            row["end_date"],
+            min_date=min_date,
+            max_date=max_date,
+            freq=freq,
+        ),
+        axis=1,
+    )
+
+    exploded_chng_log = chng_log.explode("report_date")
+
+    assert (
+        ~exploded_chng_log[["project_id", "queue_status", "report_date"]].duplicated(
+            keep=False
+        )
+    ).all(), "Exploded change log keys are not unique."
+
+    group_keys = [
+        geography,
+        "report_date",
+        "resource_class",
+    ]
+    totals_chng_log = pd.DataFrame()
+    if metric == "capacity_mw":
+        totals_chng_log = (
+            exploded_chng_log.groupby(group_keys).capacity_mw.sum().reset_index()
+        )
+    elif metric == "n_projects":
+        totals_chng_log = (
+            exploded_chng_log.groupby(group_keys)
+            .project_id.count()
+            .reset_index()
+            .rename(columns={"project_id": "n_projects"})
+        )
+    else:
+        raise ValueError(f"{metric} is not a valid aggregation metric.")
+
+    totals_chng_log = totals_chng_log.pivot_table(
+        index=[geography, "report_date"],
+        columns=["resource_class"],
+        values=metric,
+        fill_value=0,
+    )
+
+    totals_chng_log.columns = [
+        f"{resource_class}_{metric}"
+        for resource_class in totals_chng_log.columns.values
+    ]
+
+    return totals_chng_log.reset_index()
+
+
 def create_geography_change_log(
     change_log: pd.DataFrame, geography: str = "county_id_fips", freq: str = "Q"
 ) -> pd.DataFrame:
@@ -1087,15 +1195,30 @@ def create_data_mart(
 
     # create counties and region change log tables
     data_marts = {}
-    geographies = {"counties": "county_id_fips", "regions": "iso_region"}
+    geographies = {"counties": "county_id_fips", "iso_regions": "iso_region"}
     for geography, geography_columns in geographies.items():
         geography_change_log = create_geography_change_log(
             iso_projects_change_log, geography=geography_columns, freq="Q"
         )
-        data_marts[f"iso_{geography}_change_log"] = geography_change_log
+        data_marts[f"{geography}_all_projects_change_log"] = geography_change_log
+
+        # create separate tables for active projects
+        metrics = ("n_projects", "capacity_mw")
+        new_iso_projects_change_log = iso_projects_change_log.query(
+            "queue_status == 'new'"
+        )
+        for metric in metrics:
+            data_marts[
+                f"{geography}_active_projects_{metric}_change_log"
+            ] = create_total_active_project_change_logs(
+                new_iso_projects_change_log,
+                geography=geography_columns,
+                metric=metric,
+                freq="Q",
+            )
 
     validate_iso_regions_change_log(
-        data_marts["iso_regions_change_log"], all_projects_long_format
+        data_marts["iso_regions_all_projects_change_log"], all_projects_long_format
     )
 
     active_long_format = create_long_format(engine, active_projects_only=True)
