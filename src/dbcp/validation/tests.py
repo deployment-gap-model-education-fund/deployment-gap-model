@@ -105,7 +105,7 @@ def test_iso_projects_sources(engine: Engine):
         source,
         count(*) as n_iso
     from data_mart.iso_projects_long_format
-    where iso_region ~* 'caiso|ercot|miso|nyiso|pjm|spp|isone'
+    where iso_region ~* 'ercot|miso|nyiso|pjm|spp|isone'
     group by 1
     """
     expected_source = {"gridstatus"}  # region is currently NULL for offshore wind
@@ -146,7 +146,7 @@ def test_iso_projects_capacity_aggs(engine: Engine):
         ON proj.project_id = res.project_id
         LEFT JOIN data_warehouse.iso_locations as loc
         ON proj.project_id = loc.project_id
-        WHERE proj.region ~ 'non-ISO'
+        WHERE proj.region !~* 'ercot|miso|nyiso|pjm|spp|isone'
             AND resource_clean != 'Offshore Wind'
             AND proj.queue_status = 'active'
         group by 1, 2
@@ -164,6 +164,7 @@ def test_iso_projects_capacity_aggs(engine: Engine):
         ON proj.project_id = loc.project_id
         WHERE resource_clean not in ('Offshore Wind', 'Transmission')
             AND proj.queue_status = 'active'
+            AND proj.region ~* 'ercot|miso|nyiso|pjm|spp|isone'
         group by 1, 2
     ),
     offshore as (
@@ -240,7 +241,7 @@ def test_county_wide_coverage(engine: Engine):
     ), "counties_wide_format does not contain all counties"
     notnull = df.notnull()
     assert (
-        notnull.any(axis=1).sum() == 2390
+        notnull.any(axis=1).sum() == 2426
     ), f"counties_wide_format has unexpected county coverage: {notnull[notnull.any(axis=1)]}"
 
 
