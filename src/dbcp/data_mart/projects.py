@@ -557,11 +557,13 @@ def create_long_format(
     )
     _add_derived_columns(long_format)
     pk = ["source", "project_id", "county_id_fips", "resource_clean"]
-    expected_dupes = 5
+    expected_dupes = 4
     dupes = long_format.duplicated(subset=pk)
     assert (
         dupes.sum() == expected_dupes
     ), f"Expected {expected_dupes} duplicates, found {dupes.sum()}."
+    # Drop the handful of duplicates. Two projects are in mexico, and two projects have unknown fuel types
+    long_format = long_format[~dupes]
     long_format["surrogate_id"] = range(len(long_format))
 
     # If we only want active projects, grab active projects and remove withdrawn_date and actual_completion_date
@@ -792,7 +794,7 @@ def validate_project_change_log(
     ]
 
     # We expect some change in total projects count because not all projects have withdrawn and operational dates
-    expected_n_projects_change = 0.05
+    expected_n_projects_change = 0.06
     result_n_projects_change = abs(
         len(iso_projects_change_log) - len(iso_projects_long_format)
     ) / len(iso_projects_change_log)
@@ -805,7 +807,7 @@ def validate_project_change_log(
         {
             "CAISO": 0.02,
             "ISONE": 0.01,
-            "MISO": 0.01,
+            "MISO": 0.09,  # A lot of operational projects prior to 2010 are missing operational dates
             "NYISO": 0.18,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
             "PJM": 0.04,
             "SPP": 0.31,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
@@ -860,7 +862,7 @@ def validate_iso_regions_change_log(
         {
             "CAISO": 0.07,
             "ISONE": 0.01,
-            "MISO": 0.01,
+            "MISO": 0.09,  # A lot of operational projects prior to 2010 are missing operational dates
             "NYISO": 0.20,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
             "PJM": 0.04,
             "SPP": 0.31,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates

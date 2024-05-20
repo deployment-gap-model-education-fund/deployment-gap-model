@@ -202,7 +202,9 @@ def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     ), "Some operational or withdrawn projects have is_actionable or is_nearly_certain values."
 
     # S-C utilities don't list the state which prevents them from being geocoded
-    projects.loc[projects.entity.eq("S-C"), "raw_state_name"] = "SC"
+    projects.loc[
+        projects.entity.eq("S-C") | projects.entity.eq("SC"), "raw_state_name"
+    ] = "SC"
 
     # Replace ISO-NE values in region with ISONE to match gridstatus
     projects["region"] = projects["region"].replace({"ISO-NE": "ISONE"})
@@ -570,6 +572,8 @@ def _manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
         # workaround for bug in addfips library.
         # See https://github.com/fitnr/addfips/issues/8
         ["dryer", "tn", "dyer", "tn"],
+        ["churchill", "ca", "churchill", "nv"],
+        ["pershing", "ca", "pershing", "nv"],
     ]
     manual_county_state_name_fixes = pd.DataFrame(
         manual_county_state_name_fixes,

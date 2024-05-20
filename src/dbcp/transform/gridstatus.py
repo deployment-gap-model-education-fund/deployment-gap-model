@@ -591,8 +591,28 @@ def _create_project_status_classification_from_multiple_columns(
     return iso_df
 
 
-def _transform_miso(iso_df: pd.DataFrame) -> pd.DataFrame:
-    """Make miso specific transformations."""
+def _transform_miso(post_2017: pd.DataFrame, pre_2017: pd.DataFrame) -> pd.DataFrame:
+    """Make miso specific transformations.
+
+    In the second half of 2023, MISO removed all projects that entered the queue prior to 2017.
+    Luckily, our first snapshot of MISO data from GS includes projects that entered the queue
+    prior to 2017. This function grabs all unique projects from both snapshots and combines them.
+
+    Args:
+        post_2017: MISO data from 2017 to present. This contains the latest MISO data.
+        pre_2017: The oldest snapshot of GS we have. Happens to include prior to 2017.
+    """
+    # grab projects that are only in pre_2017
+    only_in_pre_2017 = pre_2017[~pre_2017["queue_id"].isin(post_2017["queue_id"])]
+
+    # ensure there are no active projects in only_in_pre_2017
+    assert (
+        only_in_pre_2017["queue_status"].ne("Active").all()
+    ), "There are active projects in the pre-2017 MISO data that are not in the current MISO data."
+
+    # concat only_in_pre_2017 with iso_df
+    iso_df = pd.concat([post_2017, only_in_pre_2017])
+
     # When a MISO project is marked as "Done" it means the study process is complete but it is not operational.
     # There is a separate column called "Post Generator Interconnection Agreement Status" the project's status
     # after the IA is executed.
@@ -617,6 +637,9 @@ def _transform_miso(iso_df: pd.DataFrame) -> pd.DataFrame:
         iso_df["Post Generator Interconnection Agreement Status"].eq("In Service"),
         "Operational",
     )
+    # There is a project from 2001 that is missing a queue status
+    # and it's post generator IA was not started so I will assume it was withdrawn
+    iso_df.loc[iso_df.queue_id.eq("G150"), "queue_status"] = "Withdrawn"
 
     actionable_vals = (
         "Phase 2",
@@ -900,7 +923,7 @@ def _normalize_project_locations(iso_df: pd.DataFrame) -> pd.DataFrame:
         geocoded_locations[["county_id_fips", "project_id"]].duplicated(keep=False)
     ]
     assert (
-        len(duplicate_locations) <= 96
+        len(duplicate_locations) <= 106
     ), f"Found more duplicate locations in Grid Status location table than expected:\n {duplicate_locations}"
     return geocoded_locations
 
@@ -1008,15 +1031,24 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         "nyiso": _transform_nyiso,
         "isone": _transform_isone,
     }
-
     projects = []
-    for iso, df in raw_dfs.items():
+    for iso, trns_func in iso_cleaning_functions.items():
         logger.info(f"Cleaning {iso} data.")
-        # Apply rename
-        renamed_df = df.rename(columns=COLUMN_RENAME_DICT).copy()
+        renamed_df = pd.DataFrame()
+        # MISO is a special case because we need multiple snapshots of the raw data
+        if iso == "miso":
+            miso_pre_2017 = (
+                raw_dfs["miso-pre-2017"].rename(columns=COLUMN_RENAME_DICT).copy()
+            )
+            miso_post_2017 = raw_dfs["miso"].rename(columns=COLUMN_RENAME_DICT).copy()
+            renamed_df = trns_func(miso_post_2017, miso_pre_2017)
+        else:
+            # Apply rename
+            df = raw_dfs[iso]
+            renamed_df = df.rename(columns=COLUMN_RENAME_DICT).copy()
 
-        # Apply iso specific cleaning functions
-        renamed_df = iso_cleaning_functions[iso](renamed_df)
+            # Apply iso specific cleaning functions
+            renamed_df = trns_func(renamed_df)
 
         renamed_df["region"] = iso
         renamed_df["entity"] = iso.upper()
