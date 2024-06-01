@@ -666,7 +666,7 @@ county_commission_election_info = Table(
 projects_current_860m = Table(
     "projects_current_860m",
     metadata,
-    Column("report_date", DateTime, primary_key=True),
+    Column("report_date", DateTime),  # not primary key. Only one row per generator here
     Column("plant_name_eia", String),
     Column("plant_id_eia", Integer, primary_key=True),
     Column("generator_id", String, primary_key=True),
@@ -713,19 +713,8 @@ projects_history_860m = Table(
     Column("plant_name_eia", String),
     Column("plant_id_eia", Integer, primary_key=True),
     Column("generator_id", String, primary_key=True),
-    Column("status_2020-12-31", String),
-    Column("status_2021-03-31", String),
-    Column("status_2021-06-30", String),
-    Column("status_2021-09-30", String),
-    Column("status_2021-12-31", String),
-    Column("status_2022-03-31", String),
-    Column("status_2022-06-30", String),
-    Column("status_2022-09-30", String),
-    Column("status_2022-12-31", String),
-    Column("status_2023-03-31", String),
-    Column("status_2023-06-30", String),
-    Column("status_2023-09-30", String),
-    Column("status_current", String),
+    Column("quarter_end", DateTime, primary_key=True),
+    Column("operational_status_code", Integer),
     schema=schema,
 )
 

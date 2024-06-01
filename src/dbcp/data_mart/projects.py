@@ -973,23 +973,56 @@ def get_eia860m_status_history(engine: sa.engine.Engine) -> pd.DataFrame:
     ORDER BY 1,2,3,4  -- must be sorted by date for the pandas groupby.first() to work
     """
     status_history = pd.read_sql(query, engine)
-
-    date_series = pd.date_range(end=end_date, periods=12, freq="Q")
-    for date in date_series:
-        date_mask = (date >= status_history["start_date"]) & (
-            date <= status_history["end_date"]
-        )
-        col_name = "status_" + date.strftime("%Y-%m-%d")
-        status_history[col_name] = status_history["operational_status_code"].where(
-            date_mask
-        )
-    status_history["status_current"] = status_history["operational_status_code"].where(
-        status_history["end_date"] == end_date
+    # The date fields are literally the first day of each month but in reality they
+    # represent the whole month. I want to convert them to intervals, but first I need
+    # to change end_date to the last day of the month.
+    status_history["end_date"] += pd.offsets.MonthEnd()
+    date_intervals = pd.IntervalIndex.from_arrays(
+        status_history["start_date"], status_history["end_date"], closed="both"
     )
-    out = status_history.groupby(["plant_id_eia", "generator_id"], as_index=False)[
-        [c for c in status_history.columns if c.startswith("status_")]
-    ].first()  # .first() gets the first non-null value. This relies on the groups
-    # being sorted by date.
+    status_history.set_index(date_intervals, inplace=True)
+
+    # create quarterly timeseries
+    end_date_adjusted = pd.Timestamp(end_date) + pd.offsets.MonthEnd()
+    quarter_end_dates = pd.date_range(end=end_date_adjusted, periods=12, freq="Q")
+    gen_key = ["plant_id_eia", "generator_id"]
+    quarterly = pd.concat(
+        (
+            status_history.loc[date, :].assign(quarter_end=date)
+            for date in quarter_end_dates
+        ),
+        ignore_index=True,  # intervals no longer needed
+    )
+    idx_cols = gen_key + ["quarter_end"]
+    quarterly.sort_values(idx_cols, inplace=True)
+    quarterly.reset_index(inplace=True, drop=True)
+
+    # some duplicates are caused by NULL values in the valid_until_date coming from
+    # PUDL, which is a bug. The coalesce() function in the SQL query then sets them to
+    # end_date, which is usually, but not always, appropriate.
+    # I resolve these by selecting the value with the latest start_date.
+    dupes = quarterly.duplicated(subset=idx_cols, keep=False)
+    # groupby is slow, so I subset to the duplicates, analyze them, then drop the
+    # offending records
+    is_last_start_date = (
+        quarterly.loc[dupes, :]
+        .groupby(idx_cols, as_index=False)["start_date"]
+        .transform(lambda x: x.eq(x.max()))
+        .squeeze()
+    )
+    idxs_to_drop = is_last_start_date.index[~is_last_start_date]
+    dedupe = quarterly.drop(idxs_to_drop, axis=0)
+
+    # convert timeseries from sparse to dense; fill with null.
+    out = (
+        dedupe.drop(columns=["start_date", "end_date"])
+        .set_index(idx_cols)
+        .unstack()
+        .stack(dropna=False)
+    )
+    out.reset_index(inplace=True)
+
+    # add plant names
     eia860m_plant_names = _get_plant_names(engine)
     out = out.merge(eia860m_plant_names, on="plant_id_eia", how="left")
 
