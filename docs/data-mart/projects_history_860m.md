@@ -16,17 +16,8 @@ This table contains three years of operational status history for each generator
 
 ## Operational Status Codes
 
-The EIA defines 12 status codes for generators, but we have simplified them down to 9 numbers, in the order a generator would typically go through in its lifecycle. The codes are:
+See the documentation for `projects_status_codes_860m` for a description of the operational status codes.
 
-|Code|EIA Code|Description|
-|----|----|----|
-|1|P|Planned for installation but regulatory approvals not initiated; Not under construction|
-|2|L|Regulatory approvals pending. Not under construction but site preparation could be underway|
-|3|T|Regulatory approvals received. Not under construction but site preparation could be underway|
-|4|U|Under construction, less than or equal to 50 percent complete (based on construction time to date of operation)|
-|5|V|Under construction, more than 50 percent complete (based on construction time to date of operation)|
-|6|TS|Construction complete, but not yet in commercial operation|
-|7|OA, OP, OS, SB|Various operational categories|
-|8|RE|Retired|
-|98|IP|Planned new generator canceled, indefinitely postponed, or no longer in resource plan|
-|99|OT|Other|
+{% content-ref url="./projects_status_codes_860m.md" %}
+[projects_status_codes_860m.md](./projects_status_codes_860m.md)
+{% endcontent-ref %}

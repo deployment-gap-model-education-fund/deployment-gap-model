@@ -23,8 +23,8 @@ This table contains the dates of each status transition for each generator in EI
 
 ## Operational Status Codes
 
-See the documentation for `projects_history_860m` for a description of the operational status codes.
+See the documentation for `projects_status_codes_860m` for a description of the operational status codes.
 
-{% content-ref url="./projects_history_860m.md" %}
-[projects_history_860m.md](./projects_history_860m.md)
+{% content-ref url="./projects_status_codes_860m.md" %}
+[projects_status_codes_860m.md](./projects_status_codes_860m.md)
 {% endcontent-ref %}

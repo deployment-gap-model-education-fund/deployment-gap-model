@@ -42,8 +42,8 @@ Column("report_date", DateTime),  # not primary key. Only one row per generator 
 
 ## Operational Status Codes
 
-See the documentation for `projects_history_860m` for a description of the operational status codes.
+See the documentation for `projects_status_codes_860m` for a description of the operational status codes.
 
-{% content-ref url="./projects_history_860m.md" %}
-[projects_history_860m.md](./projects_history_860m.md)
+{% content-ref url="./projects_status_codes_860m.md" %}
+[projects_status_codes_860m.md](./projects_status_codes_860m.md)
 {% endcontent-ref %}

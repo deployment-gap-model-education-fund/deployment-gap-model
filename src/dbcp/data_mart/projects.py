@@ -1,6 +1,7 @@
 """Module to create a project-level table for DBCP to use in spreadsheet tools."""
 import logging
 from datetime import datetime
+from io import StringIO
 from re import IGNORECASE
 from typing import Optional
 
@@ -1128,6 +1129,28 @@ def create_wide_geography_change_log(
     return wide.reset_index()
 
 
+def _create_status_codes() -> pd.DataFrame:
+    """Create a lookup table of the derived operational status codes."""
+    status_codes = pd.read_csv(
+        StringIO(
+            """operational_status_code|raw_operational_status_code|description
+1|P|Planned for installation but regulatory approvals not initiated; Not under construction
+2|L|Regulatory approvals pending. Not under construction but site preparation could be underway
+3|T|Regulatory approvals received. Not under construction but site preparation could be underway
+4|U|Under construction, less than or equal to 50 percent complete (based on construction time to date of operation)
+5|V|Under construction, more than 50 percent complete (based on construction time to date of operation)
+6|TS|Construction complete, but not yet in commercial operation
+7|OA, OP, OS, SB|Various operational categories
+8|RE|Retired
+98|IP|Planned new generator canceled, indefinitely postponed, or no longer in resource plan
+99|OT|Other
+"""
+        ),
+        sep="|",
+    )
+    return status_codes
+
+
 def create_data_mart(
     engine: Optional[sa.engine.Engine] = None,
 ) -> dict[str, pd.DataFrame]:
@@ -1182,6 +1205,7 @@ def create_data_mart(
             "projects_current_860m": eia860m_current,
             "projects_history_860m": eia860m_history,
             "projects_transition_dates_860m": eia860m_transition_dates,
+            "projects_status_codes_860m": _create_status_codes(),
         }
     )
     return data_marts

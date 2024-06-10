@@ -736,3 +736,12 @@ projects_transition_dates_860m = Table(
     Column("date_entered_99", DateTime),
     schema=schema,
 )
+
+projects_status_codes_860m = Table(
+    "projects_status_codes_860m",
+    metadata,
+    Column("operational_status_code", Integer, primary_key=True),
+    Column("raw_operational_status_code", String),
+    Column("description", String),
+    schema=schema,
+)
