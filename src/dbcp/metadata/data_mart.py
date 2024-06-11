@@ -350,12 +350,14 @@ iso_projects_long_format = Table(
 iso_projects_change_log = Table(
     "iso_projects_change_log",
     metadata,
+    # PK should be (source, project_id, resource_clean, county_id_fips)
+    # but null county_id_fips values force the use of a surrogate key.
     Column("state", String),
     Column("county", String),
     Column("county_id_fips", String),
     Column("queue_id", String),
     Column("resource_clean", String, nullable=False),
-    Column("project_id", Integer, nullable=False, primary_key=True),
+    Column("project_id", Integer, nullable=False),
     Column("date_proposed_online", DateTime),
     Column("developer", String),
     Column("entity", String),
@@ -363,7 +365,7 @@ iso_projects_change_log = Table(
     Column("point_of_interconnection", String),
     Column("project_name", String),
     Column("date_entered_queue", DateTime),
-    Column("queue_status", String, primary_key=True),
+    Column("queue_status", String, nullable=False),
     Column("iso_region", String),
     Column("utility", String),
     Column("capacity_mw", Float),
@@ -461,8 +463,8 @@ counties_long_format = Table(
     schema=schema,
 )
 
-counties_all_projects_change_log = Table(
-    "counties_all_projects_change_log",
+iso_counties_change_log = Table(
+    "iso_counties_change_log",
     metadata,
     Column("county_id_fips", String, primary_key=True),
     Column("date", DateTime, primary_key=True),
@@ -495,8 +497,8 @@ counties_all_projects_change_log = Table(
     Column("operational_other_capacity_mw", Float),
     schema=schema,
 )
-iso_regions_all_projects_change_log = Table(
-    "iso_regions_all_projects_change_log",
+iso_regions_change_log = Table(
+    "iso_regions_change_log",
     metadata,
     Column("iso_region", String, primary_key=True),
     Column("date", DateTime, primary_key=True),
@@ -527,46 +529,64 @@ iso_regions_all_projects_change_log = Table(
     schema=schema,
 )
 
-counties_active_projects_capacity_mw_change_log = Table(
-    "counties_active_projects_capacity_mw_change_log",
+iso_counties_new_clean_n_projects_changelog = Table(
+    "iso_counties_new_clean_n_projects_changelog",
     metadata,
-    Column("county_id_fips", String, primary_key=True),
-    Column("report_date", DateTime, primary_key=True),
-    Column("clean_capacity_mw", Float),
-    Column("fossil_capacity_mw", Float),
-    Column("other_capacity_mw", Float),
+    Column("county_id_fips", String),
+    Column("2022-03", Float),
+    Column("2022-06", Float),
+    Column("2022-09", Float),
+    Column("2022-12", Float),
+    Column("2023-03", Float),
+    Column("2023-06", Float),
+    Column("2023-09", Float),
+    Column("2023-12", Float),
+    Column("2024-03", Float),
     schema=schema,
 )
-
-iso_regions_active_projects_capacity_mw_change_log = Table(
-    "iso_regions_active_projects_capacity_mw_change_log",
+iso_counties_new_clean_capacity_mw_changelog = Table(
+    "iso_counties_new_clean_capacity_mw_changelog",
     metadata,
-    Column("iso_region", String, primary_key=True),
-    Column("report_date", DateTime, primary_key=True),
-    Column("clean_capacity_mw", Float),
-    Column("fossil_capacity_mw", Float),
-    Column("other_capacity_mw", Float),
+    Column("county_id_fips", String),
+    Column("2022-03", Float),
+    Column("2022-06", Float),
+    Column("2022-09", Float),
+    Column("2022-12", Float),
+    Column("2023-03", Float),
+    Column("2023-06", Float),
+    Column("2023-09", Float),
+    Column("2023-12", Float),
+    Column("2024-03", Float),
     schema=schema,
 )
-counties_active_projects_n_projects_change_log = Table(
-    "counties_active_projects_n_projects_change_log",
+iso_regions_new_clean_n_projects_changelog = Table(
+    "iso_regions_new_clean_n_projects_changelog",
     metadata,
-    Column("county_id_fips", String, primary_key=True),
-    Column("report_date", DateTime, primary_key=True),
-    Column("clean_n_projects", Integer),
-    Column("fossil_n_projects", Integer),
-    Column("other_n_projects", Integer),
+    Column("iso_region", String),
+    Column("2022-03", Float),
+    Column("2022-06", Float),
+    Column("2022-09", Float),
+    Column("2022-12", Float),
+    Column("2023-03", Float),
+    Column("2023-06", Float),
+    Column("2023-09", Float),
+    Column("2023-12", Float),
+    Column("2024-03", Float),
     schema=schema,
 )
-
-iso_regions_active_projects_n_projects_change_log = Table(
-    "iso_regions_active_projects_n_projects_change_log",
+iso_regions_new_clean_capacity_mw_changelog = Table(
+    "iso_regions_new_clean_capacity_mw_changelog",
     metadata,
-    Column("iso_region", String, primary_key=True),
-    Column("report_date", DateTime, primary_key=True),
-    Column("clean_n_projects", Integer),
-    Column("fossil_n_projects", Integer),
-    Column("other_n_projects", Integer),
+    Column("iso_region", String),
+    Column("2022-03", Float),
+    Column("2022-06", Float),
+    Column("2022-09", Float),
+    Column("2022-12", Float),
+    Column("2023-03", Float),
+    Column("2023-06", Float),
+    Column("2023-09", Float),
+    Column("2023-12", Float),
+    Column("2024-03", Float),
     schema=schema,
 )
 
