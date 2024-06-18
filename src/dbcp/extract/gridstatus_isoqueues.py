@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 ISO_QUEUE_VERSIONS: dict[str, str] = {
     "miso": "1712351594795115",
+    "miso-pre-2017": "1709776311574737",
     "caiso": "1712351595132954",
     "pjm": "1712351595509644",
     "ercot": "1712351595819850",
@@ -31,9 +32,9 @@ def extract(iso_queue_versions: dict[str, str] = ISO_QUEUE_VERSIONS):
     """Extract gridstatus ISO Queue data."""
     iso_queues: dict[str, pd.DataFrame] = {}
     for iso, revision_num in iso_queue_versions.items():
-        uri = (
-            f"gs://dgm-archive/gridstatus/interconnection_queues/parquet/{iso}.parquet"
-        )
+        # MISO is an exception to the rule because we need multiple snapshots of the data
+        filename = iso if iso != "miso-pre-2017" else "miso"
+        uri = f"gs://dgm-archive/gridstatus/interconnection_queues/parquet/{filename}.parquet"
         path = dbcp.extract.helpers.cache_gcs_archive_file_locally(
             uri=uri, revision_num=revision_num
         )

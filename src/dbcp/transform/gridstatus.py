@@ -476,7 +476,7 @@ def _clean_resource_type(
         resource_locations["county_id_fips"].isin(coastal_county_id_fips.keys())
         & resource_locations.resource_clean.eq("Onshore Wind")
     ].project_id
-    expected_n_coastal_wind_projects = 90
+    expected_n_coastal_wind_projects = 92
     assert (
         len(nyiso_coastal_wind_project_project_ids) == expected_n_coastal_wind_projects
     ), f"Expected {expected_n_coastal_wind_projects} NYISO coastal wind projects but found {len(nyiso_coastal_wind_project_project_ids)}"
@@ -591,8 +591,28 @@ def _create_project_status_classification_from_multiple_columns(
     return iso_df
 
 
-def _transform_miso(iso_df: pd.DataFrame) -> pd.DataFrame:
-    """Make miso specific transformations."""
+def _transform_miso(post_2017: pd.DataFrame, pre_2017: pd.DataFrame) -> pd.DataFrame:
+    """Make miso specific transformations.
+
+    In the second half of 2023, MISO removed all projects that entered the queue prior to 2017.
+    Luckily, our first snapshot of MISO data from GS includes projects that entered the queue
+    prior to 2017. This function grabs all unique projects from both snapshots and combines them.
+
+    Args:
+        post_2017: MISO data from 2017 to present. This contains the latest MISO data.
+        pre_2017: The oldest snapshot of GS we have. Happens to include prior to 2017.
+    """
+    # grab projects that are only in pre_2017
+    only_in_pre_2017 = pre_2017[~pre_2017["queue_id"].isin(post_2017["queue_id"])]
+
+    # ensure there are no active projects in only_in_pre_2017
+    assert (
+        only_in_pre_2017["queue_status"].ne("Active").all()
+    ), "There are active projects in the pre-2017 MISO data that are not in the current MISO data."
+
+    # concat only_in_pre_2017 with iso_df
+    iso_df = pd.concat([post_2017, only_in_pre_2017])
+
     # When a MISO project is marked as "Done" it means the study process is complete but it is not operational.
     # There is a separate column called "Post Generator Interconnection Agreement Status" the project's status
     # after the IA is executed.
@@ -617,6 +637,9 @@ def _transform_miso(iso_df: pd.DataFrame) -> pd.DataFrame:
         iso_df["Post Generator Interconnection Agreement Status"].eq("In Service"),
         "Operational",
     )
+    # There is a project from 2001 that is missing a queue status
+    # and it's post generator IA was not started so I will assume it was withdrawn
+    iso_df.loc[iso_df.queue_id.eq("G150"), "queue_status"] = "Withdrawn"
 
     actionable_vals = (
         "Phase 2",
@@ -900,7 +923,7 @@ def _normalize_project_locations(iso_df: pd.DataFrame) -> pd.DataFrame:
         geocoded_locations[["county_id_fips", "project_id"]].duplicated(keep=False)
     ]
     assert (
-        len(duplicate_locations) <= 98
+        len(duplicate_locations) <= 106
     ), f"Found more duplicate locations in Grid Status location table than expected:\n {duplicate_locations}"
     return geocoded_locations
 
@@ -1008,23 +1031,32 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         "nyiso": _transform_nyiso,
         "isone": _transform_isone,
     }
-
     projects = []
-    for iso, df in raw_dfs.items():
+    for iso, trns_func in iso_cleaning_functions.items():
         logger.info(f"Cleaning {iso} data.")
-        # Apply rename
-        renamed_df = df.rename(columns=COLUMN_RENAME_DICT).copy()
+        renamed_df = pd.DataFrame()
+        # MISO is a special case because we need multiple snapshots of the raw data
+        if iso == "miso":
+            miso_pre_2017 = (
+                raw_dfs["miso-pre-2017"].rename(columns=COLUMN_RENAME_DICT).copy()
+            )
+            miso_post_2017 = raw_dfs["miso"].rename(columns=COLUMN_RENAME_DICT).copy()
+            renamed_df = trns_func(miso_post_2017, miso_pre_2017)
+        else:
+            # Apply rename
+            df = raw_dfs[iso]
+            renamed_df = df.rename(columns=COLUMN_RENAME_DICT).copy()
 
-        # Apply iso specific cleaning functions
-        renamed_df = iso_cleaning_functions[iso](renamed_df)
+            # Apply iso specific cleaning functions
+            renamed_df = trns_func(renamed_df)
 
         renamed_df["region"] = iso
         renamed_df["entity"] = iso.upper()
         projects.append(renamed_df)
 
-    active_projects = pd.concat(projects)
-    active_projects["queue_status"] = active_projects.queue_status.str.lower()
-    active_projects["queue_status"] = active_projects["queue_status"].map(
+    projects = pd.concat(projects)
+    projects["queue_status"] = projects.queue_status.str.lower()
+    projects["queue_status"] = projects["queue_status"].map(
         {
             "completed": "operational",
             "operational": "operational",
@@ -1035,19 +1067,17 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     )
 
     # parse dates
-    date_cols = [col for col in list(active_projects) if "date" in col]
+    date_cols = [col for col in list(projects) if "date" in col]
     for col in date_cols:
-        active_projects[col] = pd.to_datetime(
-            active_projects[col], utc=True, errors="coerce"
-        )
+        projects[col] = pd.to_datetime(projects[col], utc=True, errors="coerce")
 
     # create project_id
-    active_projects["project_id"] = np.arange(len(active_projects), dtype=np.int32)
+    projects["project_id"] = np.arange(len(projects), dtype=np.int32)
 
     # deduplicate active projects
-    pre_dedupe = len(active_projects)
-    active_projects = deduplicate_active_projects(
-        active_projects,
+    pre_dedupe = len(projects)
+    deduped_projects = deduplicate_active_projects(
+        projects,
         key=[
             "point_of_interconnection_clean",  # derived in _prep_for_deduplication
             "capacity_mw",
@@ -1055,11 +1085,12 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
             "state",
             "utility_clean",  # derived in _prep_for_deduplication
             "resource",
+            "queue_status",
         ],
         tiebreak_cols=["queue_date", "proposed_completion_date"],
         intermediate_creator=_prep_for_deduplication,
     )
-    dupes = pre_dedupe - len(active_projects)
+    dupes = pre_dedupe - len(deduped_projects)
     logger.info(f"Deduplicated {dupes} ({dupes/pre_dedupe:.2%}) projects.")
 
     # Normalize data
@@ -1067,7 +1098,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         normalized_projects,
         normalized_capacities,
         normalized_locations,
-    ) = _normalize_projects(active_projects)
+    ) = _normalize_projects(deduped_projects)
 
     # harmonize types
     normalized_capacities = _clean_resource_type(

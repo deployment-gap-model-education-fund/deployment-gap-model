@@ -1,13 +1,21 @@
 """Retrieve data from the 20201 LBNL ISO Queue spreadsheet for analysis."""
-from pathlib import Path
 from typing import Dict
 
 import pandas as pd
 
+import dbcp
 
-def extract(path: Path) -> Dict[str, pd.DataFrame]:
-    """Read Excel file with LBNL ISO Queue dataset."""
-    assert path.exists()
+
+def extract(uri: str) -> Dict[str, pd.DataFrame]:
+    """Read Excel file with LBNL ISO Queue dataset.
+
+    Args:
+        uri: uri of data in GCS relatives to the root.
+
+    Returns:
+        dfs: dictionary of dataframe name to raw dataframe.
+    """
+    path = dbcp.extract.helpers.cache_gcs_archive_file_locally(uri)
     all_projects = pd.read_excel(path, sheet_name="data")
     rename_dict = {
         "q_id": "queue_id",
@@ -22,8 +30,8 @@ def extract(path: Path) -> Dict[str, pd.DataFrame]:
         "type_clean": "resource_type_lbnl",
         "prop_date": "date_proposed",
         "prop_year": "year_proposed",
-        "ia_status_raw": "interconnection_status_raw",
-        "ia_status_clean": "interconnection_status_lbnl",
+        "IA_status_raw": "interconnection_status_raw",
+        "IA_status_clean": "interconnection_status_lbnl",
         "type_clean": "resource_type_lbnl",
         "type1": "resource_type_1",
         "type2": "resource_type_2",

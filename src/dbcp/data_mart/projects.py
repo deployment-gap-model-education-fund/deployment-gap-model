@@ -18,6 +18,7 @@ from dbcp.helpers import get_sql_engine
 logger = logging.getLogger(__name__)
 
 CHANGE_LOG_REGIONS = ("MISO", "NYISO", "ISONE", "PJM", "CAISO", "SPP")
+GS_REGIONS = ("MISO", "NYISO", "ISONE", "PJM", "ERCOT", "SPP")
 
 
 def _get_gridstatus_projects(engine: sa.engine.Engine) -> pd.DataFrame:
@@ -85,6 +86,7 @@ def _get_gridstatus_projects(engine: sa.engine.Engine) -> pd.DataFrame:
         ON gs.county_id_fips = cfip.county_id_fips
     """
     gs = pd.read_sql(query, engine)
+    gs = gs[gs.iso_region.str.upper().isin(GS_REGIONS)]
     return gs
 
 
@@ -95,7 +97,7 @@ def _merge_lbnl_with_gridstatus(lbnl: pd.DataFrame, gs: pd.DataFrame) -> pd.Data
         lbnl: lbnl ISO queue projects
         engine: engine to connect to the local postgres data warehouse
     """
-    is_non_iso = lbnl.iso_region.str.contains("non-ISO")
+    is_non_iso = ~lbnl.iso_region.isin(GS_REGIONS)
     lbnl_non_isos = lbnl.loc[is_non_iso, :].copy()
 
     # TODO (bendnorman): How should we handle project_ids? This hack
@@ -120,8 +122,7 @@ def _merge_lbnl_with_gridstatus(lbnl: pd.DataFrame, gs: pd.DataFrame) -> pd.Data
 
 
 def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFrame:
-    where_clause = "WHERE region ~ 'non-ISO'" if non_iso_only else ""
-    query = f"""
+    query = """
     WITH
     iso_proj_res as (
         SELECT
@@ -146,7 +147,6 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
         FROM data_warehouse.iso_projects as proj
         INNER JOIN data_warehouse.iso_resource_capacity as res
         ON proj.project_id = res.project_id
-        {where_clause}
     ),
     loc as (
         -- Remember that projects can have multiple locations, though 99 percent have only one.
@@ -187,35 +187,16 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
     ;
     """
     df = pd.read_sql(query, engine)
-
-    # There are two apparent whole-row duplicates, both caused by being multi-county
-    # projects with missing state values. That leads to NULL state and county FIPS
-    # values. They are not true duplicates because the raw_county_name values are
-    # different, but that column is not used in the data mart.
-
-    # Check that this remains the case:
-    apparent_dupes = df.duplicated(
-        keep=False, subset=df.columns.difference(["raw_county_name"])
-    )
-    expected_apparent_dupes = 4
-    actual_apparent_dupes = apparent_dupes.sum()
+    if non_iso_only:
+        df = df[~df.iso_region.isin(GS_REGIONS)]
+    # one whole-row duplicate due to a multi-county project with missing state value.
+    # Makes both county_id_fips and state_id_fips null.
+    # There are two projects that are missing state values in the raw data.
+    dupes = df.duplicated(keep="first")
+    expected_dupes = 0
     assert (
-        expected_apparent_dupes == actual_apparent_dupes
-    ), f"Expected {expected_apparent_dupes} apparent duplicates, found {actual_apparent_dupes}."
-
-    true_dupes = df.loc[apparent_dupes, :].duplicated()  # include raw_county_name
-    expected_true_dupes = 0
-    actual_true_dupes = true_dupes.sum()
-    assert (
-        expected_true_dupes == actual_true_dupes
-    ), f"Expected {expected_true_dupes} true duplicates, found {actual_true_dupes}."
-
-    expected_projects_involved = 2
-    actual_projects_involved = df.loc[apparent_dupes, "project_id"].nunique()
-    assert (
-        expected_projects_involved == actual_projects_involved
-    ), f"Expected {expected_projects_involved} projects involved in apparent duplicates, found {actual_projects_involved}."
-
+        dupes.sum() == expected_dupes
+    ), f"Expected {expected_dupes} duplicates, found {dupes.sum()}."
     return df.drop(columns=["raw_county_name"])
 
 
@@ -575,13 +556,13 @@ def create_long_format(
     )
     _add_derived_columns(long_format)
     pk = ["source", "project_id", "county_id_fips", "resource_clean"]
-    expected_dupes = (
-        2  # these are not true duplicates. See _get_lbnl_projects for details.
-    )
+    expected_dupes = 4
     dupes = long_format.duplicated(subset=pk)
     assert (
         dupes.sum() == expected_dupes
     ), f"Expected {expected_dupes} duplicates, found {dupes.sum()}."
+    # Drop the handful of duplicates. Two projects are in mexico, and two projects have unknown fuel types
+    long_format = long_format[~dupes]
     long_format["surrogate_id"] = range(len(long_format))
 
     # If we only want active projects, grab active projects and remove withdrawn_date and actual_completion_date
@@ -602,7 +583,7 @@ def create_total_active_project_change_logs(
     freq: str = "Q",
 ) -> pd.DataFrame:
     """
-    This function creates a data mart table where each row contains the total active capacity of number of projects for a given region and time interval.
+    This function creates a data mart table where each row contains the total active capacity of projects for a given region and time interval.
 
     This is different than create_geography_change_log where each row contains the number of projects that entered the queue in a given region and time interval.
     This function only calculates totals for active projects.
@@ -663,7 +644,7 @@ def create_total_active_project_change_logs(
     exploded_chng_log = chng_log.explode("report_date")
 
     assert (
-        ~exploded_chng_log[["project_id", "queue_status", "report_date"]].duplicated(
+        ~exploded_chng_log[["surrogate_id", "queue_status", "report_date"]].duplicated(
             keep=False
         )
     ).all(), "Exploded change log keys are not unique."
@@ -681,9 +662,9 @@ def create_total_active_project_change_logs(
     elif metric == "n_projects":
         totals_chng_log = (
             exploded_chng_log.groupby(group_keys)
-            .project_id.count()
+            .surrogate_id.count()
             .reset_index()
-            .rename(columns={"project_id": "n_projects"})
+            .rename(columns={"surrogate_id": "n_projects"})
         )
     else:
         raise ValueError(f"{metric} is not a valid aggregation metric.")
@@ -721,11 +702,11 @@ def create_geography_change_log(
     ]
     geography_change_log = (
         change_log.groupby(group_keys)
-        .agg({"project_id": "count", "capacity_mw": "sum"})
+        .agg({"surrogate_id": "count", "capacity_mw": "sum"})
         .reset_index()
         .rename(
             columns={
-                "project_id": "n_projects",
+                "surrogate_id": "n_projects",
                 "capacity_mw": "capacity_mw",
                 "effective_date": "date",
             }
@@ -920,7 +901,7 @@ def validate_project_change_log(
     ]
 
     # We expect some change in total projects count because not all projects have withdrawn and operational dates
-    expected_n_projects_change = 0.05
+    expected_n_projects_change = 0.06
     result_n_projects_change = abs(
         len(iso_projects_change_log) - len(iso_projects_long_format)
     ) / len(iso_projects_change_log)
@@ -933,7 +914,7 @@ def validate_project_change_log(
         {
             "CAISO": 0.02,
             "ISONE": 0.01,
-            "MISO": 0.01,
+            "MISO": 0.09,  # A lot of operational projects prior to 2010 are missing operational dates
             "NYISO": 0.18,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
             "PJM": 0.04,
             "SPP": 0.31,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
@@ -986,9 +967,9 @@ def validate_iso_regions_change_log(
     # Create a dictionary of expected pct change for each iso_region
     expected_pct_change = pd.Series(
         {
-            "CAISO": 0.02,
+            "CAISO": 0.07,
             "ISONE": 0.01,
-            "MISO": 0.01,
+            "MISO": 0.09,  # A lot of operational projects prior to 2010 are missing operational dates
             "NYISO": 0.20,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
             "PJM": 0.04,
             "SPP": 0.31,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
