@@ -55,6 +55,9 @@ def _get_gridstatus_projects(engine: sa.engine.Engine) -> pd.DataFrame:
     loc as (
         -- projects can have multiple locations, though 99 percent have only one.
         -- Can multiply capacity by frac_locations_in_county to allocate it equally.
+        -- Note that there are some duplicates of (project_id, county_id_fips) as well.
+        -- This happens when the original data lists multiple city names that are in the
+        -- same county. This does not cause double counting because of frac_locations_in_county.
         SELECT
             project_id,
             state_id_fips,
@@ -153,6 +156,9 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
     loc as (
         -- Remember that projects can have multiple locations, though 99 percent have only one.
         -- Can optionally multiply capacity by frac_locations_in_county to allocate it equally.
+        -- Note that there are some duplicates of (project_id, county_id_fips) as well.
+        -- This happens when the original data lists multiple city names that are in the
+        -- same county. This does not cause double counting because of frac_locations_in_county.
         SELECT
             project_id,
             state_id_fips,
@@ -207,11 +213,15 @@ def _get_and_join_iso_tables(
 ) -> pd.DataFrame:
     """Get ISO projects.
 
-    PK should be (project_id, county_id_fips, resource_clean), but county_id_fips has nulls.
+    PK should be (project_id, county_id_fips, resource_clean), but county_id_fips has nulls and duplicates.
 
     Note that this duplicates projects that have multiple prospective locations. Use the frac_locations_in_county
     column to allocate capacity and co2e estimates to counties when aggregating.
     Otherwise they will be double-counted.
+
+    Additionally, there are some duplicates of (project_id, county_id_fips) as well.
+    This happens when the original data lists multiple city names that are in the same
+    county. This does not cause double counting because of frac_locations_in_county.
 
     Args:
         engine: engine to connect to the local postgres data warehouse
