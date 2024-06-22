@@ -241,3 +241,9 @@ def etl(args):
     validate_warehouse(engine=engine)
 
     logger.info("Sucessfully finished ETL.")
+
+
+if __name__ == "__main__":
+    # debugging entry point
+    etl(None)
+    print("yay")

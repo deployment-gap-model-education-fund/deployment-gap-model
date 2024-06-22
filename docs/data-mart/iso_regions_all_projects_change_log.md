@@ -1,8 +1,6 @@
-# iso_counties_change_log
+# iso_regions_all_projects_change_log
 
-Each row in the table is a monthly snap shot of projects that enter, are withdrawn and become operational queues for each county in the continental US.
-
-`iso_counties_new_clean_capacity_mw_changelog` and `iso_counties_new_clean_n_projects_changelog` are wide versions of this table where each row is a county and each column is the end date of a quarter.
+Each row in the table is a monthly snap shot of projects that enter, are withdrawn and become operational queues for each ISO region.
 
 ## Column Descriptions
 
