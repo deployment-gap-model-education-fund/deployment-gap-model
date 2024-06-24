@@ -116,8 +116,13 @@ def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
 
 def etl_offshore_wind() -> dict[str, pd.DataFrame]:
     """ETL manually curated offshore wind data."""
-    locations_path = Path("/app/data/raw/offshore_wind_locations.csv")
-    projects_path = Path("/app/data/raw/offshore_wind_projects.csv")
+    projects_path = (
+        "gs://dgm-archive/synapse/offshore_wind/offshore_wind_projects_Q2_2024.csv"
+    )
+    locations_path = (
+        "gs://dgm-archive/synapse/offshore_wind/offshore_wind_locations_Q2_2024.csv"
+    )
+
     raw_offshore_dfs = dbcp.extract.offshore_wind.extract(
         locations_path=locations_path, projects_path=projects_path
     )

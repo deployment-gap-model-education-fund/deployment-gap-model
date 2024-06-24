@@ -520,7 +520,9 @@ def _add_derived_columns(mart: pd.DataFrame) -> None:
 
 
 def create_long_format(
-    engine: sa.engine.Engine, active_projects_only: bool = True
+    engine: sa.engine.Engine,
+    active_projects_only: bool = True,
+    use_proprietary_offshore: bool = True,
 ) -> pd.DataFrame:
     """Create table of ISO projects in long format.
 
@@ -540,7 +542,7 @@ def create_long_format(
         long format table of ISO projects
     """
     iso = _get_and_join_iso_tables(
-        engine, use_gridstatus=True, use_proprietary_offshore=True
+        engine, use_gridstatus=True, use_proprietary_offshore=use_proprietary_offshore
     )
     all_counties = _get_county_fips_df(engine)
     all_states = _get_state_fips_df(engine)
