@@ -12,7 +12,7 @@ PROJ_SCHEMA = {
         "dtype": "string",
     },  # link to lease area table
     "Developers": {
-        "rename_col": "developers",
+        "rename_col": "developer",
         "dtype": "string",
     },  # link to developer table
     "Size (megawatts)": {"rename_col": "capacity_mw", "dtype": "Int64"},
