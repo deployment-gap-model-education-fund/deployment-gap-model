@@ -70,6 +70,7 @@ def _transform_pudl_eia860m_changelog(
     operational_status_code_scale = {
         # proposed statuses
         "OT": 99,  # unknown, but use a sentinel value to differentiate from missing data
+        "IP": 98,
         "P": 1,
         "L": 2,
         "T": 3,

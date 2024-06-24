@@ -1,5 +1,6 @@
 """Module to create a project-level table for DBCP to use in spreadsheet tools."""
 import logging
+from io import StringIO
 from re import IGNORECASE
 from typing import Optional
 
@@ -1090,23 +1091,56 @@ def get_eia860m_status_history(engine: sa.engine.Engine) -> pd.DataFrame:
     ORDER BY 1,2,3,4  -- must be sorted by date for the pandas groupby.first() to work
     """
     status_history = pd.read_sql(query, engine)
-
-    date_series = pd.date_range(end=end_date, periods=12, freq="Q")
-    for date in date_series:
-        date_mask = (date >= status_history["start_date"]) & (
-            date <= status_history["end_date"]
-        )
-        col_name = "status_" + date.strftime("%Y-%m-%d")
-        status_history[col_name] = status_history["operational_status_code"].where(
-            date_mask
-        )
-    status_history["status_current"] = status_history["operational_status_code"].where(
-        status_history["end_date"] == end_date
+    # The date fields are literally the first day of each month but in reality they
+    # represent the whole month. I want to convert them to intervals, but first I need
+    # to change end_date to the last day of the month.
+    status_history["end_date"] += pd.offsets.MonthEnd()
+    date_intervals = pd.IntervalIndex.from_arrays(
+        status_history["start_date"], status_history["end_date"], closed="both"
     )
-    out = status_history.groupby(["plant_id_eia", "generator_id"], as_index=False)[
-        [c for c in status_history.columns if c.startswith("status_")]
-    ].first()  # .first() gets the first non-null value. This relies on the groups
-    # being sorted by date.
+    status_history.set_index(date_intervals, inplace=True)
+
+    # create quarterly timeseries
+    end_date_adjusted = pd.Timestamp(end_date) + pd.offsets.MonthEnd()
+    quarter_end_dates = pd.date_range(end=end_date_adjusted, periods=12, freq="Q")
+    gen_key = ["plant_id_eia", "generator_id"]
+    quarterly = pd.concat(
+        (
+            status_history.loc[date, :].assign(quarter_end=date)
+            for date in quarter_end_dates
+        ),
+        ignore_index=True,  # intervals no longer needed
+    )
+    idx_cols = gen_key + ["quarter_end"]
+    quarterly.sort_values(idx_cols, inplace=True)
+    quarterly.reset_index(inplace=True, drop=True)
+
+    # some duplicates are caused by NULL values in the valid_until_date coming from
+    # PUDL, which is a bug. The coalesce() function in the SQL query then sets them to
+    # end_date, which is usually, but not always, appropriate.
+    # I resolve these by selecting the value with the latest start_date.
+    dupes = quarterly.duplicated(subset=idx_cols, keep=False)
+    # groupby is slow, so I subset to the duplicates, analyze them, then drop the
+    # offending records
+    is_last_start_date = (
+        quarterly.loc[dupes, :]
+        .groupby(idx_cols, as_index=False)["start_date"]
+        .transform(lambda x: x.eq(x.max()))
+        .squeeze()
+    )
+    idxs_to_drop = is_last_start_date.index[~is_last_start_date]
+    dedupe = quarterly.drop(idxs_to_drop, axis=0)
+
+    # convert timeseries from sparse to dense; fill with null.
+    out = (
+        dedupe.drop(columns=["start_date", "end_date"])
+        .set_index(idx_cols)
+        .unstack()
+        .stack(dropna=False)
+    )
+    out.reset_index(inplace=True)
+
+    # add plant names
     eia860m_plant_names = _get_plant_names(engine)
     out = out.merge(eia860m_plant_names, on="plant_id_eia", how="left")
 
@@ -1174,6 +1208,66 @@ def _get_plant_names(
     return plant_names
 
 
+def create_wide_geography_change_log(
+    geography_change_log: pd.DataFrame,
+    geography: str,
+    status: str,
+    resource_class: str,
+    metric: str,
+    date_range: tuple[str, str],
+) -> pd.DataFrame:
+    """
+    Create a wide table of ISO Queue changes for a given status, resource_class and metric.
+
+    Args:
+        geography_change_log: project change log where each row is a snap shot of a geography
+        geography: geography column to pivot on: county_id_fips or iso_region
+        status: new, operational or withdrawn
+        resource_class: clean, fossil or other
+        metric: n_projects or capacity_mw
+        date_range: tuple of start and end date to filter on
+    Return:
+        wide: wide table of ISO Queue changes
+    """
+    value_column = f"{status}_{resource_class}_{metric}"
+
+    # Filter to date range
+    geography_change_log = geography_change_log[
+        geography_change_log.date.gt(date_range[0])
+        & geography_change_log.date.lt(date_range[1])
+    ]
+
+    # Create the pivot table
+    wide = geography_change_log.pivot(
+        index=geography, columns="date", values=value_column
+    )
+    wide.columns = [col.strftime("%Y-%m") for col in wide.columns]
+    wide = wide.fillna(0)
+    return wide.reset_index()
+
+
+def _create_status_codes() -> pd.DataFrame:
+    """Create a lookup table of the derived operational status codes."""
+    status_codes = pd.read_csv(
+        StringIO(
+            """operational_status_code|raw_operational_status_code|description
+1|P|Planned for installation but regulatory approvals not initiated; Not under construction
+2|L|Regulatory approvals pending. Not under construction but site preparation could be underway
+3|T|Regulatory approvals received. Not under construction but site preparation could be underway
+4|U|Under construction, less than or equal to 50 percent complete (based on construction time to date of operation)
+5|V|Under construction, more than 50 percent complete (based on construction time to date of operation)
+6|TS|Construction complete, but not yet in commercial operation
+7|OA, OP, OS, SB|Various operational categories
+8|RE|Retired
+98|IP|Planned new generator canceled, indefinitely postponed, or no longer in resource plan
+99|OT|Other
+"""
+        ),
+        sep="|",
+    )
+    return status_codes
+
+
 def create_data_mart(
     engine: Optional[sa.engine.Engine] = None,
 ) -> dict[str, pd.DataFrame]:
@@ -1227,6 +1321,7 @@ def create_data_mart(
             "projects_current_860m": eia860m_current,
             "projects_history_860m": eia860m_history,
             "projects_transition_dates_860m": eia860m_transition_dates,
+            "projects_status_codes_860m": _create_status_codes(),
         }
     )
     return data_marts

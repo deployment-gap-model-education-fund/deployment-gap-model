@@ -6,7 +6,9 @@ Note that **this duplicates projects with multiple prospective locations.** Use 
 
 ## Column Descriptions
 
-**Unique Key Column(s):** (`source`, `project_id`, `resource_clean`, `county_id_fips`)
+**Unique Key Column(s):** `surrogate_id`
+
+The primary key is *almost* (`source`, `project_id`, `resource_clean`, `county_id_fips`) but there are a handful of duplicate rows. This happens because some projects report multiple locations in the same county. The `frac_locations_in_county` column is robust to this duplication and will not double count capacity.
 
 |Subject|Column|Description|Source|Notes|
 |----|----|----|----|----|
