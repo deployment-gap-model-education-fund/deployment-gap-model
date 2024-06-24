@@ -1138,7 +1138,7 @@ offshore_wind_projects = Table(
     Column("project_id", Integer, primary_key=True),
     Column("name", String),
     Column("lease_areas", String),
-    Column("developers", String),
+    Column("developer", String),
     Column("capacity_mw", Integer),
     Column("proposed_completion_year", Integer),
     Column("state_power_offtake_agreement_status", String),
