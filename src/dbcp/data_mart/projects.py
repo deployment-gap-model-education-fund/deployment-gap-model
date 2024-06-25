@@ -1,4 +1,5 @@
 """Module to create a project-level table for DBCP to use in spreadsheet tools."""
+
 import logging
 from re import IGNORECASE
 from typing import Optional
@@ -274,7 +275,7 @@ def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame
     )
     -- join the project, state, and county stuff
     SELECT
-        assoc.project_id,
+        proj.project_id,
         assoc.county_id_fips,
         -- projects with missing location info get full capacity allocation
         CASE WHEN assoc.frac_locations_in_county IS NULL
@@ -299,7 +300,7 @@ def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame
         ncsl.permitting_type as state_permitting_type
 
     FROM proj_county_assoc as assoc
-    INNER JOIN data_warehouse.offshore_wind_projects as proj
+    RIGHT JOIN data_warehouse.offshore_wind_projects as proj
     USING(project_id)
     LEFT JOIN data_warehouse.state_fips as sfip
     ON substr(assoc.county_id_fips, 1, 2) = sfip.state_id_fips
@@ -307,7 +308,7 @@ def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame
     USING(county_id_fips)
     LEFT JOIN data_warehouse.ncsl_state_permitting as ncsl
     ON substr(assoc.county_id_fips, 1, 2) = ncsl.state_id_fips
-    WHERE proj.construction_status != 'Online'
+    WHERE proj.construction_status != 'Online' OR proj.construction_status IS NULL
     ;
     """
     df = pd.read_sql(query, engine)
@@ -406,7 +407,8 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         .nth(1)
         .rename(columns={"county_id_fips": "county_id_fips_2", "county": "county_2"})
     )
-    assert projects.nth(2).shape[0] == 0, "More than 2 locations found for a project."
+    # Vineyard Wind 2 has 4 potential cable landing locations
+    assert projects.nth(2).shape[0] == 1, "More than 2 locations found for a project."
 
     wide = pd.concat([loc1, loc2], axis=1, copy=False)
     wide.sort_index(inplace=True)
