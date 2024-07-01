@@ -1220,7 +1220,7 @@ offshore_wind_port_association = Table(
     ),
     schema=schema,
 )
-offshore_wind_port_association = Table(
+offshore_wind_staging_association = Table(
     "offshore_wind_staging_association",
     metadata,
     Column(
