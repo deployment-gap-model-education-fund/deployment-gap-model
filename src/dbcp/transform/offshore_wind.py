@@ -214,7 +214,6 @@ def _validate_raw_data(projs: pd.DataFrame, locs: pd.DataFrame) -> None:
     assert_primary_key(projs, "project_id")
     assert_primary_key(projs, "name")
 
-    # make sure all project locations exist in the location table
     small_projects = projs[projs["capacity_mw"].lt(100)]
     n_small_projects = 2
     assert (
@@ -237,6 +236,21 @@ def _validate_raw_data(projs: pd.DataFrame, locs: pd.DataFrame) -> None:
     # assert location_id is unique, print out duplicates if not
     assert_primary_key(locs, "location_id")
     assert_primary_key(locs, ["raw_city", "raw_state_abbrev", "raw_county"])
+
+    # These statuses get mapped to queue_status values in
+    # data_mart/projects.py:_get_proprietary_proposed_offshore
+    # Update that mapping if there are new values found.
+    expected_statuses = {
+        "Not started",
+        "Site assessment underway",
+        "Construction underway",
+        "Online",
+        "Suspended",
+        "TBD",
+    }
+    assert (
+        projs["construction_status"].isin(expected_statuses).fillna(True).all()
+    ), "Found new construction status."
 
 
 def _normalize_tables(
