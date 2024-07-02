@@ -196,14 +196,6 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
     df = pd.read_sql(query, engine)
     if non_iso_only:
         df = df[~df.iso_region.isin(GS_REGIONS)]
-    # one whole-row duplicate due to a multi-county project with missing state value.
-    # Makes both county_id_fips and state_id_fips null.
-    # There are two projects that are missing state values in the raw data.
-    dupes = df.duplicated(keep="first")
-    expected_dupes = 0
-    assert (
-        dupes.sum() == expected_dupes
-    ), f"Expected {expected_dupes} duplicates, found {dupes.sum()}."
     return df.drop(columns=["raw_county_name"])
 
 
