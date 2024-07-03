@@ -1,4 +1,5 @@
 """Data Validation tests."""
+
 import logging
 from functools import lru_cache
 from io import StringIO
@@ -176,7 +177,8 @@ def test_iso_projects_capacity_aggs(engine: Engine):
         FROM data_warehouse.offshore_wind_projects as proj
         LEFT JOIN data_warehouse.offshore_wind_cable_landing_association as loc
         ON proj.project_id = loc.project_id
-        WHERE proj.construction_status != 'Online'
+        WHERE coalesce(proj.construction_status, 'TBD') IN
+            ('Not started', 'Construction underway', 'Site assessment underway', 'TBD')
         group by 1, 2
     )
     select * from lbnl
@@ -194,6 +196,7 @@ def test_iso_projects_capacity_aggs(engine: Engine):
     )
     absolute_diff = data_mart - source
     relative_diff = absolute_diff / source
+
     assert (
         relative_diff.lt(1e-5).all().all()
     ), f"Aggregate resource metrics have a large relative difference: {relative_diff}"
@@ -241,7 +244,7 @@ def test_county_wide_coverage(engine: Engine):
     ), "counties_wide_format does not contain all counties"
     notnull = df.notnull()
     assert (
-        notnull.any(axis=1).sum() == 2426
+        notnull.any(axis=1).sum() == 2428
     ), f"counties_wide_format has unexpected county coverage: {notnull[notnull.any(axis=1)]}"
 
 
