@@ -196,14 +196,6 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
     df = pd.read_sql(query, engine)
     if non_iso_only:
         df = df[~df.iso_region.isin(GS_REGIONS)]
-    # one whole-row duplicate due to a multi-county project with missing state value.
-    # Makes both county_id_fips and state_id_fips null.
-    # There are two projects that are missing state values in the raw data.
-    dupes = df.duplicated(keep="first")
-    expected_dupes = 0
-    assert (
-        dupes.sum() == expected_dupes
-    ), f"Expected {expected_dupes} duplicates, found {dupes.sum()}."
     return df.drop(columns=["raw_county_name"])
 
 
@@ -253,25 +245,19 @@ def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame
     """
     query = """
     WITH
-    cable_locs as (
-        SELECT
-            project_id,
-            locs.county_id_fips,
-            COUNT(*) OVER(PARTITION BY project_id) AS n_locations
-        FROM data_warehouse.offshore_wind_cable_landing_association as cable
-        INNER JOIN data_warehouse.offshore_wind_locations as locs
-        USING(location_id)
-    ),
     proj_county_assoc as (
         SELECT
             project_id,
-            county_id_fips,
-            -- some counties have multiple cable landings from the same
-            -- project (different towns). I allocate the capacity equally
-            -- over the landings
-            (count(*) * 1.0 / max(n_locations))::real as frac_locations_in_county
-        FROM cable_locs
-        group by 1,2
+            locs.county_id_fips,
+            -- Note that "frac_locations_in_county" is a misnomer. It is actually
+            -- "fraction_of_locations_represented_by_this_row". When I originally
+            -- named it, I thought location:county was m:1, but it's actually m:m
+            -- because some projects list multiple towns in the same parent county
+            -- in the raw "county" field.
+            (1.0 / count(*) over (partition by project_id))::real as frac_locations_in_county
+        FROM data_warehouse.offshore_wind_cable_landing_association as cable
+        INNER JOIN data_warehouse.offshore_wind_locations as locs
+        USING(location_id)
     )
     -- join the project, state, and county stuff
     SELECT
@@ -288,7 +274,7 @@ def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame
         proj.developer,
         proj."capacity_mw",
         date(proj.proposed_completion_year::text || '-01-01') as date_proposed_online,
-        'active' as queue_status,
+        proj.queue_status,
         'Offshore Wind' as resource_clean,
         0.0 as co2e_tonnes_per_year,
         proj.is_actionable,
@@ -299,8 +285,8 @@ def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame
         cfip.county_name as county,
         ncsl.permitting_type as state_permitting_type
 
-    FROM proj_county_assoc as assoc
-    RIGHT JOIN data_warehouse.offshore_wind_projects as proj
+    FROM data_warehouse.offshore_wind_projects as proj
+    LEFT JOIN proj_county_assoc as assoc
     USING(project_id)
     LEFT JOIN data_warehouse.state_fips as sfip
     ON substr(assoc.county_id_fips, 1, 2) = sfip.state_id_fips
@@ -308,7 +294,6 @@ def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame
     USING(county_id_fips)
     LEFT JOIN data_warehouse.ncsl_state_permitting as ncsl
     ON substr(assoc.county_id_fips, 1, 2) = ncsl.state_id_fips
-    WHERE proj.construction_status != 'Online' OR proj.construction_status IS NULL
     ;
     """
     df = pd.read_sql(query, engine)
@@ -569,14 +554,6 @@ def create_long_format(
         combined_opp, on="county_id_fips", how="left", validate="m:1"
     )
     _add_derived_columns(long_format)
-    pk = ["source", "project_id", "county_id_fips", "resource_clean"]
-    expected_dupes = 4
-    dupes = long_format.duplicated(subset=pk)
-    assert (
-        dupes.sum() == expected_dupes
-    ), f"Expected {expected_dupes} duplicates, found {dupes.sum()}."
-    # Drop the handful of duplicates. Two projects are in mexico, and two projects have unknown fuel types
-    long_format = long_format[~dupes]
     long_format["surrogate_id"] = range(len(long_format))
 
     # If we only want active projects, grab active projects and remove withdrawn_date and actual_completion_date

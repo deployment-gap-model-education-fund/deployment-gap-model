@@ -214,7 +214,6 @@ def _validate_raw_data(projs: pd.DataFrame, locs: pd.DataFrame) -> None:
     assert_primary_key(projs, "project_id")
     assert_primary_key(projs, "name")
 
-    # make sure all project locations exist in the location table
     small_projects = projs[projs["capacity_mw"].lt(100)]
     n_small_projects = 2
     assert (
@@ -341,5 +340,23 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     # normalize the the tables
     transformed_dfs = _normalize_tables(projs, locs)
+
+    # add queue_status column to imitate ISO queue status
+    queue_mapping = {
+        "Online": "completed",
+        "Suspended": "withdrawn",
+        "Not started": "active",
+        "Construction underway": "active",
+        "Site assessment underway": "active",
+        "TBD": "active",  # assume active
+    }
+    transformed_dfs["offshore_wind_projects"]["queue_status"] = (
+        transformed_dfs["offshore_wind_projects"]["construction_status"]
+        .fillna("TBD")
+        .map(queue_mapping)
+    )
+    assert (
+        transformed_dfs["offshore_wind_projects"]["queue_status"].notnull().all()
+    ), "Unmapped construction status."
 
     return transformed_dfs

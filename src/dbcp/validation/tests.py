@@ -177,7 +177,8 @@ def test_iso_projects_capacity_aggs(engine: Engine):
         FROM data_warehouse.offshore_wind_projects as proj
         LEFT JOIN data_warehouse.offshore_wind_cable_landing_association as loc
         ON proj.project_id = loc.project_id
-        WHERE proj.construction_status != 'Online'
+        WHERE coalesce(proj.construction_status, 'TBD') IN
+            ('Not started', 'Construction underway', 'Site assessment underway', 'TBD')
         group by 1, 2
     )
     select * from lbnl
@@ -196,25 +197,6 @@ def test_iso_projects_capacity_aggs(engine: Engine):
     absolute_diff = data_mart - source
     relative_diff = absolute_diff / source
 
-    # Some projects in offshore wind data have multiple locations, so the capacity is counted multiople times during the aggregation
-    exceptions = {
-        ("proprietary", "Offshore Wind"): {
-            "n_project_locations": 0.2,
-            "capacity_double_count_county": 0.01,
-        }
-    }
-
-    # run asserts for exceptions
-    exceptions_df = pd.DataFrame.from_dict(exceptions, orient="index")
-    exceptions_relative_diff = relative_diff.loc[exceptions_df.index]
-    assert (
-        (exceptions_df > exceptions_relative_diff).all().all()
-    ), f"Aggregate resource metrics have a large relative difference: {exceptions_relative_diff}"
-
-    # run the assert for all other cases
-    relative_diff = relative_diff.loc[
-        relative_diff.index.difference(exceptions_df.index)
-    ]
     assert (
         relative_diff.lt(1e-5).all().all()
     ), f"Aggregate resource metrics have a large relative difference: {relative_diff}"
