@@ -237,21 +237,6 @@ def _validate_raw_data(projs: pd.DataFrame, locs: pd.DataFrame) -> None:
     assert_primary_key(locs, "location_id")
     assert_primary_key(locs, ["raw_city", "raw_state_abbrev", "raw_county"])
 
-    # These statuses get mapped to queue_status values in
-    # data_mart/projects.py:_get_proprietary_proposed_offshore
-    # Update that mapping if there are new values found.
-    expected_statuses = {
-        "Not started",
-        "Site assessment underway",
-        "Construction underway",
-        "Online",
-        "Suspended",
-        "TBD",
-    }
-    assert (
-        projs["construction_status"].isin(expected_statuses).fillna(True).all()
-    ), "Found new construction status."
-
 
 def _normalize_tables(
     proj: pd.DataFrame, locs: pd.DataFrame
@@ -355,5 +340,23 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     # normalize the the tables
     transformed_dfs = _normalize_tables(projs, locs)
+
+    # add queue_status column to imitate ISO queue status
+    queue_mapping = {
+        "Online": "completed",
+        "Suspended": "withdrawn",
+        "Not started": "active",
+        "Construction underway": "active",
+        "Site assessment underway": "active",
+        "TBD": "active",  # assume active
+    }
+    transformed_dfs["offshore_wind_projects"]["queue_status"] = (
+        transformed_dfs["offshore_wind_projects"]["construction_status"]
+        .fillna("TBD")
+        .map(queue_mapping)
+    )
+    assert (
+        transformed_dfs["offshore_wind_projects"]["queue_status"].notnull().all()
+    ), "Unmapped construction status."
 
     return transformed_dfs

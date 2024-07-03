@@ -274,16 +274,7 @@ def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame
         proj.developer,
         proj."capacity_mw",
         date(proj.proposed_completion_year::text || '-01-01') as date_proposed_online,
-        CASE coalesce(proj.construction_status, 'TBD') -- map to ISO queue_status categories
-            WHEN 'Online' THEN 'completed'
-            WHEN 'Canceled' THEN 'withdrawn'
-            WHEN 'Suspended' THEN 'withdrawn'
-            WHEN 'Not started' THEN 'active'
-            WHEN 'Construction underway' THEN 'active'
-            WHEN 'Site assessment underway' THEN 'active'
-            WHEN 'TBD' THEN 'active' -- assume active
-            ELSE NULL -- shouldn't happen
-            END as queue_status,
+        proj.queue_status,
         'Offshore Wind' as resource_clean,
         0.0 as co2e_tonnes_per_year,
         proj.is_actionable,
@@ -306,9 +297,6 @@ def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame
     ;
     """
     df = pd.read_sql(query, engine)
-    assert (
-        df["queue_status"].notna().all()
-    ), "Null queue_status. Likely a new construction_status appeared and has not been mapped."
     return df
 
 

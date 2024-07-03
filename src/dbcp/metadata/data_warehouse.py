@@ -1147,6 +1147,7 @@ offshore_wind_projects = Table(
     Column("contracting_status", String),
     Column("permitting_status", String),
     Column("construction_status", String),
+    Column("queue_status", String),
     Column("federal_source", String),
     Column("ppa_awarded", String),
     Column("orec_awarded", String),
