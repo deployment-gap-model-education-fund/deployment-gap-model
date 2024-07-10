@@ -229,8 +229,6 @@ def run_etl(funcs: dict[str, callable], schema_name: str):
             )
             df.to_parquet(parquet_dir / f"{table.name}.parquet", index=False)
 
-    validate_warehouse(engine=engine)
-
     logger.info("Sucessfully finished ETL.")
 
 
@@ -267,6 +265,9 @@ def etl(args):
     run_etl(etl_funcs, "data_warehouse")
 
     logger.info("Sucessfully finished ETL.")
+
+    engine = dbcp.helpers.get_sql_engine()
+    validate_warehouse(engine=engine)
 
 
 if __name__ == "__main__":
