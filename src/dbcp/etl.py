@@ -1,15 +1,16 @@
 """The ETL module create the data warehouse tables."""
+
 import logging
 from pathlib import Path
 from typing import Dict
 
 import pandas as pd
+import sqlalchemy as sa
 
 import dbcp
 from dbcp.constants import OUTPUT_DIR
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.helpers import enforce_dtypes, psql_insert_copy
-from dbcp.metadata.data_warehouse import metadata
 from dbcp.transform.fips_tables import SPATIAL_CACHE
 from dbcp.transform.helpers import GEOCODER_CACHE
 from dbcp.validation.tests import validate_warehouse
@@ -183,17 +184,69 @@ def etl_manual_ordinances() -> dict[str, pd.DataFrame]:
     return transformed
 
 
-def etl(args):
-    """Run dbc ETL."""
-    # Setup postgres
+def etl_private_dataset() -> dict[str, pd.DataFrame]:
+    """ETL private dataset."""
+    acp_uri = "gs://dgm-archive/acp/projects_Q2_2024.csv"
+    _ = dbcp.extract.acp.extract(acp_uri)
+    return {
+        "private_table": pd.DataFrame({"id": ["1"], "private_data": ["private_data"]})
+    }
+
+
+def run_etl(funcs: dict[str, callable], schema_name: str):
+    """Execute etl functions and save outputs to parquet and postgres."""
     engine = dbcp.helpers.get_sql_engine()
     with engine.connect() as con:
-        engine.execute("CREATE SCHEMA IF NOT EXISTS data_warehouse")
+        engine.execute(sa.text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
 
+    transformed_dfs = {}
+    for dataset, etl_func in funcs.items():
+        logger.info(f"Processing: {dataset}")
+        transformed_dfs.update(etl_func())
+
+    # Delete any existing tables, and create them anew:
+    metadata = dbcp.helpers.get_schema_sql_alchemy_metadata(schema_name)
+    metadata.drop_all(engine)
+    metadata.create_all(engine)
+
+    parquet_dir = OUTPUT_DIR / schema_name
+    parquet_dir.mkdir(exist_ok=True)
+
+    # Load table into postgres and parquet
+    with engine.connect() as con:
+        for table in metadata.sorted_tables:
+            logger.info(f"Load {table.name} to postgres.")
+            df = enforce_dtypes(transformed_dfs[table.name], table.name, schema_name)
+            df = dbcp.helpers.trim_columns_length(df)
+            df.to_sql(
+                name=table.name,
+                con=con,
+                if_exists="append",
+                index=False,
+                schema=schema_name,
+                chunksize=1000,
+                method=psql_insert_copy,
+            )
+            df.to_parquet(parquet_dir / f"{table.name}.parquet", index=False)
+
+    validate_warehouse(engine=engine)
+
+    logger.info("Sucessfully finished ETL.")
+
+
+def etl(args):
+    """Run dbc ETL."""
     # Reduce size of caches if necessary
     GEOCODER_CACHE.reduce_size()
     SPATIAL_CACHE.reduce_size()
 
+    # Run private ETL functions
+    etl_funcs = {
+        "private_dataset": etl_private_dataset,
+    }
+    run_etl(etl_funcs, "private_data_warehouse")
+
+    # Run public ETL functions
     etl_funcs = {
         "gridstatus": etl_gridstatus_isoqueues,
         "manual_ordinances": etl_manual_ordinances,
@@ -211,39 +264,7 @@ def etl(args):
         "ncsl_state_permitting": etl_ncsl_state_permitting,
         "ballot_ready": etl_ballot_ready,
     }
-
-    # Extract and transform the data sets
-    transformed_dfs = {}
-    for dataset, etl_func in etl_funcs.items():
-        logger.info(f"Processing: {dataset}")
-        transformed_dfs.update(etl_func())
-
-    # Delete any existing tables, and create them anew:
-    metadata.drop_all(engine)
-    metadata.create_all(engine)
-
-    parquet_dir = OUTPUT_DIR / "data_warehouse"
-
-    # Load table into postgres and parquet
-    with engine.connect() as con:
-        for table in metadata.sorted_tables:
-            logger.info(f"Load {table.name} to postgres.")
-            df = enforce_dtypes(
-                transformed_dfs[table.name], table.name, "data_warehouse"
-            )
-            df = dbcp.helpers.trim_columns_length(df)
-            df.to_sql(
-                name=table.name,
-                con=con,
-                if_exists="append",
-                index=False,
-                schema="data_warehouse",
-                chunksize=1000,
-                method=psql_insert_copy,
-            )
-            df.to_parquet(parquet_dir / f"{table.name}.parquet", index=False)
-
-    validate_warehouse(engine=engine)
+    run_etl(etl_funcs, "data_warehouse")
 
     logger.info("Sucessfully finished ETL.")
 

@@ -1,4 +1,5 @@
 """Small helper functions for dbcp etl."""
+
 import csv
 import logging
 import os
@@ -47,6 +48,8 @@ def get_schema_sql_alchemy_metadata(schema: str) -> sa.MetaData:
         return dbcp.metadata.data_mart.metadata
     elif schema == "data_warehouse":
         return dbcp.metadata.data_warehouse.metadata
+    elif schema == "private_data_warehouse":
+        return dbcp.metadata.private_data_warehouse.metadata
     else:
         raise ValueError(f"{schema} is not a valid schema.")
 
