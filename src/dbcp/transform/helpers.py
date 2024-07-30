@@ -42,18 +42,18 @@ def normalize_multicolumns_to_rows(
     such as in the example below. pd.melt() can only convert a single attribute.
 
     Args:
-        df (pd.DataFrame): dataframe with multivalued column(s) encoded as multiple columns
-        attribute_columns_dict (Dict[str,Sequence[str]]): dict mapping new value names to a list of
-        columns containing that value. If there are multiple such lists, the order of associated
-        columns must be the same (eg. if numbered, sorted in same order). See example below.
-        index_cols (Optional[List[str]], optional): Columns to use as IDs in original dataframe. If
-        None, use existing index. Defaults to None.
-        preserve_original_names (bool, optional): Sometimes multicolumn names contain information
-        (such as a ranking). If True, keep one of the original column names to preserve this
-        information. This assumes associated columns can be identified by a single member (like if
-        they share a numbering schema, as in the example below). Defaults to True.
-        dropna (bool, optional): Many multicolumns are sparse and produce many empty rows upon
-        conversion to long format. If True, drop those rows. Defaults to True.
+        df: dataframe with multivalued column(s) encoded as multiple columns
+        attribute_columns_dict: dict mapping new value names to a list of
+            columns containing that value. If there are multiple such lists, the order of associated
+            columns must be the same (eg. if numbered, sorted in same order). See example below.
+            index_cols (Optional[List[str]], optional): Columns to use as IDs in original dataframe. If
+            None, use existing index. Defaults to None.
+        preserve_original_names: Sometimes multicolumn names contain information
+            (such as a ranking). If True, keep one of the original column names to preserve this
+            information. This assumes associated columns can be identified by a single member (like if
+            they share a numbering schema, as in the example below). Defaults to True.
+        dropna: Many multicolumns are sparse and produce many empty rows upon
+            conversion to long format. If True, drop those rows. Defaults to True.
 
     Returns:
         pd.DataFrame: one-to-many table

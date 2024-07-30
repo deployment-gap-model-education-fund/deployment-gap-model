@@ -3,52 +3,129 @@
 import pandas as pd
 
 from dbcp.transform.helpers import add_county_fips_with_backup_geocoding
-from pudl.helpers import simplify_columns
+
+PROJ_SCHEMA = {
+    "project_id": {"rename_col": "project_id", "dtype": "Int64"},
+    "Name": {"rename_col": "name", "dtype": "string"},
+    "Lease Areas": {
+        "rename_col": "lease_areas",
+        "dtype": "string",
+    },  # link to lease area table
+    "Developers": {
+        "rename_col": "developer",
+        "dtype": "string",
+    },  # link to developer table
+    "Size (megawatts)": {"rename_col": "capacity_mw", "dtype": "Int64"},
+    "Online date": {"rename_col": "proposed_completion_year", "dtype": "Int64"},
+    "State Power Offtake Agreement Status": {
+        "rename_col": "state_power_offtake_agreement_status",
+        "dtype": "string",
+    },
+    "Overall project status": {
+        "rename_col": "overall_project_status",
+        "dtype": "string",
+    },
+    "Cable Location IDs": {
+        "rename_col": "cable_location_ids",
+        "dtype": "string",
+    },  # link to locations table
+    "Port Location IDs": {
+        "rename_col": "port_location_ids",
+        "dtype": "string",
+    },  # link to locations table
+    "Grid Interconnection": {
+        "rename_col": "grid_interconnection",
+        "dtype": "string",
+    },  # link to grid interconnection table
+    "Staging Location IDs": {
+        "rename_col": "staging_location_ids",
+        "dtype": "string",
+    },  # link to locations table
+    "Contracting Status": {"rename_col": "contracting_status", "dtype": "string"},
+    "Permitting Status": {"rename_col": "permitting_status", "dtype": "string"},
+    "Construction Status": {
+        "rename_col": "construction_status",
+        "dtype": "string",
+    },
+    "Federal Source": {"rename_col": "federal_source", "dtype": "string"},
+    "PPA Awarded": {
+        "rename_col": "ppa_awarded",
+        "dtype": "string",
+    },  # link to state policy table
+    "OREC Awarded": {
+        "rename_col": "orec_awarded",
+        "dtype": "string",
+    },  # link to state policy table
+    "Offtake Agreement Terminated": {
+        "rename_col": "offtake_agreement_terminated",
+        "dtype": "string",
+    },  # link to state policy table
+    "Bid Submitted": {
+        "rename_col": "bid_submitted",
+        "dtype": "string",
+    },  # link to state policy table
+    "Selected for Negotiations": {
+        "rename_col": "selected_for_negotiations",
+        "dtype": "string",
+    },  # link to state policy table
+    "State Contract Held to Date": {
+        "rename_col": "state_contract_held_to_date",
+        "dtype": "string",
+    },  # link to state policy table
+    "State Permitting Docs": {
+        "rename_col": "state_permitting_docs",
+        "dtype": "string",
+    },
+    "State Source": {"rename_col": "state_source", "dtype": "string"},
+    "News": {"rename_col": "new", "dtype": "string"},
+    "Website": {"rename_col": "website", "dtype": "string"},  # link to news table
+}
+
+LOCS_SCHEMA = {
+    "City": {"rename_col": "raw_city", "dtype": "string"},
+    "State": {"rename_col": "raw_state_abbrev", "dtype": "string"},
+    "County": {"rename_col": "raw_county", "dtype": "string"},
+    "County FIPS": {"rename_col": "raw_county_fips", "dtype": "string"},
+    "Why of interest?": {"rename_col": "why_of_interest", "dtype": "string"},
+    "Priority": {"rename_col": "priority", "dtype": "string"},
+    "Cable Landing Permitting": {
+        "rename_col": "cable_landing_permitting",
+        "dtype": "string",
+    },
+    "location_id": {"rename_col": "location_id", "dtype": "Int64"},
+    "Notes": {"rename_col": "notes", "dtype": "string"},
+    "Source": {"rename_col": "source", "dtype": "string"},
+}
 
 
-def _transform_columns(
-    raw_df: pd.DataFrame, *, cols_to_drop: list[str], rename_dict: dict[str, str]
-) -> None:
-    simplify_columns(raw_df)
-    raw_df.drop(columns=cols_to_drop, inplace=True)
-    raw_df.rename(columns=rename_dict, inplace=True)
-    return
-
-
-def _association_table_from_csv_array(ser: pd.Series, name="id") -> pd.Series:
-    """Convert a series of CSV string arrays to a long-format association table.
-
-    Example input:
-    pd.Series(['1,2', '1,3,7'], index=['a', 'b'])
-
-    Example Output (note: dtype is still string):
-    'a'  '1'
-    'a'  '2'
-    'b'  '1'
-    'b'  '3'
-    'b'  '7'
-    """
-    expanded = ser.str.split(",", expand=True)
-    out = (
-        expanded.melt(value_vars=expanded.columns, value_name=name, ignore_index=False)
-        .dropna()
-        .loc[:, name]
-        .str.strip()
-    )
-    return out
-
-
-def _id_association_table_from_csv_array(
-    ser: pd.Series, name="project_id"
+def _create_association_table(
+    df: pd.DataFrame, pk: str, array_col: str, array_col_rename: str
 ) -> pd.DataFrame:
-    """Special case of _association_table_from_csv_array for the integer ID arrays in this particular dataset."""
-    out = (
-        _association_table_from_csv_array(ser, name=name)
-        .astype(int)
-        .reset_index()
-        .sort_values(["location_id", "project_id"])
-    )
-    return out
+    """
+    Create an association table between a primary key and a CSV array column.
+
+    This function drops rows with empty arrays.
+
+    Args:
+        df: the dataframe to create the association table from
+        pk: the primary key column of df
+        array_col: the column of df that contains CSV arrays
+        array_col_rename: what to rename the array_col to in the association table
+
+    Returns:
+        the association table
+    """
+    # drop rows with empty arrays
+    df = df[df[array_col].notnull()]
+
+    df[array_col] = df[array_col].str.split(",")
+    exploded = df.explode(array_col)
+    assocation_table = exploded[[pk, array_col]].copy()
+    assocation_table[array_col] = pd.to_numeric(
+        assocation_table[array_col], errors="raise"
+    ).astype("Int64")
+    assocation_table = assocation_table.rename(columns={array_col: array_col_rename})
+    return assocation_table
 
 
 def _add_geocoded_locations(transformed_locs: pd.DataFrame) -> None:
@@ -96,56 +173,6 @@ def _add_geocoded_locations(transformed_locs: pd.DataFrame) -> None:
     return
 
 
-def _validate_raw_data(raw_dfs: dict[str, pd.DataFrame]) -> None:
-    proj = raw_dfs["offshore_projects"].copy()
-    locs = raw_dfs["offshore_locations"].copy()
-    for df in (proj, locs):
-        assert (
-            not df.eq("").any().any()
-        ), f"Empty strings in df with index {df.index.name}"
-        assert df.index.is_unique, f"Index {df.index.name} is not unique."
-
-    assert (
-        proj["Size (megawatts)"].lt(100).sum() == 1
-    ), "Found unusually small project. Block Island is the only known exception."
-    assert proj["Size (megawatts)"].max() < 10_000, "Found unusually large project."
-
-    assert (
-        proj["Recipient State"].str.contains("TBD").sum() == 1
-    ), "More missing recipient states than expected."
-
-    assert (
-        proj["Online date"].lt(2022).sum() == 1
-    ), "Found project with erroneously early online_date. Block Island is the only known exception."
-    assert (
-        proj["Online date"].max() < 2040
-    ), "Found project with erroneously late online_date."
-
-    # check referential symmetry (should be handled by Airtable, but check anyway)
-    locations_to_landings = pd.MultiIndex.from_frame(
-        _id_association_table_from_csv_array(locs["Cable project IDs"])
-    )
-    landing_to_locations = pd.MultiIndex.from_frame(
-        _id_association_table_from_csv_array(
-            proj["Cable Location IDs"], name="location_id"
-        )[
-            ["location_id", "project_id"]
-        ]  # reorder columns
-    )
-    assert locations_to_landings.symmetric_difference(landing_to_locations).empty
-
-    locations_to_ports = pd.MultiIndex.from_frame(
-        _id_association_table_from_csv_array(locs["assembly/manufac project IDs"])
-    )
-    ports_to_locations = pd.MultiIndex.from_frame(
-        _id_association_table_from_csv_array(
-            proj["Port Location IDs"], name="location_id"
-        )[["location_id", "project_id"]]
-    )
-    assert locations_to_ports.symmetric_difference(ports_to_locations).empty
-    return
-
-
 def _add_actionable_and_nearly_certain_classification(projects: pd.DataFrame) -> None:
     actionable_statuses = {
         "Site assessment underway",
@@ -163,61 +190,173 @@ def _add_actionable_and_nearly_certain_classification(projects: pd.DataFrame) ->
     return None
 
 
+def _validate_raw_data(projs: pd.DataFrame, locs: pd.DataFrame) -> None:
+    """
+    Validate the raw data.
+
+    Args:
+        projs (pd.DataFrame): raw projects data
+        locs (pd.DataFrame): raw locations data
+    """
+
+    def assert_primary_key(df: pd.DataFrame, key: list[str] | str) -> None:
+        """Assert that a column is a primary key."""
+        if isinstance(key, str):
+            key = [key]
+        df_dups = df[df.duplicated(subset=key, keep=False)]
+        assert df_dups.empty, f"Duplicate {key}: {df_dups[key]}"
+
+        # assert that the primary key is not null
+        assert df[key].notnull().all().all(), f"Found nulls in {key}."
+
+    # Projects
+    # assert project_id and name are unique, print out duplicates if not
+    assert_primary_key(projs, "project_id")
+    assert_primary_key(projs, "name")
+
+    small_projects = projs[projs["capacity_mw"].lt(100)]
+    n_small_projects = 2
+    assert (
+        len(small_projects) == n_small_projects
+    ), f"Found {len(small_projects)} small projects, expected {n_small_projects}: {small_projects['name']}"
+    assert projs["capacity_mw"].max() < 10_000, "Found unusually large project."
+
+    early_projects = projs[projs["proposed_completion_year"].lt(2022)]
+    n_early_projects = 2
+    assert (
+        len(early_projects) == n_early_projects
+    ), f"Found {len(early_projects)} early projects, expected {n_early_projects}: {early_projects['name']}"
+    late_projects = projs[projs["proposed_completion_year"].ge(2040)]
+    n_late_projects = 0
+    assert (
+        len(late_projects) == n_late_projects
+    ), f"Found {len(late_projects)} early projects, expected {n_late_projects}: {late_projects['name']}"
+
+    # Locations
+    # assert location_id is unique, print out duplicates if not
+    assert_primary_key(locs, "location_id")
+    assert_primary_key(locs, ["raw_city", "raw_state_abbrev", "raw_county"])
+
+
+def _normalize_tables(
+    proj: pd.DataFrame, locs: pd.DataFrame
+) -> dict[str, pd.DataFrame]:
+    """
+    Normalize the project and location tables.
+
+    Create the following tables:
+    - offshore_wind_projects: pk is project_id
+    - offshore_wind_locations: pk is location_id
+    - offshore_wind_projects_cable_landings: association table between projects and locations for cable landings
+    - offshore_wind_port_association: association table between projects and locations for port locations
+
+    Args:
+        proj (pd.DataFrame): raw projects data
+        locs (pd.DataFrame): raw locations data
+
+    Returns:
+        dictionary of normalized tables
+    """
+    tables = {}
+    # locations
+    # TODO: add GEOID to locations table
+
+    # Create association tables
+    association_table_metadata = [
+        {
+            "table_name": "offshore_wind_cable_landing_association",
+            "pk": "project_id",
+            "array_col": "cable_location_ids",
+            "array_col_rename": "location_id",
+        },
+        {
+            "table_name": "offshore_wind_port_association",
+            "pk": "project_id",
+            "array_col": "port_location_ids",
+            "array_col_rename": "location_id",
+        },
+        {
+            "table_name": "offshore_wind_staging_association",
+            "pk": "project_id",
+            "array_col": "staging_location_ids",
+            "array_col_rename": "location_id",
+        },
+    ]
+    for metadata in association_table_metadata:
+        tables[metadata["table_name"]] = _create_association_table(
+            proj, metadata["pk"], metadata["array_col"], metadata["array_col_rename"]
+        )
+        proj = proj.drop(columns=metadata["array_col"])
+
+    # projects
+    _add_actionable_and_nearly_certain_classification(proj)
+    tables["offshore_wind_projects"] = proj
+
+    # locations
+    _add_geocoded_locations(locs)
+    tables["offshore_wind_locations"] = locs
+
+    return tables
+
+
+def _get_column_rename_dict(schema: dict[str, dict[str, str]]) -> dict[str, str]:
+    """Get a dictionary of original column names to renamed column names."""
+    return {
+        original_col_name: metadata["rename_col"]
+        for original_col_name, metadata in schema.items()
+    }
+
+
+def _get_column_dtypes(schema: dict[str, dict[str, str]]) -> dict[str, str]:
+    """Get a dictionary of column names to dtypes."""
+    return {
+        original_col_name: metadata["dtype"]
+        for original_col_name, metadata in schema.items()
+    }
+
+
 def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """Transform offshore wind data."""
-    _validate_raw_data(raw_dfs=raw_dfs)
-    proj = raw_dfs["offshore_projects"].copy()
-    locs = raw_dfs["offshore_locations"].copy()
-    # NOTE: the following column names are not raw names!
-    # They are the results of simplify_columns(), which is called in _transform_columns
-    proj_cols_to_drop = [
-        "proposed_cable_landing",
-        "county_of_cable_landing",
-        "port_locations",
-        "cop_in_process",
-    ]
-    proj_rename_dict = {
-        "size_megawatts": "capacity_mw",
-        "online_date": "proposed_completion_year",
-    }
-    locs_cols_to_drop = [
-        "cable_landing_s",
-        "assembly_manufacturing",
-    ]
-    locs_rename_dict = {
-        "city": "raw_city",
-        "state": "raw_state_abbrev",
-        "county": "raw_county",
-        "county_fips": "raw_county_fips",
-    }
-    _transform_columns(
-        proj, cols_to_drop=proj_cols_to_drop, rename_dict=proj_rename_dict
-    )
-    _transform_columns(
-        locs, cols_to_drop=locs_cols_to_drop, rename_dict=locs_rename_dict
-    )
-
-    proj.loc[:, "recipient_state"].replace({"TBD": pd.NA}, inplace=True)
-    _add_actionable_and_nearly_certain_classification(projects=proj)
-
     transformed_dfs = {}
-    transformed_dfs[
-        "offshore_wind_cable_landing_association"
-    ] = _id_association_table_from_csv_array(locs["cable_project_ids"])
-    transformed_dfs[
-        "offshore_wind_port_association"
-    ] = _id_association_table_from_csv_array(locs["assembly_manufac_project_ids"])
-    # CSV array fields no longer needed (proj CSV fields could be dropped after _validate_raw_data())
-    locs.drop(
-        columns=["cable_project_ids", "assembly_manufac_project_ids"], inplace=True
-    )
-    proj.drop(columns=["cable_location_ids", "port_location_ids"], inplace=True)
 
-    _add_geocoded_locations(locs)
-    # move index into columns
-    locs.reset_index(inplace=True)
-    proj.reset_index(inplace=True)
-    transformed_dfs["offshore_wind_projects"] = proj
-    transformed_dfs["offshore_wind_locations"] = locs
+    proj_rename_dict = _get_column_rename_dict(PROJ_SCHEMA)
+    proj_dtypes = _get_column_dtypes(PROJ_SCHEMA)
+    projs = (
+        raw_dfs["raw_offshore_wind_projects"]
+        .copy()
+        .astype(proj_dtypes)
+        .rename(columns=proj_rename_dict)[proj_rename_dict.values()]
+    )
+    locs_rename_dict = _get_column_rename_dict(LOCS_SCHEMA)
+    locs_dtypes = _get_column_dtypes(LOCS_SCHEMA)
+    locs = (
+        raw_dfs["raw_offshore_wind_locations"]
+        .copy()
+        .astype(locs_dtypes)
+        .rename(columns=locs_rename_dict)[locs_rename_dict.values()]
+    )
+
+    _validate_raw_data(projs, locs)
+
+    # normalize the the tables
+    transformed_dfs = _normalize_tables(projs, locs)
+
+    # add queue_status column to imitate ISO queue status
+    queue_mapping = {
+        "Online": "completed",
+        "Suspended": "withdrawn",
+        "Not started": "active",
+        "Construction underway": "active",
+        "Site assessment underway": "active",
+        "TBD": "active",  # assume active
+    }
+    transformed_dfs["offshore_wind_projects"]["queue_status"] = (
+        transformed_dfs["offshore_wind_projects"]["construction_status"]
+        .fillna("TBD")
+        .map(queue_mapping)
+    )
+    assert (
+        transformed_dfs["offshore_wind_projects"]["queue_status"].notnull().all()
+    ), "Unmapped construction status."
 
     return transformed_dfs

@@ -1,4 +1,5 @@
 """SQL Alchemy metadata for the datawarehouse tables."""
+
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
@@ -1136,18 +1137,30 @@ offshore_wind_projects = Table(
     metadata,
     Column("project_id", Integer, primary_key=True),
     Column("name", String),
-    Column("recipient_state", String),
-    Column("developer", String),
-    Column("capacity_mw", Float),
-    Column("proposed_completion_year", Integer),
-    Column("notes", String),
-    Column("permitting_status", String),
-    Column("contracting_status", String),
-    Column("construction_status", String),
-    Column("overall_project_status", String),
     Column("lease_areas", String),
-    Column("is_actionable", Boolean),
-    Column("is_nearly_certain", Boolean),
+    Column("developer", String),
+    Column("capacity_mw", Integer),
+    Column("proposed_completion_year", Integer),
+    Column("state_power_offtake_agreement_status", String),
+    Column("overall_project_status", String),
+    Column("grid_interconnection", String),
+    Column("contracting_status", String),
+    Column("permitting_status", String),
+    Column("construction_status", String),
+    Column("queue_status", String),
+    Column("federal_source", String),
+    Column("ppa_awarded", String),
+    Column("orec_awarded", String),
+    Column("offtake_agreement_terminated", String),
+    Column("bid_submitted", String),
+    Column("selected_for_negotiations", String),
+    Column("state_contract_held_to_date", String),
+    Column("state_permitting_docs", String),
+    Column("state_source", String),
+    Column("new", String),
+    Column("website", String),
+    Column("is_actionable", Boolean, nullable=True),
+    Column("is_nearly_certain", Boolean, nullable=True),
     schema=schema,
 )
 offshore_wind_locations = Table(
@@ -1160,7 +1173,9 @@ offshore_wind_locations = Table(
     Column("raw_county_fips", String),
     Column("why_of_interest", String),
     Column("priority", String),
+    Column("cable_landing_permitting", String),
     Column("notes", String),
+    Column("source", String),
     Column(
         "county_id_fips",
         String,
@@ -1175,15 +1190,52 @@ offshore_wind_locations = Table(
 offshore_wind_cable_landing_association = Table(
     "offshore_wind_cable_landing_association",
     metadata,
-    Column("location_id", Integer, primary_key=True),
-    Column("project_id", Integer, primary_key=True),
+    Column(
+        "location_id",
+        Integer,
+        ForeignKey("data_warehouse.offshore_wind_locations.location_id"),
+        primary_key=True,
+    ),
+    Column(
+        "project_id",
+        Integer,
+        ForeignKey("data_warehouse.offshore_wind_projects.project_id"),
+        primary_key=True,
+    ),
     schema=schema,
 )
 offshore_wind_port_association = Table(
     "offshore_wind_port_association",
     metadata,
-    Column("location_id", Integer, primary_key=True),
-    Column("project_id", Integer, primary_key=True),
+    Column(
+        "location_id",
+        Integer,
+        ForeignKey("data_warehouse.offshore_wind_locations.location_id"),
+        primary_key=True,
+    ),
+    Column(
+        "project_id",
+        Integer,
+        ForeignKey("data_warehouse.offshore_wind_projects.project_id"),
+        primary_key=True,
+    ),
+    schema=schema,
+)
+offshore_wind_staging_association = Table(
+    "offshore_wind_staging_association",
+    metadata,
+    Column(
+        "location_id",
+        Integer,
+        ForeignKey("data_warehouse.offshore_wind_locations.location_id"),
+        primary_key=True,
+    ),
+    Column(
+        "project_id",
+        Integer,
+        ForeignKey("data_warehouse.offshore_wind_projects.project_id"),
+        primary_key=True,
+    ),
     schema=schema,
 )
 
