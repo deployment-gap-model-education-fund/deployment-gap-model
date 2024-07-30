@@ -7,6 +7,7 @@ import pandas as pd
 
 import dbcp
 from dbcp.constants import OUTPUT_DIR
+from dbcp.extract.fips_tables import CENSUS_URI, TRIBAL_LANDS_URI
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.helpers import enforce_dtypes, psql_insert_copy
 from dbcp.metadata.data_warehouse import metadata
@@ -74,12 +75,10 @@ def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
 
 def etl_fips_tables() -> Dict[str, pd.DataFrame]:
     """Master state and county FIPS table ETL."""
-    census_uri = "gs://dgm-archive/census/tl_2021_us_county.zip"
-    fips = dbcp.extract.fips_tables.extract_fips(census_uri)
+    fips = dbcp.extract.fips_tables.extract_fips(CENSUS_URI)
 
-    tribal_lands_uri = "gs://dgm-archive/census/tl_2021_us_aiannh.zip"
     fips["tribal_land"] = dbcp.extract.fips_tables.extract_census_tribal_land(
-        tribal_lands_uri
+        TRIBAL_LANDS_URI
     )
 
     out = dbcp.transform.fips_tables.transform(fips)

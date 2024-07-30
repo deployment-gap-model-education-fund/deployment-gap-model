@@ -2,6 +2,7 @@
 import logging
 import re
 from pathlib import Path
+from typing import Optional, Union
 
 import google.auth
 from google.cloud import storage
@@ -10,9 +11,9 @@ logger = logging.getLogger(__name__)
 
 
 def cache_gcs_archive_file_locally(
-    uri: Path,
-    local_cache_dir: str = "/app/data/data_cache",
-    revision_num: str = None,
+    uri: str,
+    local_cache_dir: Union[str, Path] = "/app/data/data_cache",
+    revision_num: Optional[str] = None,
 ) -> Path:
     """
     Cache a file stored in the GCS archive locally to a local directory.
