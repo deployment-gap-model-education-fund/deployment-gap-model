@@ -6,7 +6,7 @@ import dbcp.data_mart.counties  # noqa: F401
 import dbcp.data_mart.projects  # noqa: F401
 import dbcp.etl  # noqa: F401
 import dbcp.extract  # noqa: F401
-import dbcp.extract.acp  # noqa: F401
+import dbcp.extract.acp_projects  # noqa: F401
 import dbcp.extract.ballot_ready  # noqa: F401
 import dbcp.extract.eip_infrastructure  # noqa: F401
 import dbcp.extract.epa_avert  # noqa: F401
@@ -27,6 +27,7 @@ import dbcp.helpers  # noqa: F401
 import dbcp.metadata.data_mart  # noqa: F401
 import dbcp.metadata.data_warehouse  # noqa: F401
 import dbcp.metadata.private_data_warehouse  # noqa: F401
+import dbcp.transform.acp_projects  # noqa: F401
 import dbcp.transform.ballot_ready  # noqa: F401
 import dbcp.transform.eip_infrastructure  # noqa: F401
 import dbcp.transform.epa_avert  # noqa: F401

@@ -36,7 +36,7 @@ def _rename_columns(raw_cols: pd.Index) -> pd.Index:
 
 def _col_transform_status(ser: pd.Series) -> pd.Series:
     """Transform status column."""
-    out = ser.str.strip().replace("", np.nan)
+    out = ser.str.strip().replace("", pd.NA)
 
     # set membership validation
     expected_values = {
@@ -45,7 +45,7 @@ def _col_transform_status(ser: pd.Series) -> pd.Series:
         "Advanced Development",
         "Decommissioned",
         "Online | Decommissioned",
-        np.nan,
+        pd.NA,
     }
     is_expected = out.isin(expected_values)
     assert (
@@ -66,7 +66,7 @@ def _col_transform_eia_plant_code(ser: pd.Series) -> pd.Series:
 
 def _col_transform_phase_type(ser: pd.Series) -> pd.Series:
     """Transform phase_type column."""
-    out = ser.str.strip().replace("", np.nan)
+    out = ser.str.strip().replace("", pd.NA)
 
     # set membership validation
     expected_values = {
@@ -74,7 +74,7 @@ def _col_transform_phase_type(ser: pd.Series) -> pd.Series:
         "Wind",
         "Storage",
         "Offshore Wind",
-        np.nan,
+        pd.NA,
     }
     is_expected = out.isin(expected_values)
     assert (
@@ -91,7 +91,7 @@ def _col_transform_iso_rtos(ser: pd.Series) -> pd.Series:
     assert (
         is_multi.mean() < 0.01
     ), f"Too many multi-valued ISO/RTOS: {ser[is_multi].value_counts()}"
-    out = ser.str.split("|", regex=False).str[0].str.strip()
+    out = ser.str.split("|", regex=False).str[0].str.strip().astype(pd.StringDtype())
 
     # Standardize some variations
     mapping = {
@@ -112,7 +112,7 @@ def _col_transform_iso_rtos(ser: pd.Series) -> pd.Series:
         "PJM",
         "SPP",
         "WECC-RMRG",
-        np.nan,
+        pd.NA,
     }
     is_expected = out.isin(expected_values)
     assert (
@@ -129,7 +129,13 @@ def _col_transform_owner_types(ser: pd.Series) -> pd.Series:
     assert (
         is_multi.mean() < 0.02
     ), f"Too many multi-valued owner types: {ser[is_multi].value_counts()}"
-    out = ser.str.split("|", regex=False).str[0].str.strip().replace("Unknown", np.nan)
+    out = (
+        ser.str.split("|", regex=False, n=1)
+        .str[0]
+        .str.strip()
+        .astype(pd.StringDtype())
+        .replace("Unknown", pd.NA)
+    )
 
     # set membership validation
     expected_values = {
@@ -150,7 +156,7 @@ def _col_transform_owner_types(ser: pd.Series) -> pd.Series:
         "Utility: Municipal",
         "Utility: Political Subdivison",
         "Utility: State",
-        np.nan,
+        pd.NA,
     }
     is_expected = out.isin(expected_values)
     assert (
@@ -197,11 +203,16 @@ def _transform_location_cols(
     #    have multivalued entries.
 
     # first check dtypes
-    assert full_df["raw_avg_latitude"].dtype == np.float64, "Latitude is not float64"
-    assert full_df["raw_avg_longitude"].dtype == np.float64, "Longitude is not float64"
+    assert (
+        full_df["raw_avg_latitude"].dtype == pd.Float64Dtype()
+    ), "Latitude is not float64"
+    assert (
+        full_df["raw_avg_longitude"].dtype == pd.Float64Dtype()
+    ), "Longitude is not float64"
+    county_shapes["GEOID"] = county_shapes["GEOID"].astype(pd.StringDtype())
     points = gpd.GeoSeries.from_xy(
-        full_df["raw_avg_longitude"],
-        full_df["raw_avg_latitude"],
+        full_df["raw_avg_longitude"].astype(np.float64),
+        full_df["raw_avg_latitude"].astype(np.float64),
         index=full_df.index,
         crs=county_shapes.crs,
     ).to_frame("lat_lon")
@@ -222,17 +233,21 @@ def _transform_location_cols(
     is_multivalued = full_df["raw_states"].str.contains("|", regex=False).fillna(
         False
     ) | full_df["raw_counties"].str.contains("|", regex=False).fillna(False)
-    fips_state_county = add_county_fips_with_backup_geocoding(
-        full_df.loc[~is_multivalued, ["raw_states", "raw_counties"]].apply(
-            lambda s: s.str.strip(), axis=1
-        ),
-        state_col="raw_states",
-        locality_col="raw_counties",
-    ).rename(
-        columns={
-            "county_id_fips": "geocoded_county_id_fips",
-            "state_id_fips": "geocoded_state_id_fips",
-        }
+    fips_state_county = (
+        add_county_fips_with_backup_geocoding(
+            full_df.loc[~is_multivalued, ["raw_states", "raw_counties"]].apply(
+                lambda s: s.str.strip(), axis=1
+            ),
+            state_col="raw_states",
+            locality_col="raw_counties",
+        )
+        .rename(
+            columns={
+                "county_id_fips": "geocoded_county_id_fips",
+                "state_id_fips": "geocoded_state_id_fips",
+            }
+        )
+        .convert_dtypes()
     )
     joined = fips_lat_lon.join(fips_state_county, how="outer").join(
         full_df[["raw_avg_longitude", "raw_avg_latitude"]].rename(
@@ -258,7 +273,7 @@ def _transform_location_cols(
     #       tail scenarios that I won't bother making individual fixes for. Most are
     #       functionally resolved (though perhaps incorrectly) with .fillna().
 
-    has_null_raw_county = full_df["raw_counties"].str.strip().replace("", np.nan).isna()
+    has_null_raw_county = full_df["raw_counties"].str.strip().replace("", pd.NA).isna()
     # anywhere raw_county is null, geocoded county FIPS should be null but state fips
     # should be included (some erroneous county results for offshore projects where
     # "<blank>, NY" is mapped to New York City)
@@ -270,7 +285,7 @@ def _transform_location_cols(
             "geocoded_locality_type",
             "geocoded_containing_county",
         ],
-    ] = np.nan
+    ] = pd.NA
     joined["county_id_fips"] = joined["geocoded_county_id_fips"].fillna(
         joined["GEOID"].astype(pd.StringDtype())
     )
@@ -281,7 +296,7 @@ def _transform_location_cols(
     failed_sjoin = joined["GEOID"].isna()
     joined.loc[
         failed_sjoin & has_point & ~is_offshore, ["avg_latitude", "avg_longitude"]
-    ] = np.nan
+    ] = pd.NA
     joined.rename(columns={"GEOID": "census_county_id_fips"}, inplace=True)
 
     # fill in any remaining missing and multi-valued entries with the first value
@@ -289,13 +304,17 @@ def _transform_location_cols(
     first_vals = full_df.loc[is_missing_multi, ["raw_states", "raw_counties"]].apply(
         lambda s: s.str.split("|", n=1).str[0].str.strip(), axis=1
     )
-    first_geocoded = add_county_fips_with_backup_geocoding(
-        first_vals, state_col="raw_states", locality_col="raw_counties"
-    ).rename(
-        columns={
-            "county_id_fips": "geocoded_county_id_fips",
-            "state_id_fips": "geocoded_state_id_fips",
-        }
+    first_geocoded = (
+        add_county_fips_with_backup_geocoding(
+            first_vals, state_col="raw_states", locality_col="raw_counties"
+        )
+        .rename(
+            columns={
+                "county_id_fips": "geocoded_county_id_fips",
+                "state_id_fips": "geocoded_state_id_fips",
+            }
+        )
+        .convert_dtypes()
     )
     geo_cols = [
         "geocoded_locality_name",
@@ -356,10 +375,12 @@ def _make_surrogate_key(raw_df: pd.DataFrame) -> pd.Series:
     ]
     dupes = raw_df.duplicated(subset=pk, keep=False)
     assert not dupes.any(), f"Uniqueness violation: {dupes.sum()} duplicate PKs found."
-    assert raw_df["MW_Total_Capacity"].dtype == float, "Capacity is not float dtype"
+    assert (
+        raw_df["MW_Total_Capacity"].dtype == pd.Float64Dtype()
+    ), "Capacity is not float dtype"
 
     to_hash = raw_df.loc[:, pk].copy()
-    str_cols = to_hash.select_dtypes(include="object").columns
+    str_cols = to_hash.select_dtypes(include="string").columns
     to_hash[str_cols] = to_hash[str_cols].apply(
         lambda s: s.str.strip().str.lower(), axis=1
     )
@@ -389,10 +410,10 @@ def _int_id_from_str(s: str) -> int:
     return int_id
 
 
-def transform(raw_df: pd.DataFrame) -> pd.DataFrame:
+def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """Transform and clean ACP projects data."""
     # rename columns
-    trans = raw_df.copy()
+    trans = raw_dfs["raw_acp_projects"].convert_dtypes()
     surrogate_key = _make_surrogate_key(trans)  # uses raw column names
     trans.columns = _rename_columns(trans.columns)
     trans["proj_id"] = surrogate_key  # assign after renaming columns
@@ -434,4 +455,4 @@ def transform(raw_df: pd.DataFrame) -> pd.DataFrame:
         "raw_owners",
     ]
     out.drop(columns=cols_to_drop, inplace=True)
-    return out
+    return {"acp_projects": out}
