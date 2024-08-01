@@ -725,3 +725,18 @@ projects_status_codes_860m = Table(
     Column("description", String),
     schema=schema,
 )
+
+county_concrete_mw = Table(
+    "county_concrete_mw",
+    metadata,
+    Column("state_id_fips", String),
+    Column("county_id_fips", String),
+    Column("state", String),
+    Column("county", String),
+    Column("resource_type", String),
+    Column("iso_rto", String),
+    Column("capacity_under_construction_mw", Float),
+    Column("capacity_awaiting_permitting_mw", Float),
+    Column("capacity_total_proposed_mw", Float),
+    schema=schema,
+)
