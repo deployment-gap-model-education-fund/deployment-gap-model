@@ -18,7 +18,7 @@ def _get_concrete_aggs(engine: sa.engine.Engine) -> pd.DataFrame:
             CASE -- need to pick 'MWH' out of the 'other' category
                 WHEN energy_source_code_1 = 'MWH' THEN 'storage'
                 ELSE fuel_type_code_pudl
-            END AS resource_type,
+            END AS resource_clean,
             CASE -- map to ACP categories
                 WHEN operational_status_code <= 3 THEN 'Advanced Development'
                 WHEN operational_status_code > 3 THEN 'Under Construction'
@@ -31,22 +31,22 @@ def _get_concrete_aggs(engine: sa.engine.Engine) -> pd.DataFrame:
     ),
     acp AS (
         SELECT
-            eia_plant_code as plant_id_eia,
+            plant_id_eia,
             NULL as generator_id,
-            mw_total_capacity as capacity_mw,
+            capacity_mw,
             CASE -- 860m doesn't separate offshore from onshore wind
-                WHEN phase_type = 'Offshore Wind' THEN 'wind'
-                ELSE lower(phase_type)
-            END AS resource_type,
+                WHEN resource = 'Offshore Wind' THEN 'wind'
+                ELSE lower(resource)
+            END AS resource_clean,
             status,
             county_id_fips,
-            iso_rtos as iso_rto
+            iso_region
         from private_data_warehouse.acp_projects as acp
         where status in ('Advanced Development', 'Under Construction')
             AND NOT EXISTS (
                 SELECT 1
                 FROM eia860m
-                WHERE eia860m.plant_id_eia = acp.eia_plant_code
+                WHERE eia860m.plant_id_eia = acp.plant_id_eia
             )
     ),
     all_projects AS (
@@ -57,8 +57,8 @@ def _get_concrete_aggs(engine: sa.engine.Engine) -> pd.DataFrame:
     aggs as (
         SELECT
             county_id_fips,
-            resource_type,
-            -- iso_rtos,  I don't have this for 860m yet
+            resource_clean,
+            -- iso_region,  I don't have this for 860m yet
             -- pivot the statuses into columns per client request
             SUM(
                 CASE
@@ -81,13 +81,13 @@ def _get_concrete_aggs(engine: sa.engine.Engine) -> pd.DataFrame:
         cfips.county_name as county,
         substr(aggs.county_id_fips, 1, 2) as state_id_fips,
         aggs.*,
-        NULL as iso_rto
+        NULL as iso_region
     from aggs
     LEFT JOIN data_warehouse.county_fips AS cfips
     ON aggs.county_id_fips = cfips.county_id_fips
     LEFT JOIN data_warehouse.state_fips AS sfips
     ON substr(aggs.county_id_fips, 1, 2) = sfips.state_id_fips
-    order by state, county, resource_type
+    order by state, county, resource_clean
     ;
     """
     df = pd.read_sql(query, engine)

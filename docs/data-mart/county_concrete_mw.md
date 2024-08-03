@@ -4,11 +4,11 @@ This table contains county-level aggregates of in-progress power generation proj
 
 ## Column Descriptions
 
-**Unique Key Column(s):** (`county_id_fips`, `resource_type`, `iso_rto`)
+**Unique Key Column(s):** (`county_id_fips`, `resource_clean`, `iso_region`)
 |Subject|Column|Description|Source|Notes|
 |----|----|----|----|----|
-|Identifiers|`resource_type`|Fuel or project type|EIA 860m or ACP||
-||`iso_rto`|The ISO/RTO the project will belong to. Usually 1:1 with county, but border counties may have multiple ISO/RTOs|EIA 860m or ACP||
+|Identifiers|`resource_clean`|Fuel or project type|EIA 860m or ACP||
+||`iso_region`|The ISO/RTO the project will belong to. Usually 1:1 with county, but border counties may have multiple ISO/RTOs|EIA 860m or ACP||
 ||`county_id_fips`|County FIPS ID|Census||
 |Location|`state_id_fips`|State FIPS ID|Census||
 ||`state`|State Name|Census||
@@ -32,7 +32,7 @@ About 0.5% of ACP projects are associated with multiple counties. For the sake o
 
 ### Project Status
 
-The `capacity_under_construction_mw` contains ACP projects with the status "Under Construction" and EIA 860m projects with `operational_status_code` equal to 4, 5, or 6, which correspond to EIA status codes U, V, or TS. The `capacity_awaiting_permitting_mw` contains ACP projects with the status "Advanged Development" and EIA 860m projects with `operational_status_code` equal to 1, 2 or 3, which correspond to EIA status codes P, L, or T. The `capacity_total_proposed_mw` is the sum of the other two columns.
+The `capacity_under_construction_mw` contains ACP projects with the status "Under Construction" and EIA 860m projects with `operational_status_code` equal to 4, 5, or 6, which correspond to EIA status codes U, V, or TS. The `capacity_awaiting_permitting_mw` contains ACP projects with the status "Advanced Development" and EIA 860m projects with `operational_status_code` equal to 1, 2 or 3, which correspond to EIA status codes P, L, or T. The `capacity_total_proposed_mw` is the sum of the other two columns.
 
 See the documentation for `projects_status_codes_860m` for more details about EIA operational status codes.
 

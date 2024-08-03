@@ -21,7 +21,7 @@ def _rename_columns(raw_cols: pd.Index) -> pd.Index:
         return re.sub("([a-z0-9])([A-Z])", r"\1_\2", name).lower()
 
     renamed = [_camel_to_snake(col) for col in raw_cols]
-    # fix a few cases with adjacent capital letters prepend 'raw_'
+    # fix a few cases with adjacent capital letters
     rename_dict = {
         "pparates": "ppa_rates",
         "ppastart_years": "ppa_start_years",
@@ -360,13 +360,16 @@ def _make_surrogate_key(raw_df: pd.DataFrame) -> pd.Series:
     # compatibility. I'll use the raw data but use mild string cleaning to avoid minor
     # changes.
 
-    # (Status, PhaseName, PhaseType, MW_Total_Capacity, States, Counties, Owners) pretty
-    # much fully specifies a project. But this maximally unique key includes many
+    # (ProjectName, PhaseName) is unique but I'm not sure if we can rely on it in the
+    # future; there are collisions in each column individually but ACP might not allow
+    # collisions on the tuples. I'm just not sure.
+    # (ProjectName, PhaseName, PhaseType, MW_Total_Capacity, States, Counties, Owners)
+    # pretty much fully specifies a project. But this maximally unique key includes many
     # columns, which risks breaking linkages over time if any values change, such as a
     # change in capacity or ownership.
-    # I'll drop Status because it is expected to change and Owners because it is likely
-    # to change over time.
+    # I'll drop Owners because it seems very likely to change over time.
     pk = [
+        "ProjectName",
         "PhaseName",
         "PhaseType",
         "MW_Total_Capacity",
@@ -454,5 +457,13 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         "raw_developers",
         "raw_owners",
     ]
+    # standardize some column names to match existing sources
+    rename_dict = {
+        "eia_plant_code": "plant_id_eia",  # match PUDL
+        "iso_rtos": "iso_region",  # match LBNL
+        "phase_type": "resource",  # match LBNL/gridstatus
+        "mw_total_capacity": "capacity_mw",  # match PUDL/LBNL/gridstatus
+    }
+    out.rename(columns=rename_dict, inplace=True)
     out.drop(columns=cols_to_drop, inplace=True)
     return {"acp_projects": out}
