@@ -6,8 +6,6 @@ This table contains the most recent information from EIA 860m for each generator
 
 **Unique Key Column(s):** (`plant_id_eia`, `generator_id`)
 
-Column("report_date", DateTime),  # not primary key. Only one row per generator here
-
 |Subject|Column|Description|Source|Notes|
 |----|----|----|----|----|
 |Identifiers|`plant_id_eia`|The EIA Plant ID number|EIA||

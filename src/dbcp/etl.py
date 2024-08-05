@@ -2,13 +2,14 @@
 
 import logging
 from pathlib import Path
-from typing import Dict
+from typing import Callable, Dict
 
 import pandas as pd
 import sqlalchemy as sa
 
 import dbcp
 from dbcp.constants import OUTPUT_DIR
+from dbcp.extract.fips_tables import CENSUS_URI, TRIBAL_LANDS_URI
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.helpers import enforce_dtypes, psql_insert_copy
 from dbcp.transform.fips_tables import SPATIAL_CACHE
@@ -75,12 +76,10 @@ def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
 
 def etl_fips_tables() -> Dict[str, pd.DataFrame]:
     """Master state and county FIPS table ETL."""
-    census_uri = "gs://dgm-archive/census/tl_2021_us_county.zip"
-    fips = dbcp.extract.fips_tables.extract_fips(census_uri)
+    fips = dbcp.extract.fips_tables.extract_fips(CENSUS_URI)
 
-    tribal_lands_uri = "gs://dgm-archive/census/tl_2021_us_aiannh.zip"
     fips["tribal_land"] = dbcp.extract.fips_tables.extract_census_tribal_land(
-        tribal_lands_uri
+        TRIBAL_LANDS_URI
     )
 
     out = dbcp.transform.fips_tables.transform(fips)
@@ -184,16 +183,15 @@ def etl_manual_ordinances() -> dict[str, pd.DataFrame]:
     return transformed
 
 
-def etl_private_dataset() -> dict[str, pd.DataFrame]:
-    """ETL private dataset."""
+def etl_acp_projects() -> dict[str, pd.DataFrame]:
+    """ETL ACP projects."""
     acp_uri = "gs://dgm-archive/acp/projects_Q2_2024.csv"
-    _ = dbcp.extract.acp.extract(acp_uri)
-    return {
-        "private_table": pd.DataFrame({"id": ["1"], "private_data": ["private_data"]})
-    }
+    raw_dfs = dbcp.extract.acp_projects.extract(acp_uri)
+    transformed = dbcp.transform.acp_projects.transform(raw_dfs)
+    return transformed
 
 
-def run_etl(funcs: dict[str, callable], schema_name: str):
+def run_etl(funcs: dict[str, Callable], schema_name: str):
     """Execute etl functions and save outputs to parquet and postgres."""
     engine = dbcp.helpers.get_sql_engine()
     with engine.connect() as con:
@@ -240,7 +238,7 @@ def etl(args):
 
     # Run private ETL functions
     etl_funcs = {
-        "private_dataset": etl_private_dataset,
+        "acp_projects": etl_acp_projects,
     }
     run_etl(etl_funcs, "private_data_warehouse")
 

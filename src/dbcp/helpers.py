@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 SA_TO_BQ_TYPES = {
     "VARCHAR": "STRING",
     "INTEGER": "INTEGER",
+    "BIGINT": "INTEGER",
     "FLOAT": "FLOAT",
     "BOOLEAN": "BOOL",
     "DATETIME": "DATETIME",
@@ -28,6 +29,7 @@ SA_TO_BQ_TYPES = {
 SA_TO_PD_TYPES = {
     "VARCHAR": "string",
     "INTEGER": "Int64",
+    "BIGINT": "Int64",
     "FLOAT": "float64",
     "BOOLEAN": "boolean",
     "DATETIME": "datetime64[ns]",
