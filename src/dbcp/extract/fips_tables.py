@@ -1,6 +1,6 @@
 """Extract canonical state and county FIPS tables from the addfips library."""
+from functools import lru_cache
 from importlib.resources import files
-from pathlib import Path
 from typing import Dict
 
 import addfips
@@ -9,8 +9,13 @@ import pandas as pd
 
 import dbcp
 
+# originally from https://www2.census.gov/geo/tiger/TIGER2021/
+CENSUS_URI = "gs://dgm-archive/census/tl_2021_us_county.zip"
+TRIBAL_LANDS_URI = "gs://dgm-archive/census/tl_2021_us_aiannh.zip"
 
-def _extract_census_counties(census_uri: Path) -> pd.DataFrame:
+
+@lru_cache(maxsize=1)  # county boundaries are also used in some transform modules
+def _extract_census_counties(census_uri: str) -> pd.DataFrame:
     """Extract canonical county FIPS tables from census data.
 
     Args:
@@ -21,7 +26,7 @@ def _extract_census_counties(census_uri: Path) -> pd.DataFrame:
     return counties
 
 
-def extract_census_tribal_land(archive_uri: Path) -> pd.DataFrame:
+def extract_census_tribal_land(archive_uri: str) -> pd.DataFrame:
     """Extract Tribal land in the census.
 
     Args:

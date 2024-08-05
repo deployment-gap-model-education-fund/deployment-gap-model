@@ -1,4 +1,5 @@
 """Small helper functions for dbcp etl."""
+
 import csv
 import logging
 import os
@@ -20,6 +21,7 @@ logger = logging.getLogger(__name__)
 SA_TO_BQ_TYPES = {
     "VARCHAR": "STRING",
     "INTEGER": "INTEGER",
+    "BIGINT": "INTEGER",
     "FLOAT": "FLOAT",
     "BOOLEAN": "BOOL",
     "DATETIME": "DATETIME",
@@ -27,6 +29,7 @@ SA_TO_BQ_TYPES = {
 SA_TO_PD_TYPES = {
     "VARCHAR": "string",
     "INTEGER": "Int64",
+    "BIGINT": "Int64",
     "FLOAT": "float64",
     "BOOLEAN": "boolean",
     "DATETIME": "datetime64[ns]",
@@ -47,6 +50,8 @@ def get_schema_sql_alchemy_metadata(schema: str) -> sa.MetaData:
         return dbcp.metadata.data_mart.metadata
     elif schema == "data_warehouse":
         return dbcp.metadata.data_warehouse.metadata
+    elif schema == "private_data_warehouse":
+        return dbcp.metadata.private_data_warehouse.metadata
     else:
         raise ValueError(f"{schema} is not a valid schema.")
 
