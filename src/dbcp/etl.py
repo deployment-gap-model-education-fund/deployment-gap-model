@@ -117,10 +117,10 @@ def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
 def etl_offshore_wind() -> dict[str, pd.DataFrame]:
     """ETL manually curated offshore wind data."""
     projects_path = (
-        "gs://dgm-archive/synapse/offshore_wind/offshore_wind_projects_Q2_2024.csv"
+        "gs://dgm-archive/synapse/offshore_wind/offshore_wind_projects_2024-08-01.csv"
     )
     locations_path = (
-        "gs://dgm-archive/synapse/offshore_wind/offshore_wind_locations_Q2_2024.csv"
+        "gs://dgm-archive/synapse/offshore_wind/offshore_wind_locations_2024-08-05.csv"
     )
 
     raw_offshore_dfs = dbcp.extract.offshore_wind.extract(
@@ -236,14 +236,9 @@ def etl(args):
     GEOCODER_CACHE.reduce_size()
     SPATIAL_CACHE.reduce_size()
 
-    # Run private ETL functions
-    etl_funcs = {
-        "acp_projects": etl_acp_projects,
-    }
-    run_etl(etl_funcs, "private_data_warehouse")
-
     # Run public ETL functions
     etl_funcs = {
+        "offshore_wind": etl_offshore_wind,
         "gridstatus": etl_gridstatus_isoqueues,
         "manual_ordinances": etl_manual_ordinances,
         "epa_avert": etl_epa_avert,
@@ -252,7 +247,6 @@ def etl(args):
         "energy_communities_by_county": etl_energy_communities_by_county,
         "fips_tables": etl_fips_tables,
         "protected_area_by_county": etl_protected_area_by_county,
-        "offshore_wind": etl_offshore_wind,
         "justice40_tracts": etl_justice40,
         "nrel_wind_solar_ordinances": etl_nrel_ordinances,
         "lbnl_iso_queue": etl_lbnl_iso_queue,
@@ -261,6 +255,12 @@ def etl(args):
         "ballot_ready": etl_ballot_ready,
     }
     run_etl(etl_funcs, "data_warehouse")
+
+    # Run private ETL functions
+    etl_funcs = {
+        "acp_projects": etl_acp_projects,
+    }
+    run_etl(etl_funcs, "private_data_warehouse")
 
     logger.info("Sucessfully finished ETL.")
 
