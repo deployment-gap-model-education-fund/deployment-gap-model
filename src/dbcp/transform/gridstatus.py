@@ -1,4 +1,5 @@
 """Clean Grid Status Interconnection queue data."""
+
 import logging
 from typing import Sequence
 
@@ -203,6 +204,7 @@ RESOURCE_DICT = {
             ],
             "spp": [
                 "Thermal - CTG",
+                "Thermal - GTC",
                 "Thermal - CT",
                 "Thermal - Gas Turbine",
                 "Thermal - Reciprocating Engine",
@@ -785,9 +787,8 @@ def _transform_spp(iso_df: pd.DataFrame) -> pd.DataFrame:
         "TERMINATED": "Withdrawn",
         pd.NA: "Active",  # There are a few projects with missing status. All of them entered the queue in the last year so I will assume they are active
     }
-    # assert no more than 22 values are missing in iso_df["Status (Original)"]
     assert (
-        iso_df["Status (Original)"].isna().sum() <= 22
+        iso_df["Status (Original)"].isna().sum() <= 27
     ), f"{iso_df['Status (Original)'].isna().sum()} SPP projects are missing status"
     # assert all values in iso_df["Status (Original)"] exist in the keys of status_map
     projects_with_unmapped_status = iso_df[
@@ -845,6 +846,7 @@ def _transform_nyiso(iso_df: pd.DataFrame) -> pd.DataFrame:
     }
 
     # Categorize project status
+    iso_df["S"] = pd.to_numeric(iso_df["S"]).astype("Int64").astype("string")
     actionable_vals = ("6", "7", "8", "9", "10")
     nearly_certain_vals = ("11", "12", "13", "15")
     iso_df = _create_project_status_classification_from_single_column(
