@@ -1,4 +1,5 @@
 """Upload the parquet files to GCS and load them into BigQuery."""
+import typing
 from pathlib import Path
 from typing import Literal
 
@@ -8,11 +9,14 @@ from google.cloud import bigquery, storage
 
 from dbcp.constants import OUTPUT_DIR
 
+DataDirectoryLiteral = Literal["data_warehouse", "data_mart", "private_data_warehouse"]
+VALID_DIRECTORIES = typing.get_args(DataDirectoryLiteral)
+
 
 def upload_parquet_directory_to_gcs(
     directory_path: str,
     bucket_name: str,
-    destination_blob_prefix: Literal["data_warehouse", "data_mart"],
+    destination_blob_prefix: DataDirectoryLiteral,
     version: str,
 ):
     """
@@ -50,7 +54,7 @@ def upload_parquet_directory_to_gcs(
 
 def load_parquet_files_to_bigquery(
     bucket_name: str,
-    destination_blob_prefix: Literal["data_warehouse", "data_mart"],
+    destination_blob_prefix: DataDirectoryLiteral,
     version: str,
 ):
     """
@@ -110,13 +114,19 @@ def load_parquet_files_to_bigquery(
 
 @click.command()
 @click.option("--build-ref")
-def publish_outputs(build_ref: str):
+@click.option(
+    "-d",
+    "--directories",
+    type=click.Choice(VALID_DIRECTORIES),
+    multiple=True,
+    default=VALID_DIRECTORIES,
+)
+def publish_outputs(build_ref: str, directories: DataDirectoryLiteral):
     """Publish outputs to Google Cloud Storage and Big Query.
 
     Args:
         build_ref (str): The github build reference to use for the outputs.
     """
-    directories = ("data_warehouse", "data_mart")
     bucket_name = "dgm-outputs"
 
     print(f"Project ID: {google.auth.default()}")
