@@ -95,7 +95,8 @@ def _col_transform_iso_rtos(ser: pd.Series) -> pd.Series:
 
     # Standardize some variations
     mapping = {
-        "ISO New England": "ISO-NE",
+        "ISO New England": "ISONE",  # make consistent with LBNL/Gridstatus
+        "ISO-NE": "ISONE",  # make consistent with LBNL/Gridstatus
         "Midcontinent Independent System Operator (MISO)": "MISO",
         "PJM Interconnection": "PJM",
         "Southwest Power Pool": "SPP",
@@ -106,7 +107,7 @@ def _col_transform_iso_rtos(ser: pd.Series) -> pd.Series:
     expected_values = {
         "CAISO",
         "ERCOT",
-        "ISO-NE",
+        "ISONE",
         "MISO",
         "NYISO",
         "PJM",

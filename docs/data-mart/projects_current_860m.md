@@ -13,6 +13,7 @@ This table contains the most recent information from EIA 860m for each generator
 |Properties|`plant_name_eia`|The name of the plant|EIA||
 ||`utility_id_eia`|The EIA Utility ID number|EIA||
 ||`utility_name_eia`|The name of the utility|EIA||
+||`iso_region`|The abbreviation of the ISO/RTO or Balancing Authority in which the project participates|EIA||
 ||`capacity_mw`|The generator's capacity in megawatts|EIA||
 ||`fuel_type_code_pudl`|The PUDL fuel type code|PUDL||
 ||`prime_mover_code`|The EIA prime mover code|EIA||
@@ -37,6 +38,8 @@ This table contains the most recent information from EIA 860m for each generator
 ||`county_id_fips`|The FIPS code for the county in which the generator is located|EIA||
 ||`latitude`|The latitude of the generator|EIA||
 ||`longitude`|The longitude of the generator|EIA||
+||`raw_state`|The state in which the generator is located, per original data|EIA||
+||`raw_county`|The county in which the generator is located, per original data|EIA||
 
 ## Operational Status Codes
 
