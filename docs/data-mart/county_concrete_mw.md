@@ -8,7 +8,7 @@ This table contains county-level aggregates of in-progress power generation proj
 |Subject|Column|Description|Source|Notes|
 |----|----|----|----|----|
 |Identifiers|`resource_clean`|Fuel or project type|EIA 860m or ACP||
-||`iso_region`|The ISO/RTO the project will belong to. Usually 1:1 with county, but border counties may have multiple ISO/RTOs|EIA 860m or ACP||
+||`iso_region`|The ISO/RTO or Balancing Authority the project will belong to. Usually 1 per county, but border counties may have multiple.|EIA 860m or ACP||
 ||`county_id_fips`|County FIPS ID|Census||
 |Location|`state_id_fips`|State FIPS ID|Census||
 ||`state`|State Name|Census||

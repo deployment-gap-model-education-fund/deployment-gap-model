@@ -995,15 +995,24 @@ def get_eia860m_current(engine: sa.engine.Engine) -> pd.DataFrame:
     Args:
         engine (sa.engine.Engine): connection to the data warehouse database
     """
-    date_as_of = (
-        pd.read_sql(
-            "SELECT max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog",
-            engine,
-        )
-        .iat[0, 0]
-        .strftime("%Y-%m-%d")
+    query = """
+    WITH
+    -- 3307 / 33943 current projects are missing a balancing authority code (mostly
+    -- retired projects). But a simple county lookup can fill in half (1642 / 3307) of them:
+    -- 1932 / 2400 counties with a project missing a BA code have a single unique
+    -- BA code among the other projects in that county. These are a pretty safe bet
+    -- to impute. Counties with multiple or zero BAs are not imputed.
+    imputed_bal_auth AS (
+        SELECT
+            county_id_fips,
+            max(balancing_authority_code_eia) as unique_ba  -- only one unique value
+        FROM data_warehouse.pudl_eia860m_changelog
+        WHERE valid_until_date = (
+            select max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog
+            )
+        GROUP BY 1
+        HAVING count(distinct balancing_authority_code_eia) = 1
     )
-    query = f"""
     SELECT
         report_date,
         plant_id_eia,
@@ -1012,10 +1021,23 @@ def get_eia860m_current(engine: sa.engine.Engine) -> pd.DataFrame:
         utility_name_eia,
         generator_id,
         capacity_mw,
-        state,
-        county,
+        eia.state_id_fips,
+        eia.county_id_fips,
+        sfips.state_name as state,
+        cfips.county_name as county,
+        -- 1. Impute BA codes
+        -- 2. Convert EIA ISO abbreviations to match those used in LBNL/GridStatus
+        -- 3. Name it iso_region for consistency with LBNL/GridStatus ISO queues
+        CASE COALESCE(balancing_authority_code_eia, imputed_ba.unique_ba)
+            WHEN 'CISO' THEN 'CAISO'
+            WHEN 'ERCO' THEN 'ERCOT'
+            WHEN 'ISNE' THEN 'ISONE'
+            WHEN 'NYIS' THEN 'NYISO'
+            WHEN 'SWPP ' THEN 'SPP'
+            -- MISO and PJM are unchanged
+            ELSE COALESCE(balancing_authority_code_eia, imputed_ba.unique_ba)
+        END as iso_region,
         current_planned_generator_operating_date,
-        -- data_maturity,
         energy_source_code_1,
         prime_mover_code,
         energy_storage_capacity_mwh,
@@ -1023,7 +1045,6 @@ def get_eia860m_current(engine: sa.engine.Engine) -> pd.DataFrame:
         generator_retirement_date,
         latitude,
         longitude,
-        -- net_capacity_mwdc,
         operational_status_code,
         operational_status AS operational_status_category,
         raw_operational_status_code,
@@ -1033,13 +1054,18 @@ def get_eia860m_current(engine: sa.engine.Engine) -> pd.DataFrame:
         planned_net_summer_capacity_uprate_mw,
         planned_uprate_date,
         technology_description,
-        -- summer_capacity_mw,
-        -- winter_capacity_mw,
-        -- valid_until_date
-        state_id_fips,
-        county_id_fips
-    FROM data_warehouse.pudl_eia860m_changelog
-    WHERE valid_until_date = '{date_as_of}'
+        state as raw_state,
+        county as raw_county
+    FROM data_warehouse.pudl_eia860m_changelog as eia
+    LEFT JOIN data_warehouse.state_fips as sfips
+    USING (state_id_fips)
+    LEFT JOIN data_warehouse.county_fips as cfips
+    USING (county_id_fips)
+    LEFT JOIN imputed_bal_auth as imputed_ba
+    ON eia.county_id_fips = imputed_ba.county_id_fips
+    WHERE valid_until_date = (
+        select max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog
+        )
     ORDER BY plant_id_eia, generator_id
     """
     current_projects = pd.read_sql(query, engine)
