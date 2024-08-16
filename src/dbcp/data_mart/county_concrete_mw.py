@@ -9,6 +9,15 @@ from dbcp.helpers import get_sql_engine
 
 
 def _get_concrete_aggs(engine: sa.engine.Engine) -> pd.DataFrame:
+    """Create county-level aggregates of "concrete" projects from EIA860m and ACP data.
+
+    The term and definition of "concrete" projects is defined by the client. It consists
+    of proposed ACP projects that are either in "advanced development" or
+    "under construction" as well as proposed EIA860m projects in a similar state,
+    defined by operational status codes 1-3 and 4-6, respectively.
+
+    When joining ACP and EIA860m data, the EIA860m data is prioritized in any conflicts.
+    """
     eia860m = get_eia860m_current(engine=engine)
     # subset to proposed projects
     is_proposed = eia860m["operational_status_code"].between(1, 6, inclusive="both")
