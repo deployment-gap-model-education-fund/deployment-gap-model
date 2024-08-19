@@ -58,8 +58,8 @@ def etl_columbia_local_opp() -> Dict[str, pd.DataFrame]:
 
 def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
     """Pull tables from pudl sqlite database."""
-    raw_pudl_tables = dbcp.extract.pudl.extract()
-    return dbcp.transform.pudl.transform(raw_pudl_tables)
+    raw_pudl_tables = dbcp.extract.pudl_data.extract()
+    return dbcp.transform.pudl_data.transform(raw_pudl_tables)
 
 
 def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
