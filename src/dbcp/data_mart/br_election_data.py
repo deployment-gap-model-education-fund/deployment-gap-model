@@ -91,7 +91,7 @@ def _create_county_commission_elections_long(
     comissioner_elections = comissioner_elections.rename(columns=rename_dict)
 
     assert ~comissioner_elections.duplicated(
-        subset=["county_id_fips", "election_id"]
+        subset=["county_id_fips", "election_id", "is_primary"]
     ).any(), "County comissioner election primary key is not unique."
     assert (
         comissioner_elections.total_n_seats >= comissioner_elections.total_n_races
@@ -183,3 +183,9 @@ def create_data_mart(
         county_commission_elections_long
     )
     return dfs
+
+
+if __name__ == "__main__":
+    # debugging entry point
+    create_data_mart()
+    print("yay")
