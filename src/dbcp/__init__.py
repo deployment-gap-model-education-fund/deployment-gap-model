@@ -21,7 +21,7 @@ import dbcp.extract.ncsl_state_permitting  # noqa: F401
 import dbcp.extract.nrel_wind_solar_ordinances  # noqa: F401
 import dbcp.extract.offshore_wind  # noqa: F401
 import dbcp.extract.protected_area_by_county  # noqa: F401
-import dbcp.extract.pudl  # noqa: F401
+import dbcp.extract.pudl_data  # noqa: F401
 import dbcp.extract.rmi_energy_communities  # noqa: F401
 import dbcp.helpers  # noqa: F401
 import dbcp.metadata.data_mart  # noqa: F401
@@ -41,6 +41,6 @@ import dbcp.transform.ncsl_state_permitting  # noqa: F401
 import dbcp.transform.nrel_wind_solar_ordinances  # noqa: F401
 import dbcp.transform.offshore_wind  # noqa: F401
 import dbcp.transform.protected_area_by_county  # noqa: F401
-import dbcp.transform.pudl  # noqa: F401
+import dbcp.transform.pudl_data  # noqa: F401
 import dbcp.transform.rmi_energy_communities  # noqa: F401
 import dbcp.validation.tests  # noqa: F401

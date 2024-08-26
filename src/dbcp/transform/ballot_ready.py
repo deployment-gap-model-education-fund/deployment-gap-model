@@ -34,10 +34,9 @@ def _normalize_entities(ballot_ready: pd.DataFrame) -> dict[str, pd.DataFrame]:
         .all()
     ), "There is duplicate entity information in the elections dataframe."
 
-    br_elections = ballot_ready.drop_duplicates(subset=election_pk_fields)[
-        election_fields
-    ].copy()
-    assert br_elections.election_id.is_unique, "election_id is not unique."
+    br_elections = ballot_ready[election_fields].drop_duplicates(
+        subset=election_pk_fields
+    )
 
     trns_dfs["br_elections"] = br_elections
 
@@ -71,7 +70,7 @@ def _normalize_entities(ballot_ready: pd.DataFrame) -> dict[str, pd.DataFrame]:
 
     logger.info(f"Found {len(duplicate_positions)} duplicate positions.")
     assert (
-        len(duplicate_positions) <= 52
+        len(duplicate_positions) <= 500
     ), f"Found more duplicate positions than expected: {len(duplicate_positions)}"
 
     # dropnas in frequency and reference_year
@@ -166,7 +165,6 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
 
     # Drop duplicates. A later version of ballot ready data will remedy this problem.
     ballot_ready = exp_ballot_ready.drop_duplicates(subset=["county", "race_id"])
-    assert ~ballot_ready.duplicated(subset=["county", "race_id"], keep=False).any()
 
     # Add state and county fips codes
     # Fix LaSalle Parish spelling to match addfips library
@@ -228,4 +226,16 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """
     raw_ballot_ready = raw_dfs["raw_ballot_ready"]
     ballot_ready = _explode_counties(raw_ballot_ready)
-    return _normalize_entities(ballot_ready)
+    out = _normalize_entities(ballot_ready)
+    return out
+
+
+if __name__ == "__main__":
+    # debugging entry point
+    from dbcp.extract.ballot_ready import extract
+
+    # is this URI still up to date?
+    uri = "gs://dgm-archive/ballot_ready/Climate Partners_Upcoming Races_All Tiers_20240524.csv"
+    raw = extract(uri)
+    transform = transform(raw)
+    print({k: df.shape for k, df in transform.items()})

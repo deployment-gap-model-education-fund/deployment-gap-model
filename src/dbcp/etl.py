@@ -58,8 +58,8 @@ def etl_columbia_local_opp() -> Dict[str, pd.DataFrame]:
 
 def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
     """Pull tables from pudl sqlite database."""
-    raw_pudl_tables = dbcp.extract.pudl.extract()
-    return dbcp.transform.pudl.transform(raw_pudl_tables)
+    raw_pudl_tables = dbcp.extract.pudl_data.extract()
+    return dbcp.transform.pudl_data.transform(raw_pudl_tables)
 
 
 def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
@@ -149,7 +149,7 @@ def etl_energy_communities_by_county() -> dict[str, pd.DataFrame]:
 
 def etl_ballot_ready() -> dict[str, pd.DataFrame]:
     """ETL Ballot Ready election data."""
-    source_uri = "gs://dgm-archive/ballot_ready/Climate Partners_Upcoming Races_All Tiers_20231013.csv"
+    source_uri = "gs://dgm-archive/ballot_ready/Climate Partners_Upcoming Races_All Tiers_20240524.csv"
     raw_df = dbcp.extract.ballot_ready.extract(source_uri)
     transformed = dbcp.transform.ballot_ready.transform(raw_df)
     return transformed
