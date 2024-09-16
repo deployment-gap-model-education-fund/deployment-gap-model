@@ -1,4 +1,5 @@
 catalystcoop.pudl==2022.11.30
+fiona~=1.9.4
 psycopg2~=2.9.3
 pytest~=6.2.5
 tqdm>=4.64.1,<5.0.0
