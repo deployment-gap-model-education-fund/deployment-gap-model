@@ -1,14 +1,31 @@
 """Helper functions for extracting data."""
 
+import json
 import logging
 import re
 from pathlib import Path
 from typing import Optional, Union
 
 import google.auth
+import pandas as pd
 from google.cloud import storage
 
 logger = logging.getLogger(__name__)
+
+
+def extract_airtable_data(path: Path) -> pd.DataFrame:
+    """
+    Extract data from an Airtable JSON file.
+
+    Args:
+        path: Path to the Airtable JSON file.
+    Returns:
+        the extracted data as a pandas DataFrame.
+    """
+    with open(path, "r") as f:
+        data = json.load(f)
+    records = [r["fields"] for r in data]
+    return pd.DataFrame.from_records(records)
 
 
 def cache_gcs_archive_file_locally(

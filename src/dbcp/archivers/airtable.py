@@ -1,4 +1,5 @@
 """Archiver for Airtable bases."""
+
 import json
 import logging
 import os
@@ -81,7 +82,15 @@ class AirtableArchiver(AbstractArchiver):
                 "schema_generation_number": schema_generation_number,
                 "table_id": table.id,
             }
-            blob.upload_from_string(json.dumps(table.all()))
+            blob.upload_from_string(
+                json.dumps(
+                    table.all(
+                        cell_format="string",
+                        user_locale="en-us",
+                        time_zone="utc",
+                    )
+                )
+            )
 
     def archive(self):
         """Archive raw tables for a list of Airtable bases to GCS."""

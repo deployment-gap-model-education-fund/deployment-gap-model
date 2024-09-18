@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-import dbcp
+from dbcp.extract.helpers import cache_gcs_archive_file_locally, extract_airtable_data
 
 
 def extract(*, locations_uri: str, projects_uri: str) -> dict[str, pd.DataFrame]:
@@ -24,15 +24,17 @@ def extract(*, locations_uri: str, projects_uri: str) -> dict[str, pd.DataFrame]
     projects_uri, projects_generation_num = str(projects_uri).split("#")
     locations_uri, locations_generation_num = str(locations_uri).split("#")
 
-    projects_path = dbcp.extract.helpers.cache_gcs_archive_file_locally(
+    projects_path = cache_gcs_archive_file_locally(
         projects_uri, generation_num=projects_generation_num
     )
-    locations_path = dbcp.extract.helpers.cache_gcs_archive_file_locally(
+    locations_path = cache_gcs_archive_file_locally(
         locations_uri, generation_num=locations_generation_num
     )
 
-    offshore_transformed_dfs["raw_offshore_wind_projects"] = pd.read_csv(projects_path)
-    offshore_transformed_dfs["raw_offshore_wind_locations"] = pd.read_csv(
+    offshore_transformed_dfs["raw_offshore_wind_projects"] = extract_airtable_data(
+        projects_path
+    )
+    offshore_transformed_dfs["raw_offshore_wind_locations"] = extract_airtable_data(
         locations_path
     )
 

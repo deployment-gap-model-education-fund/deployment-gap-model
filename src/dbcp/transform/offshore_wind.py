@@ -64,10 +64,10 @@ PROJ_SCHEMA = {
         "rename_col": "bid_submitted",
         "dtype": "string",
     },  # link to state policy table
-    "Selected for Negotiations": {
-        "rename_col": "selected_for_negotiations",
-        "dtype": "string",
-    },  # link to state policy table
+    # "Selected for Negotiations": {
+    #     "rename_col": "selected_for_negotiations",
+    #     "dtype": "string",
+    # },  # link to state policy table
     "State Contract Held to Date": {
         "rename_col": "state_contract_held_to_date",
         "dtype": "string",
@@ -87,7 +87,7 @@ LOCS_SCHEMA = {
     "County": {"rename_col": "raw_county", "dtype": "string"},
     "County FIPS": {"rename_col": "raw_county_fips", "dtype": "string"},
     "Why of interest?": {"rename_col": "why_of_interest", "dtype": "string"},
-    "Priority": {"rename_col": "priority", "dtype": "string"},
+    # "Priority": {"rename_col": "priority", "dtype": "string"},
     "Cable Landing Permitting": {
         "rename_col": "cable_landing_permitting",
         "dtype": "string",

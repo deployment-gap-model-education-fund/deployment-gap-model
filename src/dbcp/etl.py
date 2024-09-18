@@ -121,7 +121,10 @@ def etl_offshore_wind() -> dict[str, pd.DataFrame]:
     projects_uri = "airtable/Offshore Wind Locations Synapse Version/Projects.json"
     locations_uri = "airtable/Offshore Wind Locations Synapse Version/Locations.json"
 
-    es = ExtractionSettings.from_yaml("/app/dbcp/settings.yaml")
+    # es = ExtractionSettings.from_yaml("/app/dbcp/settings.yaml")
+    es = ExtractionSettings.from_archive_names([projects_uri, locations_uri])
+    es.update_archive_generation_numbers()
+
     projects_uri = es.get_full_archive_uri(projects_uri)
     locations_uri = es.get_full_archive_uri(locations_uri)
 

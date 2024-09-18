@@ -32,6 +32,7 @@ class ArchivedData(BaseModel):
     name: str
     generation_num: int | None
     pinned: bool = False
+    metadata: dict[str, str] = {}
     # Maybe include a date field for when the data was archived
 
     def get_full_path(self) -> str:
@@ -98,6 +99,7 @@ class ExtractionSettings:
                         f"Blob {archive.name} does not exist in the {self.bucket.name} bucket"
                     )
                 archive.generation_num = blob.generation
+                archive.metadata = blob.metadata
             assert (
                 archive.generation_num is not None
             ), f"Generation number for {archive.name} is None"
