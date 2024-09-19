@@ -65,16 +65,10 @@ jobs:
           echo "Pretend to run the ETL"
 
       - name: Write settings.yaml
+        id: write_settings
+        if: ${{ success() }}
         run: |
           make save_settings
-
-      - uses: EndBug/add-and-commit@v9
-        with:
-          add: "src/dbcp/settings.yaml"
-          author_name: "DBCP Bot"
-          author_email: "bennett.norman@catalyst.coop"
-          message: "Update settings.yaml"
-          push: true
 
       # - name: Publish publish outputs
       #   if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || (github.ref_name == 'dev')
@@ -95,3 +89,12 @@ jobs:
       - name: Who owns the workspace?
         if: always()
         run: ls -ld $GITHUB_WORKSPACE
+
+      - uses: EndBug/add-and-commit@v9
+        if: steps.write_settings.outcome == 'success'
+        with:
+          add: "src/dbcp/settings.yaml"
+          author_name: "DBCP Bot"
+          author_email: "bennett.norman@catalyst.coop"
+          message: "Update settings.yaml"
+          push: true
