@@ -1,5 +1,5 @@
 ---
-name: full-build
+name: update-data
 
 on:
   push:
@@ -46,6 +46,8 @@ jobs:
           docker-compose up -d
 
       - name: Run the archive
+        env:
+          AIRTABLE_API_KEY: ${{ secrets.AIRTABLE_API_KEY }}
         run: |
           make archive
 

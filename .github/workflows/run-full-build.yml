@@ -5,8 +5,8 @@ on:
   push:
     tags:
       - "v20*"
-    branches:
-      - "*"
+    # branches:
+    #   - "*"
 
 jobs:
   build:
