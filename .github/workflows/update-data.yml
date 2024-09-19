@@ -1,0 +1,95 @@
+---
+name: full-build
+
+on:
+  push:
+    tags:
+      - "v20*"
+    branches:
+      - "*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      API_KEY_GOOGLE_MAPS: ${{ secrets.API_KEY_GOOGLE_MAPS }}
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Who owns the workspace?
+        run: ls -ld $GITHUB_WORKSPACE
+
+      - uses: "google-github-actions/auth@v2"
+        with:
+          credentials_json: "${{ secrets.DGM_GITHUB_ACTION_CREDENTIALS }}"
+
+      - name: Display env variables
+        run: |
+          echo "Workspace directory: $GITHUB_WORKSPACE" \
+          echo "Google credentials path: $GOOGLE_GHA_CREDS_PATH" \
+
+      # Give the dbcp user ownership of the workspace
+      # So it can read and write files to the workspace
+      - name: Give the dbcp user ownership of the workspace
+        run: sudo chown -R 1000:1000 $GITHUB_WORKSPACE
+
+      - name: Set up Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
+      - name: Build and run Docker Compose services
+        run: |
+          docker-compose up -d
+
+      - name: Run the archive
+        run: |
+          make archive
+
+      # - name: Run full ETL
+      #   if: ${{ success() }}
+      #   run: |
+      #     make all
+
+      # - name: Run all test
+      #   run: |
+      #     make test
+
+      - name: Pretent to run the ETL
+        run: |
+          echo "Pretend to run the ETL"
+
+      - name: Write settings.yaml
+        run: |
+          make save_settings
+
+      - uses: EndBug/add-and-commit@v9
+        with:
+          add: "src/dbcp/settings.yaml"
+          author_name: "DBCP Bot"
+          author_email: "bennett.norman@catalyst.coop"
+          message: "Update settings.yaml"
+          push: true
+
+      # - name: Publish publish outputs
+      #   if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || (github.ref_name == 'dev')
+      #   run: |
+      #     docker compose run --rm app python dbcp/publish.py --build-ref ${{ github.ref_name }}
+
+      - name: Stop Docker Compose services
+        if: always()
+        run: |
+          docker-compose down
+
+      # The google-github-actions/auth step is run as runner:docker,
+      # so we need to give the workspace back to runner:docker
+      - name: Give ownership of the workspace back to root
+        if: always()
+        run: sudo chown -R runner:docker $GITHUB_WORKSPACE
+
+      - name: Who owns the workspace?
+        if: always()
+        run: ls -ld $GITHUB_WORKSPACE

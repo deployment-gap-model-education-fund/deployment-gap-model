@@ -31,4 +31,11 @@ update_conda:
 jupyter_lab:
 	docker compose up
 
+# TODO: Update to run all archives
+archive:
+	docker compose run --rm app python -m dbcp.archivers.airtable
+
+save_settings:
+	docker compose run --rm app python -m dbcp.save_settings
+
 .PHONY: test # "test" collides with a directory name. This tells make to run the command even if there is a directory named "test"
