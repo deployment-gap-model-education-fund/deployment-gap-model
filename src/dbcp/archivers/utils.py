@@ -12,7 +12,7 @@ class AbstractArchiver(ABC):
     """Abstract class for archiving data."""
 
     bucket_name: str = "dgm-archive"
-    folder_name: str
+    archive_name: str
 
     def __init__(self):
         """Initialize the archiver."""

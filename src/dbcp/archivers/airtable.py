@@ -29,7 +29,7 @@ bases = (
 class AirtableArchiver(AbstractArchiver):
     """Archiver for Airtable bases."""
 
-    folder_name = "airtable"
+    archive_name = "airtable"
 
     def __init__(self, api: Api = None):
         """
@@ -59,7 +59,7 @@ class AirtableArchiver(AbstractArchiver):
         base = self.api.base(base_info.base_id)
 
         # Construct the destination blob name
-        base_path = f"{self.folder_name}/{base_info.base_name}"
+        base_path = f"{self.archive_name}/{base_info.base_name}"
         destination_blob_name = f"{base_path}/schema.json"
 
         # Create a blob object in the bucket

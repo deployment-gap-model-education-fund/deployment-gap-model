@@ -235,7 +235,7 @@ def run_etl(funcs: dict[str, Callable], schema_name: str):
     logger.info("Sucessfully finished ETL.")
 
 
-def etl(args):
+def etl():
     """Run dbc ETL."""
     # Reduce size of caches if necessary
     GEOCODER_CACHE.reduce_size()
@@ -275,5 +275,5 @@ def etl(args):
 
 if __name__ == "__main__":
     # debugging entry point
-    etl(None)
+    etl()
     print("yay")
