@@ -3,6 +3,8 @@ name: test-full-build
 
 on:
   push:
+    tags:
+      - "v20*"
     # branches:
     #   - "*"
 

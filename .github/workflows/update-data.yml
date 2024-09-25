@@ -3,8 +3,10 @@ name: update-data
 
 on:
   push:
-    # branches:
-    #   - "*"
+    tags:
+      - "v20*"
+    branches:
+      - "*"
 
 jobs:
   build:
