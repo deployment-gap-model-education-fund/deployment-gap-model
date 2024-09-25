@@ -8,9 +8,8 @@ on:
   push:
     tags:
       - "v20*"
-    # TODO: remove branches before merging in
     branches:
-      - "**"
+      - "*"
 
 jobs:
   build:
