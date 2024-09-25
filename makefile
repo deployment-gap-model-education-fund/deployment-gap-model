@@ -34,7 +34,7 @@ jupyter_lab:
 	docker compose up
 
 archive_all:
-	$(APP_RUN_COMMAND) python -m dbcp.cli run-archives
+	$(APP_RUN_COMMAND) python -m dbcp.cli run-archivers
 
 save_settings:
 	$(APP_RUN_COMMAND) python -m dbcp.cli save-settings
