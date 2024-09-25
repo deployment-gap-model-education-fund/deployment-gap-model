@@ -8,6 +8,7 @@ on:
   push:
     tags:
       - "v20*"
+    # TODO: remove branches before merging in
     branches:
       - "*"
 
@@ -17,10 +18,18 @@ jobs:
 
     env:
       API_KEY_GOOGLE_MAPS: ${{ secrets.API_KEY_GOOGLE_MAPS }}
+      GITHUB_REF: ${{ github.ref_name }} # This is changed to dev if running on a schedule
 
     steps:
-      - name: Check out code
-        uses: actions/checkout@v2
+      - name: Use dev branch if running on a schedule
+        if: ${{ (github.event_name == 'schedule') }}
+        run: |
+          echo "This action was triggered by a schedule." && echo "GITHUB_REF=dev" >> $GITHUB_ENV
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.GITHUB_REF }}
 
       - name: Who owns the workspace?
         run: ls -ld $GITHUB_WORKSPACE
@@ -54,14 +63,14 @@ jobs:
         run: |
           make archive
 
-      # - name: Run full ETL
-      #   if: ${{ success() }}
-      #   run: |
-      #     make all
+      - name: Run full ETL
+        if: ${{ success() }}
+        run: |
+          make all
 
-      # - name: Run all test
-      #   run: |
-      #     make test
+      - name: Run all test
+        run: |
+          make test
 
       - name: Pretent to run the ETL
         run: |
@@ -73,10 +82,37 @@ jobs:
         run: |
           make save_settings
 
-      # - name: Publish publish outputs
-      #   if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || (github.ref_name == 'dev')
-      #   run: |
-      #     docker compose run --rm app python dbcp/publish.py --build-ref ${{ github.ref_name }}
+      # give permission to root
+      - name: Give ownership of the workspace back to root
+        run: sudo chown -R runner:docker $GITHUB_WORKSPACE
+
+      # commit the settings file
+      - uses: EndBug/add-and-commit@v9
+        id: commit_settings_file
+        if: steps.write_settings.outcome == 'success'
+        with:
+          add: "src/dbcp/settings.yaml"
+          author_name: "DBCP Bot"
+          author_email: "bennett.norman@catalyst.coop"
+          message: "Update settings.yaml"
+          push: true
+
+      # Give the dbcp user ownership of the workspace
+      # So it can read and write files to the workspace
+      - name: Give the dbcp user ownership of the workspace
+        run: sudo chown -R 1000:1000 $GITHUB_WORKSPACE
+
+      # publish the outputs, grab the git sha of the commit step
+      # TODO: REMOVE THE TRUE and build-ref!!!
+      - name: Publish publish outputs
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || ($GITHUB_REF == 'dev') || (true)
+        run: |
+          docker compose run --rm app python dbcp/cli.py publish-outputs \
+            -bq \
+            --build-ref 'sandbox' \
+            --code-git-sha ${{ github.sha }} \
+            --settings-file-git-sha ${{ steps.commit_settings_file.outputs.commit_long_sha }} \
+            --github-action-run-id ${{ github.run_id}}
 
       - name: Stop Docker Compose services
         if: always()
@@ -92,12 +128,3 @@ jobs:
       - name: Who owns the workspace?
         if: always()
         run: ls -ld $GITHUB_WORKSPACE
-
-      - uses: EndBug/add-and-commit@v9
-        if: steps.write_settings.outcome == 'success'
-        with:
-          add: "src/dbcp/settings.yaml"
-          author_name: "DBCP Bot"
-          author_email: "bennett.norman@catalyst.coop"
-          message: "Update settings.yaml"
-          push: true
