@@ -6,11 +6,11 @@ on:
   schedule:
     - cron: "0 7 * * 1-5"
   push:
-    tags:
-      - "v20*"
-    # TODO: remove branches before merging in
-    branches:
-      - "*"
+    # tags:
+    #   - "v20*"
+    # # TODO: remove branches before merging in
+    # branches:
+    #   - "*"
 
 jobs:
   build:
