@@ -1,16 +1,7 @@
 ---
 name: update-data
 
-on:
-  push
-  # workflow_dispatch:
-  # schedule:
-  #   - cron: "0 7 * * 1-5"
-  # push:
-  #   tags:
-  #     - "v20*"
-  #   branches:
-  #     - "*"
+on: push
 
 jobs:
   build:
