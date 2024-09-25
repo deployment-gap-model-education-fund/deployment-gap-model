@@ -1,7 +1,12 @@
 ---
 name: update-data
 
-on: push
+on:
+  push:
+    tags:
+      - "v20*"
+    branches:
+      - "*"
 
 jobs:
   build:
