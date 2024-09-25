@@ -57,7 +57,7 @@ jobs:
         env:
           AIRTABLE_API_KEY: ${{ secrets.AIRTABLE_API_KEY }}
         run: |
-          make archive
+          make archive_all
 
       - name: Run full ETL
         if: ${{ success() }}
@@ -67,10 +67,6 @@ jobs:
       - name: Run all test
         run: |
           make test
-
-      - name: Pretent to run the ETL
-        run: |
-          echo "Pretend to run the ETL"
 
       - name: Write settings.yaml
         id: write_settings
