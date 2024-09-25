@@ -7,13 +7,13 @@ shell:
 	$(APP_RUN_COMMAND) /bin/bash
 
 data_warehouse:
-	$(APP_RUN_COMMAND) python -m dbcp.cli --data-warehouse
+	$(APP_RUN_COMMAND) python -m dbcp.cli etl --data-warehouse
 
 data_mart:
-	$(APP_RUN_COMMAND) python -m dbcp.cli --data-mart
+	$(APP_RUN_COMMAND) python -m dbcp.cli etl --data-mart
 
 all:
-	$(APP_RUN_COMMAND) python -m dbcp.cli --data-mart --data-warehouse
+	$(APP_RUN_COMMAND) python -m dbcp.cli etl --data-mart --data-warehouse
 
 sql_shell:
 	docker compose run --rm postgres bash -c 'psql -U $$POSTGRES_USER -h $$POSTGRES_HOST $$POSTGRES_DB'
