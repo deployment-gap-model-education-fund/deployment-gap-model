@@ -6,10 +6,10 @@ on:
   # schedule:
   #   - cron: "0 7 * * 1-5"
   push:
-    tags:
-      - "v20*"
-    branches:
-      - "*"
+    # tags:
+    #   - "v20*"
+    # branches:
+    #   - "*"
 
 jobs:
   build:
