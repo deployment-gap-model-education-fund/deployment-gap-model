@@ -101,7 +101,7 @@ jobs:
       # publish the outputs, grab the git sha of the commit step
       # TODO: REMOVE THE TRUE and build-ref!!!
       - name: Publish publish outputs
-        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || ($GITHUB_REF == 'dev') || (true)
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || (env.GITHUB_REF == 'dev') || (true)
         run: |
           docker compose run --rm app python dbcp/cli.py publish-outputs \
             -bq \
