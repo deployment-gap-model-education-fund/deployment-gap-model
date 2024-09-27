@@ -79,6 +79,22 @@ class AirtableArchiver(AbstractArchiver):
         # for each table in the base, save the table json to a file in the bucket, add the required metadata
         for table in base.tables():
             logger.info(f"Archiving table {table.name}")
+            # Add missing columns to data
+            # Airtable API: 'Any "empty" fields (e.g. "", [], or false) in the record will not be returned.'
+            # If there is column in the base that does not have any data in it it will not be returned by table.all()
+            # This code grabs all the columns from the table schema and adds them to the data if they are missing
+            table_data = table.all(
+                cell_format="string",
+                user_locale="en-us",
+                time_zone="utc",
+            )
+            schema_cols = {field.name for field in table.schema().fields}
+            for record in table_data:
+                record_cols = set(record["fields"])
+                missing_cols = schema_cols - record_cols
+                for col in missing_cols:
+                    record["fields"][col] = None
+
             # Construct the destination blob name
             destination_blob_name = f"{base_path}/{table.name}.json"
 
@@ -89,15 +105,7 @@ class AirtableArchiver(AbstractArchiver):
             blob.metadata = AirtableArchiveMetadata(
                 table_id=table.id, schema_generation_number=schema_generation_number
             ).dict()
-            blob.upload_from_string(
-                json.dumps(
-                    table.all(
-                        cell_format="string",
-                        user_locale="en-us",
-                        time_zone="utc",
-                    )
-                )
-            )
+            blob.upload_from_string(json.dumps(table_data))
 
     def archive(self):
         """Archive raw tables for a list of Airtable bases to GCS."""
