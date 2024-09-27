@@ -1,10 +1,13 @@
 """Command to run raw data archivers."""
 import importlib
+import logging
 import pkgutil
 
 import click
 
 from dbcp.archivers.utils import AbstractArchiver
+
+logger = logging.getLogger(__name__)
 
 
 def get_archivers() -> dict[str, AbstractArchiver]:
@@ -41,8 +44,12 @@ def run_archivers(archiver_names: list[str]):
     """Run the specified archivers."""
     archivers = get_archivers()
     if not archiver_names:
+        logger.info("No archiver names provided. Running all archivers.")
         archiver_names = archivers.keys()
 
     for name, archiver in archivers.items():
         if name in archiver_names:
+            logger.info(f"Running archiver {name}.")
             archiver().archive()
+        else:
+            raise ValueError(f"Archiver {name} not found.")

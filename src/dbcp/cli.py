@@ -1,4 +1,5 @@
 """A Command line interface for the down ballot project."""
+
 import logging
 
 import click
@@ -15,9 +16,16 @@ logger = logging.getLogger(__name__)
 
 
 @click.group(name="dbcp")
-def cli():
+@click.option(
+    "--loglevel",
+    help="Set logging level (DEBUG, INFO, WARNING, ERROR, or CRITICAL).",
+    default="INFO",
+)
+def cli(loglevel):
     """A command line interface for the down ballot project."""
-    pass
+    dbcp_logger = logging.getLogger()
+    log_format = "%(asctime)s [%(levelname)8s] %(name)s:%(lineno)s %(message)s"
+    coloredlogs.install(fmt=log_format, level=loglevel, logger=dbcp_logger)
 
 
 @cli.command()
@@ -32,13 +40,8 @@ def cli():
     "-dw",
     "--data-warehouse",
     help="Load the data warehouse tables to the database",
-    default=False,
+    default=True,
     is_flag=True,
-)
-@click.option(
-    "--loglevel",
-    help="Set logging level (DEBUG, INFO, WARNING, ERROR, or CRITICAL).",
-    default="INFO",
 )
 @click.option(
     "-clr",
@@ -47,13 +50,8 @@ def cli():
     default=False,
     is_flag=True,
 )
-def etl(data_mart, data_warehouse, loglevel, clear_cache):
+def etl(data_mart, data_warehouse, clear_cache):
     """Run the ETL process to produce the data warehouse and mart."""
-    # Display logged output from the PUDL package:
-    dbcp_logger = logging.getLogger()
-    log_format = "%(asctime)s [%(levelname)8s] %(name)s:%(lineno)s %(message)s"
-    coloredlogs.install(fmt=log_format, level=loglevel, logger=dbcp_logger)
-
     if clear_cache:
         GEOCODER_CACHE.clear()
         SPATIAL_CACHE.clear()

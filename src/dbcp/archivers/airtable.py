@@ -12,6 +12,13 @@ from dbcp.archivers.utils import AbstractArchiver
 logger = logging.getLogger(__name__)
 
 
+class AirtableArchiveMetadata(BaseModel):
+    """Metadata about an Airtable table archive."""
+
+    table_id: str = Field(min_length=17, max_length=17)
+    schema_generation_number: int
+
+
 class AirtableBaseInfo(BaseModel):
     """Information about an Airtable base."""
 
@@ -78,10 +85,10 @@ class AirtableArchiver(AbstractArchiver):
             # Create a blob object in the bucket
             blob = self.bucket.blob(destination_blob_name)
             # save the metadata to a file in the bucket
-            blob.metadata = {
-                "schema_generation_number": schema_generation_number,
-                "table_id": table.id,
-            }
+
+            blob.metadata = AirtableArchiveMetadata(
+                table_id=table.id, schema_generation_number=schema_generation_number
+            ).dict()
             blob.upload_from_string(
                 json.dumps(
                     table.all(

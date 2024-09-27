@@ -1,4 +1,5 @@
 """Upload the parquet files to GCS and load them into BigQuery."""
+
 import logging
 import typing
 import uuid
@@ -22,7 +23,7 @@ VALID_DIRECTORIES = typing.get_args(DataDirectoryLiteral)
 
 def upload_parquet_directory_to_gcs(
     directory_path: str,
-    bucket_name: str,
+    output_bucket: storage.Bucket,
     destination_blob_prefix: DataDirectoryLiteral,
     version: str,
 ):
@@ -31,17 +32,10 @@ def upload_parquet_directory_to_gcs(
 
     Args:
         directory_path: Path to the directory containing Parquet files.
-        bucket_name: Name of the GCS bucket to upload files to.
+        output_bucket: The GCS output bucket
         destination_blob_prefix: Prefix to prepend to destination blob names.
         version: The version of the data to upload.
     """
-    # Create a storage client
-    credentials, project_id = google.auth.default()
-    client = storage.Client(credentials=credentials, project=project_id)
-
-    # Get the GCS bucket
-    bucket = client.get_bucket(bucket_name)
-
     # List all Parquet files in the directory
     parquet_files = list(Path(directory_path).glob("*.parquet"))
 
@@ -51,16 +45,18 @@ def upload_parquet_directory_to_gcs(
         destination_blob_name = f"{version}/{destination_blob_prefix}/{file.name}"
 
         # Create a blob object in the bucket
-        blob = bucket.blob(destination_blob_name)
+        blob = output_bucket.blob(destination_blob_name)
 
         # Upload the file to GCS
         blob.upload_from_filename(str(file))
 
-        logger.info(f"Uploaded {file} to gs://{bucket_name}/{destination_blob_name}")
+        logger.info(
+            f"Uploaded {file} to gs://{output_bucket.id}/{destination_blob_name}"
+        )
 
 
 def load_parquet_files_to_bigquery(
-    bucket_name: str,
+    output_bucket: storage.Bucket,
     destination_blob_prefix: DataDirectoryLiteral,
     version: str,
     build_ref: str,
@@ -69,7 +65,7 @@ def load_parquet_files_to_bigquery(
     Load Parquet files from GCS to BigQuery.
 
     Args:
-        bucket_name: the name of the GCS bucket to load parquet files from.
+        output_bucket: the GCS bucket containing the output Parquet files.
         destination_blob_prefix: the prefix of the GCS blobs to load.
         version: the version of the data to load.
     """
@@ -83,11 +79,8 @@ def load_parquet_files_to_bigquery(
     dataset_id = f"{destination_blob_prefix}{destination_suffix}"
     dataset_ref = client.dataset(dataset_id)
 
-    # Get the GCS bucket
-    bucket = storage.Client().get_bucket(bucket_name)
-
     # get all parquet files in the bucket/{version} directory
-    blobs = bucket.list_blobs(prefix=f"{version}/{destination_blob_prefix}")
+    blobs = output_bucket.list_blobs(prefix=f"{version}/{destination_blob_prefix}")
 
     # Load each Parquet file to BigQuery
     for blob in blobs:
@@ -107,7 +100,7 @@ def load_parquet_files_to_bigquery(
                 write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
             )
             load_job = client.load_table_from_uri(
-                f"gs://{bucket_name}/{blob.name}", table_ref, job_config=job_config
+                f"gs://{output_bucket.id}/{blob.name}", table_ref, job_config=job_config
             )
 
             logger.info(f"Loading {blob.name} to {dataset_id}.{table_name}")
@@ -151,23 +144,56 @@ class OutputMetadata(BaseModel):
 
     def to_yaml(self) -> str:
         """Convert the metadata to a YAML string."""
-        # TODO: add urls?
-        # TODO: add path to etl_settings file
-        return yaml.dump(self.dict())
+        settings_dict = self.dict()
+        repo_base_url = "https://github.com/deployment-gap-model-education-fund/deployment-gap-model"
+        settings_dict["code_git_sha_url"] = f"{repo_base_url}/tree/{self.git_ref}"
+        settings_dict[
+            "settings_file_git_sha_url"
+        ] = f"{repo_base_url}/blob/{self.settings_file_git_sha}/src/dbcp/settings.yaml"
+        settings_dict[
+            "github_action_run_url"
+        ] = f"{repo_base_url}/actions/runs/{self.github_action_run_id}"
+
+        return yaml.dump(settings_dict)
 
 
 @click.command()
-@click.option("--build-ref", default=None)
-@click.option("--code-git-sha", default=None)
-@click.option("--settings-file-git-sha", default=None)
-@click.option("--github-action-run-id", default=None)
-@click.option("-bq", "--upload-to-big-query", default=False, is_flag=True)
+@click.option(
+    "--build-ref",
+    default=None,
+    help="The git reference used to build the outputs. Will typically be a tag or the dev branch",
+)
+@click.option(
+    "--code-git-sha",
+    default=None,
+    help="The git sha of the code used to build the outputs",
+)
+@click.option(
+    "--settings-file-git-sha",
+    default=None,
+    help="The git sha of the settings file used to build the outputs. This is different than the"
+    "code git sha because the updated settings file used in the ETL is commited once the ETL"
+    "and tests have passed.",
+)
+@click.option(
+    "--github-action-run-id",
+    default=None,
+    help="The run id of the github action that built the outputs",
+)
+@click.option(
+    "-bq",
+    "--upload-to-big-query",
+    default=False,
+    is_flag=True,
+    help="Upload the outputs to BigQuery",
+)
 @click.option(
     "-d",
     "--directories",
     type=click.Choice(VALID_DIRECTORIES),
     multiple=True,
     default=VALID_DIRECTORIES,
+    help="The directories of local parquet files to publish to GCS and BigQuery",
 )
 def publish_outputs(
     build_ref: str,
@@ -177,12 +203,9 @@ def publish_outputs(
     directories: DataDirectoryLiteral,
     upload_to_big_query: bool,
 ):
-    """Publish outputs to Google Cloud Storage and Big Query.
-
-    Args:
-        build_ref (str): The github build reference to use for the outputs.
-    """
+    """Publish outputs to Google Cloud Storage and Big Query."""
     bucket_name = "dgm-outputs"
+    output_bucket = storage.Client().get_bucket(bucket_name)
 
     metadata = OutputMetadata(
         git_ref=build_ref,
@@ -193,16 +216,11 @@ def publish_outputs(
 
     for directory in directories:
         upload_parquet_directory_to_gcs(
-            OUTPUT_DIR / directory, bucket_name, directory, metadata.version
+            OUTPUT_DIR / directory, output_bucket, directory, metadata.version
         )
     # write metadata file to GCS
-    # TODO: Consolidate GCS uploading logic
-
-    credentials, project_id = google.auth.default()
-    client = storage.Client(credentials=credentials, project=project_id)
-    bucket = client.get_bucket(bucket_name)
     destination_blob_name = f"{metadata.version}/etl-run-metadata.yaml"
-    blob = bucket.blob(destination_blob_name)
+    blob = output_bucket.blob(destination_blob_name)
     blob.upload_from_string(metadata.to_yaml())
     logger.info(f"Uploaded metadata to gs://{bucket_name}/{destination_blob_name}")
 
@@ -210,7 +228,7 @@ def publish_outputs(
         if build_ref:
             for directory in directories:
                 load_parquet_files_to_bigquery(
-                    bucket_name, directory, metadata.version, build_ref
+                    output_bucket, directory, metadata.version, build_ref
                 )
         else:
             logger.warning("No build reference provided. Skipping BigQuery upload.")
