@@ -40,7 +40,7 @@ def cli(loglevel):
     "-dw",
     "--data-warehouse",
     help="Load the data warehouse tables to the database",
-    default=True,
+    default=False,
     is_flag=True,
 )
 @click.option(
@@ -50,7 +50,7 @@ def cli(loglevel):
     default=False,
     is_flag=True,
 )
-def etl(data_mart, data_warehouse, clear_cache):
+def etl(data_mart: bool, data_warehouse: bool, clear_cache: bool):
     """Run the ETL process to produce the data warehouse and mart."""
     if clear_cache:
         GEOCODER_CACHE.clear()
@@ -60,6 +60,10 @@ def etl(data_mart, data_warehouse, clear_cache):
         dbcp.etl.etl()
     if data_mart:
         dbcp.data_mart.create_data_marts()
+    else:
+        raise ValueError(
+            "Please specify a target for the ETL process: --data-warehouse and/or --data-mart."
+        )
 
 
 cli.add_command(publish_outputs)
