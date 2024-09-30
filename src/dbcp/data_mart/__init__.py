@@ -15,7 +15,7 @@ from dbcp.validation.tests import validate_data_mart
 logger = logging.getLogger(__name__)
 
 
-def create_data_marts(args):  # noqa: max-complexity=11
+def create_data_marts():  # noqa: max-complexity=11
     """Collect and load all data mart tables to data warehouse."""
     engine = dbcp.helpers.get_sql_engine()
     data_marts = {}

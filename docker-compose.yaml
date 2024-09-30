@@ -6,6 +6,7 @@ services:
       - .env
     environment:
       - API_KEY_GOOGLE_MAPS=${API_KEY_GOOGLE_MAPS} # get this value from our google account: https://console.cloud.google.com/google/maps-apis/credentials?project=dbcp-dev&supportedpurview=project
+      - AIRTABLE_API_KEY=${AIRTABLE_API_KEY}
     depends_on:
       - postgres
     volumes:
