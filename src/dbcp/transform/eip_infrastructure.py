@@ -38,11 +38,11 @@ def _format_column_names(cols: Sequence[str]) -> List[str]:
 
 
 def _fix_erroneous_array_items(ser: pd.Series, split_on=",", regex=False) -> pd.Series:
-    """Split on commas, preserve only the first value, and cast to numeric.
+    """Split on a delimiter and preserve only the first value.
 
     Several columns in EIP data should be numeric types but a small number of erroneous
-    values forces them to object dtype. The erroneous pattern is for the number to simply
-    be duplicated as a CSV string. For example, 0.2 appears as '0.2, 0.2'.
+    values forces them to object dtype. The erroneous pattern is for the value to be
+    duplicated as a CSV string. For example, 0.2 appears as '0.2, 0.2'.
 
     Args:
         ser (pd.Series): values to fix
@@ -120,9 +120,8 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         "raw_wastewater_discharge_indicator",
     ]
     for col in should_be_numeric:
-        if not pd.api.types.is_numeric_dtype(fac[col]):
-            new = _fix_erroneous_array_items(fac[col])
-            fac[col] = pd.to_numeric(new, errors="raise")
+        new = _fix_erroneous_array_items(fac[col])
+        fac[col] = pd.to_numeric(new, errors="raise")
 
     fac.loc[:, "is_ccs"] = _convert_string_to_boolean(fac.loc[:, "raw_is_ccs"])
 
@@ -161,8 +160,8 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
     )
 
     duplicative_columns = [  # these are raw names
-        # These columns are just a concatenation of the names and IDs corresponding to the ID columns
-        # They add no information and invite inconsistency
+        # These columns are just a concatenation of the names and IDs corresponding to
+        # the ID columns. They add no information and invite inconsistency
         "Company",
         "Project",
         "Associated Facilities",
@@ -236,10 +235,9 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
     ]
     for col in should_be_numeric:
         # these columns suffer from occasional duplicate values as CSV for some reason.
-        # Like "1.0, 1.0". The second number is never different.
-        if not pd.api.types.is_numeric_dtype(proj[col]):
-            new = _fix_erroneous_array_items(proj[col])
-            proj[col] = pd.to_numeric(new, errors="raise")
+        # Like "1.0, 1.0". The second number is never different. [validate this?]
+        new = _fix_erroneous_array_items(proj[col])
+        proj[col] = pd.to_numeric(new, errors="raise")
 
     proj.loc[:, "is_ccs"] = _convert_string_to_boolean(proj.loc[:, "raw_is_ccs"])
     proj.loc[:, "is_ally_target"] = _convert_string_to_boolean(
@@ -248,10 +246,17 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
 
     # manual correction for project with 92 Billion dollar cost (lol). Googled it and
     # it was supposed to be 9.2 Billion
-    proj.loc[
-        proj["name"].eq("Gron Fuels' Renewable Fuels Plant - Initial Construction"),
-        "cost_millions",
-    ] *= 0.1
+    if (
+        proj.loc[
+            proj["name"].eq("Gron Fuels' Renewable Fuels Plant - Initial Construction"),
+            "cost_millions",
+        ]
+        >= 9000  # it's over 9000!
+    ):
+        proj.loc[
+            proj["name"].eq("Gron Fuels' Renewable Fuels Plant - Initial Construction"),
+            "cost_millions",
+        ] *= 0.1
     # manual fix. One project's facility id doesn't exist. The project is the Oil part
     # of the willow Project. The next project ID belongs to the gas part, and its
     # facility ID does exist. So I assign the oil facility ID to the gas facility ID.
