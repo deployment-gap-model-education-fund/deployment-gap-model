@@ -1,4 +1,10 @@
-"""Retrieve data from EIP Infrastructure spreadsheets for analysis."""
+"""Retrieve data from EIP Infrastructure spreadsheets for analysis.
+
+This data was updated by contacting EIP directly for the latest version, but now they
+host an Excel file at oilandgaswatch.org -> Resources -> Downloads, which points to:
+https://drive.google.com/drive/folders/1udtw3XeezA5Lkb8Mfc_cntNTcV4oPuKi
+Note that this new data version has changed structure from the one extracted below.
+"""
 from pathlib import Path
 from typing import Dict
 

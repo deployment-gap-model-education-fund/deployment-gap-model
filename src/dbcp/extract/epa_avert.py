@@ -1,4 +1,4 @@
-"""Retrieve data from EIP Infrastructure spreadsheets for analysis."""
+"""Retrieve data from EPA AVERT avoided carbon modeling."""
 from pathlib import Path
 
 import pandas as pd

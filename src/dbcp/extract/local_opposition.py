@@ -1,4 +1,9 @@
-"""Extraction logic for Columbia Local Opposition dataset."""
+"""Extraction logic for Columbia Local Opposition dataset.
+
+This dataset is a .docx file with a hierarchical structure.  The hierarchy is denoted by
+formatting details (paragraph level, font, etc), but is surprisingly consistent. It is
+infrequently updated by a research group at Columbia University.
+"""
 from pathlib import Path
 from typing import Dict, List, Optional
 

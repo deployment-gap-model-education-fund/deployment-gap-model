@@ -1,4 +1,7 @@
-"""Extract data from RMI's energy communities analysis."""
+"""Extract data from RMI/Catalyst energy communities analysis.
+
+Source repo: https://github.com/catalyst-cooperative/rmi-energy-communities
+"""
 from pathlib import Path
 
 import pandas as pd
