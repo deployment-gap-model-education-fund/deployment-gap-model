@@ -246,17 +246,13 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
 
     # manual correction for project with 92 Billion dollar cost (lol). Googled it and
     # it was supposed to be 9.2 Billion
-    if (
-        proj.loc[
-            proj["name"].eq("Gron Fuels' Renewable Fuels Plant - Initial Construction"),
-            "cost_millions",
-        ]
-        >= 9000  # it's over 9000!
-    ):
-        proj.loc[
-            proj["name"].eq("Gron Fuels' Renewable Fuels Plant - Initial Construction"),
-            "cost_millions",
-        ] *= 0.1
+    to_correct = proj.loc[
+        proj["name"].eq("Gron Fuels' Renewable Fuels Plant - Initial Construction"),
+        "cost_millions",
+    ]
+    assert len(to_correct) == 1, "Expected one project to correct."
+    assert to_correct.ge(9000).all(), "Expected erroneous cost over 9 billion."
+    to_correct *= 0.1
     # manual fix. One project's facility id doesn't exist. The project is the Oil part
     # of the willow Project. The next project ID belongs to the gas part, and its
     # facility ID does exist. So I assign the oil facility ID to the gas facility ID.
@@ -447,3 +443,15 @@ def transform(raw_eip_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     }
 
     return out
+
+
+if __name__ == "__main__":
+    #  debugging entry point
+    from pathlib import Path
+
+    from dbcp.extract.eip_infrastructure import extract
+
+    source_path = Path("/app/data/raw/2023.05.24 OGW database.xlsx")
+    eip_raw_dfs = extract(source_path)
+    eip_transformed_dfs = transform(eip_raw_dfs)
+    print("yay")
