@@ -16,17 +16,15 @@ import dbcp
 
 logger = logging.getLogger(__name__)
 
-# These are the earliest version we have for ISOs
-# except for spp and ISONE because the recent versions
-# have columns the old versions don't.
 ISO_QUEUE_VERSIONS: dict[str, str] = {
-    "miso": "1704654953145483",
-    "caiso": "1704654953474846",
-    "pjm": "1704654953842777",
-    "ercot": "1704654954177109",
-    "spp": "1704654954488739",
-    "nyiso": "1702235705611699",
-    "isone": "1704654954804863",
+    "miso": "1719774997006069",
+    "miso-pre-2017": "1709776311574737",
+    "caiso": "1719774997530790",
+    "pjm": "1719774998059470",
+    "ercot": "1719774998544416",
+    "spp": "1719774998998901",
+    "nyiso": "1719774999497797",
+    "isone": "1719774999940225",
 }
 
 
@@ -34,7 +32,9 @@ def extract(iso_queue_versions: dict[str, str] = ISO_QUEUE_VERSIONS):
     """Extract gridstatus ISO Queue data."""
     iso_queues: dict[str, pd.DataFrame] = {}
     for iso, revision_num in iso_queue_versions.items():
-        uri = f"gs://gridstatus-archive/interconnection_queues/{iso}.parquet"
+        # MISO is an exception to the rule because we need multiple snapshots of the data
+        filename = iso if iso != "miso-pre-2017" else "miso"
+        uri = f"gs://dgm-archive/gridstatus/interconnection_queues/parquet/{filename}.parquet"
         path = dbcp.extract.helpers.cache_gcs_archive_file_locally(
             uri=uri, revision_num=revision_num
         )

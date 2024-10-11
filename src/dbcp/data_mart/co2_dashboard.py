@@ -10,30 +10,52 @@ import sqlalchemy as sa
 
 from dbcp.constants import PUDL_LATEST_YEAR
 from dbcp.data_mart.helpers import _get_county_fips_df, _get_state_fips_df
-from dbcp.helpers import download_pudl_data, get_sql_engine
+from dbcp.helpers import get_pudl_resource, get_sql_engine
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     bedford_addfips_fix,
 )
 
 
-def _get_existing_plant_fuel_data(pudl_engine: sa.engine.Engine) -> pd.DataFrame:
-    query = f"""
-    select
-        plant_id_eia,
-        fuel_type_code_pudl,
-        prime_mover_code,
-        report_date,
-        net_generation_mwh as mwh,
-        fuel_consumed_for_electricity_mmbtu as mmbtu
-    from generation_fuel_eia923
-    -- select one calendar year of monthly data
-    where report_date >= date('{PUDL_LATEST_YEAR}-01-01')
-        and report_date < date('{PUDL_LATEST_YEAR+1}-01-01')
-    AND fuel_type_code_pudl in ('coal', 'gas', 'oil')
-    ;
-    """
-    df = pd.read_sql(query, pudl_engine)
+def _get_existing_plant_fuel_data() -> pd.DataFrame:
+    df = pd.read_parquet(
+        get_pudl_resource("core_eia923__monthly_generation_fuel.parquet"),
+        engine="pyarrow",
+        use_nullable_dtypes=True,
+    )
+    # convert all columns with the word date to datetime
+    date_columns = [col for col in df.columns if "date" in col]
+    for col in date_columns:
+        df[col] = pd.to_datetime(df[col])
+
+    # convert all categorical columns to strings
+    for col in df.select_dtypes(include="category").columns:
+        df[col] = df[col].astype("string")
+    df = df[
+        (df["report_date"] >= f"{PUDL_LATEST_YEAR}-01-01")
+        & (df["report_date"] < f"{PUDL_LATEST_YEAR+1}-01-01")
+        & (df["fuel_type_code_pudl"].isin(["coal", "gas", "oil"]))
+    ]
+
+    # Select specific columns
+    df = df[
+        [
+            "plant_id_eia",
+            "fuel_type_code_pudl",
+            "prime_mover_code",
+            "report_date",
+            "net_generation_mwh",
+            "fuel_consumed_for_electricity_mmbtu",
+        ]
+    ]
+
+    # Rename columns
+    df = df.rename(
+        columns={
+            "net_generation_mwh": "mwh",
+            "fuel_consumed_for_electricity_mmbtu": "mmbtu",
+        }
+    )
     return df
 
 
@@ -146,17 +168,9 @@ def _estimate_existing_co2e(gen_fuel_923: pd.DataFrame) -> pd.Series:
     return plant_co2e
 
 
-def _get_plant_location_data(pudl_engine: sa.engine.Engine) -> pd.DataFrame:
-    query = """
-    select
-        plant_id_eia,
-        state,
-        county
-    from plants_entity_eia
-    ;
-    """
-    df = pd.read_sql(query, pudl_engine)
-    return df
+def _get_plant_location_data() -> pd.DataFrame:
+    df = pd.read_parquet(get_pudl_resource("core_eia__entity_plants.parquet"))
+    return df[["plant_id_eia", "state", "county"]]
 
 
 def _transfrom_plant_location_data(
@@ -196,13 +210,12 @@ def _transfrom_plant_location_data(
 
 def _get_existing_fossil_plants(
     postgres_engine: sa.engine.Engine,
-    pudl_engine: sa.engine.Engine,
 ) -> pd.DataFrame:
-    gen_fuel_923 = _get_existing_plant_fuel_data(pudl_engine)
+    gen_fuel_923 = _get_existing_plant_fuel_data()
     plant_co2e = _estimate_existing_co2e(gen_fuel_923)
     states = _get_state_fips_df(postgres_engine)
     counties = _get_county_fips_df(postgres_engine)
-    plant_locations = _get_plant_location_data(pudl_engine)
+    plant_locations = _get_plant_location_data()
     plant_locations = _transfrom_plant_location_data(
         plant_locations, state_table=states, county_table=counties
     )
@@ -414,13 +427,11 @@ def _get_proposed_fossil_infra(engine: sa.engine.Engine) -> pd.DataFrame:
 
 def create_data_mart(
     engine: Optional[sa.engine.Engine] = None,
-    pudl_engine: Optional[sa.engine.Engine] = None,
 ) -> pd.DataFrame:
     """Create final output table.
 
     Args:
         engine (Optional[sa.engine.Engine], optional): postgres engine. Defaults to None.
-        pudl_engine (Optional[sa.engine.Engine], optional): pudl's sqlite engine. Defaults to None.
 
     Returns:
         pd.DataFrame: table for data mart
@@ -428,11 +439,6 @@ def create_data_mart(
     postgres_engine = engine
     if postgres_engine is None:
         postgres_engine = get_sql_engine()
-    if pudl_engine is None:
-        pudl_data_path = download_pudl_data()
-        pudl_engine = sa.create_engine(
-            f"sqlite:////{pudl_data_path}/pudl_data/sqlite/pudl.sqlite"
-        )
 
     tables = [
         func(engine=postgres_engine)
@@ -441,10 +447,6 @@ def create_data_mart(
             _get_proposed_fossil_infra,
         )
     ]
-    tables.append(
-        _get_existing_fossil_plants(
-            postgres_engine=postgres_engine, pudl_engine=pudl_engine
-        )
-    )
+    tables.append(_get_existing_fossil_plants(postgres_engine=postgres_engine))
     df = pd.concat(tables, axis=0, ignore_index=True, copy=False)
     return df

@@ -1,17 +1,16 @@
 """Small helper functions for dbcp etl."""
+
 import csv
 import logging
 import os
 from io import StringIO
 from pathlib import Path
 
-import boto3
+import fsspec
 import google.auth
 import pandas as pd
 import pandas_gbq
 import sqlalchemy as sa
-from botocore import UNSIGNED
-from botocore.config import Config
 from google.cloud import bigquery
 from tqdm import tqdm
 
@@ -22,6 +21,7 @@ logger = logging.getLogger(__name__)
 SA_TO_BQ_TYPES = {
     "VARCHAR": "STRING",
     "INTEGER": "INTEGER",
+    "BIGINT": "INTEGER",
     "FLOAT": "FLOAT",
     "BOOLEAN": "BOOL",
     "DATETIME": "DATETIME",
@@ -29,6 +29,7 @@ SA_TO_BQ_TYPES = {
 SA_TO_PD_TYPES = {
     "VARCHAR": "string",
     "INTEGER": "Int64",
+    "BIGINT": "Int64",
     "FLOAT": "float64",
     "BOOLEAN": "boolean",
     "DATETIME": "datetime64[ns]",
@@ -49,6 +50,8 @@ def get_schema_sql_alchemy_metadata(schema: str) -> sa.MetaData:
         return dbcp.metadata.data_mart.metadata
     elif schema == "data_warehouse":
         return dbcp.metadata.data_warehouse.metadata
+    elif schema == "private_data_warehouse":
+        return dbcp.metadata.private_data_warehouse.metadata
     else:
         raise ValueError(f"{schema} is not a valid schema.")
 
@@ -102,33 +105,46 @@ def get_sql_engine() -> sa.engine.Engine:
     return sa.create_engine(f"postgresql://{user}:{password}@{db}:5432")
 
 
-def get_pudl_engine() -> sa.engine.Engine:
-    """Create a sql alchemy engine for the pudl database."""
-    pudl_data_path = download_pudl_data()
-    pudl_engine = sa.create_engine(f"sqlite:////{pudl_data_path}")
-    return pudl_engine
+def get_pudl_resource(
+    pudl_resource: str, bucket: str = "gs://parquet.catalyst.coop"
+) -> Path:
+    """Given the name of a PUDL resource, return the path to the cached file.
 
+    If the file is not cached, download it from S3 and return the path.
 
-def download_pudl_data() -> Path:
-    """Download pudl data from AWS."""
+    Args:
+        pudl_resource: The name of the PUDL resource to retrieve.
+    Returns:
+        pudl_resource_path: The path to the cached PUDL resource.
+    """
     PUDL_VERSION = os.environ["PUDL_VERSION"]
 
     pudl_cache = Path("/app/data/data_cache/pudl/")
     pudl_cache.mkdir(exist_ok=True)
     pudl_version_cache = pudl_cache / PUDL_VERSION
-    pudl_data_path = pudl_version_cache / "pudl.sqlite"
-    if not pudl_data_path.exists():
-        logger.info("PUDL data directory does not exist, downloading from AWS.")
-        pudl_version_cache.mkdir()
+    pudl_version_cache.mkdir(exist_ok=True)
 
-        s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
-        s3.download_file(
-            "intake.catalyst.coop",
-            f"{PUDL_VERSION}/pudl.sqlite",
-            str(pudl_data_path),
-        )
+    remote_pudl_resource_path = f"{bucket}/{PUDL_VERSION}/{pudl_resource}"
+    local_pudl_resource_path = pudl_version_cache / pudl_resource
 
-    return pudl_data_path
+    if not local_pudl_resource_path.exists():
+        fs = fsspec.filesystem("gs")
+        file_size = fs.size(remote_pudl_resource_path)
+
+        # open the remote_pudl_resource_path and track progress with tqdm
+        with fs.open(remote_pudl_resource_path) as fo:
+            with open(local_pudl_resource_path, "wb") as local_file:
+                with tqdm(
+                    total=file_size, unit="B", unit_scale=True, unit_divisor=1024
+                ) as pbar:
+                    while True:
+                        buf = fo.read(8192)
+                        if not buf:
+                            break
+                        local_file.write(buf)
+                        pbar.update(len(buf))
+
+    return local_pudl_resource_path
 
 
 def track_tar_progress(members):
@@ -233,3 +249,9 @@ def psql_insert_copy(table, conn, keys, data_iter):
         sql = f"COPY {table_name} ({columns}) FROM STDIN WITH CSV"
         cur.copy_expert(sql=sql, file=s_buf)
         dbapi_conn.commit()
+
+
+def trim_columns_length(df: pd.DataFrame, length_limit: int = 63) -> pd.DataFrame:
+    """Trim column length of a pandas dataframe to satisfy postgres column length limit."""
+    df.columns = [col[:length_limit] for col in df.columns]
+    return df

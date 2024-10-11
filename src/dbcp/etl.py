@@ -1,21 +1,20 @@
 """The ETL module create the data warehouse tables."""
+
 import logging
 from pathlib import Path
-from typing import Dict
+from typing import Callable, Dict
 
 import pandas as pd
 import sqlalchemy as sa
 
 import dbcp
-from dbcp.constants import FIPS_CODE_VINTAGE
+from dbcp.constants import OUTPUT_DIR
+from dbcp.extract.fips_tables import CENSUS_URI, TRIBAL_LANDS_URI
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.helpers import enforce_dtypes, psql_insert_copy
-from dbcp.metadata.data_warehouse import metadata
 from dbcp.transform.fips_tables import SPATIAL_CACHE
-from dbcp.transform.helpers import GEOCODER_CACHE, bedford_addfips_fix
+from dbcp.transform.helpers import GEOCODER_CACHE
 from dbcp.validation.tests import validate_warehouse
-from pudl.helpers import add_fips_ids as _add_fips_ids
-from pudl.output.pudltabl import PudlTabl
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +33,8 @@ def etl_eip_infrastructure() -> Dict[str, pd.DataFrame]:
 
 def etl_lbnl_iso_queue() -> Dict[str, pd.DataFrame]:
     """LBNL ISO Queues ETL."""
-    source_path = Path("/app/data/raw/queues_2022_clean_data.xlsx")
-    lbnl_raw_dfs = dbcp.extract.lbnl_iso_queue.extract(source_path)
+    lbnl_uri = "gs://dgm-archive/lbnl_iso_queue/queues_2023_clean_data.xlsx"
+    lbnl_raw_dfs = dbcp.extract.lbnl_iso_queue.extract(lbnl_uri)
     lbnl_transformed_dfs = dbcp.transform.lbnl_iso_queue.transform(lbnl_raw_dfs)
 
     return lbnl_transformed_dfs
@@ -59,36 +58,8 @@ def etl_columbia_local_opp() -> Dict[str, pd.DataFrame]:
 
 def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
     """Pull tables from pudl sqlite database."""
-    pudl_data_path = dbcp.helpers.download_pudl_data()
-
-    pudl_tables = {}
-
-    pudl_engine = sa.create_engine(f"sqlite:////{pudl_data_path}")
-    pudl_out = PudlTabl(
-        pudl_engine,
-        start_date="2021-01-01",
-        end_date="2021-12-31",
-        freq="AS",
-        fill_fuel_cost=False,
-        roll_fuel_cost=True,
-        fill_net_gen=True,
-    )
-
-    mcoe = pudl_out.mcoe(all_gens=True, gens_cols="all")
-    # add FIPS
-    # workaround for addfips Bedford, VA problem
-    bedford_addfips_fix(mcoe)
-    filled_location = mcoe.loc[:, ["state", "county"]].fillna(
-        ""
-    )  # copy; don't want to fill actual table
-    fips = _add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
-    mcoe = pd.concat(
-        [mcoe, fips[["state_id_fips", "county_id_fips"]]], axis=1, copy=False
-    )
-    mcoe = mcoe.convert_dtypes()
-    pudl_tables["mcoe"] = mcoe
-
-    return pudl_tables
+    raw_pudl_tables = dbcp.extract.pudl_data.extract()
+    return dbcp.transform.pudl_data.transform(raw_pudl_tables)
 
 
 def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
@@ -105,12 +76,10 @@ def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
 
 def etl_fips_tables() -> Dict[str, pd.DataFrame]:
     """Master state and county FIPS table ETL."""
-    census_uri = "gs://dgm-archive/census/tl_2021_us_county.zip"
-    fips = dbcp.extract.fips_tables.extract_fips(census_uri)
+    fips = dbcp.extract.fips_tables.extract_fips(CENSUS_URI)
 
-    tribal_lands_uri = "gs://dgm-archive/census/tl_2021_us_aiannh.zip"
     fips["tribal_land"] = dbcp.extract.fips_tables.extract_census_tribal_land(
-        tribal_lands_uri
+        TRIBAL_LANDS_URI
     )
 
     out = dbcp.transform.fips_tables.transform(fips)
@@ -147,8 +116,13 @@ def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
 
 def etl_offshore_wind() -> dict[str, pd.DataFrame]:
     """ETL manually curated offshore wind data."""
-    locations_path = Path("/app/data/raw/offshore_wind_locations.csv")
-    projects_path = Path("/app/data/raw/offshore_wind_projects.csv")
+    projects_path = (
+        "gs://dgm-archive/synapse/offshore_wind/offshore_wind_projects_2024-09-10.csv"
+    )
+    locations_path = (
+        "gs://dgm-archive/synapse/offshore_wind/offshore_wind_locations_2024-09-10.csv"
+    )
+
     raw_offshore_dfs = dbcp.extract.offshore_wind.extract(
         locations_path=locations_path, projects_path=projects_path
     )
@@ -175,7 +149,7 @@ def etl_energy_communities_by_county() -> dict[str, pd.DataFrame]:
 
 def etl_ballot_ready() -> dict[str, pd.DataFrame]:
     """ETL Ballot Ready election data."""
-    source_uri = "gs://dgm-archive/ballot_ready/Climate Partners_Upcoming Races_All Tiers_20231013.csv"
+    source_uri = "gs://dgm-archive/ballot_ready/Climate Partners_Upcoming Races_All Tiers_20240524.csv"
     raw_df = dbcp.extract.ballot_ready.extract(source_uri)
     transformed = dbcp.transform.ballot_ready.transform(raw_df)
     return transformed
@@ -209,18 +183,62 @@ def etl_manual_ordinances() -> dict[str, pd.DataFrame]:
     return transformed
 
 
-def etl(args):
-    """Run dbc ETL."""
-    # Setup postgres
+def etl_acp_projects() -> dict[str, pd.DataFrame]:
+    """ETL ACP projects."""
+    acp_uri = "gs://dgm-archive/acp/projects_Q2_2024.csv"
+    raw_dfs = dbcp.extract.acp_projects.extract(acp_uri)
+    transformed = dbcp.transform.acp_projects.transform(raw_dfs)
+    return transformed
+
+
+def run_etl(funcs: dict[str, Callable], schema_name: str):
+    """Execute etl functions and save outputs to parquet and postgres."""
     engine = dbcp.helpers.get_sql_engine()
     with engine.connect() as con:
-        engine.execute("CREATE SCHEMA IF NOT EXISTS data_warehouse")
+        engine.execute(sa.text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
 
+    transformed_dfs = {}
+    for dataset, etl_func in funcs.items():
+        logger.info(f"Processing: {dataset}")
+        transformed_dfs.update(etl_func())
+
+    # Delete any existing tables, and create them anew:
+    metadata = dbcp.helpers.get_schema_sql_alchemy_metadata(schema_name)
+    metadata.drop_all(engine)
+    metadata.create_all(engine)
+
+    parquet_dir = OUTPUT_DIR / schema_name
+    parquet_dir.mkdir(exist_ok=True)
+
+    # Load table into postgres and parquet
+    with engine.connect() as con:
+        for table in metadata.sorted_tables:
+            logger.info(f"Load {table.name} to postgres.")
+            df = enforce_dtypes(transformed_dfs[table.name], table.name, schema_name)
+            df = dbcp.helpers.trim_columns_length(df)
+            df.to_sql(
+                name=table.name,
+                con=con,
+                if_exists="append",
+                index=False,
+                schema=schema_name,
+                chunksize=1000,
+                method=psql_insert_copy,
+            )
+            df.to_parquet(parquet_dir / f"{table.name}.parquet", index=False)
+
+    logger.info("Sucessfully finished ETL.")
+
+
+def etl(args):
+    """Run dbc ETL."""
     # Reduce size of caches if necessary
     GEOCODER_CACHE.reduce_size()
     SPATIAL_CACHE.reduce_size()
 
+    # Run public ETL functions
     etl_funcs = {
+        "offshore_wind": etl_offshore_wind,
         "gridstatus": etl_gridstatus_isoqueues,
         "manual_ordinances": etl_manual_ordinances,
         "epa_avert": etl_epa_avert,
@@ -229,7 +247,6 @@ def etl(args):
         "energy_communities_by_county": etl_energy_communities_by_county,
         "fips_tables": etl_fips_tables,
         "protected_area_by_county": etl_protected_area_by_county,
-        "offshore_wind": etl_offshore_wind,
         "justice40_tracts": etl_justice40,
         "nrel_wind_solar_ordinances": etl_nrel_ordinances,
         "lbnl_iso_queue": etl_lbnl_iso_queue,
@@ -237,44 +254,21 @@ def etl(args):
         "ncsl_state_permitting": etl_ncsl_state_permitting,
         "ballot_ready": etl_ballot_ready,
     }
+    run_etl(etl_funcs, "data_warehouse")
 
-    # Extract and transform the data sets
-    transformed_dfs = {}
-    for dataset, etl_func in etl_funcs.items():
-        logger.info(f"Processing: {dataset}")
-        transformed_dfs.update(etl_func())
-
-    # Delete any existing tables, and create them anew:
-    metadata.drop_all(engine)
-    metadata.create_all(engine)
-
-    # Load table into postgres
-    with engine.connect() as con:
-        for table in metadata.sorted_tables:
-            logger.info(f"Load {table.name} to postgres.")
-            df = enforce_dtypes(
-                transformed_dfs[table.name], table.name, "data_warehouse"
-            )
-            df.to_sql(
-                name=table.name,
-                con=con,
-                if_exists="append",
-                index=False,
-                schema="data_warehouse",
-                chunksize=1000,
-                method=psql_insert_copy,
-            )
-
-    validate_warehouse(engine=engine)
-
-    if args.upload_to_bigquery:
-        if args.bigquery_env == "dev":
-            dbcp.helpers.upload_schema_to_bigquery("data_warehouse")
-        elif args.bigquery_env == "prod":
-            dbcp.helpers.upload_schema_to_bigquery("data_warehouse", dev=False)
-        else:
-            raise ValueError(
-                f"{args.bigquery_env} is an invalid BigQuery environment value. Must be: dev or prod."
-            )
+    # Run private ETL functions
+    etl_funcs = {
+        "acp_projects": etl_acp_projects,
+    }
+    run_etl(etl_funcs, "private_data_warehouse")
 
     logger.info("Sucessfully finished ETL.")
+
+    engine = dbcp.helpers.get_sql_engine()
+    validate_warehouse(engine=engine)
+
+
+if __name__ == "__main__":
+    # debugging entry point
+    etl(None)
+    print("yay")

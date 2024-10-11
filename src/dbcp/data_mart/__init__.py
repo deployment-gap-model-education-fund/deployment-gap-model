@@ -7,6 +7,7 @@ import pkgutil
 import pandas as pd
 
 import dbcp
+from dbcp.constants import OUTPUT_DIR
 from dbcp.helpers import enforce_dtypes, psql_insert_copy
 from dbcp.metadata.data_mart import metadata
 from dbcp.validation.tests import validate_data_mart
@@ -57,11 +58,14 @@ def create_data_marts(args):  # noqa: max-complexity=11
     metadata.drop_all(engine)
     metadata.create_all(engine)
 
-    # Load table into postgres
+    parquet_dir = OUTPUT_DIR / "data_mart"
+
+    # Load table into postgres and parquet
     with engine.connect() as con:
         for table in metadata.sorted_tables:
             logger.info(f"Load {table.name} to postgres.")
             df = enforce_dtypes(data_marts[table.name], table.name, "data_mart")
+            df = dbcp.helpers.trim_columns_length(df)
             df.to_sql(
                 name=table.name,
                 con=con,
@@ -71,14 +75,6 @@ def create_data_marts(args):  # noqa: max-complexity=11
                 method=psql_insert_copy,
             )
 
-    validate_data_mart(engine=engine)
+            df.to_parquet(parquet_dir / f"{table.name}.parquet", index=False)
 
-    if args.upload_to_bigquery:
-        if args.bigquery_env == "dev":
-            dbcp.helpers.upload_schema_to_bigquery("data_mart")
-        elif args.bigquery_env == "prod":
-            dbcp.helpers.upload_schema_to_bigquery("data_mart", dev=False)
-        else:
-            raise ValueError(
-                f"{args.bigquery_env} is an invalid BigQuery environment value. Must be: dev or prod."
-            )
+    validate_data_mart(engine=engine)

@@ -68,13 +68,20 @@ authenticated, the command should print out a message:
 Credentials saved to file: <path/to/your_credentials.json>
 ```
 
-Add this path to the `GOOGLE_APPLICATION_CREDENTIALS_PATH` environment variable in
-your  `.env` file (see Environment Variables section below).
+Set this path to a local environment varible called `GOOGLE_GHA_CREDS_PATH`
 
-`GOOGLE_APPLICATION_CREDENTIALS_PATH=<path/to/your_credentials.json>``
+```
+export GOOGLE_GHA_CREDS_PATH=<path/to/your_credentials.json>
+```
 
-`GOOGLE_APPLICATION_CREDENTIALS_PATH` will be mounted into the container so
+`GOOGLE_GHA_CREDS_PATH` will be mounted into the container so
 the GCP APIs in the container can access the data stored in GCP.
+
+You'll also need to set an environment variable for the Google Maps API Key:
+
+```
+export API_KEY_GOOGLE_MAPS={Google Maps API key for GCP project dbcp-dev-350818}
+```
 
 ## Git Pre-commit Hooks
 
@@ -108,19 +115,6 @@ Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docke
 
 during this step it means docker is not running.
 
-## Environment Variables
-
-Once the image is created we need to set some environment variables. First, make a new file in the repo root directory called `.env` and enter these two lines to configure local ports:
-
-```
-POSTGRES_PORT=5432
-JUPYTER_PORT=8890
-```
-
-If you have other services running on these ports, you can change them in `.env`.
-
-Second, make a copy of `default.env` and call it `local.env`. Follow the instructions inside to set up API key access. `local.env` contains environment variables that can be accessed within the docker container. You can read more about docker environment variables [here](https://docs.docker.com/compose/environment-variables/).
-
 ## Run the ETL
 
 Now that we’ve built the image and set the environment variables run:
@@ -142,40 +136,22 @@ make build
 Builds the dbcp docker images.
 
 ```
-make etl_local
+make data_warehouse
 ```
 
 Runs the etl and loads the data warehouse table to postgres.
 
 ```
-make etl_bq
-```
-
-Runs the etl and upload the data warehouse to BigQuery.
-
-```
-make data_mart_local
+make data_mart
 ```
 
 Loads the data mart tables into postgres.
 
 ```
-make data_mart_bq
-```
-
-Loads the data mart tables to BigQuery.
-
-```
-make all_local
+make all
 ```
 
 Creates and loads the data warehouse and data mart tables into postgres.
-
-```
-make all_bq
-```
-
-Creates and loads the data warehouse and data mart tables to BigQuery.
 
 ```
 make sql_shell

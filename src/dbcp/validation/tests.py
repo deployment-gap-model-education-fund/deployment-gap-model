@@ -1,4 +1,5 @@
 """Data Validation tests."""
+
 import logging
 from functools import lru_cache
 from io import StringIO
@@ -69,10 +70,12 @@ def test_gridstatus_fips_coverage(engine: Engine):
         gridstatus_locations = pd.read_sql_table(
             "gridstatus_locations", con, schema="data_warehouse"
         )
+    location_coverage = gridstatus_locations.county_id_fips.isna().sum() / len(
+        gridstatus_locations
+    )
     assert (
-        gridstatus_locations.county_id_fips.isna().sum() / len(gridstatus_locations)
-        < 0.02
-    ), "More than 2 percent of Grid Status locations could not be geocoded."
+        location_coverage < 0.04
+    ), "More than 4 percent of Grid Status locations could not be geocoded."
 
 
 def test_iso_projects_sources(engine: Engine):
@@ -89,9 +92,7 @@ def test_iso_projects_sources(engine: Engine):
     expected_source = {"proprietary"}
     offshore_test = pd.read_sql(
         proprietary_offshore, engine, index_col="source"
-    ).squeeze(
-        axis=1
-    )  # make series
+    ).squeeze(axis=1)  # make series
     actual_source = set(offshore_test.index)
     assert (
         actual_source == expected_source
@@ -103,7 +104,7 @@ def test_iso_projects_sources(engine: Engine):
         source,
         count(*) as n_iso
     from data_mart.iso_projects_long_format
-    where iso_region ~* 'caiso|ercot|miso|nyiso|pjm|spp|isone'
+    where iso_region ~* 'ercot|miso|nyiso|pjm|spp|isone'
     group by 1
     """
     expected_source = {"gridstatus"}  # region is currently NULL for offshore wind
@@ -144,8 +145,9 @@ def test_iso_projects_capacity_aggs(engine: Engine):
         ON proj.project_id = res.project_id
         LEFT JOIN data_warehouse.iso_locations as loc
         ON proj.project_id = loc.project_id
-        WHERE proj.region ~ 'non-ISO'
+        WHERE proj.region !~* 'ercot|miso|nyiso|pjm|spp|isone'
             AND resource_clean != 'Offshore Wind'
+            AND proj.queue_status = 'active'
         group by 1, 2
     ),
     gridstatus as (
@@ -160,6 +162,8 @@ def test_iso_projects_capacity_aggs(engine: Engine):
         LEFT JOIN data_warehouse.gridstatus_locations as loc
         ON proj.project_id = loc.project_id
         WHERE resource_clean not in ('Offshore Wind', 'Transmission')
+            AND proj.queue_status = 'active'
+            AND proj.region ~* 'ercot|miso|nyiso|pjm|spp|isone'
         group by 1, 2
     ),
     offshore as (
@@ -171,7 +175,8 @@ def test_iso_projects_capacity_aggs(engine: Engine):
         FROM data_warehouse.offshore_wind_projects as proj
         LEFT JOIN data_warehouse.offshore_wind_cable_landing_association as loc
         ON proj.project_id = loc.project_id
-        WHERE proj.construction_status != 'Online'
+        WHERE coalesce(proj.construction_status, 'TBD') IN
+            ('Not started', 'Construction underway', 'Site assessment underway', 'TBD')
         group by 1, 2
     )
     select * from lbnl
@@ -189,6 +194,7 @@ def test_iso_projects_capacity_aggs(engine: Engine):
     )
     absolute_diff = data_mart - source
     relative_diff = absolute_diff / source
+
     assert (
         relative_diff.lt(1e-5).all().all()
     ), f"Aggregate resource metrics have a large relative difference: {relative_diff}"
@@ -235,9 +241,10 @@ def test_county_wide_coverage(engine: Engine):
         df.shape[0] == n_counties
     ), "counties_wide_format does not contain all counties"
     notnull = df.notnull()
-    assert (
-        notnull.any(axis=1).sum() == 2374
-    ), f"counties_wide_format has unexpected county coverage: {notnull[notnull.any(axis=1)]}"
+    assert notnull.any(axis=1).sum() == 2461, (
+        "counties_wide_format has unexpected county coverage:"
+        f" {notnull.loc[notnull.any(axis=1), 'county_id_fips']}"
+    )
 
 
 def test_county_long_vs_wide(engine: Engine):

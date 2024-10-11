@@ -96,6 +96,11 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
     # manual corrections
     location_corrections = {
         "Batavia Township (Clermont County)": "Batavia Township (Branch County)",
+        "Town of Albion (Kennebec County)": "Albion (Kennebec County)",
+        "Town of Lovell (Oxford County)": "Lovell (Oxford County)",
+        "Town of Charlton (Worcester County)": "Charlton (Worcester County)",
+        "City of Owasso (Rogers and Tulsa Counties)": "Owasso (Rogers and Tulsa Counties)",
+        "City of Burleson (Tarrant and Johnson Counties)": "Burleson (Tarrant and Johnson Counties)",
     }
     local.loc[:, "locality"].replace(location_corrections, inplace=True)
 
@@ -155,3 +160,20 @@ def _validate_ordinances(ordn: pd.DataFrame) -> None:
     assert (
         ordn["geocoded_locality_type"].isna().sum() == 0
     ), "Missing geocoded locality types."
+
+
+if __name__ == "__main__":
+    # debugging entry point
+    from pathlib import Path
+
+    from dbcp.extract.local_opposition import ColumbiaDocxParser
+
+    source_path = Path(
+        "/app/data/raw/2023.05.30 Opposition to Renewable Energy Facilities - FINAL.docx"
+    )
+    extractor = ColumbiaDocxParser()
+    extractor.load_docx(source_path)
+    docx_dfs = extractor.extract()
+
+    # Transform
+    transformed_dfs = transform(docx_dfs)

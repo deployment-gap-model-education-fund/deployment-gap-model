@@ -1,4 +1,5 @@
 """Clean Grid Status Interconnection queue data."""
+
 import logging
 from typing import Sequence
 
@@ -48,10 +49,15 @@ RESOURCE_DICT = {
                 "Storage + Storage",
                 "Storage + Photovoltaic + Wind Turbine",
                 "Battery",
+                "Storage + Combustion Turbine",
+                "Storage + Gas Turbine",
+                "Storage + Solar Thermal",
+                "Storage + Steam Turbine + Combustion Turbine",
+                "Storage + Wind Turbine + Photovoltaic",
             ],
             "pjm": ["Storage", "Storage; Solar", "Storage; Wind"],
             "ercot": ["Other - Battery Energy Storage", "Other - Energy Storage"],
-            "spp": ["Battery/Storage"],
+            "spp": ["Battery/Storage", "Battery/Storage - WERE"],
             "nyiso": ["Energy Storage"],
             "isone": ["BAT"],
         },
@@ -87,9 +93,9 @@ RESOURCE_DICT = {
             "caiso": [],
             "pjm": [],
             "ercot": [],
-            "spp": [],
+            "spp": ["Thermal - Coal"],
             "nyiso": [],
-            "isone": [],
+            "isone": ["BIT", "BIT RFO"],
         },
         "type": "Fossil",
     },
@@ -149,7 +155,7 @@ RESOURCE_DICT = {
             "ercot": [],
             "spp": [],
             "nyiso": [],
-            "isone": [],
+            "isone": ["LFG", "MSW"],
         },
         "type": "Fossil",
     },
@@ -160,7 +166,9 @@ RESOURCE_DICT = {
             "pjm": [],
             "ercot": [],
             "spp": [],
-            "nyiso": [],
+            "nyiso": [
+                "=Solid Waste",
+            ],
             "isone": [],
         },
         "type": "Fossil",
@@ -173,6 +181,10 @@ RESOURCE_DICT = {
                 "Gas Turbine",
                 "Combined Cycle",
                 "Combined Cycle + Storage",
+                "Combined Cycle + Combined Cycle",
+                "Combustion Turbine + Photovoltaic",
+                "Combustion Turbine + Storage",
+                "Combustion Turbine + Storage + Steam Turbine",
             ],
             "pjm": [
                 "Natural Gas",
@@ -180,6 +192,11 @@ RESOURCE_DICT = {
                 "Methane",
                 "Gas - Internal Combustion Engine, eg. Reciprocating",
                 "Gas - Combined-Cycle",
+                "Natural Gas; Diesel; Other; Storage",
+                "Natural Gas; Oil",
+                "Natural Gas; Other; Storage; Solar",
+                "Natural Gas; Solar; Other",
+                "Natural Gas; Storage",
             ],
             "ercot": [
                 "Gas - Combustion (gas) Turbine, but not part of a Combined-Cycle",
@@ -187,6 +204,7 @@ RESOURCE_DICT = {
             ],
             "spp": [
                 "Thermal - CTG",
+                "Thermal - GTC",
                 "Thermal - CT",
                 "Thermal - Gas Turbine",
                 "Thermal - Reciprocating Engine",
@@ -194,9 +212,33 @@ RESOURCE_DICT = {
                 "Thermal - Gas",
                 "Thermal - Combined Cycle",
                 "Thermal - RICE",
+                "Thermal - Steam Turbine",
+                "Thermal - NG/CT",
+                "Thermal - CT/ST",
+                "Thermal - CC",
+                "Thermal - Bio",
+                "Thermal - Combustion",
+                "Thermal - Combustion Turbine",
+                "Thermal - ST",
+                "Thermal - VFT",
             ],
-            "nyiso": ["Combined Cycle"],
-            "isone": ["NG", "DFO NG", "NG SUN BAT"],
+            "nyiso": [
+                "Combined Cycle",
+                "Combined Cycle - Dual Fuel",
+                "Combustion Turbine - Dual Fuel",
+                "Combustion Turbine - Natural Gas",
+                "Steam Turbine & Combustion Turbine-  Natural Gas",
+                "Steam Turbine - Natural Gas",
+            ],
+            "isone": [
+                "NG",
+                "DFO NG",
+                "NG SUN BAT",
+                "NG OTH",
+                "NG RFO",
+                "NG WDS",
+                "NG WO",
+            ],
         },
         "type": "Fossil",
     },
@@ -206,9 +248,9 @@ RESOURCE_DICT = {
             "caiso": [],
             "pjm": [],
             "ercot": [],
-            "spp": [],
+            "spp": ["Thermal - Nuclear"],
             "nyiso": [],
-            "isone": [],
+            "isone": ["NUC"],
         },
         "type": "Renewable",
     },
@@ -228,11 +270,20 @@ RESOURCE_DICT = {
         "codes": {
             "miso": ["Diesel"],
             "caiso": [],
-            "pjm": ["Diesel; Solar"],
+            "pjm": ["Diesel; Solar", "Diesel; Methane"],
             "ercot": [],
             "spp": ["Thermal - Diesel/Gas"],
             "nyiso": [],
-            "isone": ["KER BAT"],
+            "isone": [
+                "KER BAT",
+                "DFO",
+                "DFO KER",
+                "DFO KER NG",
+                "DFO SUB",
+                "DFO WDS",
+                "KER",
+                "KER NG",
+            ],
         },
         "type": "Fossil",
     },
@@ -245,36 +296,39 @@ RESOURCE_DICT = {
                 "Storage + Wind Turbine",
                 "Wind Turbine + Photovoltaic + Storage",
                 "Wind Turbine + Storage + Photovoltaic",
+                "Wind Turbine + Photovoltaic",
             ],
             "pjm": ["Wind", "Wind; Solar", "Solar; Storage; Wind", "Wind; Storage"],
             "ercot": ["Wind - Wind Turbine"],
-            "spp": ["Wind", "Hybrid - Wind/Storage", "Hybrid - Wind/Solar"],
+            "spp": ["Wind", "Hybrid - Wind/Storage", "Hybrid - Wind/Solar", "WIND"],
             "nyiso": ["Wind"],
-            "isone": ["WND"],
+            "isone": ["WND", "WND BAT"],
         },
         "type": "Renewable",
     },
     "Other": {
         "codes": {
-            "miso": [],
-            "caiso": [],
+            "miso": ["Wood"],
+            "caiso": [
+                "Reciprocating Engine",
+            ],
             "pjm": ["Other"],
             "ercot": ["Other - Other"],
             "spp": ["Hybrid - Solar\\RECIP Gas"],
-            "nyiso": [],
-            "isone": [],
+            "nyiso": ["Wood"],
+            "isone": ["JF", "JF KER", "JF KER NG", "JF NG"],
         },
         "type": "Unknown Resource",
     },
     "Unknown": {
         "codes": {
-            "miso": ["Hybrid", "Co-Gen"],
-            "caiso": ["Water", "Gravity via Rail"],
-            "pjm": [],
+            "miso": ["Co-Gen"],
+            "caiso": ["Water", "Gravity via Rail", "Cogeneration"],
+            "pjm": ["Methane; Solar", "Solar; Biomass"],
             "ercot": [],
             "spp": [],
-            "nyiso": ["Load"],
-            "isone": ["WAT", "WDS", "WAT BAT"],
+            "nyiso": ["Load", "Dual Fuel"],
+            "isone": ["WAT", "WDS", "WAT BAT", "BLQ DFO KER WDS", "BLQ WDS"],
         },
         "type": "Unknown Resource",
     },
@@ -285,7 +339,7 @@ RESOURCE_DICT = {
             "pjm": [],
             "ercot": [],
             "spp": [],
-            "nyiso": [],
+            "nyiso": ["Flywheel"],
             "isone": [],
         },
         "type": "Renewable",
@@ -304,13 +358,19 @@ RESOURCE_DICT = {
     },
     "Solar": {
         "codes": {
-            "miso": ["Solar"],
+            "miso": ["Solar", "Hybrid"],
             "caiso": [
                 "Storage + Photovoltaic",
                 "Photovoltaic + Storage",
                 "Photovoltaic",
                 "Solar Thermal + Storage",
                 "Photovoltaic + Storage + Wind Turbine",
+                "Photovoltaic + Combustion Turbine",
+                "Photovoltaic + Steam Turbine",
+                "Photovoltaic + Storage + Combustion Turbine",
+                "Photovoltaic + Wind Turbine",
+                "Photovoltaic + Wind Turbine + Storage",
+                "Solar Thermal",
             ],
             "pjm": ["Solar", "Solar; Storage", "Solar; Wind", "Solar; Battery"],
             "ercot": ["Solar - Photovoltaic Solar", "Other - Photovoltaic Solar"],
@@ -329,7 +389,11 @@ RESOURCE_DICT = {
     "Steam": {
         "codes": {
             "miso": [],
-            "caiso": ["Steam Turbine + Storage", "Steam Turbine"],
+            "caiso": [
+                "Steam Turbine + Storage",
+                "Steam Turbine",
+                "Steam Turbine + Steam Turbine",
+            ],
             "pjm": [],
             "ercot": [],
             "spp": ["Thermal - Steam"],
@@ -345,7 +409,7 @@ RESOURCE_DICT = {
             "pjm": [],
             "ercot": [],
             "spp": [],
-            "nyiso": ["AC Transmission", "DC Transmission"],
+            "nyiso": ["AC Transmission", "DC Transmission", "DC/AC Transmission"],
             "isone": [],
         },
         "type": "Other",
@@ -367,7 +431,11 @@ RESOURCE_DICT = {
 logger = logging.getLogger(__name__)
 
 
-def _clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
+def _clean_resource_type(
+    resource_df: pd.DataFrame,
+    normalized_projects: pd.DataFrame,
+    normalized_locations: pd.DataFrame,
+) -> pd.DataFrame:
     """Harmonize resource type for all ISO queues."""
     resource_df = resource_df.copy()
     long_dict = {}
@@ -388,9 +456,45 @@ def _clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
         resource_df["resource"].fillna("Unknown").map(long_dict)
     )
 
+    # The raw NYISO data does have labels for on and offshore wind.
+    # Assume all wind projects in coastal counties are offshore.
+    # This isn't the msot robust solution but it looks like all active
+    # wind projets in these counties are infact offshore. I think this
+    # is a reasonable solution because these counties don't have a ton of
+    # developable land for large wind projects.
+    coastal_county_id_fips = {
+        "36103": "Suffolk",
+        "36047": "Kings",
+        "36085": "Richmond",
+        "36059": "Nassau",
+        "36081": "Queens",
+        "36061": "New York",
+    }
+
+    resource_locations = resource_df.merge(
+        normalized_locations, on="project_id", how="left", validate="m:m"
+    )
+    nyiso_coastal_wind_project_project_ids = resource_locations[
+        resource_locations["county_id_fips"].isin(coastal_county_id_fips.keys())
+        & resource_locations.resource_clean.eq("Onshore Wind")
+    ].project_id
+    expected_n_coastal_wind_projects = 92
+    assert (
+        len(nyiso_coastal_wind_project_project_ids) == expected_n_coastal_wind_projects
+    ), f"Expected {expected_n_coastal_wind_projects} NYISO coastal wind projects but found {len(nyiso_coastal_wind_project_project_ids)}"
+    # For all project ids in nyiso_coastal_wind_project_project_ids, set the resource_clean to "Offshore Wind" in resource_df
+    resource_df.loc[
+        resource_df.project_id.isin(nyiso_coastal_wind_project_project_ids),
+        "resource_clean",
+    ] = "Offshore Wind"
+
     unmapped = resource_df["resource_clean"].isna()
     if unmapped.sum() != 0:
-        debug = resource_df[unmapped]["resource"].value_counts(dropna=False)
+        unmapped = resource_df[unmapped]
+        unmapped = unmapped.merge(
+            normalized_projects, on="project_id", how="left", validate="m:1"
+        )
+        debug = unmapped[["region", "resource"]].value_counts(dropna=False).sort_index()
         raise AssertionError(f"Unmapped resource types in: \n{debug}")
     return resource_df
 
@@ -401,21 +505,37 @@ def _create_project_status_classification_from_single_column(
     nearly_certain_vals: Sequence[str],
     actionable_vals: Sequence[str],
 ) -> pd.DataFrame:
-    """Add columns is_actionable and is_nearly_certain that classify each project.
+    """Add columns is_actionable and is_nearly_certain that classify each active project.
 
     This function handles data from ISOs that report project status information in
-    a single column.
+    a single column. is_actionable and is_nearly_certain are null if project is not active.
 
     This model was created by a consultant in Excel and translated to python.
     """
-    iso_df["is_actionable"] = iso_df[status_col].isin(actionable_vals).fillna(False)
-    iso_df["is_nearly_certain"] = (
-        iso_df[status_col].isin(nearly_certain_vals).fillna(False)
+    # add is_actionable and is_nearly_certain columns fill with pd.NA
+    iso_df["is_actionable"] = pd.NA
+    iso_df["is_nearly_certain"] = pd.NA
+
+    is_active = iso_df["queue_status"].eq("Active")
+    active_projects = iso_df[is_active]
+
+    active_projects["is_actionable"] = (
+        active_projects[status_col].isin(actionable_vals).fillna(False)
+    )
+    active_projects["is_nearly_certain"] = (
+        active_projects[status_col].isin(nearly_certain_vals).fillna(False)
     )
 
     assert (
-        ~iso_df[["is_actionable", "is_nearly_certain"]].all(axis=1)
+        ~active_projects[["is_actionable", "is_nearly_certain"]].all(axis=1)
     ).all(), "Some projects are marked marked actionable and nearly certain."
+
+    # assert some projects are marked actionable and nearly certain
+    assert (
+        active_projects.is_actionable.any() & active_projects.is_nearly_certain.any()
+    ), "No projects are marked actionable or nearly certain."
+
+    iso_df.loc[is_active] = active_projects
 
     return iso_df
 
@@ -430,7 +550,8 @@ def _create_project_status_classification_from_multiple_columns(
     """Add columns is_actionable and is_nearly_certain that classify each project.
 
     This function handles data from ISOs that report project status information in
-    a multiple columns.
+    a multiple columns. is_actionable and is_nearly_certain are null if project
+    is not active.
 
     This model was created by a consultant in Excel and translated to python.
     """
@@ -446,29 +567,85 @@ def _create_project_status_classification_from_multiple_columns(
     )
     status_df.rename(columns=status_cols, inplace=True)
 
-    iso_df["is_nearly_certain"] = status_df.loc[:, "executed_ia"]
-    iso_df["is_actionable"] = (
+    iso_df["is_actionable"] = pd.NA
+    iso_df["is_nearly_certain"] = pd.NA
+
+    is_active = iso_df["queue_status"].eq("Active")
+    active_projects = iso_df[is_active]
+
+    active_projects["is_nearly_certain"] = status_df.loc[:, "executed_ia"]
+    active_projects["is_actionable"] = (
         status_df.completed_system_impact_study
         | status_df.completed_facilities_study_status
     ) & ~status_df.executed_ia
 
     assert (
-        ~iso_df[["is_actionable", "is_nearly_certain"]].all(axis=1)
+        ~active_projects[["is_actionable", "is_nearly_certain"]].all(axis=1)
     ).all(), "Some projects are marked marked actionable and nearly certain."
+
+    # assert some projects are marked actionable and nearly certain
+    assert (
+        active_projects.is_actionable.any() & active_projects.is_nearly_certain.any()
+    ), "No projects are marked actionable or nearly certain."
+
+    iso_df.loc[is_active] = active_projects
+
     return iso_df
 
 
-def _transform_miso(iso_df: pd.DataFrame) -> pd.DataFrame:
-    """Make miso specific transformations."""
-    # Grab all projects that are "Active" and "Done" that are under construction or about to be.
-    is_active_project = iso_df["Post Generator Interconnection Agreement Status"].isin(
-        ("Under Construction", "Not Started")
-    ) & iso_df["queue_status"].isin(("Active", "Done"))
-    iso_df = iso_df[is_active_project].copy()
+def _transform_miso(post_2017: pd.DataFrame, pre_2017: pd.DataFrame) -> pd.DataFrame:
+    """Make miso specific transformations.
+
+    In the second half of 2023, MISO removed all projects that entered the queue prior to 2017.
+    Luckily, our first snapshot of MISO data from GS includes projects that entered the queue
+    prior to 2017. This function grabs all unique projects from both snapshots and combines them.
+
+    Args:
+        post_2017: MISO data from 2017 to present. This contains the latest MISO data.
+        pre_2017: The oldest snapshot of GS we have. Happens to include prior to 2017.
+    """
+    # grab projects that are only in pre_2017
+    only_in_pre_2017 = pre_2017[~pre_2017["queue_id"].isin(post_2017["queue_id"])]
+
+    # ensure there are no active projects in only_in_pre_2017
+    assert (
+        only_in_pre_2017["queue_status"].ne("Active").all()
+    ), "There are active projects in the pre-2017 MISO data that are not in the current MISO data."
+
+    # concat only_in_pre_2017 with iso_df
+    iso_df = pd.concat([post_2017, only_in_pre_2017])
+
+    # When a MISO project is marked as "Done" it means the study process is complete but it is not operational.
+    # There is a separate column called "Post Generator Interconnection Agreement Status" the project's status
+    # after the IA is executed.
+    # We expect all "In Service Projects" to have a project status of "Done". There is only one project that violates this expectation.
+    in_service_projects = iso_df[
+        iso_df["Post Generator Interconnection Agreement Status"].eq("In Service")
+    ]
+    assert (
+        len(in_service_projects[in_service_projects["queue_status"].ne("Done")]) <= 1
+    ), "There is an unexpected number of MISO projects that are In Service but not Done."
+
+    # Mark "Done" projects as "Active" because they are not necesarily operational yet.
+    iso_df["queue_status"] = iso_df["queue_status"].map(
+        {
+            "Done": "Active",
+            "Withdrawn - Pending Cure": "Withdrawn",
+            "Active": "Active",
+            "Withdrawn": "Withdrawn",
+        }
+    )
+    iso_df["queue_status"] = iso_df.queue_status.mask(
+        iso_df["Post Generator Interconnection Agreement Status"].eq("In Service"),
+        "Operational",
+    )
+    # There is a project from 2001 that is missing a queue status
+    # and it's post generator IA was not started so I will assume it was withdrawn
+    iso_df.loc[iso_df.queue_id.eq("G150"), "queue_status"] = "Withdrawn"
 
     actionable_vals = (
-        "PHASE 2",
-        "PHASE 3",
+        "Phase 2",
+        "Phase 3",
     )
     nearly_certain_vals = ("GIA",)
     iso_df = _create_project_status_classification_from_single_column(
@@ -488,12 +665,22 @@ def _transform_miso(iso_df: pd.DataFrame) -> pd.DataFrame:
     # addition record where studyPhase == "Network Upgrade". I don't fully
     # understand why but it seems like a reasonable drop
     iso_df = iso_df.drop_duplicates(subset="queue_id")
+
+    # There is a project with junk information: project name and resource type are just random collections of words: "rabit fish horse"
+    ids_to_remove = ("AA1234",)
+    iso_df = iso_df[~iso_df["queue_id"].isin(ids_to_remove)]
     return iso_df
 
 
 def _transform_caiso(iso_df: pd.DataFrame) -> pd.DataFrame:
     """Make caiso specific transformations."""
-    iso_df = iso_df.query("queue_status == 'ACTIVE'").copy()
+    iso_df["queue_status"] = iso_df["queue_status"].str.title()
+
+    # Use Proposed On-line Date (as filed with IR) for operational projects
+    iso_df["proposed_completion_date"] = iso_df["proposed_completion_date"].mask(
+        iso_df.queue_status.eq("Completed"),
+        iso_df["Proposed On-line Date (as filed with IR)"],
+    )
 
     iso_df = _create_project_status_classification_from_multiple_columns(
         iso_df,
@@ -507,15 +694,20 @@ def _transform_caiso(iso_df: pd.DataFrame) -> pd.DataFrame:
 
 def _transform_pjm(iso_df: pd.DataFrame) -> pd.DataFrame:
     """Make pjm specific transformations."""
-    is_active_project = iso_df.queue_status.isin(
-        {
-            "Engineering and Procurement",
-            "Partially in Service - Under Construction",
-            "Under Construction",
-            "Active",
-        }
-    )
-    iso_df = iso_df.loc[is_active_project, :].copy()
+    status_map = {
+        "Withdrawn": "Withdrawn",
+        "Active": "Active",
+        "In Service": "Operational",
+        "Engineering and Procurement": "Active",
+        "Confirmed": "Active",
+        "Retracted": "Withdrawn",
+        "Suspended": "Suspended",
+        "Deactivated": "Withdrawn",
+        "Partially in Service - Under Construction": "Operational",  # LBNL consideres partially in service projects operational
+        "Under Construction": "Active",
+        "Annulled": "Withdrawn",
+    }
+    iso_df["queue_status"] = iso_df["queue_status"].map(status_map)
 
     iso_df = _create_project_status_classification_from_multiple_columns(
         iso_df,
@@ -541,24 +733,19 @@ def _transform_pjm(iso_df: pd.DataFrame) -> pd.DataFrame:
     iso_df.drop(columns="point_of_interconnection", inplace=True)
     iso_df.rename(columns={"project_name": "point_of_interconnection"}, inplace=True)
 
-    # GridStatus also wrongly sources "Proposed Completion Date" from
-    # "Revised In Service Date". It should come from "Commercial Operation Milestone".
-    # Switch the column names.
-    iso_df.rename(
-        columns={"proposed_completion_date": "Revised In Service Date"}, inplace=True
-    )
-    iso_df.rename(
-        columns={"Commercial Operation Milestone": "proposed_completion_date"},
-        inplace=True,
-    )
-
     # winter_capacity_mw in pjm aligns with the LBNL data
     iso_df["capacity_mw"] = iso_df["winter_capacity_mw"]
+
+    # There is a project missing a queue status but it has a withdrawn date so mark it as withdrawn
+    iso_df.loc[iso_df.queue_id.eq("AC2-174"), "queue_status"] = "Withdrawn"
     return iso_df
 
 
 def _transform_ercot(iso_df: pd.DataFrame) -> pd.DataFrame:
     """Make ercot specific transformations."""
+    # GridStatus wrongly labels projects with a signed IA as "Operational".
+    # We currently only integrate large active projects
+    iso_df["queue_status"] = "Active"
     actionable_vals = (
         "SS Completed, FIS Started, No IA",
         "SS Completed, FIS Completed, No IA",
@@ -586,27 +773,31 @@ def _transform_ercot(iso_df: pd.DataFrame) -> pd.DataFrame:
 
 def _transform_spp(iso_df: pd.DataFrame) -> pd.DataFrame:
     """Make spp specific transformations."""
-    # SPP queue does not include withdrawn projects.
-    # Grab all projects that aren't operational.
-    is_active_project = ~iso_df["Status (Original)"].isin(
-        ("IA FULLY EXECUTED/COMMERCIAL OPERATION",)
-    )
-    iso_df = iso_df[is_active_project].copy()
-    # Impute missing status values
-    # If queue_status is missing and withdrawn date is not missing, mark
-    # the project as withdrawn
-    iso_df["queue_status"] = iso_df["queue_status"].mask(
-        iso_df["queue_status"].isna() & ~iso_df["withdrawn_date"].isna(), "Withdrawn"
-    )
-    # If queue_status is missing and commercial operation date is not missing, mark
-    # the project as completed
-    iso_df["queue_status"] = iso_df["queue_status"].mask(
-        iso_df["queue_status"].isna() & ~iso_df["Commercial Operation Date"].isna(),
-        "Completed",
-    )
+    # A dozen projects status is "None". They all entered the queue recently
+    # so I'm going to mark them as active.
+    status_map = {
+        "DISIS STAGE": "Active",
+        "None": "Active",
+        "IA FULLY EXECUTED/COMMERCIAL OPERATION": "Operational",
+        "IA FULLY EXECUTED/ON SCHEDULE": "Active",
+        "IA PENDING": "Active",
+        "FACILITY STUDY STAGE": "Active",
+        "IA FULLY EXECUTED/ON SUSPENSION": "Suspended",
+        "WITHDRAWN": "Withdrawn",
+        "TERMINATED": "Withdrawn",
+        pd.NA: "Active",  # There are a few projects with missing status. All of them entered the queue in the last year so I will assume they are active
+    }
     assert (
-        ~iso_df["queue_status"].isna().any()
-    ), f"{iso_df['queue_status'].isna().sum()} SPP projects are missing queue_status"
+        iso_df["Status (Original)"].isna().sum() <= 27
+    ), f"{iso_df['Status (Original)'].isna().sum()} SPP projects are missing status"
+    # assert all values in iso_df["Status (Original)"] exist in the keys of status_map
+    projects_with_unmapped_status = iso_df[
+        ~iso_df["Status (Original)"].isin(status_map.keys())
+    ]
+    assert (
+        len(projects_with_unmapped_status) == 0
+    ), f"Some SPP projects have an unknown status {projects_with_unmapped_status['Status (Original)'].unique()}"
+    iso_df["queue_status"] = iso_df["Status (Original)"].map(status_map)
 
     # Categorize certain and actionable projects
     actionable_vals = ("DISIS STAGE", "FACILITY STUDY STAGE")
@@ -629,56 +820,53 @@ def _transform_spp(iso_df: pd.DataFrame) -> pd.DataFrame:
 
 def _transform_nyiso(iso_df: pd.DataFrame) -> pd.DataFrame:
     """Make nyiso specific transformations."""
+    # pad queue_id with 0 to 4 characters
+    iso_df["queue_id"] = iso_df["queue_id"].str.zfill(4)
     # NYISO status mapping from the excel sheet
     status_mapping = {
-        0: "Withdrawn",
-        1: "Scoping Meeting Pending",
-        2: "FES Pending",
-        3: "FES in Progress",
-        4: "SRIS/SIS Pending",
-        5: "SRIS/SIS in Progress",
-        6: "SRIS/SIS Approved",
-        7: "FS Pending",
-        8: "Rejected Cost Allocation/Next FS Pending",
-        9: "FS in Progress",
-        10: "Accepted Cost Allocation/IA in Progress",
-        11: "IA Completed",
-        12: "Under Construction",
-        13: "In Service for Test",
-        14: "In Service Commercial",
-        15: "Partial In-Service",
+        "1": "Scoping Meeting Pending",
+        "2": "FES Pending",
+        "3": "FES in Progress",
+        "3A": "FES Approved/Performed",
+        "4": "SRIS/SIS Pending",
+        "5": "SRIS/SIS in Progress",
+        "5P": "SRIS Commenced, Stopped and Pending  Adoption of IP",
+        "6": "SRIS/SIS Approved",
+        "7": "FS Pending",
+        "8": "Rejected Cost Allocation/Next FS Pending",
+        "9": "FS in Progress",
+        "10": "Accepted Cost Allocation/IA in Progress",
+        "11": "IA Completed",
+        "12": "Under Construction",
+        "13": "In Service for Test",
+        "14": "In Service Commercial",
+        "0": "Withdrawn",
+        "15": "Partial In-Service",
+        "P": "Pending Adoption of IP Compliance with Order 2023",  # Vast majority of projects with status 'P' don't have any studies posted yet
     }
 
-    # Some projects have multiple values listed. Grab the largest value.
-    if pd.api.types.is_string_dtype(iso_df["S"]) or pd.api.types.is_object_dtype(
-        iso_df["S"]
-    ):
-        iso_df["S"] = (
-            iso_df["S"]
-            .str.split(",")
-            .apply(lambda lst: max([pd.to_numeric(x) for x in lst]))
-        )
-        iso_df["S"] = pd.to_numeric(iso_df["S"])
-
-    # Remove all withdrawn and in service projects
-    iso_df = iso_df.loc[iso_df["S"].ne(0) & iso_df["S"].ne(14), :].copy()
-
     # Categorize project status
-    iso_df["is_actionable"] = (iso_df["S"].ge(6) & iso_df["S"].lt(11)).fillna(False)
-    iso_df["is_nearly_certain"] = iso_df["S"].ge(11).fillna(False)
-    assert (
-        ~iso_df[["is_actionable", "is_nearly_certain"]].all(axis=1)
-    ).all(), "Some projects are marked marked actionable and nearly certain."
+    iso_df["S"] = pd.to_numeric(iso_df["S"]).astype("Int64").astype("string")
+    actionable_vals = ("6", "7", "8", "9", "10")
+    nearly_certain_vals = ("11", "12", "13", "15")
+    iso_df = _create_project_status_classification_from_single_column(
+        iso_df,
+        "S",
+        nearly_certain_vals,
+        actionable_vals,
+    )
 
     iso_df["interconnection_status_raw"] = iso_df["S"].map(status_mapping)
+
     return iso_df
 
 
 def _transform_isone(iso_df: pd.DataFrame) -> pd.DataFrame:
     """Make isone specific transformations."""
-    # Grab all active projects
-    iso_df = iso_df.query("queue_status == 'Active'").copy()
-
+    # GS doesn't think there is an actual completion date but it seems like Op Date could be it.
+    iso_df["actual_completion_date"] = pd.to_datetime(
+        iso_df["Op Date"], errors="coerce"
+    )
     iso_df = _create_project_status_classification_from_multiple_columns(
         iso_df,
         facilities_study_status_col="Facilities Study Status",
@@ -737,7 +925,7 @@ def _normalize_project_locations(iso_df: pd.DataFrame) -> pd.DataFrame:
         geocoded_locations[["county_id_fips", "project_id"]].duplicated(keep=False)
     ]
     assert (
-        len(duplicate_locations) < 30
+        len(duplicate_locations) <= 108
     ), f"Found more duplicate locations in Grid Status location table than expected:\n {duplicate_locations}"
     return geocoded_locations
 
@@ -770,12 +958,11 @@ def _normalize_project_capacity(iso_df: pd.DataFrame) -> pd.DataFrame:
         index_cols=["project_id"],
         dropna=True,
     )
+    original_capacity = caiso[caiso_capacity_cols].sum().sum().round()
+    normalized_capacity = caiso_capacity_df["capacity_mw"].sum().round()
     assert (
-        ~caiso_capacity_df[["project_id", "resource"]].duplicated().any()
-    ), "Found duplicate CAISO capacities."
-    assert (
-        caiso[caiso_capacity_cols].sum().sum() == caiso_capacity_df["capacity_mw"].sum()
-    ), "Total CAISO capacity not preserved after normaliztion."
+        original_capacity == normalized_capacity
+    ), f"Total CAISO capacity not preserved after normaliztion\n\tOriginal: {original_capacity}\n\tNormalized: {normalized_capacity}."
 
     capacity_df = pd.concat(
         [iso_df[~is_caiso][capacity_cols], caiso_capacity_df[capacity_cols]]
@@ -795,10 +982,10 @@ def _normalize_projects(
     project_cols = [
         "project_id",
         "actual_completion_date",
+        "proposed_completion_date",
         "interconnecting_entity",
         "point_of_interconnection",
         "project_name",
-        "proposed_completion_date",
         "queue_date",
         "queue_id",
         "queue_status",
@@ -846,34 +1033,53 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         "nyiso": _transform_nyiso,
         "isone": _transform_isone,
     }
-
     projects = []
-    for iso, df in raw_dfs.items():
-        # Apply rename
-        renamed_df = df.rename(columns=COLUMN_RENAME_DICT).copy()
+    for iso, trns_func in iso_cleaning_functions.items():
+        logger.info(f"Cleaning {iso} data.")
+        renamed_df = pd.DataFrame()
+        # MISO is a special case because we need multiple snapshots of the raw data
+        if iso == "miso":
+            miso_pre_2017 = (
+                raw_dfs["miso-pre-2017"].rename(columns=COLUMN_RENAME_DICT).copy()
+            )
+            miso_post_2017 = raw_dfs["miso"].rename(columns=COLUMN_RENAME_DICT).copy()
+            renamed_df = trns_func(miso_post_2017, miso_pre_2017)
+        else:
+            # Apply rename
+            df = raw_dfs[iso]
+            renamed_df = df.rename(columns=COLUMN_RENAME_DICT).copy()
 
-        # Apply iso specific cleaning functions
-        renamed_df = iso_cleaning_functions[iso](renamed_df)
+            # Apply iso specific cleaning functions
+            renamed_df = trns_func(renamed_df)
 
         renamed_df["region"] = iso
         renamed_df["entity"] = iso.upper()
         projects.append(renamed_df)
 
-    active_projects = pd.concat(projects)
-    active_projects["queue_status"] = active_projects.queue_status.str.lower()
+    projects = pd.concat(projects)
+    projects["queue_status"] = projects.queue_status.str.lower()
+    projects["queue_status"] = projects["queue_status"].map(
+        {
+            "completed": "operational",
+            "operational": "operational",
+            "active": "active",
+            "withdrawn": "withdrawn",
+            "suspended": "suspended",
+        }
+    )
 
     # parse dates
-    date_cols = [col for col in list(active_projects) if "date" in col]
+    date_cols = [col for col in list(projects) if "date" in col]
     for col in date_cols:
-        active_projects[col] = pd.to_datetime(active_projects[col], utc=True)
+        projects[col] = pd.to_datetime(projects[col], utc=True, errors="coerce")
 
     # create project_id
-    active_projects["project_id"] = np.arange(len(active_projects), dtype=np.int32)
+    projects["project_id"] = np.arange(len(projects), dtype=np.int32)
 
     # deduplicate active projects
-    pre_dedupe = len(active_projects)
-    active_projects = deduplicate_active_projects(
-        active_projects,
+    pre_dedupe = len(projects)
+    deduped_projects = deduplicate_active_projects(
+        projects,
         key=[
             "point_of_interconnection_clean",  # derived in _prep_for_deduplication
             "capacity_mw",
@@ -881,11 +1087,12 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
             "state",
             "utility_clean",  # derived in _prep_for_deduplication
             "resource",
+            "queue_status",
         ],
         tiebreak_cols=["queue_date", "proposed_completion_date"],
         intermediate_creator=_prep_for_deduplication,
     )
-    dupes = pre_dedupe - len(active_projects)
+    dupes = pre_dedupe - len(deduped_projects)
     logger.info(f"Deduplicated {dupes} ({dupes/pre_dedupe:.2%}) projects.")
 
     # Normalize data
@@ -893,10 +1100,12 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         normalized_projects,
         normalized_capacities,
         normalized_locations,
-    ) = _normalize_projects(active_projects)
+    ) = _normalize_projects(deduped_projects)
 
     # harmonize types
-    normalized_capacities = _clean_resource_type(normalized_capacities)
+    normalized_capacities = _clean_resource_type(
+        normalized_capacities, normalized_projects, normalized_locations
+    )
 
     # Correct dtypes
     normalized_capacities["capacity_mw"] = pd.to_numeric(

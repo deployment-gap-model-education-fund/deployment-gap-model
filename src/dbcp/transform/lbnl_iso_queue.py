@@ -26,12 +26,13 @@ RESOURCE_DICT = {
     "Fuel Cell": {"codes": ["Fuel Cell", "FC"], "type": "Fossil"},
     "Geothermal": {"codes": [], "type": "Renewable"},
     "Hydro": {"codes": ["WAT", "H", "Water"], "type": "Renewable"},
-    "Landfill Gas": {"codes": ["LFG", "L"], "type": "Fossil"},
+    "Landfill Gas": {"codes": ["LFG", "L", "Landfill", "Waste"], "type": "Fossil"},
     "Municipal Solid Waste": {"codes": ["MSW"], "type": "Fossil"},
     "Natural Gas": {
         "codes": [
             "NG",
             "Methane",
+            "Methane Gas",
             "CT-NG",
             "CC",
             "CC-NG",
@@ -48,6 +49,7 @@ RESOURCE_DICT = {
             "KER NG",
             "Natural Gas; Diesel; Other; Storage",
             "Natural Gas; Oil",
+            "Thermal",
         ],
         "type": "Fossil",
     },
@@ -59,7 +61,10 @@ RESOURCE_DICT = {
     },
     "Onshore Wind": {"codes": ["Wind", "WND", "Wind Turbine"], "type": "Renewable"},
     "Other": {"codes": [], "type": "Unknown Resource"},
-    "Unknown": {"codes": ["Wo", "F", "Hybrid", "M"], "type": "Unknown Resource"},
+    "Unknown": {
+        "codes": ["Wo", "F", "Hybrid", "M", "Byproduct", "Conventional"],
+        "type": "Unknown Resource",
+    },
     "Other Storage": {
         "codes": ["Flywheel", "Storage", "CAES", "Gravity Rail", "Hydrogen"],
         "type": "Renewable",
@@ -69,7 +74,7 @@ RESOURCE_DICT = {
         "type": "Renewable",
     },
     "Solar": {"codes": ["SUN", "S"], "type": "Renewable"},
-    "Steam": {"codes": ["ST"], "type": "Fossil"},
+    "Steam": {"codes": ["ST", "Steam Turbine"], "type": "Fossil"},
     "Waste Heat": {
         "codes": [
             "Waste Heat Recovery",
@@ -83,6 +88,7 @@ RESOURCE_DICT = {
 
 def _harmonize_interconnection_status_lbnl(statuses: pd.Series) -> pd.Series:
     """Harmonize the interconnection_status_lbnl values."""
+    statuses = statuses.str.strip()
     mapping = {
         "Feasability Study": "Feasibility Study",
         "Feasibility": "Feasibility Study",
@@ -90,6 +96,12 @@ def _harmonize_interconnection_status_lbnl(statuses: pd.Series) -> pd.Series:
         "IA in Progress": "In Progress (unknown study)",
         "Unknown": "In Progress (unknown study)",
         "Withdrawn, Feasibility Study": "Withdrawn",
+        "operational": "Operational",
+        "withdrawn": "Withdrawn",
+        "IA Draft": "In Progress (unknown study)",
+        "Facility study": "Facility Study",
+        "active": "In Progress (unknown study)",
+        "suspended": "Suspended",
     }
     allowed_statuses = {
         "Cluster Study",
@@ -108,31 +120,46 @@ def _harmonize_interconnection_status_lbnl(statuses: pd.Series) -> pd.Series:
         "Withdrawn",
     }
     out = statuses.replace(mapping)
-    bad = out.loc[~out.isin(allowed_statuses)]
-    assert len(bad) == 0, f"Unknown interconnection status(es): {bad.value_counts()}"
+    bad = out.loc[~out.isin(allowed_statuses) & out.notna()]
+    assert len(bad) == 0, f"Unknown interconnection status(es):\n{bad.value_counts()}"
     return out
 
 
-def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
-    """Transform active iso queue data."""
+def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
+    """Transform active, operational and withdrawn iso queue projects."""
+    projects = raw_projects.copy()
     rename_dict = {
         "state": "raw_state_name",
         "county": "raw_county_name",
     }
-    active_projects["project_id"] = np.arange(len(active_projects), dtype=np.int32)
-    active_projects = active_projects.rename(columns=rename_dict)  # copy
-    active_projects.loc[
+    # manual fix for a project that doesn't have queue date, or status
+    # drop row where queue_id is 326 and entity is IP
+    projects = projects.drop(
+        projects[projects["queue_id"].eq("326") & (projects["entity"].eq("IP"))].index
+    )
+
+    projects["project_id"] = np.arange(len(projects), dtype=np.int32)
+    projects = projects.rename(columns=rename_dict)  # copy
+    projects.loc[
         :, "interconnection_status_lbnl"
     ] = _harmonize_interconnection_status_lbnl(
-        active_projects.loc[:, "interconnection_status_lbnl"]
+        projects.loc[:, "interconnection_status_lbnl"]
     )
-    # drop irrelevant columns (structurally all nan due to 'active' filter)
-    active_projects.drop(columns=["date_withdrawn", "date_operational"], inplace=True)
-    parse_date_columns(active_projects)
+    parse_date_columns(projects)
+    # rename date_withdrawn to withdrawn_date and date_operational to actual_completion_date
+    projects.rename(
+        columns={
+            "date_withdrawn_raw": "withdrawn_date_raw",
+            "date_operational_raw": "actual_completion_date_raw",
+            "date_withdrawn": "withdrawn_date",
+            "date_operational": "actual_completion_date",
+        },
+        inplace=True,
+    )
     # deduplicate
-    pre_dedupe = len(active_projects)
-    active_projects = deduplicate_active_projects(
-        active_projects,
+    pre_dedupe = len(projects)
+    projects = deduplicate_active_projects(
+        projects,
         key=[
             "point_of_interconnection_clean",  # derived in _prep_for_deduplication
             "capacity_mw_resource_1",
@@ -140,6 +167,7 @@ def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
             "raw_state_name",
             "utility_clean",  # derived in _prep_for_deduplication
             "resource_type_1",
+            "queue_status",
         ],
         tiebreak_cols=[  # first priority to last
             "date_proposed",
@@ -148,25 +176,39 @@ def active_iso_queue_projects(active_projects: pd.DataFrame) -> pd.DataFrame:
         ],
         intermediate_creator=_prep_for_deduplication,
     )
-    n_dupes = pre_dedupe - len(active_projects)
+    n_dupes = pre_dedupe - len(projects)
     logger.info(f"Deduplicated {n_dupes} ({n_dupes/pre_dedupe:.2%}) projects.")
 
-    active_projects.set_index("project_id", inplace=True)
-    active_projects.sort_index(inplace=True)
-    # manual fix for duplicate resource type in raw data
-    bad_proj_id = 1606
-    assert (
-        active_projects.loc[bad_proj_id, "project_name"] == "Coleto Creek ESS Addition"
-    ), "Manual correction is misidentified."
-    active_projects.loc[
-        bad_proj_id, "resource_type_1"
-    ] = "Coal"  # raw data has two instances of "battery storage"
+    projects.set_index("project_id", inplace=True)
+    projects.sort_index(inplace=True)
     # clean up whitespace
-    for col in active_projects.columns:
-        if pd.api.types.is_object_dtype(active_projects.loc[:, col]):
-            active_projects.loc[:, col] = active_projects.loc[:, col].str.strip()
-    active_projects = _add_actionable_and_nearly_certain_classification(active_projects)
-    return active_projects
+    for col in projects.columns:
+        if pd.api.types.is_object_dtype(projects.loc[:, col]):
+            projects.loc[:, col] = projects.loc[:, col].str.strip()
+
+    # add is_actionable and is_nearly_certain classifications to active projects
+    projects["is_actionable"] = pd.NA
+    projects["is_nearly_certain"] = pd.NA
+    is_active_project = projects.queue_status.eq("active")
+    projects.loc[is_active_project] = _add_actionable_and_nearly_certain_classification(
+        projects.loc[is_active_project]
+    )
+    # assert is_actionable and is_nearly_certain are all null for operational and withdrawn projects
+    assert (
+        projects.loc[~is_active_project, ["is_actionable", "is_nearly_certain"]]
+        .isna()
+        .all()
+        .all()
+    ), "Some operational or withdrawn projects have is_actionable or is_nearly_certain values."
+
+    # S-C utilities don't list the state which prevents them from being geocoded
+    projects.loc[
+        projects.entity.eq("S-C") | projects.entity.eq("SC"), "raw_state_name"
+    ] = "SC"
+
+    # Replace ISO-NE values in region with ISONE to match gridstatus
+    projects["region"] = projects["region"].replace({"ISO-NE": "ISONE"})
+    return projects
 
 
 def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
@@ -179,8 +221,9 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     Returns:
         lbnl_transformed_dfs: Dictionary of the transformed tables.
     """
-    active = lbnl_raw_dfs["lbnl_iso_queue"].query("queue_status == 'active'").copy()
-    transformed = active_iso_queue_projects(active)  # sets index to project_id
+    transformed = _clean_all_iso_projects(
+        lbnl_raw_dfs["lbnl_iso_queue"]
+    )  # sets index to project_id
 
     # Combine and normalize iso queue tables
     lbnl_normalized_dfs = normalize_lbnl_dfs(transformed)
@@ -200,6 +243,10 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         .loc[:, ["raw_state_name", "raw_county_name"]]
         .copy()
     )
+    # Fix defunct county FIPS code
+    new_locs.loc[
+        new_locs.county_id_fips.eq("51515"), "county_id_fips"
+    ] = "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
     lbnl_normalized_dfs["iso_locations"] = new_locs
 
     # Clean up and categorize resources
@@ -209,6 +256,15 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     if lbnl_normalized_dfs["iso_resource_capacity"].resource_clean.isna().any():
         raise AssertionError("Missing Resources!")
     lbnl_normalized_dfs["iso_projects"].reset_index(inplace=True)
+
+    # Most projects missing queue_status are from the early 2000s so I'm going to assume
+    # they were withrawn.
+    assert (
+        lbnl_normalized_dfs["iso_projects"]["queue_status"].isna().sum() <= 42
+    ), "Unexpected number of projects missing queue status."
+    lbnl_normalized_dfs["iso_projects"]["queue_status"] = lbnl_normalized_dfs[
+        "iso_projects"
+    ]["queue_status"].fillna("withdrawn")
 
     return lbnl_normalized_dfs
 
@@ -411,7 +467,7 @@ def deduplicate_active_projects(
     tiebreak_cols: Sequence[str],
     intermediate_creator: Callable[[pd.DataFrame], None],
 ) -> pd.DataFrame:
-    """First draft deduplication of ISO queues (for active projects only).
+    """First draft deduplication of ISO queues.
 
     The intention here is to identify rows that likely describe the same physical
     project, but are duplicated due to different proposed start dates or IA statuses.
@@ -515,7 +571,9 @@ def _manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
         ["delaware (ok)", "ok", "delaware", "ok"],
         # workaround for bug in addfips library.
         # See https://github.com/fitnr/addfips/issues/8
-        ["bedford", "va", "bedford county", "va"],
+        ["dryer", "tn", "dyer", "tn"],
+        ["churchill", "ca", "churchill", "nv"],
+        ["pershing", "ca", "pershing", "nv"],
     ]
     manual_county_state_name_fixes = pd.DataFrame(
         manual_county_state_name_fixes,
@@ -536,12 +594,6 @@ def _manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
     locs.loc[:, "raw_state_name"] = locs.loc[:, "clean_state"].fillna(
         locs.loc[:, "raw_state_name"]
     )
-    # one cross-state project breaks the schema, so remove the second location for now.
-    is_cross_state = locs["raw_county_name"].eq("benton (ar)") & locs.loc[
-        :, "raw_state_name"
-    ].eq("ok")
-    assert is_cross_state.sum() == 1, "Expected one match for cross-state project."
-    locs = locs.loc[~is_cross_state, :]
     locs = locs.drop(["clean_county", "clean_state"], axis=1)
     return locs
 
@@ -553,8 +605,6 @@ def _add_actionable_and_nearly_certain_classification(
 
     This model was created by a consultant in Excel and translated to python.
     """
-    if not queue["queue_status"].eq("active").all():
-        raise ValueError("This function only applies to active projects.")
     if (
         queue["interconnection_status_lbnl"]
         .isin(
@@ -588,3 +638,14 @@ def _add_actionable_and_nearly_certain_classification(
     )
 
     return queue
+
+
+if __name__ == "__main__":
+    # debugging entry point
+    import dbcp
+
+    lbnl_uri = "gs://dgm-archive/lbnl_iso_queue/queues_2023_clean_data.xlsx"
+    lbnl_raw_dfs = dbcp.extract.lbnl_iso_queue.extract(lbnl_uri)
+    lbnl_transformed_dfs = dbcp.transform.lbnl_iso_queue.transform(lbnl_raw_dfs)
+
+    assert lbnl_transformed_dfs
