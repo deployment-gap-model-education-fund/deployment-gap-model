@@ -92,9 +92,7 @@ def test_iso_projects_sources(engine: Engine):
     expected_source = {"proprietary"}
     offshore_test = pd.read_sql(
         proprietary_offshore, engine, index_col="source"
-    ).squeeze(
-        axis=1
-    )  # make series
+    ).squeeze(axis=1)  # make series
     actual_source = set(offshore_test.index)
     assert (
         actual_source == expected_source
