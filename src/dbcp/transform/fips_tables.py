@@ -36,7 +36,7 @@ def _add_tribal_land_frac(
     dissolved_tribal = tribal_land.dissolve()
     dissolved_tribal_geometry = dissolved_tribal.geometry.iloc[0]
 
-    # Calculate intersection, convert to km
+    # Calculate intersection, convert m^2 to km^2
     counties["tribal_land_intersection"] = (
         counties.intersection(dissolved_tribal_geometry).area / 1e6
     )

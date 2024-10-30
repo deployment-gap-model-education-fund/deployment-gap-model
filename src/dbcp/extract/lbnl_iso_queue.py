@@ -1,4 +1,4 @@
-"""Retrieve data from the 20201 LBNL ISO Queue spreadsheet for analysis."""
+"""Retrieve data from the LBNL ISO Queue spreadsheet."""
 from typing import Dict
 
 import pandas as pd
@@ -10,7 +10,7 @@ def extract(uri: str) -> Dict[str, pd.DataFrame]:
     """Read Excel file with LBNL ISO Queue dataset.
 
     Args:
-        uri: uri of data in GCS relatives to the root.
+        uri: uri of data in GCS relative to the root.
 
     Returns:
         dfs: dictionary of dataframe name to raw dataframe.
