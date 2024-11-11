@@ -19,6 +19,7 @@ separately, such as non-commutative aggregations over nested groupings, eg
 `count(distinct my_column)) group by county, resource` cannot have another
 `count(distinct my_column) group by county` on top of it.
 """
+
 from io import StringIO
 from typing import Dict, Optional
 
