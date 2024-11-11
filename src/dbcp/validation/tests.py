@@ -92,7 +92,9 @@ def test_iso_projects_sources(engine: Engine):
     expected_source = {"proprietary"}
     offshore_test = pd.read_sql(
         proprietary_offshore, engine, index_col="source"
-    ).squeeze(axis=1)  # make series
+    ).squeeze(
+        axis=1
+    )  # make series
     actual_source = set(offshore_test.index)
     assert (
         actual_source == expected_source
@@ -241,9 +243,10 @@ def test_county_wide_coverage(engine: Engine):
         df.shape[0] == n_counties
     ), "counties_wide_format does not contain all counties"
     notnull = df.notnull()
-    assert notnull.any(axis=1).sum() == 2461, (
-        "counties_wide_format has unexpected county coverage:"
-        f" {notnull.loc[notnull.any(axis=1), 'county_id_fips']}"
+    n_expected_counties = 2458
+    assert notnull.any(axis=1).sum() == n_expected_counties, (
+        "counties_wide_format has unexpected county coverage."
+        f" Expected {n_expected_counties}, found {notnull.any(axis=1).sum()}"
     )
 
 

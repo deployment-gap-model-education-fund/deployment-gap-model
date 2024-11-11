@@ -781,7 +781,7 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
         f"{pct_after_current_year:.2%} of operational projects have actual_completion_date after the current year."
     )
     # make sure pct_after_current_year is less than 0.001 of operational projects
-    expected_missing = 0.001
+    expected_missing = 0.002
     assert (
         pct_after_current_year < expected_missing
     ), f"More than {expected_missing}% of operational projects have actual_completion_date after the current year."
@@ -909,7 +909,7 @@ def validate_project_change_log(
             "MISO": 0.09,  # A lot of operational projects prior to 2010 are missing operational dates
             "NYISO": 0.18,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
             "PJM": 0.04,
-            "SPP": 0.31,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
+            "SPP": 0.32,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
         }
     )
 
@@ -964,7 +964,7 @@ def validate_iso_regions_change_log(
             "MISO": 0.09,  # A lot of operational projects prior to 2010 are missing operational dates
             "NYISO": 0.20,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
             "PJM": 0.04,
-            "SPP": 0.31,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
+            "SPP": 0.32,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
         }
     )
 

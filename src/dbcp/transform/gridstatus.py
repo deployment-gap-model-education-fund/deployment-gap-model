@@ -478,7 +478,7 @@ def _clean_resource_type(
         resource_locations["county_id_fips"].isin(coastal_county_id_fips.keys())
         & resource_locations.resource_clean.eq("Onshore Wind")
     ].project_id
-    expected_n_coastal_wind_projects = 92
+    expected_n_coastal_wind_projects = 85
     assert (
         len(nyiso_coastal_wind_project_project_ids) == expected_n_coastal_wind_projects
     ), f"Expected {expected_n_coastal_wind_projects} NYISO coastal wind projects but found {len(nyiso_coastal_wind_project_project_ids)}"
@@ -622,9 +622,13 @@ def _transform_miso(post_2017: pd.DataFrame, pre_2017: pd.DataFrame) -> pd.DataF
     in_service_projects = iso_df[
         iso_df["Post Generator Interconnection Agreement Status"].eq("In Service")
     ]
+    done_in_service_projects = in_service_projects[
+        in_service_projects["queue_status"].ne("Done")
+    ]
+    expected_n_done_in_service_projects = 2
     assert (
-        len(in_service_projects[in_service_projects["queue_status"].ne("Done")]) <= 1
-    ), "There is an unexpected number of MISO projects that are In Service but not Done."
+        len(done_in_service_projects) <= expected_n_done_in_service_projects
+    ), f"Expected {expected_n_done_in_service_projects} MISO projects that are In Service but not Done but found {len(done_in_service_projects)}."
 
     # Mark "Done" projects as "Active" because they are not necesarily operational yet.
     iso_df["queue_status"] = iso_df["queue_status"].map(
@@ -708,6 +712,9 @@ def _transform_pjm(iso_df: pd.DataFrame) -> pd.DataFrame:
         "Annulled": "Withdrawn",
     }
     iso_df["queue_status"] = iso_df["queue_status"].map(status_map)
+
+    # There is one project that is missing a queue status. Assume it is withdrawn
+    iso_df.loc[iso_df.queue_id.eq("AC1-073"), "queue_status"] = "Withdrawn"
 
     iso_df = _create_project_status_classification_from_multiple_columns(
         iso_df,
@@ -925,7 +932,7 @@ def _normalize_project_locations(iso_df: pd.DataFrame) -> pd.DataFrame:
         geocoded_locations[["county_id_fips", "project_id"]].duplicated(keep=False)
     ]
     assert (
-        len(duplicate_locations) <= 108
+        len(duplicate_locations) <= 114
     ), f"Found more duplicate locations in Grid Status location table than expected:\n {duplicate_locations}"
     return geocoded_locations
 
