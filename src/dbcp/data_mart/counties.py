@@ -41,6 +41,7 @@ from dbcp.data_mart.helpers import (
     _get_county_fips_df,
     _get_state_fips_df,
     _subset_db_columns,
+    get_query,
 )
 from dbcp.data_mart.projects import create_long_format as create_iso_data_mart
 from dbcp.helpers import get_sql_engine
@@ -230,52 +231,7 @@ def _get_existing_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
     # SELECT max(fuel_type_count) as max_fuel_type_count
     # FROM gen_fuels
 
-    query = """
-    WITH
-    plant_fuel_aggs as (
-        SELECT
-            plant_id_eia,
-            (CASE
-                WHEN technology_description = 'Batteries' THEN 'Battery Storage'
-                WHEN technology_description = 'Offshore Wind Turbine' THEN 'Offshore Wind'
-                WHEN fuel_type_code_pudl = 'waste' THEN 'other'
-                ELSE fuel_type_code_pudl
-            END
-            ) as resource,
-            sum(net_generation_mwh) as net_gen_by_fuel,
-            sum(capacity_mw) as capacity_by_fuel,
-            max(generator_operating_date) as max_operating_date
-        from data_warehouse.pudl_generators
-        where operational_status = 'existing'
-        group by 1, 2
-    ),
-    plant_capacity as (
-        SELECT
-            plant_id_eia,
-            sum(capacity_by_fuel) as capacity_mw
-        from plant_fuel_aggs
-        group by 1
-    ),
-    all_aggs as (
-        SELECT
-            *
-        from plant_fuel_aggs as pfuel
-        LEFT JOIN plant_capacity as pcap
-        USING (plant_id_eia)
-    )
-    -- select fuel type with the largest generation (with capacity as tiebreaker)
-    -- https://stackoverflow.com/questions/3800551/select-first-row-in-each-group-by-group/7630564
-    -- NOTE: this is not appropriate for fields that require aggregation, hence CTEs above
-    SELECT DISTINCT ON (plant_id_eia)
-        plant_id_eia,
-        resource,
-        -- net_gen_by_fuel for debugging
-        max_operating_date,
-        capacity_mw
-    from all_aggs
-    ORDER BY plant_id_eia, net_gen_by_fuel DESC NULLS LAST, capacity_by_fuel DESC NULLS LAST
-    ;
-    """
+    query = get_query("get_existing_plant_attributes.sql")
     df = pd.read_sql(query, engine)
     resource_map = {
         "gas": "Natural Gas",
@@ -668,50 +624,7 @@ def _get_offshore_wind_extra_cols(engine: sa.engine.Engine) -> pd.DataFrame:
     # they intentionally double-count capacity. The theory is that the loss
     # of any port could block the whole associated project, so we want
     # to know how much total capacity is at stake in each port county.
-    query = """
-    WITH
-    proj_ports AS (
-        SELECT
-            proj."project_id",
-            port.location_id,
-            locs.county_id_fips,
-            proj."capacity_mw"
-        FROM "data_warehouse"."offshore_wind_projects" as proj
-        INNER JOIN data_warehouse.offshore_wind_port_association as port
-        USING(project_id)
-        INNER JOIN data_warehouse.offshore_wind_locations as locs
-        USING(location_id)
-    ),
-    -- select * from proj_ports
-    -- order by project_id, location_id
-    port_aggs AS (
-        SELECT
-            county_id_fips,
-            -- intentional double-counting here. The theory is that the loss
-            -- of any port could block the whole associated project, so we want
-            -- to know how much total capacity is at stake in each port county.
-            SUM(capacity_mw) as offshore_wind_capacity_mw_via_ports
-        FROM proj_ports
-        GROUP BY 1
-        order by 1
-    ),
-    interest AS (
-        SELECT
-            county_id_fips,
-            string_agg(distinct(why_of_interest), ',' order by why_of_interest) as offshore_wind_interest_type
-        FROM data_warehouse.offshore_wind_locations as locs
-        GROUP BY 1
-        ORDER BY 1
-    )
-    SELECT
-        county_id_fips,
-        offshore_wind_capacity_mw_via_ports,
-        offshore_wind_interest_type
-    FROM interest
-    LEFT JOIN port_aggs
-    USING(county_id_fips)
-    where county_id_fips is not NULL;
-    """
+    query = get_query("get_offshore_wind_extra_cols.sql")
     df = pd.read_sql(query, engine)
     df.set_index("county_id_fips", inplace=True)
     return df
@@ -779,25 +692,8 @@ def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
 def _get_energy_community_qualification(postgres_engine: sa.engine.Engine):
     # NOTE: this query contains hardcoded parameters for the
     # energy communities qualification criteria
-    query = """
-    WITH
-    ec as (
-        SELECT
-            ec.county_id_fips,
-            coal_qualifying_area_fraction as energy_community_coal_closures_area_fraction,
-            qualifies_by_employment_criteria as energy_community_qualifies_via_employment
-        FROM data_warehouse.energy_communities_by_county AS ec
-        LEFT JOIN data_warehouse.county_fips AS fips
-        USING (county_id_fips)
-    )
-    SELECT
-        *,
-        (energy_community_coal_closures_area_fraction > 0.5 OR
-        energy_community_qualifies_via_employment) as energy_community_qualifies
-    FROM ec
-    """
+    query = get_query("get_energy_community_qualification.sql")
     ec = pd.read_sql(query, postgres_engine)
-
     return ec
 
 

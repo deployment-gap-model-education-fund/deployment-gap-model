@@ -1,5 +1,6 @@
 """Module of helper functions for creating data mart tables from the data warehouse."""
 
+from pathlib import Path
 from typing import Optional, Sequence
 
 import pandas as pd
@@ -342,3 +343,10 @@ def _estimate_proposed_power_co2e(
     ]
     iso_projects.drop(columns=intermediates, inplace=True)
     return
+
+
+def get_query(filename: str) -> str:
+    """Get the query from a file."""
+    sql_query_dir = Path(__file__).parent / "sql_queries"
+    full_path = sql_query_dir / filename
+    return full_path.read_text()
