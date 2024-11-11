@@ -967,16 +967,15 @@ def _add_avoided_co2e(iso: pd.DataFrame, engine: sa.engine.Engine) -> pd.DataFra
 
 
 def _get_avoided_emissions_by_county_resource(engine: sa.engine.Engine) -> pd.DataFrame:
-    query = """
-    select
-        avert_region,
-        resource_type,
-        co2e_tonnes_per_year_per_mw
-    from data_warehouse.avert_avoided_emissions_factors
-    -- drop distributed_pv
-    WHERE resource_type in ('onshore_wind', 'offshore_wind', 'utility_pv')
-    """
-    emiss_fac = pd.read_sql(query, engine)
+    emiss_fac = pd.read_sql_table(
+        "avert_avoided_emissions_factors", engine, schema="data_warehouse"
+    )
+    emiss_fac = emiss_fac[
+        emiss_fac.resource_type.isin(["onshore_wind", "offshore_wind", "utility_pv"])
+    ]
+    emiss_fac = emiss_fac[
+        ["avert_region", "resource_type", "co2e_tonnes_per_year_per_mw"]
+    ]
     crosswalk = pd.read_sql_table(
         "avert_county_region_assoc", engine, schema="data_warehouse"
     )
