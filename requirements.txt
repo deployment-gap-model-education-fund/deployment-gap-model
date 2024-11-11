@@ -1,4 +1,4 @@
-catalystcoop.pudl==2022.11.30
+addfips>=0.4
 fiona~=1.9.4
 psycopg2~=2.9.3
 pytest~=6.2.5

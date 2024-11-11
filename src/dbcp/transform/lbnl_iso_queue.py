@@ -1,16 +1,17 @@
 """Functions to transform LBNL ISO queue tables."""
+
 import logging
 from typing import Callable, Dict, List, Sequence
 
 import numpy as np
 import pandas as pd
 
+from dbcp.helpers import add_fips_ids
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     normalize_multicolumns_to_rows,
     parse_dates,
 )
-from pudl.helpers import add_fips_ids as _add_fips_ids
 
 logger = logging.getLogger(__name__)
 
@@ -526,7 +527,7 @@ def _fix_independent_city_fips(location_df: pd.DataFrame) -> pd.DataFrame:
         .str.lower()
         .str.replace("^city of (.+)", lambda x: x.group(1) + " city", regex=True)
     )
-    nan_fips = _add_fips_ids(
+    nan_fips = add_fips_ids(
         nan_fips, state_col="raw_state_name", county_col="raw_county_name"
     )
 

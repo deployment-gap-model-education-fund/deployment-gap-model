@@ -1,11 +1,12 @@
 """Transform functions for local opposition data."""
+
 from typing import Dict
 
 import pandas as pd
 
 from dbcp.constants import FIPS_CODE_VINTAGE
+from dbcp.helpers import add_fips_ids
 from dbcp.transform.helpers import add_county_fips_with_backup_geocoding
-from pudl.helpers import add_fips_ids as _add_fips_ids
 
 
 def _extract_years(ser: pd.Series) -> pd.Series:
@@ -51,7 +52,7 @@ def _transform_state_policy(state_policy_df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: dataframe of state policies with additional columns
     """
-    state = _add_fips_ids(
+    state = add_fips_ids(
         state_policy_df, county_col="policy", vintage=FIPS_CODE_VINTAGE
     ).drop(columns="county_id_fips")
     year_summaries = _extract_years(state.loc[:, "policy"])
@@ -128,7 +129,7 @@ def _transform_contested_projects(project_df: pd.DataFrame) -> pd.DataFrame:
         pd.DataFrame: dataframe of contested projects with additional columns
     """
     # this should really use geocoding, but we don't use this data so I didn't bother.
-    proj = _add_fips_ids(project_df, county_col="description").drop(
+    proj = add_fips_ids(project_df, county_col="description").drop(
         columns="county_id_fips"
     )
     year_summaries = _extract_years(proj.loc[:, "description"])

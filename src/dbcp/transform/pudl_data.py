@@ -1,9 +1,10 @@
 """Transform PUDL tables."""
+
 import pandas as pd
 
 from dbcp.constants import FIPS_CODE_VINTAGE
+from dbcp.helpers import add_fips_ids
 from dbcp.transform.helpers import bedford_addfips_fix
-from pudl.helpers import add_fips_ids as _add_fips_ids
 
 
 def _transform_pudl_generators(pudl_generators) -> pd.DataFrame:
@@ -22,7 +23,7 @@ def _transform_pudl_generators(pudl_generators) -> pd.DataFrame:
     filled_location = pudl_generators.loc[:, ["state", "county"]].fillna(
         ""
     )  # copy; don't want to fill actual table
-    fips = _add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
+    fips = add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
     pudl_generators = pd.concat(
         [pudl_generators, fips[["state_id_fips", "county_id_fips"]]], axis=1, copy=False
     )
@@ -55,7 +56,7 @@ def _transform_pudl_eia860m_changelog(
         ""
     )  # copy; don't want to fill actual table
 
-    fips = _add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
+    fips = add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
     pudl_eia860m_changelog = pd.concat(
         [pudl_eia860m_changelog, fips[["state_id_fips", "county_id_fips"]]],
         axis=1,
