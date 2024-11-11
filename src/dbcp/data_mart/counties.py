@@ -135,38 +135,80 @@ def _create_dbcp_ej_index(j40_df: pd.DataFrame) -> pd.Series:
 
 def _get_env_justice_df(engine: sa.engine.Engine) -> pd.DataFrame:
     """Create county-level aggregates of Justice40 tracts."""
-    query = """
-    SELECT
-        SUBSTRING("tract_id_fips", 1, 5) as county_id_fips,
-        COUNT("tract_id_fips") as total_tracts,
-        SUM("is_disadvantaged"::INTEGER) as n_distinct_qualifying_tracts,
-        SUM("expected_agriculture_loss_rate_is_low_income"::INTEGER) as n_tracts_agriculture_loss_low_income,
-        SUM("expected_building_loss_rate_is_low_income"::INTEGER) as n_tracts_building_loss_low_income,
-        SUM("expected_population_loss_rate_is_low_income"::INTEGER) as n_tracts_population_loss_low_income,
-        SUM("diesel_particulates_is_low_income"::INTEGER) as n_tracts_diesel_particulates_low_income,
-        SUM("energy_burden_is_low_income"::INTEGER) as n_tracts_energy_burden_low_income,
-        SUM("pm2_5_is_low_income"::INTEGER) as n_tracts_pm2_5_low_income,
-        SUM("traffic_proximity_is_low_income"::INTEGER) as n_tracts_traffic_low_income,
-        SUM("lead_paint_and_median_house_value_is_low_income"::INTEGER) as n_tracts_lead_paint_and_median_home_price_low_income,
-        SUM("housing_burden_is_low_income"::INTEGER) as n_tracts_housing_burden_low_income,
-        SUM("proximity_to_superfund_sites_is_low_income"::INTEGER) as n_tracts_superfund_proximity_low_income,
-        SUM("wastewater_discharge_is_low_income"::INTEGER) as n_tracts_wastewater_low_income,
-        SUM("asthma_is_low_income"::INTEGER) as n_tracts_asthma_low_income,
-        SUM("heart_disease_is_low_income"::INTEGER) as n_tracts_heart_disease_low_income,
-        SUM("diabetes_is_low_income"::INTEGER) as n_tracts_diabetes_low_income,
-        SUM("low_median_household_income_and_low_hs_attainment"::INTEGER) as n_tracts_local_to_area_income_ratio_and_low_high_school,
-        SUM("households_in_linguistic_isolation_and_low_hs_attainment"::INTEGER) as n_tracts_linguistic_isolation_and_low_high_school,
-        SUM("households_below_federal_poverty_level_low_hs_attainment"::INTEGER) as n_tracts_below_poverty_and_low_high_school,
-        SUM("unemployment_and_low_hs_attainment"::INTEGER) as n_tracts_unemployment_and_low_high_school,
-        SUM("proximity_to_hazardous_waste_facilities_is_low_income"::INTEGER) as n_tracts_hazardous_waste_proximity_low_income,
-        SUM("unemployment_and_low_hs_edu_islands"::INTEGER) as n_tracts_unemployment_less_than_high_school_islands,
-        SUM("low_median_household_income_and_low_hs_edu_islands"::INTEGER) as n_tracts_local_to_area_income_ratio_less_than_high_school_islands,
-        SUM("households_below_federal_poverty_level_low_hs_edu_islands"::INTEGER) as n_tracts_below_poverty_line_less_than_high_school_islands,
-        SUM("low_life_expectancy_is_low_income"::INTEGER) as n_tracts_life_expectancy_low_income
-    FROM "data_warehouse"."justice40_tracts"
-    GROUP BY 1;
-    """
-    df = pd.read_sql(query, engine)
+    df = pd.read_sql_table("justice40_tracts", engine, schema="data_warehouse")
+    df["county_id_fips"] = df["tract_id_fips"].str.slice(0, 5)
+    df.groupby("county_id_fips").agg(
+        total_tracts=("tract_id_fips", "count"),
+        n_distinct_qualifying_tracts=("is_disadvantaged", "sum"),
+        n_tracts_agriculture_loss_low_income=(
+            "expected_agriculture_loss_rate_is_low_income",
+            "sum",
+        ),
+        n_tracts_building_loss_low_income=(
+            "expected_building_loss_rate_is_low_income",
+            "sum",
+        ),
+        n_tracts_population_loss_low_income=(
+            "expected_population_loss_rate_is_low_income",
+            "sum",
+        ),
+        n_tracts_diesel_particulates_low_income=(
+            "diesel_particulates_is_low_income",
+            "sum",
+        ),
+        n_tracts_energy_burden_low_income=("energy_burden_is_low_income", "sum"),
+        n_tracts_pm2_5_low_income=("pm2_5_is_low_income", "sum"),
+        n_tracts_traffic_low_income=("traffic_proximity_is_low_income", "sum"),
+        n_tracts_lead_paint_and_median_home_price_low_income=(
+            "lead_paint_and_median_house_value_is_low_income",
+            "sum",
+        ),
+        n_tracts_housing_burden_low_income=("housing_burden_is_low_income", "sum"),
+        n_tracts_superfund_proximity_low_income=(
+            "proximity_to_superfund_sites_is_low_income",
+            "sum",
+        ),
+        n_tracts_wastewater_low_income=("wastewater_discharge_is_low_income", "sum"),
+        n_tracts_asthma_low_income=("asthma_is_low_income", "sum"),
+        n_tracts_heart_disease_low_income=("heart_disease_is_low_income", "sum"),
+        n_tracts_diabetes_low_income=("diabetes_is_low_income", "sum"),
+        n_tracts_local_to_area_income_ratio_and_low_high_school=(
+            "low_median_household_income_and_low_hs_attainment",
+            "sum",
+        ),
+        n_tracts_linguistic_isolation_and_low_high_school=(
+            "households_in_linguistic_isolation_and_low_hs_attainment",
+            "sum",
+        ),
+        n_tracts_below_poverty_and_low_high_school=(
+            "households_below_federal_poverty_level_low_hs_attainment",
+            "sum",
+        ),
+        n_tracts_unemployment_and_low_high_school=(
+            "unemployment_and_low_hs_attainment",
+            "sum",
+        ),
+        n_tracts_hazardous_waste_proximity_low_income=(
+            "proximity_to_hazardous_waste_facilities_is_low_income",
+            "sum",
+        ),
+        n_tracts_unemployment_less_than_high_school_islands=(
+            "unemployment_and_low_hs_edu_islands",
+            "sum",
+        ),
+        n_tracts_local_to_area_income_ratio_less_than_high_school_islands=(
+            "low_median_household_income_and_low_hs_edu_islands",
+            "sum",
+        ),
+        n_tracts_below_poverty_line_less_than_high_school_islands=(
+            "households_below_federal_poverty_level_low_hs_edu_islands",
+            "sum",
+        ),
+        n_tracts_life_expectancy_low_income=(
+            "low_life_expectancy_is_low_income",
+            "sum",
+        ),
+    )
     df["justice40_dbcp_index"] = _create_dbcp_ej_index(df)
     return df
 
