@@ -137,7 +137,7 @@ def _get_env_justice_df(engine: sa.engine.Engine) -> pd.DataFrame:
     """Create county-level aggregates of Justice40 tracts."""
     df = pd.read_sql_table("justice40_tracts", engine, schema="data_warehouse")
     df["county_id_fips"] = df["tract_id_fips"].str.slice(0, 5)
-    df.groupby("county_id_fips").agg(
+    df = df.groupby("county_id_fips").agg(
         total_tracts=("tract_id_fips", "count"),
         n_distinct_qualifying_tracts=("is_disadvantaged", "sum"),
         n_tracts_agriculture_loss_low_income=(
@@ -196,7 +196,7 @@ def _get_env_justice_df(engine: sa.engine.Engine) -> pd.DataFrame:
             "unemployment_and_low_hs_edu_islands",
             "sum",
         ),
-        n_tracts_local_to_area_income_ratio_less_than_high_school_islands=(
+        n_tracts_local_to_area_income_ratio_less_than_high_school_islan=(
             "low_median_household_income_and_low_hs_edu_islands",
             "sum",
         ),
