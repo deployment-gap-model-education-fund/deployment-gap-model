@@ -478,7 +478,7 @@ def _clean_resource_type(
         resource_locations["county_id_fips"].isin(coastal_county_id_fips.keys())
         & resource_locations.resource_clean.eq("Onshore Wind")
     ].project_id
-    expected_n_coastal_wind_projects = 85
+    expected_n_coastal_wind_projects = 88
     assert (
         len(nyiso_coastal_wind_project_project_ids) == expected_n_coastal_wind_projects
     ), f"Expected {expected_n_coastal_wind_projects} NYISO coastal wind projects but found {len(nyiso_coastal_wind_project_project_ids)}"
@@ -850,12 +850,31 @@ def _transform_nyiso(iso_df: pd.DataFrame) -> pd.DataFrame:
         "0": "Withdrawn",
         "15": "Partial In-Service",
         "P": "Pending Adoption of IP Compliance with Order 2023",  # Vast majority of projects with status 'P' don't have any studies posted yet
+        "1C": "IR Validated/ Scoping Meeting Pending",
+        "2C": "Customer Engagement Window",
+        "3C": "Phase 1 Entry Decision Period",
+        "4C": "Phase 1 Study",
+        "5C": "Phase 2 Entry Decision Period",
+        "6C": "Phase 2 Study",
+        "7C": "Final Decision Period",
+        "10C": "Accepted Cost Allocation/ IA in Progress",
+        "11C": "IA Completed",
+        "12C": "Under Construction",
+        "13C": "In Service for Test",
+        "14C": "In Service Commercial",
+        "15C": "Partially In-Service/ Partially under construction",
     }
 
     # Categorize project status
-    iso_df["S"] = pd.to_numeric(iso_df["S"]).astype("Int64").astype("string")
-    actionable_vals = ("6", "7", "8", "9", "10")
-    nearly_certain_vals = ("11", "12", "13", "15")
+    iso_df["S"] = iso_df["S"].str.replace(r"\.0$", "", regex=True)
+    actionable_vals = (
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+    )  # TODO: What are actionable values for cluster studies?
+    nearly_certain_vals = ("11", "12", "13", "15", "11C", "12C", "13C", "15C")
     iso_df = _create_project_status_classification_from_single_column(
         iso_df,
         "S",
@@ -932,7 +951,7 @@ def _normalize_project_locations(iso_df: pd.DataFrame) -> pd.DataFrame:
         geocoded_locations[["county_id_fips", "project_id"]].duplicated(keep=False)
     ]
     assert (
-        len(duplicate_locations) <= 114
+        len(duplicate_locations) <= 116
     ), f"Found more duplicate locations in Grid Status location table than expected:\n {duplicate_locations}"
     return geocoded_locations
 
