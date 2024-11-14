@@ -595,8 +595,8 @@ def create_total_active_project_change_logs(
     ).all(), "Found rows with unexpected queue status."
 
     chng_log = active_iso_projects_change_log.copy()
-    min_date = chng_log.effective_date.min()
-    max_date = chng_log.effective_date.max()
+    min_date = chng_log.effective_date.min() - pd.offsets.QuarterBegin(startingMonth=1)
+    max_date = chng_log.effective_date.max() + pd.offsets.QuarterEnd(0)
 
     def generate_frequencies(start, end, min_date, max_date, freq="Q"):
         """
@@ -747,6 +747,7 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
         long_format.resource_clean.eq("Unknown"), "other"
     )
 
+    # Not all ISO regions have operational and withdrawn dates which are required to make a full change log.
     long_format = long_format[long_format["iso_region"].isin(CHANGE_LOG_REGIONS)]
 
     # make sure we are missing less than 10% of withdrawn_date
