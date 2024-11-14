@@ -1,4 +1,5 @@
 """Transform functions for local opposition data."""
+
 from typing import Dict
 
 import pandas as pd
@@ -101,6 +102,7 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
         "Town of Charlton (Worcester County)": "Charlton (Worcester County)",
         "City of Owasso (Rogers and Tulsa Counties)": "Owasso (Rogers and Tulsa Counties)",
         "City of Burleson (Tarrant and Johnson Counties)": "Burleson (Tarrant and Johnson Counties)",
+        "Montrose City (Genesee County)": "Montrose (Genesee County)",
     }
     local.loc[:, "locality"].replace(location_corrections, inplace=True)
 
