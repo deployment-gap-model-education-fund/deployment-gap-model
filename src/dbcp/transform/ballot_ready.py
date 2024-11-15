@@ -1,4 +1,5 @@
 """Module for cleaning Ballot Ready data."""
+
 import logging
 
 import pandas as pd
@@ -204,10 +205,11 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
     # These ones contain both state and county FIPS. Some have letters or non FIPs
     # characters, so we shouldn't expect a perfect match.
     state_match = ballot_ready.geo_id.str[0:2] == ballot_ready.state_id_fips
-    logger.info(
-        f"State FIPS codes:{sum(state_match)} of {len(state_match)} geocoded state FIPS IDs match the Ballot Ready data ({sum(state_match)/len(state_match):.0%})"
-    )
-    assert sum(state_match) / len(state_match) > 0.99
+    expected_state_match = 0.99
+    result_state_match_coverage = sum(state_match) / len(state_match)
+    assert (
+        sum(state_match) / len(state_match) > expected_state_match
+    ), f"State FIPS codes:{sum(state_match)} of {len(state_match)} geocoded state FIPS IDs match the Ballot Ready data ({result_state_match_coverage:.0%}). Expected atleast {expected_state_match:.0%}"
 
     # All GEO IDs contain the state FIPS code. But only these contain the County FIPS:
     # 5 digits: State FIPS + County FIPS
