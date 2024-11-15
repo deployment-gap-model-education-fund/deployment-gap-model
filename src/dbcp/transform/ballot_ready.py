@@ -215,7 +215,10 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
     # 12 digits: State FIPS + County FIPS + Tract + Block Group
     # 15 digits: State FIPS + County FIPS + Tract + Block
     # 16 digits: State FIPS + County FIPS + Tract + Block + Suffix
-    geo_ids = ballot_ready.loc[ballot_ready.geo_id.str.len().isin([5, 10, 12, 15, 16])]
+    geo_ids = ballot_ready.loc[
+        (ballot_ready.geo_id.str.len().isin([5, 10, 12, 15, 16]))
+        & (ballot_ready.county_id_fips.notnull())
+    ]
     county_match = geo_ids.geo_id.str[0:5] == geo_ids.county_id_fips
     logger.info(
         f"County FIPS codes:{sum(county_match)} of {len(county_match)} geocoded state FIPS IDs match the Ballot Ready data ({sum(county_match)/len(county_match):.0%})"
