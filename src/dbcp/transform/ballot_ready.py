@@ -1,4 +1,5 @@
 """Module for cleaning Ballot Ready data."""
+
 import logging
 
 import pandas as pd
@@ -197,6 +198,34 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
         valdez_corrections_dfs.append(corrected_df)
 
     ballot_ready = pd.concat(valdez_corrections_dfs + [ballot_ready])
+
+    # Validate the geocoding against the GEO IDs that contain a state and county FIPS ID
+    # GEO IDs vary in length based on what information they contain.
+    # https://www.census.gov/programs-surveys/geography/guidance/geo-identifiers.html
+    # These ones contain both state and county FIPS. Some have letters or non FIPs
+    # characters, so we shouldn't expect a perfect match.
+    state_match = ballot_ready.geo_id.str[0:2] == ballot_ready.state_id_fips
+    expected_state_match = 0.99
+    result_state_match_coverage = sum(state_match) / len(state_match)
+    assert (
+        sum(state_match) / len(state_match) > expected_state_match
+    ), f"State FIPS codes:{sum(state_match)} of {len(state_match)} geocoded state FIPS IDs match the Ballot Ready data ({result_state_match_coverage:.0%}). Expected atleast {expected_state_match:.0%}"
+
+    # All GEO IDs contain the state FIPS code. But only these contain the County FIPS:
+    # 5 digits: State FIPS + County FIPS
+    # 10 digits: State FIPS + County FIPS + County sub-division
+    # 12 digits: State FIPS + County FIPS + Tract + Block Group
+    # 15 digits: State FIPS + County FIPS + Tract + Block
+    # 16 digits: State FIPS + County FIPS + Tract + Block + Suffix
+    geo_ids = ballot_ready.loc[
+        (ballot_ready.geo_id.str.len().isin([5, 10, 12, 15, 16]))
+        & (ballot_ready.county_id_fips.notnull())
+    ]
+    county_match = geo_ids.geo_id.str[0:5] == geo_ids.county_id_fips
+    logger.info(
+        f"County FIPS codes:{sum(county_match)} of {len(county_match)} geocoded state FIPS IDs match the Ballot Ready data ({sum(county_match)/len(county_match):.0%})"
+    )
+    assert sum(county_match) / len(county_match) > 0.85
 
     # Drop unused columns
     ballot_ready = ballot_ready.drop(columns=["position_description"])
