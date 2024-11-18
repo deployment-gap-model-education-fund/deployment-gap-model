@@ -4,7 +4,7 @@ import logging
 
 import pandas as pd
 
-from pudl.helpers import add_fips_ids
+from dbcp.helpers import add_fips_ids
 
 DATETIME_COLUMNS = ["race_created_at", "race_updated_at", "election_day"]
 

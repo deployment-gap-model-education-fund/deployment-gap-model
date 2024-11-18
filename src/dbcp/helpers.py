@@ -6,6 +6,7 @@ import os
 from io import StringIO
 from pathlib import Path
 
+import addfips
 import fsspec
 import google.auth
 import pandas as pd
@@ -254,4 +255,55 @@ def psql_insert_copy(table, conn, keys, data_iter):
 def trim_columns_length(df: pd.DataFrame, length_limit: int = 63) -> pd.DataFrame:
     """Trim column length of a pandas dataframe to satisfy postgres column length limit."""
     df.columns = [col[:length_limit] for col in df.columns]
+    return df
+
+
+def add_fips_ids(
+    df: pd.DataFrame,
+    state_col: str = "state",
+    county_col: str = "county",
+    vintage: int = 2015,
+) -> pd.DataFrame:
+    """Add State and County FIPS IDs to a dataframe.
+
+    To just add State FIPS IDs, make county_col = None.
+    """
+    # force the columns to be the nullable string types so we have a consistent
+    # null value to filter out before feeding to addfips
+    df = df.astype({state_col: pd.StringDtype()})
+    if county_col:
+        df = df.astype({county_col: pd.StringDtype()})
+    af = addfips.AddFIPS(vintage=vintage)
+    # Lookup the state and county FIPS IDs and add them to the dataframe:
+    df["state_id_fips"] = df.apply(
+        lambda x: (
+            af.get_state_fips(state=x[state_col]) if pd.notnull(x[state_col]) else pd.NA
+        ),
+        axis=1,
+    )
+
+    # force the code columns to be nullable strings - the leading zeros are
+    # important
+    df = df.astype({"state_id_fips": pd.StringDtype()})
+
+    logger.info(
+        f"Assigned state FIPS codes for "
+        f"{len(df[df.state_id_fips.notnull()])/len(df):.2%} of records."
+    )
+    if county_col:
+        df["county_id_fips"] = df.apply(
+            lambda x: (
+                af.get_county_fips(state=x[state_col], county=x[county_col])
+                if pd.notnull(x[county_col]) and pd.notnull(x[state_col])
+                else pd.NA
+            ),
+            axis=1,
+        )
+        # force the code columns to be nullable strings - the leading zeros are
+        # important
+        df = df.astype({"county_id_fips": pd.StringDtype()})
+        logger.info(
+            f"Assigned county FIPS codes for "
+            f"{len(df[df.county_id_fips.notnull()])/len(df):.2%} of records."
+        )
     return df
