@@ -1,4 +1,5 @@
 """Create county-level aggregates of proposed projects from EIA860m and ACP data."""
+
 from typing import Optional
 
 import pandas as pd
@@ -57,19 +58,21 @@ def _get_concrete_aggs(engine: sa.engine.Engine) -> pd.DataFrame:
         inplace=True,
     )
 
-    acp_query = """
-    SELECT
-        plant_id_eia,
-        NULL as generator_id,
-        capacity_mw,
-        lower(resource) AS resource_clean,
-        status,
-        county_id_fips,
-        iso_region
-    from private_data_warehouse.acp_projects as acp
-    where status in ('Advanced Development', 'Under Construction')
-    """
-    acp = pd.read_sql(acp_query, engine)
+    acp = pd.read_sql_table("acp_projects", engine, schema="private_data_warehouse")
+    acp = acp[
+        [
+            "plant_id_eia",
+            "capacity_mw",
+            "resource",
+            "status",
+            "county_id_fips",
+            "iso_region",
+        ]
+    ]
+    acp["resource_clean"] = acp["resource"].str.lower()
+    acp["generator_id"] = pd.NA
+    acp = acp[acp.status.isin(["Advanced Development", "Under Construction"])]
+
     # remove overlapping projects from ACP (prioritize 860m)
     is_overlap = acp["plant_id_eia"].isin(eia860m["plant_id_eia"])
     acp = acp.loc[~is_overlap, :]

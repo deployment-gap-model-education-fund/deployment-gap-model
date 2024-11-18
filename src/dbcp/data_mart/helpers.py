@@ -1,5 +1,6 @@
 """Module of helper functions for creating data mart tables from the data warehouse."""
 
+from pathlib import Path
 from typing import Optional, Sequence
 
 import pandas as pd
@@ -342,3 +343,28 @@ def _estimate_proposed_power_co2e(
     ]
     iso_projects.drop(columns=intermediates, inplace=True)
     return
+
+
+def get_query(filename: str) -> str:
+    """
+    Get the query from a file.
+
+    To avoid having to write long queries in Python, we store them in separate files
+    in the src/dbcp/sql_queries directory. To use them, call this function with the
+    filename of the query you want to use.
+
+    Args:
+        filename: name of the file in the sql_queries directory with the .sql extension
+    Returns:
+        the query as a string
+    Example:
+        >>> import pandas as pd
+        >>> from dbcp.data_mart.helpers import get_query
+        >>> from dbcp.helpers import get_sql_engine
+        >>> engine = get_sql_engine()
+        >>> query = get_query("get_proposed_infra_projects.sql")
+        >>> df = pd.read_sql(query, engine)
+    """
+    sql_query_dir = Path(__file__).parent / "sql_queries"
+    full_path = sql_query_dir / filename
+    return full_path.read_text()

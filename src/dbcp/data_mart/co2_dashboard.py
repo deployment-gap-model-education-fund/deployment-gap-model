@@ -3,13 +3,14 @@
 The table is at the county level and contains data from.
 
 """
+
 from typing import Optional
 
 import pandas as pd
 import sqlalchemy as sa
 
 from dbcp.constants import PUDL_LATEST_YEAR
-from dbcp.data_mart.helpers import _get_county_fips_df, _get_state_fips_df
+from dbcp.data_mart.helpers import _get_county_fips_df, _get_state_fips_df, get_query
 from dbcp.helpers import get_pudl_resource, get_sql_engine
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
@@ -234,46 +235,7 @@ def _get_existing_fossil_plants(
 
 def _get_proposed_fossil_plants(engine: sa.engine.Engine) -> pd.DataFrame:
     # see last SELECT statement for output columns
-    query = """
-    WITH
-    active_loc as (
-        select
-            proj.project_id,
-            loc.county_id_fips
-        from data_warehouse.iso_projects as proj
-        left join data_warehouse.iso_locations as loc
-            on loc.project_id = proj.project_id
-        where proj.queue_status = 'active'
-    ),
-    projects as (
-        select
-            loc.project_id,
-            loc.county_id_fips,
-            res.capacity_mw,
-            res.resource_clean as resource
-        from active_loc as loc
-        left join data_warehouse.iso_resource_capacity as res
-            on res.project_id = loc.project_id
-        where res.capacity_mw is not NULL
-        and res.resource_clean in ('Natural Gas', 'Coal', 'Oil')
-    ),
-    w_county_names as (
-    select
-        cfip.county_name as county,
-        cfip.state_id_fips,
-        proj.*
-    from projects as proj
-    left join data_warehouse.county_fips as cfip
-        on proj.county_id_fips = cfip.county_id_fips
-    )
-    SELECT
-        sfip.state_name as state,
-        proj.*
-    from w_county_names as proj
-    left join data_warehouse.state_fips as sfip
-        on proj.state_id_fips = sfip.state_id_fips
-    ;
-    """
+    query = get_query("get_proposed_fossil_plants.sql")
     df = pd.read_sql(query, engine)
     _estimate_proposed_power_co2e(df)
     df.rename(columns={"project_id": "id"}, inplace=True)
@@ -358,67 +320,7 @@ def _estimate_proposed_power_co2e(
 
 
 def _get_proposed_fossil_infra(engine: sa.engine.Engine) -> pd.DataFrame:
-    query = """
-    WITH
-    projects as (
-        SELECT
-            project_id,
-            -- First multiplier below is unit conversion
-            -- The second is 15 percent haircut to account for realistic utilization, as per design doc.
-            greenhouse_gases_co2e_tpy * 0.907185 * 0.85 as co2e_tonnes_per_year
-        FROM data_warehouse.eip_projects
-        WHERE operating_status not in ('Operating', 'Under construction', 'Canceled')
-    ),
-    facilities as (
-        SELECT
-            facility_id,
-            county_id_fips,
-            state_id_fips
-        FROM data_warehouse.eip_facilities
-    ),
-    association as (
-        -- this query simplifies the m:m relationship
-        -- by taking only the first result, making it m:1.
-        -- Only 5 rows are dropped.
-        select DISTINCT ON (project_id)
-            project_id,
-            facility_id
-        from data_warehouse.eip_facility_project_association
-        order by 1, 2 DESC
-    ),
-    proj_agg_to_facility as (
-        SELECT
-            ass.facility_id,
-            sum(co2e_tonnes_per_year) as co2e_tonnes_per_year
-        FROM projects as proj
-        LEFT JOIN association as ass
-        ON proj.project_id = ass.project_id
-        GROUP BY 1
-    ),
-    facility_aggs as (
-        SELECT
-            fac.*,
-            proj.co2e_tonnes_per_year
-        FROM proj_agg_to_facility as proj
-        LEFT JOIN facilities as fac
-        ON proj.facility_id = fac.facility_id
-    ),
-    w_county_names as (
-    select
-        cfip.county_name as county,
-        proj.*
-    from facility_aggs as proj
-    left join data_warehouse.county_fips as cfip
-        on proj.county_id_fips = cfip.county_id_fips
-    )
-    SELECT
-        sfip.state_name as state,
-        proj.*
-    from w_county_names as proj
-    left join data_warehouse.state_fips as sfip
-        on proj.state_id_fips = sfip.state_id_fips
-    ;
-    """
+    query = get_query("get_proposed_fossil_infra.sql")
     df = pd.read_sql(query, engine)
     df["facility_type"] = "proposed_infrastructure"
     df.rename(columns={"facility_id": "id"}, inplace=True)

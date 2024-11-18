@@ -1,4 +1,5 @@
 """Module to create a denormalized table for the Ballot Ready Election Data."""
+
 from typing import Optional
 
 import pandas as pd
@@ -9,22 +10,20 @@ from dbcp.helpers import get_sql_engine
 
 def _create_br_election_data_mart(engine: sa.engine.Engine) -> pd.DataFrame:
     """Denormalize the ballot ready entities."""
-    pos_county_query = """
-    SELECT
-        cfips.county_name,
-        sfips.state_name,
-        br.*
-    FROM data_warehouse.br_positions_counties_assoc as br
-    LEFT JOIN data_warehouse.county_fips as cfips
-    USING (county_id_fips)
-    LEFT JOIN data_warehouse.state_fips as sfips
-    ON sfips.state_id_fips = br.state_id_fips
-    """
     with engine.connect() as con:
         br_races = pd.read_sql_table("br_races", con, schema="data_warehouse")
         br_elections = pd.read_sql_table("br_elections", con, schema="data_warehouse")
         br_positions = pd.read_sql_table("br_positions", con, schema="data_warehouse")
-        br_positions_counties_assoc = pd.read_sql(pos_county_query, con)
+        br_positions_counties_assoc = pd.read_sql_table(
+            "br_positions_counties_assoc", con, schema="data_warehouse"
+        )
+        county_fips = pd.read_sql_table("county_fips", con, schema="data_warehouse")
+        state_fips = pd.read_sql_table("state_fips", con, schema="data_warehouse")
+
+    # Add state and county names
+    br_positions_counties_assoc = br_positions_counties_assoc.merge(
+        county_fips[["county_id_fips", "county_name"]], how="left", on="county_id_fips"
+    ).merge(state_fips[["state_id_fips", "state_name"]], how="left", on="state_id_fips")
 
     br_election_data = br_races.merge(
         br_elections, how="left", on="election_id", validate="m:1"
