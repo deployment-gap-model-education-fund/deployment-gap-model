@@ -106,7 +106,7 @@ class ExtractionSettings:
             archive = self.archived_data[archive_name]
         except KeyError:
             raise KeyError(f"Archive {archive_name} not found in the settings.")
-        return f"gs://{self.bucket.name}/{archive.get_full_path()}"
+        return f"gs://{self.bucket.name}/{archive.get_full_path}"
 
     def update_archive_generation_numbers(self):
         """Update the generation numbers for the archived data."""
