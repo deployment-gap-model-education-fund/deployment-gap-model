@@ -59,10 +59,7 @@ def extract_census_tribal_land(archive_uri: str) -> pd.DataFrame:
 
 
 def _extract_state_fips() -> pd.DataFrame:
-    """Extract canonical state and county FIPS tables from census data and the addfips library.
-
-    Args:
-        vintage (int, optional): which Census year to use. Defaults to FIPS_CODE_VINTAGE.
+    """Extract canonical state FIPS tables from the addfips library.
 
     Returns:
         Dict[str, pd.DataFrame]: output dictionary of dataframes
@@ -74,7 +71,7 @@ def _extract_state_fips() -> pd.DataFrame:
 
 
 def extract_fips(census_uri: str) -> Dict[str, pd.DataFrame]:
-    """Extract canonical state and county FIPS tables from census data and the addfips library.
+    """Extract canonical FIPS tables from census data and the addfips library.
 
     Returns:
         Dict[str, pd.DataFrame]: output dictionary of dataframes

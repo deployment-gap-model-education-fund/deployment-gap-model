@@ -243,9 +243,10 @@ def test_county_wide_coverage(engine: Engine):
         df.shape[0] == n_counties
     ), "counties_wide_format does not contain all counties"
     notnull = df.notnull()
-    assert notnull.any(axis=1).sum() == 2461, (
-        "counties_wide_format has unexpected county coverage:"
-        f" {notnull.loc[notnull.any(axis=1), 'county_id_fips']}"
+    n_expected_counties = 2459
+    assert notnull.any(axis=1).sum() == n_expected_counties, (
+        "counties_wide_format has unexpected county coverage."
+        f" Expected {n_expected_counties}, found {notnull.any(axis=1).sum()}"
     )
 
 

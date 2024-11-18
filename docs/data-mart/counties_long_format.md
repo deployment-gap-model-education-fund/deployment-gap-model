@@ -61,7 +61,6 @@ This table is mostly a restructured version of counties_wide_format. It provides
 ||`n_tracts_local_to_area_income_ratio_less_than_high_school_islan`|Number of tracts with low ratios of local to regional income and low high school graduation rates (island territories only)|Justice40||
 ||`n_tracts_pm2_5_low_income`|Number of tracts with high particulate matter pollution and low income (excepting students)|Justice40||
 ||`n_tracts_population_loss_low_income`|Number of tracts with high predicted climate-driven population loss and low income (excepting students)|Justice40||
-||`n_tracts_risk_management_plan_proximity_low_income`|Number of tracts with close proximity to RMP sites and low income (excepting students)|Justice40||
 ||`n_tracts_superfund_proximity_low_income`|Number of tracts with close proximity to superfund sites and low income (excepting students)|Justice40||
 ||`n_tracts_traffic_low_income`|Number of tracts with high traffic exposure and low income (excepting students)|Justice40||
 ||`n_tracts_unemployment_and_low_high_school`|Number of tracts with high unemployment and low high school graduation rates|Justice40||

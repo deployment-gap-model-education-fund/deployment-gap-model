@@ -156,7 +156,7 @@ def transform(raw_j40: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     out_df.drop(columns="", inplace=True)
     out_df.loc[:, "tract_id_fips"] = _fips_int_to_string(out_df.loc[:, "tract_id_fips"])
 
-    # Correct percents
+    # Correct percentage errors and convert to fractions
     percent_cols = list(filter(lambda col: col.endswith("_percent"), list(out_df)))
     for col in percent_cols:
         col_max = out_df[col].max()

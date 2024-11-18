@@ -7,6 +7,7 @@ import dbcp.commands.settings  # noqa: F401
 import dbcp.data_mart  # noqa: F401
 import dbcp.data_mart.br_election_data  # noqa: F401
 import dbcp.data_mart.counties  # noqa: F401
+import dbcp.data_mart.county_concrete_mw  # noqa: F401
 import dbcp.data_mart.projects  # noqa: F401
 import dbcp.etl  # noqa: F401
 import dbcp.extract  # noqa: F401
