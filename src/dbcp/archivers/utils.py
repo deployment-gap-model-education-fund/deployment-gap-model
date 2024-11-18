@@ -25,6 +25,24 @@ class AbstractArchiver(ABC):
         """Archive raw data to GCS."""
         raise NotImplementedError()
 
+    def upload_blob(
+        self, blob_name: str, data: str, metadata: dict[str, str] = None
+    ) -> storage.Blob:
+        """
+        Upload a blob to GCS.
+
+        Args:
+            blob_name: The name of the blob.
+            data: The data to upload.
+            metadata: Metadata to attach to the blob.
+        Returns:
+            The uploaded blob object.
+        """
+        blob = self.bucket.blob(blob_name)
+        blob.metadata = metadata
+        blob.upload_from_string(data)
+        return blob
+
 
 class ArchivedData(BaseModel):
     """Model with information about a single archived object."""
@@ -35,6 +53,7 @@ class ArchivedData(BaseModel):
     metadata: dict[str, str] = {}
     # Maybe include a date field for when the data was archived
 
+    @property
     def get_full_path(self) -> str:
         """Get the full path of the archived data."""
         return f"{self.name}#{self.generation_num}"

@@ -26,13 +26,6 @@ class AirtableBaseInfo(BaseModel):
     base_name: str
 
 
-bases = (
-    AirtableBaseInfo(
-        base_id="appZHPwbPSqIMgphw", base_name="Offshore Wind Locations Synapse Version"
-    ),
-)
-
-
 class AirtableArchiver(AbstractArchiver):
     """Archiver for Airtable bases."""
 
@@ -70,8 +63,7 @@ class AirtableArchiver(AbstractArchiver):
         destination_blob_name = f"{base_path}/schema.json"
 
         # Create a blob object in the bucket
-        blob = self.bucket.blob(destination_blob_name)
-        blob.upload_from_string(base.schema().json())
+        blob = self.upload_blob(destination_blob_name, base.schema().json())
 
         # get the generation number
         schema_generation_number = blob.generation
@@ -97,18 +89,21 @@ class AirtableArchiver(AbstractArchiver):
 
             # Construct the destination blob name
             destination_blob_name = f"{base_path}/{table.name}.json"
-
-            # Create a blob object in the bucket
-            blob = self.bucket.blob(destination_blob_name)
-            # save the metadata to a file in the bucket
-
-            blob.metadata = AirtableArchiveMetadata(
+            archive_metadata = AirtableArchiveMetadata(
                 table_id=table.id, schema_generation_number=schema_generation_number
             ).dict()
-            blob.upload_from_string(json.dumps(table_data))
+            self.upload_blob(
+                destination_blob_name, json.dumps(table_data), archive_metadata
+            )
 
     def archive(self):
         """Archive raw tables for a list of Airtable bases to GCS."""
+        bases = (
+            AirtableBaseInfo(
+                base_id="appZHPwbPSqIMgphw",
+                base_name="Offshore Wind Locations Synapse Version",
+            ),
+        )
         for base in bases:
             self.archive_base(base)
 

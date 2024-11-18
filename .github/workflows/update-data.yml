@@ -5,8 +5,8 @@ on:
   push:
     tags:
       - "v20*"
-    branches:
-      - init-airtable-automation
+  workflow_dispatch:
+  schedule: 5 7 * * 1-5
 
 jobs:
   build:
@@ -97,11 +97,11 @@ jobs:
       # publish the outputs, grab the git sha of the commit step
       # TODO: REMOVE THE TRUE and build-ref!!!
       - name: Publish publish outputs
-        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || (env.GITHUB_REF == 'dev') || (true)
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || (env.GITHUB_REF == 'dev')
         run: |
           docker compose run --rm app python dbcp/cli.py publish-outputs \
             -bq \
-            --build-ref 'sandbox' \
+            --build-ref $GITHUB_REF \
             --code-git-sha ${{ github.sha }} \
             --settings-file-git-sha ${{ steps.commit_settings_file.outputs.commit_long_sha }} \
             --github-action-run-id ${{ github.run_id}}
