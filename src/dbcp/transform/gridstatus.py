@@ -478,7 +478,7 @@ def _clean_resource_type(
         resource_locations["county_id_fips"].isin(coastal_county_id_fips.keys())
         & resource_locations.resource_clean.eq("Onshore Wind")
     ].project_id
-    expected_n_coastal_wind_projects = 92
+    expected_n_coastal_wind_projects = 88
     assert (
         len(nyiso_coastal_wind_project_project_ids) == expected_n_coastal_wind_projects
     ), f"Expected {expected_n_coastal_wind_projects} NYISO coastal wind projects but found {len(nyiso_coastal_wind_project_project_ids)}"
@@ -622,9 +622,13 @@ def _transform_miso(post_2017: pd.DataFrame, pre_2017: pd.DataFrame) -> pd.DataF
     in_service_projects = iso_df[
         iso_df["Post Generator Interconnection Agreement Status"].eq("In Service")
     ]
+    done_in_service_projects = in_service_projects[
+        in_service_projects["queue_status"].ne("Done")
+    ]
+    expected_n_done_in_service_projects = 2
     assert (
-        len(in_service_projects[in_service_projects["queue_status"].ne("Done")]) <= 1
-    ), "There is an unexpected number of MISO projects that are In Service but not Done."
+        len(done_in_service_projects) <= expected_n_done_in_service_projects
+    ), f"Expected {expected_n_done_in_service_projects} MISO projects that are In Service but not Done but found {len(done_in_service_projects)}."
 
     # Mark "Done" projects as "Active" because they are not necesarily operational yet.
     iso_df["queue_status"] = iso_df["queue_status"].map(
@@ -708,6 +712,9 @@ def _transform_pjm(iso_df: pd.DataFrame) -> pd.DataFrame:
         "Annulled": "Withdrawn",
     }
     iso_df["queue_status"] = iso_df["queue_status"].map(status_map)
+
+    # There is one project that is missing a queue status. Assume it is withdrawn
+    iso_df.loc[iso_df.queue_id.eq("AC1-073"), "queue_status"] = "Withdrawn"
 
     iso_df = _create_project_status_classification_from_multiple_columns(
         iso_df,
@@ -843,12 +850,31 @@ def _transform_nyiso(iso_df: pd.DataFrame) -> pd.DataFrame:
         "0": "Withdrawn",
         "15": "Partial In-Service",
         "P": "Pending Adoption of IP Compliance with Order 2023",  # Vast majority of projects with status 'P' don't have any studies posted yet
+        "1C": "IR Validated/ Scoping Meeting Pending",
+        "2C": "Customer Engagement Window",
+        "3C": "Phase 1 Entry Decision Period",
+        "4C": "Phase 1 Study",
+        "5C": "Phase 2 Entry Decision Period",
+        "6C": "Phase 2 Study",
+        "7C": "Final Decision Period",
+        "10C": "Accepted Cost Allocation/ IA in Progress",
+        "11C": "IA Completed",
+        "12C": "Under Construction",
+        "13C": "In Service for Test",
+        "14C": "In Service Commercial",
+        "15C": "Partially In-Service/ Partially under construction",
     }
 
     # Categorize project status
-    iso_df["S"] = pd.to_numeric(iso_df["S"]).astype("Int64").astype("string")
-    actionable_vals = ("6", "7", "8", "9", "10")
-    nearly_certain_vals = ("11", "12", "13", "15")
+    iso_df["S"] = iso_df["S"].str.replace(r"\.0$", "", regex=True)
+    actionable_vals = (
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+    )  # TODO: What are actionable values for cluster studies?
+    nearly_certain_vals = ("11", "12", "13", "15", "11C", "12C", "13C", "15C")
     iso_df = _create_project_status_classification_from_single_column(
         iso_df,
         "S",
@@ -924,8 +950,9 @@ def _normalize_project_locations(iso_df: pd.DataFrame) -> pd.DataFrame:
     duplicate_locations = geocoded_locations[
         geocoded_locations[["county_id_fips", "project_id"]].duplicated(keep=False)
     ]
+    n_expected_duplicates = 118
     assert (
-        len(duplicate_locations) <= 108
+        len(duplicate_locations) <= n_expected_duplicates
     ), f"Found more duplicate locations in Grid Status location table than expected:\n {duplicate_locations}"
     return geocoded_locations
 

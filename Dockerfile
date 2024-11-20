@@ -1,7 +1,7 @@
 # set base image (host OS)
 FROM python:3.10
 
-RUN apt-get update && apt-get install sqlite3
+RUN apt-get -y update && apt-get -y install sqlite3
 RUN apt-get -y install libgdal-dev
 
 RUN useradd -d /app/ dbcp

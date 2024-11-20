@@ -1,11 +1,12 @@
 """Tranform functions for NCSL state permitting."""
+
 from typing import Dict
 
 import numpy as np
 import pandas as pd
 
 from dbcp.constants import US_STATES_TERRITORIES
-from pudl.helpers import add_fips_ids as _add_fips_ids
+from dbcp.helpers import add_fips_ids
 
 
 def transform(raw_df: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
@@ -38,7 +39,7 @@ def transform(raw_df: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         "link": pd.StringDtype(),
     }
     transform_df = transform_df.astype(dtypes, copy=False)
-    transform_df = _add_fips_ids(transform_df, county_col="description").drop(
+    transform_df = add_fips_ids(transform_df, county_col="description").drop(
         columns="county_id_fips"
     )
     transform_df.rename(columns={"state": "raw_state_name"}, inplace=True)

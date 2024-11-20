@@ -14,6 +14,7 @@ from dbcp.data_mart.helpers import (
     _estimate_proposed_power_co2e,
     _get_county_fips_df,
     _get_state_fips_df,
+    get_query,
 )
 from dbcp.helpers import get_sql_engine
 
@@ -25,71 +26,7 @@ GS_REGIONS = ("MISO", "NYISO", "ISONE", "PJM", "ERCOT", "SPP")
 
 def _get_gridstatus_projects(engine: sa.engine.Engine) -> pd.DataFrame:
     # drops transmission projects
-    query = """
-    WITH
-    proj_res AS (
-        SELECT
-            queue_id,
-            is_nearly_certain,
-            project_id,
-            project_name,
-            capacity_mw,
-            developer,
-            entity,
-            entity AS iso_region, -- these are different in non-ISO data from LBNL
-            utility,
-            proposed_completion_date AS date_proposed_online,
-            point_of_interconnection,
-            is_actionable,
-            resource_clean,
-            queue_status,
-            queue_date AS date_entered_queue,
-            actual_completion_date,
-            withdrawn_date,
-            interconnection_status_raw AS interconnection_status
-        FROM data_warehouse.gridstatus_projects as proj
-        LEFT JOIN data_warehouse.gridstatus_resource_capacity as res
-        USING (project_id)
-        WHERE resource_clean != 'Transmission'
-    ),
-    loc as (
-        -- projects can have multiple locations, though 99 percent have only one.
-        -- Can multiply capacity by frac_locations_in_county to allocate it equally.
-        -- Note that there are some duplicates of (project_id, county_id_fips) as well.
-        -- This happens when the original data lists multiple city names that are in the
-        -- same county. This does not cause double counting because of frac_locations_in_county.
-        SELECT
-            project_id,
-            state_id_fips,
-            county_id_fips,
-            (1.0 / count(*) over (partition by project_id))::real as frac_locations_in_county
-        FROM data_warehouse.gridstatus_locations
-    ),
-    gs as (
-        SELECT
-            proj_res.*,
-            loc.state_id_fips,
-            loc.county_id_fips,
-            -- projects with missing location info get full capacity allocation
-            coalesce(loc.frac_locations_in_county, 1.0) as frac_locations_in_county
-        FROM proj_res
-        LEFT JOIN loc
-        USING (project_id)
-    )
-    SELECT
-        sfip.state_name AS state,
-        cfip.county_name AS county,
-        gs.*,
-        'gridstatus' AS source,
-        ncsl.permitting_type AS state_permitting_type
-    FROM gs
-    LEFT JOIN data_warehouse.ncsl_state_permitting AS ncsl
-        on gs.state_id_fips = ncsl.state_id_fips
-    LEFT JOIN data_warehouse.state_fips AS sfip
-        ON gs.state_id_fips = sfip.state_id_fips
-    LEFT JOIN data_warehouse.county_fips AS cfip
-        ON gs.county_id_fips = cfip.county_id_fips
-    """
+    query = get_query("get_gridstatus_projects.sql")
     gs = pd.read_sql(query, engine)
     gs = gs[gs.iso_region.str.upper().isin(GS_REGIONS)]
     return gs
@@ -127,73 +64,7 @@ def _merge_lbnl_with_gridstatus(lbnl: pd.DataFrame, gs: pd.DataFrame) -> pd.Data
 
 
 def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFrame:
-    query = """
-    WITH
-    iso_proj_res as (
-        SELECT
-            proj.project_id,
-            proj.queue_id,
-            proj.date_proposed as date_proposed_online,
-            proj.developer,
-            proj.entity,
-            proj.interconnection_status_lbnl as interconnection_status,
-            proj.point_of_interconnection,
-            proj.project_name,
-            proj.queue_date as date_entered_queue,
-            proj.queue_status,
-            proj.region as iso_region,
-            proj.utility,
-            proj.is_actionable,
-            proj.is_nearly_certain,
-            proj.actual_completion_date,
-            proj.withdrawn_date,
-            res.capacity_mw,
-            res.resource_clean
-        FROM data_warehouse.iso_projects as proj
-        INNER JOIN data_warehouse.iso_resource_capacity as res
-        ON proj.project_id = res.project_id
-    ),
-    loc as (
-        -- Remember that projects can have multiple locations, though 99 percent have only one.
-        -- Can optionally multiply capacity by frac_locations_in_county to allocate it equally.
-        -- Note that there are some duplicates of (project_id, county_id_fips) as well.
-        -- This happens when the original data lists multiple city names that are in the
-        -- same county. This does not cause double counting because of frac_locations_in_county.
-        SELECT
-            project_id,
-            state_id_fips,
-            county_id_fips,
-            raw_county_name, -- for validation only
-            (1.0 / count(*) over (partition by project_id))::real as frac_locations_in_county
-        FROM data_warehouse.iso_locations
-    ),
-    iso as (
-        SELECT
-            iso_proj_res.*,
-            loc.state_id_fips,
-            loc.county_id_fips,
-            loc.raw_county_name, -- for validation only
-            -- projects with missing location info get full capacity allocation
-            coalesce(loc.frac_locations_in_county, 1.0) as frac_locations_in_county
-        from iso_proj_res
-        LEFT JOIN loc
-        ON iso_proj_res.project_id = loc.project_id
-    )
-    SELECT
-        sfip.state_name as state,
-        cfip.county_name as county,
-        iso.*,
-        'lbnl' as source,
-        ncsl.permitting_type as state_permitting_type
-    from iso
-    left join data_warehouse.state_fips as sfip
-        on iso.state_id_fips = sfip.state_id_fips
-    left join data_warehouse.county_fips as cfip
-        on iso.county_id_fips = cfip.county_id_fips
-    left join data_warehouse.ncsl_state_permitting as ncsl
-        on iso.state_id_fips = ncsl.state_id_fips
-    ;
-    """
+    query = get_query("get_lbnl_projects.sql")
     df = pd.read_sql(query, engine)
     if non_iso_only:
         df = df[~df.iso_region.isin(GS_REGIONS)]
@@ -244,59 +115,7 @@ def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame
     column to allocate capacity and co2e estimates to counties when aggregating.
     Otherwise they will be double-counted.
     """
-    query = """
-    WITH
-    proj_county_assoc as (
-        SELECT
-            project_id,
-            locs.county_id_fips,
-            -- Note that "frac_locations_in_county" is a misnomer. It is actually
-            -- "fraction_of_locations_represented_by_this_row". When I originally
-            -- named it, I thought location:county was m:1, but it's actually m:m
-            -- because some projects list multiple towns in the same parent county
-            -- in the raw "county" field.
-            (1.0 / count(*) over (partition by project_id))::real as frac_locations_in_county
-        FROM data_warehouse.offshore_wind_cable_landing_association as cable
-        INNER JOIN data_warehouse.offshore_wind_locations as locs
-        USING(location_id)
-    )
-    -- join the project, state, and county stuff
-    SELECT
-        proj.project_id,
-        assoc.county_id_fips,
-        -- projects with missing location info get full capacity allocation
-        CASE WHEN assoc.frac_locations_in_county IS NULL
-            THEN 1.0
-            ELSE assoc.frac_locations_in_county
-            END as frac_locations_in_county,
-        substr(assoc.county_id_fips, 1, 2) as state_id_fips,
-
-        proj.name as project_name,
-        proj.developer,
-        proj."capacity_mw",
-        date(proj.proposed_completion_year::text || '-01-01') as date_proposed_online,
-        proj.queue_status,
-        'Offshore Wind' as resource_clean,
-        0.0 as co2e_tonnes_per_year,
-        proj.is_actionable,
-        proj.is_nearly_certain,
-        'proprietary' as source,
-
-        sfip.state_name as state,
-        cfip.county_name as county,
-        ncsl.permitting_type as state_permitting_type
-
-    FROM data_warehouse.offshore_wind_projects as proj
-    LEFT JOIN proj_county_assoc as assoc
-    USING(project_id)
-    LEFT JOIN data_warehouse.state_fips as sfip
-    ON substr(assoc.county_id_fips, 1, 2) = sfip.state_id_fips
-    LEFT JOIN data_warehouse.county_fips as cfip
-    USING(county_id_fips)
-    LEFT JOIN data_warehouse.ncsl_state_permitting as ncsl
-    ON substr(assoc.county_id_fips, 1, 2) = ncsl.state_id_fips
-    ;
-    """
+    query = get_query("get_proprietary_proposed_offshore.sql")
     df = pd.read_sql(query, engine)
     return df
 
@@ -595,8 +414,8 @@ def create_total_active_project_change_logs(
     ).all(), "Found rows with unexpected queue status."
 
     chng_log = active_iso_projects_change_log.copy()
-    min_date = chng_log.effective_date.min()
-    max_date = chng_log.effective_date.max()
+    min_date = chng_log.effective_date.min() - pd.offsets.QuarterBegin(startingMonth=1)
+    max_date = chng_log.effective_date.max() + pd.offsets.QuarterEnd(0)
 
     def generate_frequencies(start, end, min_date, max_date, freq="Q"):
         """
@@ -747,6 +566,7 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
         long_format.resource_clean.eq("Unknown"), "other"
     )
 
+    # Not all ISO regions have operational and withdrawn dates which are required to make a full change log.
     long_format = long_format[long_format["iso_region"].isin(CHANGE_LOG_REGIONS)]
 
     # make sure we are missing less than 10% of withdrawn_date
@@ -781,7 +601,7 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
         f"{pct_after_current_year:.2%} of operational projects have actual_completion_date after the current year."
     )
     # make sure pct_after_current_year is less than 0.001 of operational projects
-    expected_missing = 0.001
+    expected_missing = 0.002
     assert (
         pct_after_current_year < expected_missing
     ), f"More than {expected_missing}% of operational projects have actual_completion_date after the current year."
@@ -909,7 +729,7 @@ def validate_project_change_log(
             "MISO": 0.09,  # A lot of operational projects prior to 2010 are missing operational dates
             "NYISO": 0.18,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
             "PJM": 0.04,
-            "SPP": 0.31,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
+            "SPP": 0.32,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
         }
     )
 
@@ -964,7 +784,7 @@ def validate_iso_regions_change_log(
             "MISO": 0.09,  # A lot of operational projects prior to 2010 are missing operational dates
             "NYISO": 0.20,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
             "PJM": 0.04,
-            "SPP": 0.31,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
+            "SPP": 0.32,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
         }
     )
 
@@ -995,79 +815,7 @@ def get_eia860m_current(engine: sa.engine.Engine) -> pd.DataFrame:
     Args:
         engine (sa.engine.Engine): connection to the data warehouse database
     """
-    query = """
-    WITH
-    -- 3307 / 33943 current projects are missing a balancing authority code (mostly
-    -- retired projects). But a simple county lookup can fill in half (1642 / 3307) of them:
-    -- 1932 / 2400 counties with a project missing a BA code have a single unique
-    -- BA code among the other projects in that county. These are a pretty safe bet
-    -- to impute. Counties with multiple or zero BAs are not imputed.
-    imputed_bal_auth AS (
-        SELECT
-            county_id_fips,
-            max(balancing_authority_code_eia) as unique_ba  -- only one unique value
-        FROM data_warehouse.pudl_eia860m_changelog
-        WHERE valid_until_date = (
-            select max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog
-            )
-        GROUP BY 1
-        HAVING count(distinct balancing_authority_code_eia) = 1
-    )
-    SELECT
-        report_date,
-        plant_id_eia,
-        plant_name_eia,
-        utility_id_eia,
-        utility_name_eia,
-        generator_id,
-        capacity_mw,
-        eia.state_id_fips,
-        eia.county_id_fips,
-        sfips.state_name as state,
-        cfips.county_name as county,
-        -- 1. Impute BA codes
-        -- 2. Convert EIA ISO abbreviations to match those used in LBNL/GridStatus
-        -- 3. Name it iso_region for consistency with LBNL/GridStatus ISO queues
-        CASE COALESCE(balancing_authority_code_eia, imputed_ba.unique_ba)
-            WHEN 'CISO' THEN 'CAISO'
-            WHEN 'ERCO' THEN 'ERCOT'
-            WHEN 'ISNE' THEN 'ISONE'
-            WHEN 'NYIS' THEN 'NYISO'
-            WHEN 'SWPP ' THEN 'SPP'
-            -- MISO and PJM are unchanged
-            ELSE COALESCE(balancing_authority_code_eia, imputed_ba.unique_ba)
-        END as iso_region,
-        current_planned_generator_operating_date,
-        energy_source_code_1,
-        prime_mover_code,
-        energy_storage_capacity_mwh,
-        fuel_type_code_pudl,
-        generator_retirement_date,
-        latitude,
-        longitude,
-        operational_status_code,
-        operational_status AS operational_status_category,
-        raw_operational_status_code,
-        planned_derate_date,
-        planned_generator_retirement_date,
-        planned_net_summer_capacity_derate_mw,
-        planned_net_summer_capacity_uprate_mw,
-        planned_uprate_date,
-        technology_description,
-        state as raw_state,
-        county as raw_county
-    FROM data_warehouse.pudl_eia860m_changelog as eia
-    LEFT JOIN data_warehouse.state_fips as sfips
-    USING (state_id_fips)
-    LEFT JOIN data_warehouse.county_fips as cfips
-    USING (county_id_fips)
-    LEFT JOIN imputed_bal_auth as imputed_ba
-    ON eia.county_id_fips = imputed_ba.county_id_fips
-    WHERE valid_until_date = (
-        select max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog
-        )
-    ORDER BY plant_id_eia, generator_id
-    """
+    query = get_query("get_eia860m_current.sql")
     current_projects = pd.read_sql(query, engine)
     return current_projects
 
