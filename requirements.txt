@@ -1,5 +1,5 @@
-catalystcoop.pudl==2022.11.30
-fiona~=1.9.4
+addfips>=0.4
+fiona~=1.10.1
 psycopg2~=2.9.3
 pytest~=6.2.5
 tqdm>=4.64.1,<5.0.0
@@ -8,7 +8,7 @@ googlemaps~=4.5.3
 pandas-gbq~=0.19.1
 pydata-google-auth~=1.7.0
 pandera[io]~=0.8.1
-jupyterlab~=3.2.8
+jupyterlab~=4.3.0
 pandas~=1.4.0
 joblib~=1.2.0
 beautifulsoup4~=4.11
@@ -17,4 +17,10 @@ gridstatus~=0.20.0
 s3fs>=2022.11.0
 click>=8.1.7
 pyairtable>=2.3.3
-fiona==1.9.6 # https://stackoverflow.com/questions/78949093/how-to-resolve-attributeerror-module-fiona-has-no-attribute-path
+numpy<2
+sqlalchemy<2
+coloredlogs~=15.0.1
+scipy~=1.14.1
+google-cloud-storage~=2.18.2
+geopandas~=1.0.1
+gcsfs~=2024.10.0

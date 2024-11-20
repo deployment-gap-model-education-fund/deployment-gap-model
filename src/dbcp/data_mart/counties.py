@@ -19,6 +19,7 @@ separately, such as non-commutative aggregations over nested groupings, eg
 `count(distinct my_column)) group by county, resource` cannot have another
 `count(distinct my_column) group by county` on top of it.
 """
+
 from io import StringIO
 from typing import Dict, Optional
 
@@ -40,6 +41,7 @@ from dbcp.data_mart.helpers import (
     _get_county_fips_df,
     _get_state_fips_df,
     _subset_db_columns,
+    get_query,
 )
 from dbcp.data_mart.projects import create_long_format as create_iso_data_mart
 from dbcp.helpers import get_sql_engine
@@ -134,38 +136,80 @@ def _create_dbcp_ej_index(j40_df: pd.DataFrame) -> pd.Series:
 
 def _get_env_justice_df(engine: sa.engine.Engine) -> pd.DataFrame:
     """Create county-level aggregates of Justice40 tracts."""
-    query = """
-    SELECT
-        SUBSTRING("tract_id_fips", 1, 5) as county_id_fips,
-        COUNT("tract_id_fips") as total_tracts,
-        SUM("is_disadvantaged"::INTEGER) as n_distinct_qualifying_tracts,
-        SUM("expected_agriculture_loss_rate_is_low_income"::INTEGER) as n_tracts_agriculture_loss_low_income,
-        SUM("expected_building_loss_rate_is_low_income"::INTEGER) as n_tracts_building_loss_low_income,
-        SUM("expected_population_loss_rate_is_low_income"::INTEGER) as n_tracts_population_loss_low_income,
-        SUM("diesel_particulates_is_low_income"::INTEGER) as n_tracts_diesel_particulates_low_income,
-        SUM("energy_burden_is_low_income"::INTEGER) as n_tracts_energy_burden_low_income,
-        SUM("pm2_5_is_low_income"::INTEGER) as n_tracts_pm2_5_low_income,
-        SUM("traffic_proximity_is_low_income"::INTEGER) as n_tracts_traffic_low_income,
-        SUM("lead_paint_and_median_house_value_is_low_income"::INTEGER) as n_tracts_lead_paint_and_median_home_price_low_income,
-        SUM("housing_burden_is_low_income"::INTEGER) as n_tracts_housing_burden_low_income,
-        SUM("proximity_to_superfund_sites_is_low_income"::INTEGER) as n_tracts_superfund_proximity_low_income,
-        SUM("wastewater_discharge_is_low_income"::INTEGER) as n_tracts_wastewater_low_income,
-        SUM("asthma_is_low_income"::INTEGER) as n_tracts_asthma_low_income,
-        SUM("heart_disease_is_low_income"::INTEGER) as n_tracts_heart_disease_low_income,
-        SUM("diabetes_is_low_income"::INTEGER) as n_tracts_diabetes_low_income,
-        SUM("low_median_household_income_and_low_hs_attainment"::INTEGER) as n_tracts_local_to_area_income_ratio_and_low_high_school,
-        SUM("households_in_linguistic_isolation_and_low_hs_attainment"::INTEGER) as n_tracts_linguistic_isolation_and_low_high_school,
-        SUM("households_below_federal_poverty_level_low_hs_attainment"::INTEGER) as n_tracts_below_poverty_and_low_high_school,
-        SUM("unemployment_and_low_hs_attainment"::INTEGER) as n_tracts_unemployment_and_low_high_school,
-        SUM("proximity_to_hazardous_waste_facilities_is_low_income"::INTEGER) as n_tracts_hazardous_waste_proximity_low_income,
-        SUM("unemployment_and_low_hs_edu_islands"::INTEGER) as n_tracts_unemployment_less_than_high_school_islands,
-        SUM("low_median_household_income_and_low_hs_edu_islands"::INTEGER) as n_tracts_local_to_area_income_ratio_less_than_high_school_islands,
-        SUM("households_below_federal_poverty_level_low_hs_edu_islands"::INTEGER) as n_tracts_below_poverty_line_less_than_high_school_islands,
-        SUM("low_life_expectancy_is_low_income"::INTEGER) as n_tracts_life_expectancy_low_income
-    FROM "data_warehouse"."justice40_tracts"
-    GROUP BY 1;
-    """
-    df = pd.read_sql(query, engine)
+    df = pd.read_sql_table("justice40_tracts", engine, schema="data_warehouse")
+    df["county_id_fips"] = df["tract_id_fips"].str.slice(0, 5)
+    df = df.groupby("county_id_fips").agg(
+        total_tracts=("tract_id_fips", "count"),
+        n_distinct_qualifying_tracts=("is_disadvantaged", "sum"),
+        n_tracts_agriculture_loss_low_income=(
+            "expected_agriculture_loss_rate_is_low_income",
+            "sum",
+        ),
+        n_tracts_building_loss_low_income=(
+            "expected_building_loss_rate_is_low_income",
+            "sum",
+        ),
+        n_tracts_population_loss_low_income=(
+            "expected_population_loss_rate_is_low_income",
+            "sum",
+        ),
+        n_tracts_diesel_particulates_low_income=(
+            "diesel_particulates_is_low_income",
+            "sum",
+        ),
+        n_tracts_energy_burden_low_income=("energy_burden_is_low_income", "sum"),
+        n_tracts_pm2_5_low_income=("pm2_5_is_low_income", "sum"),
+        n_tracts_traffic_low_income=("traffic_proximity_is_low_income", "sum"),
+        n_tracts_lead_paint_and_median_home_price_low_income=(
+            "lead_paint_and_median_house_value_is_low_income",
+            "sum",
+        ),
+        n_tracts_housing_burden_low_income=("housing_burden_is_low_income", "sum"),
+        n_tracts_superfund_proximity_low_income=(
+            "proximity_to_superfund_sites_is_low_income",
+            "sum",
+        ),
+        n_tracts_wastewater_low_income=("wastewater_discharge_is_low_income", "sum"),
+        n_tracts_asthma_low_income=("asthma_is_low_income", "sum"),
+        n_tracts_heart_disease_low_income=("heart_disease_is_low_income", "sum"),
+        n_tracts_diabetes_low_income=("diabetes_is_low_income", "sum"),
+        n_tracts_local_to_area_income_ratio_and_low_high_school=(
+            "low_median_household_income_and_low_hs_attainment",
+            "sum",
+        ),
+        n_tracts_linguistic_isolation_and_low_high_school=(
+            "households_in_linguistic_isolation_and_low_hs_attainment",
+            "sum",
+        ),
+        n_tracts_below_poverty_and_low_high_school=(
+            "households_below_federal_poverty_level_low_hs_attainment",
+            "sum",
+        ),
+        n_tracts_unemployment_and_low_high_school=(
+            "unemployment_and_low_hs_attainment",
+            "sum",
+        ),
+        n_tracts_hazardous_waste_proximity_low_income=(
+            "proximity_to_hazardous_waste_facilities_is_low_income",
+            "sum",
+        ),
+        n_tracts_unemployment_less_than_high_school_islands=(
+            "unemployment_and_low_hs_edu_islands",
+            "sum",
+        ),
+        n_tracts_local_to_area_income_ratio_less_than_high_school_islan=(
+            "low_median_household_income_and_low_hs_edu_islands",
+            "sum",
+        ),
+        n_tracts_below_poverty_line_less_than_high_school_islands=(
+            "households_below_federal_poverty_level_low_hs_edu_islands",
+            "sum",
+        ),
+        n_tracts_life_expectancy_low_income=(
+            "low_life_expectancy_is_low_income",
+            "sum",
+        ),
+    )
     df["justice40_dbcp_index"] = _create_dbcp_ej_index(df)
     return df
 
@@ -187,52 +231,7 @@ def _get_existing_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
     # SELECT max(fuel_type_count) as max_fuel_type_count
     # FROM gen_fuels
 
-    query = """
-    WITH
-    plant_fuel_aggs as (
-        SELECT
-            plant_id_eia,
-            (CASE
-                WHEN technology_description = 'Batteries' THEN 'Battery Storage'
-                WHEN technology_description = 'Offshore Wind Turbine' THEN 'Offshore Wind'
-                WHEN fuel_type_code_pudl = 'waste' THEN 'other'
-                ELSE fuel_type_code_pudl
-            END
-            ) as resource,
-            sum(net_generation_mwh) as net_gen_by_fuel,
-            sum(capacity_mw) as capacity_by_fuel,
-            max(generator_operating_date) as max_operating_date
-        from data_warehouse.pudl_generators
-        where operational_status = 'existing'
-        group by 1, 2
-    ),
-    plant_capacity as (
-        SELECT
-            plant_id_eia,
-            sum(capacity_by_fuel) as capacity_mw
-        from plant_fuel_aggs
-        group by 1
-    ),
-    all_aggs as (
-        SELECT
-            *
-        from plant_fuel_aggs as pfuel
-        LEFT JOIN plant_capacity as pcap
-        USING (plant_id_eia)
-    )
-    -- select fuel type with the largest generation (with capacity as tiebreaker)
-    -- https://stackoverflow.com/questions/3800551/select-first-row-in-each-group-by-group/7630564
-    -- NOTE: this is not appropriate for fields that require aggregation, hence CTEs above
-    SELECT DISTINCT ON (plant_id_eia)
-        plant_id_eia,
-        resource,
-        -- net_gen_by_fuel for debugging
-        max_operating_date,
-        capacity_mw
-    from all_aggs
-    ORDER BY plant_id_eia, net_gen_by_fuel DESC NULLS LAST, capacity_by_fuel DESC NULLS LAST
-    ;
-    """
+    query = get_query("get_existing_plant_attributes.sql")
     df = pd.read_sql(query, engine)
     resource_map = {
         "gas": "Natural Gas",
@@ -625,50 +624,7 @@ def _get_offshore_wind_extra_cols(engine: sa.engine.Engine) -> pd.DataFrame:
     # they intentionally double-count capacity. The theory is that the loss
     # of any port could block the whole associated project, so we want
     # to know how much total capacity is at stake in each port county.
-    query = """
-    WITH
-    proj_ports AS (
-        SELECT
-            proj."project_id",
-            port.location_id,
-            locs.county_id_fips,
-            proj."capacity_mw"
-        FROM "data_warehouse"."offshore_wind_projects" as proj
-        INNER JOIN data_warehouse.offshore_wind_port_association as port
-        USING(project_id)
-        INNER JOIN data_warehouse.offshore_wind_locations as locs
-        USING(location_id)
-    ),
-    -- select * from proj_ports
-    -- order by project_id, location_id
-    port_aggs AS (
-        SELECT
-            county_id_fips,
-            -- intentional double-counting here. The theory is that the loss
-            -- of any port could block the whole associated project, so we want
-            -- to know how much total capacity is at stake in each port county.
-            SUM(capacity_mw) as offshore_wind_capacity_mw_via_ports
-        FROM proj_ports
-        GROUP BY 1
-        order by 1
-    ),
-    interest AS (
-        SELECT
-            county_id_fips,
-            string_agg(distinct(why_of_interest), ',' order by why_of_interest) as offshore_wind_interest_type
-        FROM data_warehouse.offshore_wind_locations as locs
-        GROUP BY 1
-        ORDER BY 1
-    )
-    SELECT
-        county_id_fips,
-        offshore_wind_capacity_mw_via_ports,
-        offshore_wind_interest_type
-    FROM interest
-    LEFT JOIN port_aggs
-    USING(county_id_fips)
-    where county_id_fips is not NULL;
-    """
+    query = get_query("get_offshore_wind_extra_cols.sql")
     df = pd.read_sql(query, engine)
     df.set_index("county_id_fips", inplace=True)
     return df
@@ -736,25 +692,8 @@ def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
 def _get_energy_community_qualification(postgres_engine: sa.engine.Engine):
     # NOTE: this query contains hardcoded parameters for the
     # energy communities qualification criteria
-    query = """
-    WITH
-    ec as (
-        SELECT
-            ec.county_id_fips,
-            coal_qualifying_area_fraction as energy_community_coal_closures_area_fraction,
-            qualifies_by_employment_criteria as energy_community_qualifies_via_employment
-        FROM data_warehouse.energy_communities_by_county AS ec
-        LEFT JOIN data_warehouse.county_fips AS fips
-        USING (county_id_fips)
-    )
-    SELECT
-        *,
-        (energy_community_coal_closures_area_fraction > 0.5 OR
-        energy_community_qualifies_via_employment) as energy_community_qualifies
-    FROM ec
-    """
+    query = get_query("get_energy_community_qualification.sql")
     ec = pd.read_sql(query, postgres_engine)
-
     return ec
 
 
@@ -966,16 +905,15 @@ def _add_avoided_co2e(iso: pd.DataFrame, engine: sa.engine.Engine) -> pd.DataFra
 
 
 def _get_avoided_emissions_by_county_resource(engine: sa.engine.Engine) -> pd.DataFrame:
-    query = """
-    select
-        avert_region,
-        resource_type,
-        co2e_tonnes_per_year_per_mw
-    from data_warehouse.avert_avoided_emissions_factors
-    -- drop distributed_pv
-    WHERE resource_type in ('onshore_wind', 'offshore_wind', 'utility_pv')
-    """
-    emiss_fac = pd.read_sql(query, engine)
+    emiss_fac = pd.read_sql_table(
+        "avert_avoided_emissions_factors", engine, schema="data_warehouse"
+    )
+    emiss_fac = emiss_fac[
+        emiss_fac.resource_type.isin(["onshore_wind", "offshore_wind", "utility_pv"])
+    ]
+    emiss_fac = emiss_fac[
+        ["avert_region", "resource_type", "co2e_tonnes_per_year_per_mw"]
+    ]
     crosswalk = pd.read_sql_table(
         "avert_county_region_assoc", engine, schema="data_warehouse"
     )

@@ -1,4 +1,5 @@
 """Common transform operations."""
+
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -6,8 +7,8 @@ import pandas as pd
 from joblib import Memory
 
 from dbcp.constants import FIPS_CODE_VINTAGE
+from dbcp.helpers import add_fips_ids
 from dbcp.transform.geocoding import GoogleGeocoder
-from pudl.helpers import add_fips_ids as _add_fips_ids
 
 UNIX_EPOCH_ORIGIN = pd.Timestamp("01/01/1970")
 # Excel parser is simplified and will be one day off for dates < 1900/03/01
@@ -319,7 +320,7 @@ def add_county_fips_with_backup_geocoding(
     )  # copy
     # first try a simple FIPS lookup and split by valid/invalid fips codes
     # The only purpose of this step is to save API calls on the easy ones (most of them)
-    with_fips = _add_fips_ids(
+    with_fips = add_fips_ids(
         filled_state_locality,
         state_col=state_col,
         county_col=locality_col,
@@ -350,7 +351,7 @@ def add_county_fips_with_backup_geocoding(
     )
     nan_fips = pd.concat([nan_fips, geocoded], axis=1)
     # add fips using geocoded names
-    filled_fips = _add_fips_ids(
+    filled_fips = add_fips_ids(
         nan_fips,
         state_col=state_col,
         county_col="geocoded_containing_county",
