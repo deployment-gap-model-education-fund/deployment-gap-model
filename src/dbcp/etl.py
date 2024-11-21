@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Callable, Dict
 
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 import sqlalchemy as sa
 
 import dbcp
@@ -225,12 +227,17 @@ def run_etl(funcs: dict[str, Callable], schema_name: str):
                 chunksize=1000,
                 method=psql_insert_copy,
             )
-            df.to_parquet(parquet_dir / f"{table.name}.parquet", index=False)
+
+            schema = dbcp.helpers.get_pyarrow_schema_from_metadata(
+                table.name, schema_name
+            )
+            pa_table = pa.Table.from_pandas(df, schema=schema)
+            pq.write_table(pa_table, parquet_dir / f"{table.name}.parquet")
 
     logger.info("Sucessfully finished ETL.")
 
 
-def etl(args):
+def etl():
     """Run dbc ETL."""
     # Reduce size of caches if necessary
     GEOCODER_CACHE.reduce_size()
