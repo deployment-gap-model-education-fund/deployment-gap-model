@@ -1,4 +1,5 @@
 """A Command line interface for the down ballot project."""
+
 import argparse
 import logging
 import sys
@@ -66,9 +67,9 @@ def main():
         SPATIAL_CACHE.clear()
 
     if args.etl:
-        dbcp.etl.etl(args)
+        dbcp.etl.etl()
     if args.data_mart:
-        dbcp.data_mart.create_data_marts(args)
+        dbcp.data_mart.create_data_marts()
 
 
 if __name__ == "__main__":
