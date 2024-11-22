@@ -103,7 +103,7 @@ https://github.com/catalyst-cooperative/pudl/issues/1264
 
 FIPS_CODE_VINTAGE = 2020
 
-PUDL_LATEST_YEAR = 2022
+PUDL_LATEST_YEAR = 2023
 
 US_STATES = set(
     POLITICAL_SUBDIVISIONS.query("subdivision_type == 'state'").subdivision_name
