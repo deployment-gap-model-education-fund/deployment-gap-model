@@ -32,12 +32,12 @@ ISO_QUEUE_VERSIONS: dict[str, str] = {
 def extract(iso_queue_versions: dict[str, str] = ISO_QUEUE_VERSIONS):
     """Extract gridstatus ISO Queue data."""
     iso_queues: dict[str, pd.DataFrame] = {}
-    for iso, revision_num in iso_queue_versions.items():
+    for iso, generation_num in iso_queue_versions.items():
         # MISO is an exception to the rule because we need multiple snapshots of the data
         filename = iso if iso != "miso-pre-2017" else "miso"
         uri = f"gs://dgm-archive/gridstatus/interconnection_queues/parquet/{filename}.parquet"
         path = dbcp.extract.helpers.cache_gcs_archive_file_locally(
-            uri=uri, revision_num=revision_num
+            uri=uri, generation_num=generation_num
         )
 
         iso_queues[iso] = pd.read_parquet(path)

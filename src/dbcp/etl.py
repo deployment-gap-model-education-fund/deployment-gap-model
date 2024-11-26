@@ -10,6 +10,7 @@ import pyarrow.parquet as pq
 import sqlalchemy as sa
 
 import dbcp
+from dbcp.archivers.utils import ExtractionSettings
 from dbcp.constants import OUTPUT_DIR
 from dbcp.extract.fips_tables import CENSUS_URI, TRIBAL_LANDS_URI
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
@@ -118,15 +119,18 @@ def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
 
 def etl_offshore_wind() -> dict[str, pd.DataFrame]:
     """ETL manually curated offshore wind data."""
-    projects_path = (
-        "gs://dgm-archive/synapse/offshore_wind/offshore_wind_projects_2024-09-10.csv"
-    )
-    locations_path = (
-        "gs://dgm-archive/synapse/offshore_wind/offshore_wind_locations_2024-09-10.csv"
-    )
+    # get the latest version of the offshore wind data from the candidate yaml file
+    projects_uri = "airtable/Offshore Wind Locations Synapse Version/Projects.json"
+    locations_uri = "airtable/Offshore Wind Locations Synapse Version/Locations.json"
+
+    es = ExtractionSettings.from_yaml("/app/dbcp/settings.yaml")
+    es.update_archive_generation_numbers()
+
+    projects_uri = es.get_full_archive_uri(projects_uri)
+    locations_uri = es.get_full_archive_uri(locations_uri)
 
     raw_offshore_dfs = dbcp.extract.offshore_wind.extract(
-        locations_path=locations_path, projects_path=projects_path
+        locations_uri=locations_uri, projects_uri=projects_uri
     )
     offshore_transformed_dfs = dbcp.transform.offshore_wind.transform(raw_offshore_dfs)
 
@@ -277,5 +281,5 @@ def etl():
 
 if __name__ == "__main__":
     # debugging entry point
-    etl(None)
+    etl()
     print("yay")
