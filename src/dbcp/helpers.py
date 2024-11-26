@@ -11,6 +11,7 @@ import fsspec
 import google.auth
 import pandas as pd
 import pandas_gbq
+import pyarrow as pa
 import sqlalchemy as sa
 from google.cloud import bigquery
 from tqdm import tqdm
@@ -34,6 +35,14 @@ SA_TO_PD_TYPES = {
     "FLOAT": "float64",
     "BOOLEAN": "boolean",
     "DATETIME": "datetime64[ns]",
+}
+SA_TO_PA_TYPES = {
+    "VARCHAR": pa.string(),
+    "INTEGER": pa.int64(),
+    "BIGINT": pa.int64(),
+    "FLOAT": pa.float64(),
+    "BOOLEAN": pa.bool_(),
+    "DATETIME": pa.timestamp("ms"),
 }
 SA_TO_BQ_MODES = {True: "NULLABLE", False: "REQUIRED"}
 
@@ -81,6 +90,25 @@ def get_bq_schema_from_metadata(
     return bq_schema
 
 
+def get_pyarrow_schema_from_metadata(table_name: str, schema: str) -> pa.Schema:
+    """
+    Create a PyArrow schema from SQL Alchemy metadata.
+
+    Args:
+        table_name: the name of the table.
+        schema: the name of the database schema.
+    Returns:
+        pyarrow_schema: a PyArrow schema description.
+    """
+    table_name = f"{schema}.{table_name}"
+    metadata = get_schema_sql_alchemy_metadata(schema)
+    table_sa = metadata.tables[table_name]
+    pyarrow_schema = []
+    for column in table_sa.columns:
+        pyarrow_schema.append((column.name, SA_TO_PA_TYPES[str(column.type)]))
+    return pa.schema(pyarrow_schema)
+
+
 def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str):
     """Apply dtypes to a dataframe using the sqlalchemy metadata."""
     table_name = f"{schema}.{table_name}"
@@ -90,12 +118,16 @@ def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str):
     except KeyError:
         raise KeyError(f"{table_name} does not exist in metadata.")
 
-    dtypes = {
-        col.name: SA_TO_PD_TYPES[str(col.type)]
-        for col in table.columns
-        if col.name in df.columns
-    }
-    return df.astype(dtypes)
+    for col in table.columns:
+        # Add the column if it doesn't exist
+        if col.name not in df.columns:
+            df[col.name] = None
+        df[col.name] = df[col.name].astype(SA_TO_PD_TYPES[str(col.type)])
+
+    # convert datetime[ns] columns to milliseconds
+    for col in df.select_dtypes(include=["datetime64[ns]"]).columns:
+        df[col] = df[col].dt.floor("ms")
+    return df
 
 
 def get_sql_engine() -> sa.engine.Engine:

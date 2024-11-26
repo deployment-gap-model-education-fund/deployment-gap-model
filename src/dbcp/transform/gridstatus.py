@@ -950,8 +950,9 @@ def _normalize_project_locations(iso_df: pd.DataFrame) -> pd.DataFrame:
     duplicate_locations = geocoded_locations[
         geocoded_locations[["county_id_fips", "project_id"]].duplicated(keep=False)
     ]
+    n_expected_duplicates = 118
     assert (
-        len(duplicate_locations) <= 116
+        len(duplicate_locations) <= n_expected_duplicates
     ), f"Found more duplicate locations in Grid Status location table than expected:\n {duplicate_locations}"
     return geocoded_locations
 

@@ -5,6 +5,8 @@ import logging
 import pkgutil
 
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 import dbcp
 from dbcp.constants import OUTPUT_DIR
@@ -64,8 +66,8 @@ def create_data_marts():  # noqa: max-complexity=11
     with engine.connect() as con:
         for table in metadata.sorted_tables:
             logger.info(f"Load {table.name} to postgres.")
-            df = enforce_dtypes(data_marts[table.name], table.name, "data_mart")
-            df = dbcp.helpers.trim_columns_length(df)
+            df = dbcp.helpers.trim_columns_length(data_marts[table.name])
+            df = enforce_dtypes(df, table.name, "data_mart")
             df.to_sql(
                 name=table.name,
                 con=con,
@@ -74,7 +76,10 @@ def create_data_marts():  # noqa: max-complexity=11
                 schema="data_mart",
                 method=psql_insert_copy,
             )
-
-            df.to_parquet(parquet_dir / f"{table.name}.parquet", index=False)
+            schema = dbcp.helpers.get_pyarrow_schema_from_metadata(
+                table.name, "data_mart"
+            )
+            pa_table = pa.Table.from_pandas(df, schema=schema)
+            pq.write_table(pa_table, parquet_dir / f"{table.name}.parquet")
 
     validate_data_mart(engine=engine)
