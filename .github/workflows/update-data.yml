@@ -5,8 +5,11 @@ on:
   push:
     tags:
       - "v20*"
+    branches:
+      - "dev"
   workflow_dispatch:
-  schedule: 5 7 * * 1-5
+  schedule:
+    - cron: 5 7 * * 1-5
 
 jobs:
   build:
