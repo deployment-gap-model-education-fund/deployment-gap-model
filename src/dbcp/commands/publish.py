@@ -138,8 +138,11 @@ class OutputMetadata(BaseModel):
     def git_ref_must_be_dev_or_tag(cls, git_ref: str | None) -> str | None:
         """Validate that the git ref is either "dev" or a tag starting with "v20"."""
         if git_ref:
-            if (git_ref not in ("dev", "sandbox")) or (not git_ref.startswith("v20")):
-                raise ValueError('Git ref must be "dev" or start with "v20"')
+            if (git_ref in ("dev", "sandbox")) or git_ref.startswith("v20"):
+                return git_ref
+            raise ValueError(
+                f'{git_ref} is not a valid Git rev. Must be "dev" or start with "v20"'
+            )
         return git_ref
 
     def to_yaml(self) -> str:
