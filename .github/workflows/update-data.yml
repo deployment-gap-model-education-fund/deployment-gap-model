@@ -5,6 +5,8 @@ on:
   push:
     tags:
       - "v20*"
+    branches:
+      - "fix-update-data-trigger" # TODO: REMOVE
   workflow_dispatch:
   schedule:
     - cron: 5 7 * * 1-5
