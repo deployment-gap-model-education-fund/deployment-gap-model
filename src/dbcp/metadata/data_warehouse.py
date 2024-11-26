@@ -583,7 +583,11 @@ pudl_eia860m_changelog = Table(
     Column("longitude", Float),
     Column("net_capacity_mwdc", Float),
     Column("operational_status", String),
-    Column("raw_operational_status_code", String),
+    Column(
+        "raw_operational_status_code",
+        String,
+        ForeignKey("data_warehouse.pudl_eia860m_status_codes.code"),
+    ),
     Column("operational_status_code", Integer, nullable=True),
     Column("planned_derate_date", DateTime),
     Column("planned_generator_retirement_date", DateTime),
@@ -608,6 +612,15 @@ pudl_eia860m_changelog = Table(
         ForeignKey("data_warehouse.county_fips.county_id_fips"),
         nullable=True,
     ),  # Should not be nullable in future updates
+    schema=schema,
+)
+
+pudl_eia860m_status_codes = Table(
+    "pudl_eia860m_status_codes",
+    metadata,
+    Column("code", String, primary_key=True),
+    Column("status", Integer),
+    Column("description", String),
     schema=schema,
 )
 

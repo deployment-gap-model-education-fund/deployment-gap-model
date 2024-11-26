@@ -6,6 +6,26 @@ from dbcp.constants import FIPS_CODE_VINTAGE
 from dbcp.helpers import add_fips_ids
 from dbcp.transform.helpers import bedford_addfips_fix
 
+# Map operational_status_code values to numeric scale
+OPERATIONAL_STATUS_CODES_SCALE = {
+    # proposed statuses
+    "OT": 99,  # unknown, but use a sentinel value to differentiate from missing data
+    "IP": 98,
+    "P": 1,
+    "L": 2,
+    "T": 3,
+    "U": 4,
+    "V": 5,
+    "TS": 6,
+    # operational statuses
+    "OA": 7,
+    "OP": 7,
+    "OS": 7,
+    "SB": 7,
+    # retired
+    "RE": 8,
+}
+
 
 def _transform_pudl_generators(pudl_generators) -> pd.DataFrame:
     """Transform pudl_generators table.
@@ -67,33 +87,33 @@ def _transform_pudl_eia860m_changelog(
         pudl_eia860m_changelog.county_id_fips.eq("51515"), "county_id_fips"
     ] = "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
 
-    # Map operational_status_code values to numeric scale
-    operational_status_code_scale = {
-        # proposed statuses
-        "OT": 99,  # unknown, but use a sentinel value to differentiate from missing data
-        "IP": 98,
-        "P": 1,
-        "L": 2,
-        "T": 3,
-        "U": 4,
-        "V": 5,
-        "TS": 6,
-        # operational statuses
-        "OA": 7,
-        "OP": 7,
-        "OS": 7,
-        "SB": 7,
-        # retired
-        "RE": 8,
-    }
     pudl_eia860m_changelog["raw_operational_status_code"] = pudl_eia860m_changelog[
         "operational_status_code"
     ].copy()
     pudl_eia860m_changelog["operational_status_code"] = pudl_eia860m_changelog[
         "raw_operational_status_code"
-    ].map(operational_status_code_scale)
+    ].map(OPERATIONAL_STATUS_CODES_SCALE)
 
     return pudl_eia860m_changelog
+
+
+def _transform_pudl_eia860m_status_codes(pudl_eia860m_status_codes):
+    """
+    Create a table with operational status codes and descriptions.
+
+    Args:
+        pudl_eia860m_status_codes: the raw core_eia__codes_operational_status table.
+    Returns:
+        The DBCP operation status values mapped to PUDL codes and descriptions.
+    """
+    op_status_codes_scale = (
+        pd.DataFrame.from_dict(OPERATIONAL_STATUS_CODES_SCALE, "index")
+        .reset_index()
+        .rename(columns={"index": "code", 0: "status"})
+    )
+    return op_status_codes_scale.merge(
+        pudl_eia860m_status_codes, how="inner", on="code"
+    )[["code", "status", "description"]]
 
 
 def transform(raw_pudl_tables: pd.DataFrame) -> dict[str, pd.DataFrame]:
@@ -107,6 +127,7 @@ def transform(raw_pudl_tables: pd.DataFrame) -> dict[str, pd.DataFrame]:
     table_transform_functions = {
         "pudl_generators": _transform_pudl_generators,
         "pudl_eia860m_changelog": _transform_pudl_eia860m_changelog,
+        "pudl_eia860m_status_codes": _transform_pudl_eia860m_status_codes,
     }
 
     transformed_dfs = {}

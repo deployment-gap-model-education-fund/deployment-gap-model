@@ -1,4 +1,5 @@
 """Logic for extracing PUDL data."""
+
 import pandas as pd
 
 import dbcp
@@ -43,6 +44,17 @@ def _extract_pudl_eia860m_changelog() -> pd.DataFrame:
     return pudl_eia860m_changelog
 
 
+def _extract_pudl_eia860m_status_codes() -> pd.DataFrame:
+    """Extract the core_eia__codes_operational_status parquet file from the PUDL resources."""
+    pudl_resource_path = dbcp.helpers.get_pudl_resource(
+        pudl_resource="core_eia__codes_operational_status.parquet"
+    )
+    pudl_eia860m_changelog = pd.read_parquet(
+        pudl_resource_path, engine="pyarrow", use_nullable_dtypes=True
+    )
+    return pudl_eia860m_changelog
+
+
 def extract() -> dict[str, pd.DataFrame]:
     """Pull tables from pudl sqlite database.
 
@@ -54,6 +66,7 @@ def extract() -> dict[str, pd.DataFrame]:
     tables = {
         "pudl_generators": _extract_pudl_generators,
         "pudl_eia860m_changelog": _extract_pudl_eia860m_changelog,
+        "pudl_eia860m_status_codes": _extract_pudl_eia860m_status_codes,
     }
     for dgm_table_name, extract_func in tables.items():
         raw_pudl_tables[dgm_table_name] = extract_func()
