@@ -24,3 +24,4 @@ scipy~=1.14.1
 google-cloud-storage~=2.18.2
 geopandas~=1.0.1
 gcsfs~=2024.10.0
+pydantic<2.10,>=2.9 # https://github.com/gtalarico/pyairtable/issues/411
