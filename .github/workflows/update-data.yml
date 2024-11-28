@@ -8,8 +8,9 @@ on:
     branches:
       - "dev"
   workflow_dispatch:
-  schedule:
-    - cron: 5 7 * * 1-5
+  # Temporarily disable scheduled on runs because geocoding without a cache everytime is expensive
+  # schedule:
+  #   - cron: 5 7 * * 1-5
 
 jobs:
   build:
