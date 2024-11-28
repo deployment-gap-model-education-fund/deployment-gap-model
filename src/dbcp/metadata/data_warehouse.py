@@ -471,6 +471,7 @@ pudl_generators = Table(
     Column("fluidized_bed_tech", Boolean),
     Column("fuel_cost_from_eiaapi", Boolean),
     Column("fuel_cost_per_mmbtu", Float),
+    Column("fuel_cost_per_mmbtu_source", String),
     Column("fuel_cost_per_mwh", Float),
     Column("fuel_type_code_pudl", String),
     Column("fuel_type_count", Integer, nullable=False),
@@ -577,11 +578,16 @@ pudl_eia860m_changelog = Table(
     Column("energy_storage_capacity_mwh", Float),
     Column("fuel_type_code_pudl", String),
     Column("generator_retirement_date", DateTime),
+    Column("generator_operating_date", DateTime),
     Column("latitude", Float),
     Column("longitude", Float),
     Column("net_capacity_mwdc", Float),
     Column("operational_status", String),
-    Column("raw_operational_status_code", String),
+    Column(
+        "raw_operational_status_code",
+        String,
+        ForeignKey("data_warehouse.pudl_eia860m_status_codes.code"),
+    ),
     Column("operational_status_code", Integer, nullable=True),
     Column("planned_derate_date", DateTime),
     Column("planned_generator_retirement_date", DateTime),
@@ -606,6 +612,15 @@ pudl_eia860m_changelog = Table(
         ForeignKey("data_warehouse.county_fips.county_id_fips"),
         nullable=True,
     ),  # Should not be nullable in future updates
+    schema=schema,
+)
+
+pudl_eia860m_status_codes = Table(
+    "pudl_eia860m_status_codes",
+    metadata,
+    Column("code", String, primary_key=True),
+    Column("status", Integer),
+    Column("description", String),
     schema=schema,
 )
 

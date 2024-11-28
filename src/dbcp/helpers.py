@@ -139,7 +139,7 @@ def get_sql_engine() -> sa.engine.Engine:
 
 
 def get_pudl_resource(
-    pudl_resource: str, bucket: str = "gs://parquet.catalyst.coop"
+    pudl_resource: str, bucket: str = "s3://pudl.catalyst.coop"
 ) -> Path:
     """Given the name of a PUDL resource, return the path to the cached file.
 
@@ -161,7 +161,7 @@ def get_pudl_resource(
     local_pudl_resource_path = pudl_version_cache / pudl_resource
 
     if not local_pudl_resource_path.exists():
-        fs = fsspec.filesystem("gs")
+        fs = fsspec.filesystem("s3", anon=True)
         file_size = fs.size(remote_pudl_resource_path)
 
         # open the remote_pudl_resource_path and track progress with tqdm
