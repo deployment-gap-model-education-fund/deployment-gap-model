@@ -4,6 +4,9 @@ name: test-full-build
 on:
   workflow_dispatch:
   push:
+    branches-ignore: # update-data.yml runs on push to main and dev so it's duplicative to run this test as well
+      - main
+      - dev
 
 jobs:
   build:
