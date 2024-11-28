@@ -104,6 +104,10 @@ https://github.com/catalyst-cooperative/pudl/issues/1264
 FIPS_CODE_VINTAGE = 2020
 
 PUDL_LATEST_YEAR = 2023
+"""The latest year of PUDL data available for data that is reported annually.
+
+Note some datasets we use here are reported quarterly like EIA 860m.
+"""
 
 US_STATES = set(
     POLITICAL_SUBDIVISIONS.query("subdivision_type == 'state'").subdivision_name
