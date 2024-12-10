@@ -1,4 +1,5 @@
 """SQL Alchemy metadata for the data mart tables."""
+
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
@@ -46,6 +47,7 @@ counties_wide_format = Table(
     Column("infra_total_proposed_pm2_5_tonnes_per_year", Float),
     Column("battery_storage_existing_capacity_mw", Float),
     Column("battery_storage_existing_facility_count", Integer),
+    Column("battery_storage_existing_co2e_tonnes_per_year", Float),
     Column("battery_storage_proposed_capacity_mw", Float),
     Column("battery_storage_proposed_facility_count", Integer),
     Column("coal_existing_capacity_mw", Float),
