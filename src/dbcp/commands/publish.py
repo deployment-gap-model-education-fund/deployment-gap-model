@@ -75,7 +75,7 @@ def load_parquet_files_to_bigquery(
 
     # Get the BigQuery dataset
     # the "production" bigquery datasets do not have a suffix
-    destination_suffix = "" if build_ref.startswith("v20") else f"_{build_ref}"
+    destination_suffix = "" if build_ref == "main" else f"_{build_ref}"
     dataset_id = f"{destination_blob_prefix}{destination_suffix}"
     dataset_ref = client.dataset(dataset_id)
 
@@ -136,12 +136,12 @@ class OutputMetadata(BaseModel):
 
     @validator("git_ref")
     def git_ref_must_be_dev_or_tag(cls, git_ref: str | None) -> str | None:
-        """Validate that the git ref is either "dev" or a tag starting with "v20"."""
+        """Validate that the git ref is either "dev" or "main"."""
         if git_ref:
-            if (git_ref in ("dev", "sandbox")) or git_ref.startswith("v20"):
+            if git_ref in ("dev", "sandbox", "main"):
                 return git_ref
             raise ValueError(
-                f'{git_ref} is not a valid Git rev. Must be "dev" or start with "v20"'
+                f'{git_ref} is not a valid Git rev. Must be "dev" or "main".'
             )
         return git_ref
 
