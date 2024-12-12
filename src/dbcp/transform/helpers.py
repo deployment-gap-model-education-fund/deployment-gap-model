@@ -342,13 +342,29 @@ def add_county_fips_with_backup_geocoding(
 
     # geocode the lookup failures - they are often city/town names (instead of counties) or simply mis-spelled
     nan_fips = with_fips.loc[fips_is_nan, :].copy()
-    geocoded = _geocode_locality(
-        nan_fips.loc[:, [state_col, locality_col]],
+
+    # Deduplicate on the state and locality columns to minimize API calls
+    key_cols = [state_col, locality_col]
+    deduped_nan_fips = nan_fips.loc[:, key_cols].drop_duplicates()
+    deduped_geocoded = _geocode_locality(
+        deduped_nan_fips,
         # pass subset to _geocode_locality to maximize chance of a cache hit
         # (this way other columns can change but caching still works)
         state_col=state_col,
         locality_col=locality_col,
     )
+    # recombine deduped geocoded data with original nan_fips
+    geocoded_deduped_nan_fips = pd.concat(
+        [deduped_nan_fips[key_cols], deduped_geocoded], axis=1
+    )
+    index_name = nan_fips.index.name
+    index_name = index_name if index_name is not None else "index"
+    geocoded = (
+        nan_fips.reset_index()
+        .merge(geocoded_deduped_nan_fips, on=key_cols, how="left", validate="m:1")
+        .set_index(index_name)[deduped_geocoded.columns]
+    )
+
     nan_fips = pd.concat([nan_fips, geocoded], axis=1)
     # add fips using geocoded names
     filled_fips = add_fips_ids(
