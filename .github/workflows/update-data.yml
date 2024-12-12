@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        # This will checkout the main branch on "schedule" and the specified branch on "workflow_dispatch"
+        # The archiver should probably be pulled out into its own repo so archive code and data don't diverge
 
       - name: Who owns the workspace?
         run: ls -ld $GITHUB_WORKSPACE
@@ -51,9 +53,22 @@ jobs:
         run: |
           make archive_all
 
+      # The google-github-actions/auth step is run as runner:docker,
+      # so we need to give the workspace back to runner:docker
+      - name: Give ownership of the workspace back to root
+        if: always()
+        run: sudo chown -R runner:docker $GITHUB_WORKSPACE
+
+      - name: Who owns the workspace?
+        if: always()
+        run: ls -ld $GITHUB_WORKSPACE
+
   matrix_prep:
     needs: archive # Ensure archive job finishes first
-    if: ${{ always() }}
+    # Only run if the archive job is successful or is skipped
+    # I had to add always() because the matrix_pre job wouldn't run if the archive job was skipped
+    # I think this happens because archive is skipped on push, but matrix_prep is not
+    if: ${{ always() && (needs.archive.result == 'success' || needs.archive.result == 'skipped') }}
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -73,7 +88,7 @@ jobs:
   etl:
     needs: matrix_prep # Ensure archive job finishes first
     runs-on: ubuntu-latest
-    if: ${{ always() }} # TODO: This should only run if the matrix_prep job is successful
+    if: ${{ always() && needs.matrix_prep.result == 'success' }}
     strategy:
       matrix: ${{ fromJSON(needs.matrix_prep.outputs.matrix) }}
     env:
