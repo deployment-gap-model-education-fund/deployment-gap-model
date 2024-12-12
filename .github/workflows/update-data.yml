@@ -3,33 +3,21 @@ name: update-data
 
 on:
   push:
-    tags:
-      - "v20*"
     branches:
       - "dev"
+      - "main"
   workflow_dispatch:
   # Temporarily disable scheduled on runs because geocoding without a cache everytime is expensive
   # schedule:
   #   - cron: 5 7 * * 1-5
 
 jobs:
-  build:
+  archive:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-
-    env:
-      API_KEY_GOOGLE_MAPS: ${{ secrets.API_KEY_GOOGLE_MAPS }}
-      GITHUB_REF: ${{ github.ref_name }} # This is changed to dev if running on a schedule
-
     steps:
-      - name: Use dev branch if running on a schedule
-        if: ${{ (github.event_name == 'schedule') }}
-        run: |
-          echo "This action was triggered by a schedule." && echo "GITHUB_REF=dev" >> $GITHUB_ENV
-
-      - name: Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: ${{ env.GITHUB_REF }}
 
       - name: Who owns the workspace?
         run: ls -ld $GITHUB_WORKSPACE
@@ -63,12 +51,77 @@ jobs:
         run: |
           make archive_all
 
+  matrix_prep:
+    needs: archive # Ensure archive job finishes first
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Set branch dynamically
+        id: set-matrix
+        run: |
+          if [ "${{ github.event_name }}" == "push" ]; then
+            echo "matrix={\"include\":[{\"branch\":\"${{ github.ref_name }}\"}]}" >> $GITHUB_OUTPUT
+          else
+            echo "matrix={\"include\":[{\"branch\":\"main\"},{\"branch\":\"dev\"}]}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: echo matrix
+        run: echo ${{ steps.set-matrix.outputs.matrix }}
+
+  etl:
+    needs: matrix_prep # Ensure archive job finishes first
+    runs-on: ubuntu-latest
+    if: ${{ always() }} # TODO: This should only run if the matrix_prep job is successful
+    strategy:
+      matrix: ${{ fromJSON(needs.matrix_prep.outputs.matrix) }}
+    env:
+      API_KEY_GOOGLE_MAPS: ${{ secrets.API_KEY_GOOGLE_MAPS }}
+      GITHUB_REF: ${{ github.ref_name }} # This is changed to dev if running on a schedule
+    steps:
+      - name: print matrix
+        run: echo ${{ matrix.branch }}
+
+      - name: Checkout Repository
+        id: checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.branch }}
+
+      - name: Who owns the workspace?
+        run: ls -ld $GITHUB_WORKSPACE
+
+      - uses: "google-github-actions/auth@v2"
+        with:
+          credentials_json: "${{ secrets.DGM_GITHUB_ACTION_CREDENTIALS }}"
+
+      - name: Display env variables
+        run: |
+          echo "Workspace directory: $GITHUB_WORKSPACE" \
+          echo "Google credentials path: $GOOGLE_GHA_CREDS_PATH" \
+
+      # Give the dbcp user ownership of the workspace
+      # So it can read and write files to the workspace
+      - name: Give the dbcp user ownership of the workspace
+        run: sudo chown -R 1000:1000 $GITHUB_WORKSPACE
+
+      - name: Set up Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
+      - name: Build and run Docker Compose services
+        run: |
+          docker-compose up -d
+
       - name: Run full ETL
         if: ${{ success() }}
         run: |
           make all
 
       - name: Run all test
+        if: ${{ success() }}
         run: |
           make test
 
@@ -100,12 +153,11 @@ jobs:
 
       # publish the outputs, grab the git sha of the commit step
       - name: Publish publish outputs
-        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || (github.ref_name == 'dev')
         run: |
           docker compose run --rm app python dbcp/cli.py publish-outputs \
             -bq \
-            --build-ref ${{ github.ref_name }} \
-            --code-git-sha ${{ github.sha }} \
+            --build-ref ${{ matrix.branch }} \
+            --code-git-sha ${{ steps.checkout.outputs.commit }} \
             --settings-file-git-sha ${{ steps.commit_settings_file.outputs.commit_long_sha }} \
             --github-action-run-id ${{ github.run_id}}
 
