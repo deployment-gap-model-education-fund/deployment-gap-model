@@ -1,9 +1,26 @@
 """Retrieve data from EIP Infrastructure spreadsheets for analysis.
 
-This data was updated by contacting EIP directly for the latest version, but now they
-host an Excel file at oilandgaswatch.org -> Resources -> Downloads, which points to:
-https://drive.google.com/drive/folders/1udtw3XeezA5Lkb8Mfc_cntNTcV4oPuKi
-Note that this new data version has changed structure from the one extracted below.
+This data is accessed through a xata API hosted by EIP. Each entity (facility, project,
+air construction permit) has its own CSV file, and then there are two additional files
+with IDs linking facilities to projects and projects to air construction permits.
+
+The following datasets are available but not currently downloaded:
+# TODO - update this!
+# 'Pipelines',
+# 'NGA',
+# 'NAICS',
+# 'CWA-NPDES',
+# 'CWA Wetland',
+# 'Air Operating',
+# 'Glossary',  # useful for data dictionary
+# 'Data Sources',
+# 'Map Layers',
+# 'Other Permits',
+# 'Test Collection',
+# 'Featured Facility Descriptors',
+# 'MARAD',
+# 'TEST',
+# 'Pipeline Digitization',
 """
 from pathlib import Path
 from typing import Dict
@@ -29,7 +46,7 @@ def _downcast_ints(df: pd.DataFrame) -> None:
 
 
 def extract(path: Path) -> Dict[str, pd.DataFrame]:
-    """Read EIP excel database.
+    """Read in EIP CSV files from a provided path to a folder.
 
     Args:
         path (Path): filepath
@@ -37,36 +54,14 @@ def extract(path: Path) -> Dict[str, pd.DataFrame]:
     Returns:
         Dict[str, pd.DataFrame]: output dictionary of dataframes
     """
-    sheets_to_read = [
-        "Facility",
-        # 'Company',
-        "Project",
-        "Air Construction",  # permit status is key to identifying actionable projects
-        # 'Pipelines',
-        # 'NGA',
-        # 'NAICS',
-        # 'CWA-NPDES',
-        # 'CWA Wetland',
-        # 'Air Operating',
-        # 'Glossary',  # useful for data dictionary
-        # 'Data Sources',
-        # 'Map Layers',
-        # 'Other Permits',
-        # 'Test Collection',
-        # 'Featured Facility Descriptors',
-        # 'MARAD',
-        # 'TEST',
-        # 'Pipeline Digitization',
-    ]
-    raw_dfs = pd.read_excel(path, sheet_name=sheets_to_read)
-    rename_dict = {
-        "Facility": "eip_facilities",
-        "Project": "eip_projects",
-        "Air Construction": "eip_air_constr_permits",
-    }
-    raw_dfs = {rename_dict[key]: df for key, df in raw_dfs.items()}
-    for df in raw_dfs.values():
+    files = Path(path).glob("*.csv")  # Get all CSV files in folder
+    raw_dfs = {}
+
+    for file in files:
+        df = pd.read_csv(file)
         _convert_object_to_string_dtypes(df)
         _downcast_ints(df)
+        # Get the first part of the name (e.g. eip_air_construction_permits) as the key
+        raw_dfs[file.name.rsplit("_", 1)[0]] = df
 
     return raw_dfs
