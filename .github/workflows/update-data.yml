@@ -170,12 +170,20 @@ jobs:
       # publish the outputs, grab the git sha of the commit step
       - name: Publish publish outputs
         run: |
+          # Use the commit_settings_file hash if settings.yaml was updated
+          # If it wasn't updated that means there were no changes so use the
+          # commit hash from the checkout step
+          SETTINGS_FILE_SHA="${{ steps.commit_settings_file.outputs.commit_long_sha }}"
+          if [ -z "$SETTINGS_FILE_SHA" ]; then
+            SETTINGS_FILE_SHA="${{ steps.checkout.outputs.commit }}"
+          fi
+
           docker compose run --rm app python dbcp/cli.py publish-outputs \
             -bq \
             --build-ref ${{ matrix.branch }} \
             --code-git-sha ${{ steps.checkout.outputs.commit }} \
-            --settings-file-git-sha ${{ steps.commit_settings_file.outputs.commit_long_sha }} \
-            --github-action-run-id ${{ github.run_id}}
+            --settings-file-git-sha $SETTINGS_FILE_SHA \
+            --github-action-run-id ${{ github.run_id }}
 
       - name: Stop Docker Compose services
         if: always()
