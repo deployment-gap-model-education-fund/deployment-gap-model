@@ -1,6 +1,7 @@
 """Functions to transform EIP Infrastructure tables."""
 
 import logging
+import re
 from typing import Dict, List, Sequence
 
 import pandas as pd
@@ -25,15 +26,13 @@ def _format_column_names(cols: Sequence[str]) -> List[str]:
     """Convert column names from human friendly to machine friendly.
 
     Args:
-        cols (Sequence[str]): raw column names
+        cols (Sequence[str]): raw column names in camel case
 
     Returns:
         List[str]: list of converted column names
     """
-    out = [
-        (col.lower().replace(" ", "_").replace("(", "").replace(")", ""))
-        for col in cols
-    ]
+    pattern = re.compile(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
+    out = [pattern.sub("_", col).lower().replace("-", "") for col in cols]
     return out
 
 
@@ -69,10 +68,10 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
     fac.columns = _format_column_names(fac.columns)
     rename_dict = {  # add 'raw_' prefix to columns that need transformation
         "id": "facility_id",
-        "modified_on": "raw_modified_on",
-        "created_on": "raw_created_on",
-        "company_id": "raw_company_id",
-        "project_id": "raw_project_id",
+        "updated_at": "raw_modified_on",
+        "created_at": "raw_created_on",
+        # "company_id": "raw_company_id",
+        # "project_id": "raw_project_id",
         "state": "raw_state",
         "state_facility_id_numbers": "raw_state_facility_id_numbers",
         "primary_naics_code": "raw_primary_naics_code",
@@ -80,30 +79,30 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         "street_address": "raw_street_address",
         "city": "raw_city",
         "zip_code": "raw_zip_code",
-        "county_or_parish": "raw_county_or_parish",
-        "associated_facilities_id": "raw_associated_facilities_id",
-        "pipelines_id": "raw_pipelines_id",
-        "air_operating_id": "raw_air_operating_id",
-        "latest_updates": "raw_latest_updates",
-        "cwa-npdes_id": "raw_cwa_npdes_id",
-        "cwa_wetland_id": "raw_cwa_wetland_id",
-        "other_permits_id": "raw_other_permits_id",
-        "congressional_representatives": "raw_congressional_representatives",
-        "estimated_population_within_3_miles": "raw_estimated_population_within_3_miles",
-        "percent_people_of_color_within_3_miles": "raw_percent_people_of_color_within_3_miles",
-        "percent_low-income_within_3_miles": "raw_percent_low_income_within_3_miles",
-        "percent_under_5_years_old_within_3_miles": "raw_percent_under_5_years_old_within_3_miles",
-        "percent_people_over_64_years_old_within_3_miles": "raw_percent_people_over_64_years_old_within_3_miles",
+        "countyor_parish": "raw_county_or_parish",
+        # "associated_facilities_id": "raw_associated_facilities_id",
+        # "pipelines_id": "raw_pipelines_id",
+        # "air_operating_id": "raw_air_operating_id",
+        # "latest_updates": "raw_latest_updates",
+        # "cwa-npdes_id": "raw_cwa_npdes_id",
+        # "cwa_wetland_id": "raw_cwa_wetland_id",
+        # "other_permits_id": "raw_other_permits_id",
+        # "congressional_representatives": "raw_congressional_representatives",
+        "estimated_populationwithin3miles": "raw_estimated_population_within_3_miles",
+        "percent_peopleof_colorwithin3miles": "raw_percent_people_of_color_within_3_miles",
+        "percent_lowincomewithin3miles": "raw_percent_low_income_within_3_miles",
+        "percent_under5years_oldwithin3miles": "raw_percent_under_5_years_old_within_3_miles",
+        "percent_peopleover64years_oldwithin3miles": "raw_percent_people_over_64_years_old_within_3_miles",
         "air_toxics_cancer_risk_nata_cancer_risk": "raw_air_toxics_cancer_risk_nata_cancer_risk",
-        "respiratory_hazard_index": "raw_respiratory_hazard_index",
-        "pm2.5_ug/m3": "raw_pm2_5_ug_per_m3",
-        "o3_ppb": "raw_o3_ppb",
-        "wastewater_discharge_indicator": "raw_wastewater_discharge_indicator",
+        # "respiratory_hazard_index": "raw_respiratory_hazard_index",
+        # "pm2.5_ug/m3": "raw_pm2_5_ug_per_m3",
+        # "o3_ppb": "raw_o3_ppb",
+        # "wastewater_discharge_indicator": "raw_wastewater_discharge_indicator",
         "location": "raw_location",
         "facility_footprint": "raw_facility_footprint",
-        "epa_frs_id": "raw_epa_frs_id",
-        "facility_id": "unknown_id",
-        "ccs/ccus": "raw_is_ccs",
+        "epafrsid1": "raw_epa_frs_id",
+        "id_qaqc": "unknown_id",
+        # "ccs/ccus": "raw_is_ccs",
     }
     fac.rename(columns=rename_dict, inplace=True)
     should_be_numeric = [
