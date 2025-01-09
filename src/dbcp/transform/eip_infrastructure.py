@@ -36,6 +36,22 @@ def _format_column_names(cols: Sequence[str]) -> List[str]:
     return out
 
 
+def _split_xata_column(df: pd.DataFrame) -> pd.DataFrame:
+    """Converts xata JSON string column into separate columns.
+
+    Args:
+        df: DataFrame containing a xata column.
+
+    Returns:
+        DataFrame with xata column split out into individual columns.
+    """
+    if "xata" in df.columns:
+        xata_cols = pd.json_normalize(df.xata.map(eval))
+        df = pd.concat([df, xata_cols], axis="columns")
+        return df.drop("xata", axis="columns")
+    return df
+
+
 def _fix_erroneous_array_items(ser: pd.Series, split_on=",", regex=False) -> pd.Series:
     """Split on a delimiter and preserve only the first value.
 
@@ -65,7 +81,10 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         pd.DataFrame: transformed copy of the raw facilities dataframe
     """
     fac = raw_fac_df.copy()
-    fac.columns = _format_column_names(fac.columns)
+    fac = _split_xata_column(fac)
+    fac.columns = _format_column_names(fac)
+    # Drop facilities that aren't published by EIP
+    fac = fac.loc[fac["published"]]
     rename_dict = {  # add 'raw_' prefix to columns that need transformation
         "id": "facility_id",
         "updated_at": "raw_modified_on",
@@ -80,6 +99,34 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         "city": "raw_city",
         "zip_code": "raw_zip_code",
         "countyor_parish": "raw_county_or_parish",
+        "estimated_populationwithin3miles": "raw_estimated_population_within_3_miles",
+        "percent_peopleof_colorwithin3miles": "raw_percent_people_of_color_within_3_miles",
+        "percent_peopleof_color_percentile": "raw_percentile_people_of_color_within_3_miles",
+        "percent_lowincomewithin3miles": "raw_percent_low_income_within_3_miles",
+        "percent_lowincome_percentile": "raw_percentile_low_income_within_3_miles",
+        "percent_under5years_oldwithin3miles": "raw_percent_under_5_years_old_within_3_miles",
+        "percentunder5years_old_percentile": "raw_percentile_under_5_years_old_within_3_miles",
+        "percent_peopleover64years_oldwithin3miles": "raw_percent_people_over_64_years_old_within_3_miles",
+        "percentover64years_old_percentile": "raw_percentile_people_over_64_years_old_within_3_miles",
+        "air_toxics_cancer_risk_nata_cancer_risk": "raw_air_toxics_cancer_risk_nata_cancer_risk",
+        "air_toxics_cancer_risk_percentile": "raw_air_toxics_cancer_risk_percentile",
+        "location": "raw_location",
+        "facility_footprint": "raw_facility_footprint",
+        "epafrsid1": "raw_epa_frs_id_1",
+        "epafrsid2": "raw_epa_frs_id_2",
+        "epafrsid3": "raw_epa_frs_id_3",
+        "id_qaqc": "unknown_id",
+        # New columns
+        "cancer_prevalence": "raw_percent_cancer_prevalence",
+        "cancer_prevalence_percentile": "raw_percentile_cancer_prevalence",
+        "county_fips_code_text": "raw_county_fips_code",
+        "location": "raw_location",
+        "facility_footprint": "raw_facility_footprint",
+        "epafrsid1": "raw_epa_frs_id_1",
+        "epafrsid2": "raw_epa_frs_id_2",
+        "epafrsid3": "raw_epa_frs_id_3",
+        "id_qaqc": "unknown_id",
+        # FIND THESE!
         # "associated_facilities_id": "raw_associated_facilities_id",
         # "pipelines_id": "raw_pipelines_id",
         # "air_operating_id": "raw_air_operating_id",
@@ -88,90 +135,78 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         # "cwa_wetland_id": "raw_cwa_wetland_id",
         # "other_permits_id": "raw_other_permits_id",
         # "congressional_representatives": "raw_congressional_representatives",
-        "estimated_populationwithin3miles": "raw_estimated_population_within_3_miles",
-        "percent_peopleof_colorwithin3miles": "raw_percent_people_of_color_within_3_miles",
-        "percent_lowincomewithin3miles": "raw_percent_low_income_within_3_miles",
-        "percent_under5years_oldwithin3miles": "raw_percent_under_5_years_old_within_3_miles",
-        "percent_peopleover64years_oldwithin3miles": "raw_percent_people_over_64_years_old_within_3_miles",
-        "air_toxics_cancer_risk_nata_cancer_risk": "raw_air_toxics_cancer_risk_nata_cancer_risk",
+        # "ccs/ccus": "raw_is_ccs",
         # "respiratory_hazard_index": "raw_respiratory_hazard_index",
         # "pm2.5_ug/m3": "raw_pm2_5_ug_per_m3",
         # "o3_ppb": "raw_o3_ppb",
         # "wastewater_discharge_indicator": "raw_wastewater_discharge_indicator",
-        "location": "raw_location",
-        "facility_footprint": "raw_facility_footprint",
-        "epafrsid1": "raw_epa_frs_id",
-        "id_qaqc": "unknown_id",
-        # "ccs/ccus": "raw_is_ccs",
     }
     fac.rename(columns=rename_dict, inplace=True)
     should_be_numeric = [
         "facility_id",
         "raw_estimated_population_within_3_miles",
         "raw_percent_people_of_color_within_3_miles",
+        "raw_percentile_people_of_color_within_3_miles"
         "raw_percent_low_income_within_3_miles",
+        "raw_percentile_low_income_within_3_miles",
         "raw_percent_under_5_years_old_within_3_miles",
+        "raw_percentile_under_5_years_old_within_3_miles",
         "raw_percent_people_over_64_years_old_within_3_miles",
+        "raw_percentile_people_over_64_years_old_within_3_miles",
         "raw_air_toxics_cancer_risk_nata_cancer_risk",
-        "raw_respiratory_hazard_index",
-        "raw_pm2_5_ug_per_m3",
-        "raw_o3_ppb",
-        "raw_wastewater_discharge_indicator",
+        "raw_air_toxics_cancer_risk_percentile",
+        "raw_percent_cancer_prevalence",
+        "raw_percentile_cancer_prevalence",
+        # "raw_respiratory_hazard_index",
+        # "raw_pm2_5_ug_per_m3",
+        # "raw_o3_ppb",
+        # "raw_wastewater_discharge_indicator",
     ]
+    # Check that all columns that should be numeric are
     for col in should_be_numeric:
-        new = _fix_erroneous_array_items(fac[col])
-        fac[col] = pd.to_numeric(new, errors="raise")
-
-    fac.loc[:, "is_ccs"] = _convert_string_to_boolean(fac.loc[:, "raw_is_ccs"])
+        if not pd.is_numeric_dtype(fac[col]):
+            fac[col] = pd.to_numeric(col, errors="raise")
 
     # fix states that are CSV duplicates like "LA, LA"
+    # TODO: There are 3 facilities with multiple states - pick first
+    # logger.info(f"Assigning project to first listed state for {len(fac.loc[(fac.raw_state.str.contains(","))])} projects with multiple states.")
     fac["state"] = _fix_erroneous_array_items(fac["raw_state"])
     fac["state"].replace(["TBD", "TDB", ""], pd.NA, inplace=True)
 
     # fix counties with multiple values
     # Simplify by only taking first county. Only 11 multivalued as of 7/18/2023
+    # logger.info(f"Assigning project to first listed county for {len(fac.loc[(fac.raw_county.str.contains(","))])} projects with multiple counties.")
     fac["county"] = _fix_erroneous_array_items(
         fac["raw_county_or_parish"], split_on=",| and | or ", regex=True
     )
     fac["county"] = fac["county"].astype("string")
-    fac["county"].replace(["TBD", "TDB", ""], pd.NA, inplace=True)
+    fac["county"].replace(
+        ["TBD", "TDB", "TBD County", "TBD Parish", ""], pd.NA, inplace=True
+    )
+    # Strip leading and trailing whitespace
+    fac["county"] = fac["county"].strip()
 
+    # fix county FIPS codes with multiple values
+    # Simplify by only taking first FIPS code.
+    # 26 values as of Jan 9 2025.
+    fac["county_fips_code"] = _fix_erroneous_array_items(fac["raw_county_fips_code"])
+
+    # Geocode, then compare to EIP-provided data
     fac = add_county_fips_with_backup_geocoding(
         fac, state_col="state", locality_col="county"
     )
-    fac.drop(columns=["state", "county"], inplace=True)  # drop intermediates
+    assert len(fac.loc[fac.county_id_fips != fac.county_fips_code]) == 0
 
-    coord_pattern = (
-        r"^POINT\((?P<longitude>\-\d{2,3}\.\d{2,7}) (?P<latitude>\d{2,3}\.\d{2,7})\)"
-    )
-    coords = fac["raw_location"].str.extractall(coord_pattern).droplevel("match")
-    assert coords.shape[0] <= fac.shape[0]  # str.extractall() skips non-matches
-    for col in coords.columns:
-        coords[col] = pd.to_numeric(coords.loc[:, col], errors="raise")
-    # check order is as assumed
-    assert coords["longitude"].max() < 0  # USA longitudes
-    assert coords["latitude"].min() > 0  # USA latitudes
-    fac = fac.join(coords, how="left")
-    assert fac.index.is_unique  # check join didn't duplicate rows
+    fac.drop(
+        columns=["state", "county", "county_fips_code"], inplace=True
+    )  # drop intermediates
+
+    assert fac["longitude"].max() < 0  # USA longitudes
+    assert fac["latitude"].min() > 0  # USA latitudes
 
     fac["date_modified"] = pd.to_datetime(
         fac.loc[:, "raw_modified_on"], infer_datetime_format=True
     )
-
-    duplicative_columns = [  # these are raw names
-        # These columns are just a concatenation of the names and IDs corresponding to
-        # the ID columns. They add no information and invite inconsistency
-        "Company",
-        "Project",
-        "Associated Facilities",
-        "Pipelines",
-        "Air Operating",
-        "CWA-NPDES",
-        "Other Permits",
-        "CCS",
-    ]
-    duplicative_columns = _format_column_names(duplicative_columns)
-    fac.drop(columns=duplicative_columns, inplace=True)
 
     return fac
 

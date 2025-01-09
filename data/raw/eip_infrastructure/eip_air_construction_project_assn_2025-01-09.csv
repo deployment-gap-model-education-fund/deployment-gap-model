@@ -1012,3 +1012,5 @@ AirConstruction,Project,id,id_qaqc,xata
 {'id': 'rec_ct7ihu670ga83rj04l70'},{'id': 'rec_ct7ic0fj4t833ubhts7g'},rec_ct7ii9m4gbv0p11jq3vg,15150,"{'createdAt': '2024-12-03T15:52:06.138998Z', 'updatedAt': '2024-12-03T17:47:46.265715Z', 'version': 1}"
 {'id': 'rec_ctbk7k3cic82fp470evg'},{'id': 'rec_ctbk04rcic82fp46v26g'},rec_ctbk8flqfkdtj0lqmveg,15173,"{'createdAt': '2024-12-09T19:25:50.326739Z', 'updatedAt': '2024-12-10T03:28:02.796726Z', 'version': 1}"
 {'id': 'rec_ctcrkif86psc0rgeokt0'},{'id': 'rec_ctcrh4bifh7okq994570'},rec_ctcrl6rifh7okq995rf0,15190,"{'createdAt': '2024-12-11T16:15:23.462361Z', 'updatedAt': '2024-12-11T17:46:23.804994Z', 'version': 1}"
+{'id': 'rec_ctit0tv86psc0rgrphv0'},{'id': '3080'},rec_ctit1hrifh7okq9nc24g,15234,"{'createdAt': '2024-12-20T20:17:11.666155Z', 'updatedAt': '2024-12-21T03:02:59.893008Z', 'version': 1}"
+{'id': 'rec_ctrh1u2ab52bjrb17uug'},{'id': 'rec_ctrgg3v86psc0rh9flcg'},rec_ctrh2nrifh7okqa7hu90,15266,"{'createdAt': '2025-01-02T22:21:19.094612Z', 'updatedAt': '2025-01-03T03:05:18.540651Z', 'version': 1}"
