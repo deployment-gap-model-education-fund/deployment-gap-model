@@ -8,6 +8,7 @@ from joblib import Memory
 
 from dbcp.constants import FIPS_CODE_VINTAGE
 from dbcp.helpers import add_fips_ids
+from dbcp.transform import geocodio
 from dbcp.transform.geocoding import GoogleGeocoder
 
 UNIX_EPOCH_ORIGIN = pd.Timestamp("01/01/1970")
@@ -299,6 +300,52 @@ def _geocode_locality(
     return new_cols
 
 
+def test_geocode_and_add_fips(
+    nan_fips: pd.DataFrame, state_col="state", locality_col="county", api="geocodio"
+) -> pd.DataFrame:
+    """Geocode locality names in a dataframe and add FIPS codes."""
+    # Deduplicate on the state and locality columns to minimize API calls
+    key_cols = [state_col, locality_col]
+    deduped_nan_fips = nan_fips.loc[:, key_cols].drop_duplicates()
+    if api == "google":
+        deduped_geocoded = _geocode_locality(
+            deduped_nan_fips,
+            # pass subset to _geocode_locality to maximize chance of a cache hit
+            # (this way other columns can change but caching still works)
+            state_col=state_col,
+            locality_col=locality_col,
+        )
+    elif api == "geocodio":
+        deduped_geocoded = geocodio._geocode_locality(
+            deduped_nan_fips,
+            state_col=state_col,
+            locality_col=locality_col,
+        )
+    else:
+        raise ValueError(f"Unknown API: {api}")
+
+    # recombine deduped geocoded data with original nan_fips
+    geocoded_deduped_nan_fips = pd.concat(
+        [deduped_nan_fips[key_cols], deduped_geocoded], axis=1
+    )
+    index_name = nan_fips.index.name
+    index_name = index_name if index_name is not None else "index"
+    geocoded = (
+        nan_fips.reset_index()
+        .merge(geocoded_deduped_nan_fips, on=key_cols, how="left", validate="m:1")
+        .set_index(index_name)[deduped_geocoded.columns]
+    )
+
+    nan_fips = pd.concat([nan_fips, geocoded], axis=1)
+    # add fips using geocoded names
+    return add_fips_ids(
+        nan_fips,
+        state_col=state_col,
+        county_col="geocoded_containing_county",
+        vintage=FIPS_CODE_VINTAGE,
+    )
+
+
 def add_county_fips_with_backup_geocoding(
     state_locality_df: pd.DataFrame, state_col="state", locality_col="county"
 ) -> pd.DataFrame:
@@ -315,6 +362,14 @@ def add_county_fips_with_backup_geocoding(
     Returns:
         pd.DataFrame: copy of state_locality_df with new columns 'geocoded_locality_name', 'geocoded_locality_type', 'geocoded_containing_county'
     """
+    cols_to_keep = [
+        "state_id_fips",
+        "county_id_fips",
+        "geocoded_locality_name",
+        "geocoded_locality_type",
+        "geocoded_containing_county",
+    ]
+
     filled_state_locality = state_locality_df.loc[:, [state_col, locality_col]].fillna(
         ""
     )  # copy
@@ -332,7 +387,8 @@ def add_county_fips_with_backup_geocoding(
         with_fips["geocoded_locality_name"] = with_fips[locality_col]
         with_fips["geocoded_locality_type"] = "county"
         with_fips["geocoded_containing_county"] = with_fips[locality_col]
-        return with_fips
+        # attach to original df
+        return pd.concat([state_locality_df, with_fips[cols_to_keep]], axis=1)
 
     good_fips = with_fips.loc[~fips_is_nan, :].copy()
     # standardize output columns
@@ -343,45 +399,40 @@ def add_county_fips_with_backup_geocoding(
     # geocode the lookup failures - they are often city/town names (instead of counties) or simply mis-spelled
     nan_fips = with_fips.loc[fips_is_nan, :].copy()
 
-    # Deduplicate on the state and locality columns to minimize API calls
-    key_cols = [state_col, locality_col]
-    deduped_nan_fips = nan_fips.loc[:, key_cols].drop_duplicates()
-    deduped_geocoded = _geocode_locality(
-        deduped_nan_fips,
-        # pass subset to _geocode_locality to maximize chance of a cache hit
-        # (this way other columns can change but caching still works)
-        state_col=state_col,
-        locality_col=locality_col,
+    google = test_geocode_and_add_fips(
+        nan_fips, state_col=state_col, locality_col=locality_col, api="google"
     )
-    # recombine deduped geocoded data with original nan_fips
-    geocoded_deduped_nan_fips = pd.concat(
-        [deduped_nan_fips[key_cols], deduped_geocoded], axis=1
-    )
-    index_name = nan_fips.index.name
-    index_name = index_name if index_name is not None else "index"
-    geocoded = (
-        nan_fips.reset_index()
-        .merge(geocoded_deduped_nan_fips, on=key_cols, how="left", validate="m:1")
-        .set_index(index_name)[deduped_geocoded.columns]
+    geocodio = test_geocode_and_add_fips(
+        nan_fips, state_col=state_col, locality_col=locality_col, api="geocodio"
     )
 
-    nan_fips = pd.concat([nan_fips, geocoded], axis=1)
-    # add fips using geocoded names
-    filled_fips = add_fips_ids(
-        nan_fips,
-        state_col=state_col,
-        county_col="geocoded_containing_county",
-        vintage=FIPS_CODE_VINTAGE,
+    # compare geocoding results
+    comp = geocodio.merge(
+        google,
+        how="left",
+        validate="1:1",
+        left_index=True,
+        right_index=True,
+        suffixes=("_geocodio", "_google"),
     )
+    print("--------------------------------")
+    print("Geocoding comparison:")
+    print(
+        comp.county_id_fips_google.eq(comp.county_id_fips_geocodio).value_counts(
+            dropna=False
+        )
+    )
+    # raw_comp = pd.concat(
+    #     [comp, state_locality_df.loc[comp.index]], axis=1
+    # )  # noqa: F841
+    # eq = comp.geocoded_locality_name_geocodio.eq(
+    #     comp.geocoded_locality_name_google
+    # )  # noqa: F841
+    print("--------------------------------")
+
+    filled_fips = geocodio
 
     # recombine and restore row order
-    cols_to_keep = [
-        "state_id_fips",
-        "county_id_fips",
-        "geocoded_locality_name",
-        "geocoded_locality_type",
-        "geocoded_containing_county",
-    ]
     recombined = pd.concat([good_fips, filled_fips], axis=0).loc[
         state_locality_df.index, cols_to_keep
     ]

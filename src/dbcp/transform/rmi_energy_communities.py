@@ -1,4 +1,5 @@
 """Transformations for RMI's energy communities analysis."""
+
 import pandas as pd
 
 from dbcp.transform.helpers import add_county_fips_with_backup_geocoding
@@ -18,6 +19,10 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         "percent_of_county_coal_qualified": "coal_qualifying_area_fraction",
     }
     transformed.rename(columns=rename_dict, inplace=True)
+    transformed["raw_county_name"] = transformed.apply(
+        lambda row: row["raw_county_name"].replace(f", {row['raw_state_name']}", ""),
+        axis=1,
+    )
     # fix two counties whose FIPS changed from 2010 to 2015
     transformed = add_county_fips_with_backup_geocoding(
         transformed, state_col="raw_state_name", locality_col="raw_county_name"
@@ -25,9 +30,10 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     # fix one null FIPS (Villalba Municipio, Puerto Rico)
     fips_is_nan = transformed["county_id_fips"].isna()
+    expected_null_fips = 0
     assert (
-        fips_is_nan.sum() == 1
-    ), f"Assumption violation: expected 1 null FIPS, got {fips_is_nan.sum()}"
+        fips_is_nan.sum() == expected_null_fips
+    ), f"Assumption violation: expected {expected_null_fips} null FIPS, got {fips_is_nan.sum()}"
     transformed.loc[:, "county_id_fips"] = transformed.loc[:, "county_id_fips"].fillna(
         transformed.loc[:, "raw_county_id_fips"]
     )
