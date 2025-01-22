@@ -1,6 +1,8 @@
 """Test suite for dbcp.transform.google_maps module."""
+import pandas as pd
 import pytest
 
+import dbcp.transform.geocodio as geocodio
 from dbcp.transform.google_maps import GoogleGeocoder
 
 
@@ -294,3 +296,81 @@ def test_GoogleGeocoder_init_and_properties():
     full = GoogleGeocoder()
     full._response = mock_geocoder_town_and_county()._response
     assert full.locality_name == "Westport"
+
+
+@pytest.mark.parametrize(
+    "raw_localities, expected",
+    [
+        pytest.param(
+            {"state": "ny", "county": "richmond-nj"},
+            {
+                "geocoded_locality_name": "Richmond County",
+                "geocoded_locality_type": "county",
+                "geocoded_containing_county": "Richmond County",
+            },
+        ),
+        (
+            {"state": "ny", "county": "renssalear"},
+            {
+                "geocoded_locality_name": "Rensselaer",
+                "geocoded_locality_type": "city",
+                "geocoded_containing_county": "Rensselaer County",
+            },
+        ),
+        (
+            {"state": "me", "county": "fairfield"},
+            {
+                "geocoded_locality_name": "Fairfield",
+                "geocoded_locality_type": "city",
+                "geocoded_containing_county": "Somerset County",
+            },
+        ),
+        pytest.param(
+            {"state": "nc", "county": "northhampton"},
+            {
+                "geocoded_locality_name": "Northampton County",
+                "geocoded_locality_type": "county",
+                "geocoded_containing_county": "Northampton County",
+            },
+        ),
+        pytest.param(
+            {"state": "co", "county": "rio arriba"},
+            {
+                "geocoded_locality_name": "Rio Arriba County",
+                "geocoded_locality_type": "county",
+                "geocoded_containing_county": "Rio Arriba County",
+            },
+            marks=pytest.mark.xfail(
+                reason="There is an Arriba city in Colorado but there is a Rio Arriba County in NM."
+            ),
+        ),
+        pytest.param(
+            {"state": "ca", "county": "Sonoma"},
+            {
+                "geocoded_locality_name": "Sonoma",
+                "geocoded_locality_type": "city",
+                "geocoded_containing_county": "Sonoma County",
+            },
+        ),
+        pytest.param(
+            {"state": "XX", "county": "Random locality name"},
+            {
+                "geocoded_locality_name": "",
+                "geocoded_locality_type": "",
+                "geocoded_containing_county": "",
+            },
+        ),
+    ],
+)
+def test_geocodio_geocode_locality(raw_localities, expected):
+    """Test the geocode_locality() method."""
+    # create dataframe from raw_localities
+    df = pd.DataFrame([raw_localities])
+    # geocode locality
+    result = geocodio._geocode_locality.func(
+        df, state_col="state", locality_col="county"
+    )
+    # create expected dataframe from expected dict
+    expected_df = pd.DataFrame([expected])
+    # test equality
+    pd.testing.assert_frame_equal(result, expected_df)

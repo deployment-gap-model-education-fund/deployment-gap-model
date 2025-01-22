@@ -68,10 +68,8 @@ def _geocode_batch(
     Returns:
         dataframe with geocoded locality information
     """
-    batch = batch.rename(columns={locality_col: "city", state_col: "state"})
-    batch["country"] = "US"
-    components_data = batch.to_dict(orient="records")
-    results = client.geocode(components_data=components_data)
+    batch["address"] = batch[locality_col] + ", " + batch[state_col]
+    results = client.geocode(batch["address"].tolist())
 
     results_df = []
     for result in results:

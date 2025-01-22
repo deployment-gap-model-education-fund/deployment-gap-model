@@ -1,5 +1,6 @@
 """Common transform operations."""
 
+import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -9,6 +10,8 @@ from joblib import Memory
 from dbcp.constants import FIPS_CODE_VINTAGE
 from dbcp.helpers import add_fips_ids
 from dbcp.transform import geocodio, google_maps
+
+logger = logging.getLogger(__name__)
 
 UNIX_EPOCH_ORIGIN = pd.Timestamp("01/01/1970")
 # Excel parser is simplified and will be one day off for dates < 1900/03/01
@@ -310,7 +313,10 @@ def _geocode_and_add_fips(
 
 
 def add_county_fips_with_backup_geocoding(
-    state_locality_df: pd.DataFrame, state_col="state", locality_col="county"
+    state_locality_df: pd.DataFrame,
+    state_col="state",
+    locality_col="county",
+    debug=False,
 ) -> pd.DataFrame:
     """Add state and county FIPS codes to a DataFrame with state and locality columns.
 
@@ -362,9 +368,38 @@ def add_county_fips_with_backup_geocoding(
     # geocode the lookup failures - they are often city/town names (instead of counties) or simply mis-spelled
     nan_fips = with_fips.loc[fips_is_nan, :].copy()
 
-    filled_fips = _geocode_and_add_fips(
+    # Compare google and geocodio results
+    geocodio_df = _geocode_and_add_fips(
         nan_fips, state_col=state_col, locality_col=locality_col, api="geocodio"
     )
+    if debug:
+        google_df = _geocode_and_add_fips(
+            nan_fips, state_col=state_col, locality_col=locality_col, api="google"
+        )
+
+        # combine the two geocoded dataframes
+        comp = geocodio_df.merge(
+            google_df,
+            left_index=True,
+            right_index=True,
+            how="outer",
+            validate="1:1",
+            suffixes=("_geocodio", "_google"),
+        )
+
+        county_eq = comp.geocoded_containing_county_geocodio.eq(
+            comp.geocoded_containing_county_google
+        )
+        logger.info("---------------------")
+        logger.info(
+            f"---- pct of geocoded fip failures that don't match: {(~county_eq).sum() / len(comp)}"
+        )
+        logger.info(
+            f"---- pct of all records that don't have the same county: {(~county_eq).sum() / len(state_locality_df)}"
+        )
+        logger.info("---------------------")
+
+    filled_fips = geocodio_df
 
     # recombine and restore row order
     recombined = pd.concat([good_fips, filled_fips], axis=0).loc[
