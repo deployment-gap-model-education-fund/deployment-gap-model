@@ -19,6 +19,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         "percent_of_county_coal_qualified": "coal_qualifying_area_fraction",
     }
     transformed.rename(columns=rename_dict, inplace=True)
+    # Some county entries have the state name appended to the county name which confuses the geocoder
     transformed["raw_county_name"] = transformed.apply(
         lambda row: row["raw_county_name"].replace(f", {row['raw_state_name']}", ""),
         axis=1,

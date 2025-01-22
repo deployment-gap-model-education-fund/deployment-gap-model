@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 from geocodio import GeocodioClient
+from geocodio.exceptions import GeocodioAuthError
 from joblib import Memory
 from pydantic import BaseModel
 
@@ -65,7 +66,12 @@ def _geocode_batch(
         dataframe with geocoded locality information
     """
     batch["address"] = batch[locality_col] + ", " + batch[state_col]
-    results = client.geocode(batch["address"].tolist())
+    try:
+        results = client.geocode(batch["address"].tolist())
+    except GeocodioAuthError:
+        raise GeocodioAuthError(
+            "Geocodio API key is invalid or you hit the daily geocoding limit which you can change in the Geocodio billing tab."
+        )
 
     results_df = []
     for result in results:
