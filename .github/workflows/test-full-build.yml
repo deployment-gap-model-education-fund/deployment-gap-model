@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      API_KEY_GOOGLE_MAPS: ${{ secrets.API_KEY_GOOGLE_MAPS }}
+      GEOCODIO_API_KEY: ${{ secrets.GEOCODIO_API_KEY }}
 
     steps:
       - name: Check out code

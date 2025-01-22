@@ -16,7 +16,7 @@ from dbcp.extract.fips_tables import CENSUS_URI, TRIBAL_LANDS_URI
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.helpers import enforce_dtypes, psql_insert_copy
 from dbcp.transform.fips_tables import SPATIAL_CACHE
-from dbcp.transform.helpers import GEOCODER_CACHE
+from dbcp.transform.helpers import GEOCODER_CACHES
 from dbcp.validation.tests import validate_warehouse
 
 logger = logging.getLogger(__name__)
@@ -244,7 +244,7 @@ def run_etl(funcs: dict[str, Callable], schema_name: str):
 def etl():
     """Run dbc ETL."""
     # Reduce size of caches if necessary
-    GEOCODER_CACHE.reduce_size()
+    GEOCODER_CACHES.reduce_cache_sizes()
     SPATIAL_CACHE.reduce_size()
 
     # Run public ETL functions

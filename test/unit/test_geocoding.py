@@ -1,7 +1,7 @@
-"""Test suite for dbcp.transform.geocoding module."""
+"""Test suite for dbcp.transform.google_maps module."""
 import pytest
 
-from dbcp.transform.geocoding import GoogleGeocoder
+from dbcp.transform.google_maps import GoogleGeocoder
 
 
 class mock_geocoder(GoogleGeocoder):
