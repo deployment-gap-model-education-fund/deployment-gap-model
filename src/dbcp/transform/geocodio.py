@@ -8,14 +8,10 @@ from geocodio import GeocodioClient
 from joblib import Memory
 from pydantic import BaseModel
 
-try:  # docker path
-    # 3 directories above current module
-    geocoder_local_cache = Path("/app/data/geocodio_cache")
-    assert geocoder_local_cache.exists()
-except AssertionError:  # local path
-    # 4 directories above current module
-    geocoder_local_cache = Path(__file__).resolve().parents[3] / "data/geocodio_cache"
-    assert geocoder_local_cache.exists()
+geocoder_local_cache = Path("/app/data/geocodio_cache")
+# create geocoder_local_cache if it doesn't exist
+geocoder_local_cache.mkdir(parents=True, exist_ok=True)
+assert geocoder_local_cache.exists()
 # cache needs to be accessed outside this module to call .clear()
 # limit cache size to 100 KB, keeps most recently accessed first
 GEOCODER_CACHE = Memory(location=geocoder_local_cache, bytes_limit=2**19)
