@@ -89,7 +89,10 @@ class AddressData(BaseModel):
         """
         if self.accuracy_type == "place":
             return "city"
-        return self.accuracy_type
+        elif self.accuracy_type == "county":
+            return "county"
+        else:
+            return None
 
 
 def _geocode_batch(
