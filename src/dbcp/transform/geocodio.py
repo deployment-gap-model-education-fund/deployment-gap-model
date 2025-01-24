@@ -1,54 +1,95 @@
 """Geocodio geocoding functions."""
 
 import os
+from enum import Enum
 from pathlib import Path
 
 import pandas as pd
 from geocodio import GeocodioClient
 from geocodio.exceptions import GeocodioAuthError
 from joblib import Memory
-from pydantic import BaseModel
+from pydantic import BaseModel, confloat
 
 geocoder_local_cache = Path("/app/data/geocodio_cache")
 # create geocoder_local_cache if it doesn't exist
 geocoder_local_cache.mkdir(parents=True, exist_ok=True)
 assert geocoder_local_cache.exists()
 # cache needs to be accessed outside this module to call .clear()
-# limit cache size to 100 KB, keeps most recently accessed first
+# limit cache size to keep most recently accessed first
 GEOCODER_CACHE = Memory(location=geocoder_local_cache, bytes_limit=2**19)
 
 
 class AddressComponents(BaseModel):
     """Address components from Geocodio."""
 
-    number: str = ""
-    predirectional: str = ""
-    street: str = ""
-    suffix: str = ""
-    formatted_street: str = ""
-    city: str = ""
-    county: str = ""
-    state: str = ""
-    zip: str = ""  # noqa: A003
-    country: str = ""
+    number: str | None = None
+    predirectional: str | None = None
+    street: str | None = None
+    suffix: str | None = None
+    formatted_street: str | None = None
+    city: str | None = None
+    county: str | None = None
+    state: str | None = None
+    zip: str | None = None  # noqa: A003
+    country: str | None = None
 
 
 class Location(BaseModel):
     """Location from Geocodio."""
 
-    lat: float = 0.0
-    lng: float = 0.0
+    lat: float
+    lng: float
+
+
+class AccuracyType(str, Enum):
+    """
+    Accuracy types from Geocodio.
+
+    Valid values are documented at https://www.geocod.io/guides/accuracy-types-scores/
+    """
+
+    rooftop = "rooftop"
+    point = "point"
+    range_interpolation = "range_interpolation"
+    nearest_rooftop_match = "nearest_rooftop_match"
+    intersection = "intersection"
+    street_center = "street_center"
+    place = "place"
+    county = "county"
+    state = "state"
 
 
 class AddressData(BaseModel):
     """Address data from Geocodio."""
 
     address_components: AddressComponents
-    formatted_address: str = ""
+    formatted_address: str
     location: Location
-    accuracy: float = 0.0
-    accuracy_type: str = ""
-    source: str = ""
+    accuracy: confloat(ge=0, le=1)
+    accuracy_type: AccuracyType
+    source: str
+
+    @property
+    def locality_name(self) -> str:
+        """Create a locality name based on the accuracy type."""
+        if self.accuracy_type == "place":
+            return self.address_components.city
+        elif self.accuracy_type == "county":
+            return self.address_components.county
+        else:
+            # We only care about cities and counties.
+            return None
+
+    @property
+    def locality_type(self) -> str:
+        """Geocodio places cities into the generic 'place' type.
+
+        Historically we've only dealt with counties and cities. This function
+        converts 'place' to 'city' for consistency.
+        """
+        if self.accuracy_type == "place":
+            return "city"
+        return self.accuracy_type
 
 
 def _geocode_batch(
@@ -75,23 +116,15 @@ def _geocode_batch(
 
     results_df = []
     for result in results:
-        if "error" in result:
-            results_df.append(["", "", ""])
-        elif result["results"]:
+        if result.get("results"):
+            # The results are always ordered with the most accurate locations first.
+            # It is therefore always safe to pick the first result in the list.
             ad = AddressData.parse_obj(result["results"][0])
-            locality_type = ad.accuracy_type
-            if locality_type == "place":
-                locality_name = ad.address_components.city
-                locality_type = "city"
-            elif locality_type == "county":
-                locality_name = ad.address_components.county
-            else:
-                locality_name = ""
             results_df.append(
-                [locality_name, locality_type, ad.address_components.county]
+                [ad.locality_name, ad.locality_type, ad.address_components.county]
             )
         else:
-            results_df.append(["", "", ""])
+            results_df.append([None, None, None])
 
     results_df = pd.DataFrame(
         results_df,

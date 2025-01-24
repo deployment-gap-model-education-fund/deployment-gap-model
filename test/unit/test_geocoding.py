@@ -355,9 +355,9 @@ def test_GoogleGeocoder_init_and_properties():
         pytest.param(
             {"state": "XX", "county": "Random locality name"},
             {
-                "geocoded_locality_name": "",
-                "geocoded_locality_type": "",
-                "geocoded_containing_county": "",
+                "geocoded_locality_name": None,
+                "geocoded_locality_type": None,
+                "geocoded_containing_county": None,
             },
         ),
     ],

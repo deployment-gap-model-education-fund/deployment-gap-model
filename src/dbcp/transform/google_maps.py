@@ -18,7 +18,7 @@ geocoder_local_cache = Path("/app/data/google_geocoder_cache")
 geocoder_local_cache.mkdir(parents=True, exist_ok=True)
 assert geocoder_local_cache.exists()
 # cache needs to be accessed outside this module to call .clear()
-# limit cache size to 100 KB, keeps most recently accessed first
+# limit cache size to keep most recently accessed first
 GEOCODER_CACHE = Memory(location=geocoder_local_cache, bytes_limit=2**19)
 
 
