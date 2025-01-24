@@ -108,26 +108,27 @@ def _geocode_batch(
     """
     batch["address"] = batch[locality_col] + ", " + batch[state_col]
     try:
-        results = client.geocode(batch["address"].tolist())
+        responses = client.geocode(batch["address"].tolist())
     except GeocodioAuthError:
         raise GeocodioAuthError(
             "Geocodio API key is invalid or you hit the daily geocoding limit which you can change in the Geocodio billing tab."
         )
 
-    results_df = []
-    for result in results:
-        if result.get("results"):
+    geocoded_localities = []
+    for r in responses:
+        results = r.get("results")
+        if results:
             # The results are always ordered with the most accurate locations first.
             # It is therefore always safe to pick the first result in the list.
-            ad = AddressData.parse_obj(result["results"][0])
-            results_df.append(
+            ad = AddressData.parse_obj(results[0])
+            geocoded_localities.append(
                 [ad.locality_name, ad.locality_type, ad.address_components.county]
             )
         else:
-            results_df.append([None, None, None])
+            geocoded_localities.append([None, None, None])
 
-    results_df = pd.DataFrame(
-        results_df,
+    geocoded_localities = pd.DataFrame(
+        geocoded_localities,
         columns=[
             "geocoded_locality_name",
             "geocoded_locality_type",
@@ -135,12 +136,12 @@ def _geocode_batch(
         ],
         index=batch.index,
     )
-    return results_df
+    return geocoded_localities
 
 
 @GEOCODER_CACHE.cache()
 def _geocode_locality(
-    state_locality_df: pd.DataFrame,
+    localities: pd.DataFrame,
     state_col: str = "state",
     locality_col: str = "county",
     batch_size: int = 100,
@@ -148,7 +149,7 @@ def _geocode_locality(
     """Geocode locality names in a dataframe.
 
     Args:
-        state_locality_df: dataframe with state and locality columns
+        localities: dataframe with state and locality columns
         state_col: name of the state column
         locality_col: name of the locality column
         batch_size: number of rows to geocode at once
@@ -158,9 +159,9 @@ def _geocode_locality(
     GEOCODIO_API_KEY = os.environ["GEOCODIO_API_KEY"]
     client = GeocodioClient(GEOCODIO_API_KEY)
 
-    geocoded_df = []
+    geocoded_results = []
 
-    for start in range(0, len(state_locality_df), batch_size):
-        batch = state_locality_df.iloc[start : start + batch_size]  # noqa: E203
-        geocoded_df.append(_geocode_batch(batch, client, state_col, locality_col))
-    return pd.concat(geocoded_df)
+    for start in range(0, len(localities), batch_size):
+        batch = localities.iloc[start : start + batch_size]  # noqa: E203
+        geocoded_results.append(_geocode_batch(batch, client, state_col, locality_col))
+    return pd.concat(geocoded_results)
