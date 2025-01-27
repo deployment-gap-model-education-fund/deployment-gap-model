@@ -1,9 +1,11 @@
 """Test suite for dbcp.transform.google_maps module."""
+
 import pandas as pd
 import pytest
 
 import dbcp.transform.geocodio as geocodio
 from dbcp.transform.google_maps import GoogleGeocoder
+from dbcp.transform.helpers import add_county_fips_with_backup_geocoding
 
 
 class mock_geocoder(GoogleGeocoder):
@@ -374,3 +376,62 @@ def test_geocodio_geocode_locality(raw_localities, expected):
     expected_df = pd.DataFrame([expected])
     # test equality
     pd.testing.assert_frame_equal(result, expected_df)
+
+
+@pytest.mark.parametrize(
+    "input_data, expected_data",
+    [
+        # Test the dataframe is properly reconstructuted when no geocoding is needed
+        pytest.param(
+            {
+                "state": ["NY", "CA"],
+                "county": ["Tompkins", "Alameda"],
+                "metric": [1, 2],
+            },
+            {
+                "state": ["NY", "CA"],
+                "county": ["Tompkins", "Alameda"],
+                "metric": [1, 2],
+                "state_id_fips": ["36", "06"],
+                "county_id_fips": ["36109", "06001"],
+                "geocoded_locality_name": ["Tompkins", "Alameda"],
+                "geocoded_locality_type": ["county", "county"],
+                "geocoded_containing_county": ["Tompkins", "Alameda"],
+            },
+        ),
+        # Test add fips and geocded records are being combined properly
+        pytest.param(
+            {
+                "state": ["NY", "CA", "NY"],
+                "county": ["Tompkins", "Alameda", "Rchmond"],
+                "metric": [1, 2, 3],
+            },
+            {
+                "state": ["NY", "CA", "NY"],
+                "county": ["Tompkins", "Alameda", "Rchmond"],
+                "metric": [1, 2, 3],
+                "state_id_fips": ["36", "06", "36"],
+                "county_id_fips": ["36109", "06001", "36085"],
+                "geocoded_locality_name": ["Tompkins", "Alameda", "Richmond County"],
+                "geocoded_locality_type": ["county", "county", "county"],
+                "geocoded_containing_county": [
+                    "Tompkins",
+                    "Alameda",
+                    "Richmond County",
+                ],
+            },
+        ),
+    ],
+)
+def test_add_county_fips_with_backup_geocoding(input_data, expected_data):
+    """Test the add_county_fips_with_backup_geocoding() function."""
+    # create dataframe from input_data
+    input_df = pd.DataFrame(input_data).convert_dtypes()
+    # geocode locality
+    result = add_county_fips_with_backup_geocoding(
+        input_df, state_col="state", locality_col="county"
+    )
+    # create expected dataframe from expected_data
+    expected = pd.DataFrame(expected_data).convert_dtypes()
+    # test equality
+    pd.testing.assert_frame_equal(result, expected)
