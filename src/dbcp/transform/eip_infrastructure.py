@@ -109,12 +109,16 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         "estimated_populationwithin3miles": "raw_estimated_population_within_3_miles",
         "percent_peopleof_colorwithin3miles": "raw_percent_people_of_color_within_3_miles",
         "percent_peopleof_color_percentile": "raw_percentile_people_of_color_within_3_miles",
+        "percent_peopleof_color_national_average": "percent_people_of_color_national_average",
         "percent_lowincomewithin3miles": "raw_percent_low_income_within_3_miles",
         "percent_lowincome_percentile": "raw_percentile_low_income_within_3_miles",
+        "percent_lowincome_national_average": "percent_low_income_national_average",
         "percentunder5years_oldwithin3miles": "raw_percent_under_5_years_old_within_3_miles",
         "percentunder5years_old_percentile": "raw_percentile_under_5_years_old_within_3_miles",
+        "percentunder5years_old_national_average": "percent_under_5_years_old_national_average",
         "percent_peopleover64years_oldwithin3miles": "raw_percent_people_over_64_years_old_within_3_miles",
         "percentover64years_old_percentile": "raw_percentile_people_over_64_years_old_within_3_miles",
+        "percentover64years_old_national_average": "percent_people_over_64_years_old_national_average",
         "air_toxics_cancer_risk_nata_cancer_risk": "raw_air_toxics_cancer_risk_nata_cancer_risk",
         "air_toxics_cancer_risk_percentile": "raw_air_toxics_cancer_risk_percentile",
         "location": "raw_location",
@@ -123,6 +127,7 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         "epafrsid2": "raw_epa_frs_id_2",
         "epafrsid3": "raw_epa_frs_id_3",
         "id_qaqc": "unknown_id",
+        "linkto_ejscreen_report": "link_to_ejscreen_report",
         # New columns
         "cancer_prevalence": "raw_percent_cancer_prevalence",
         "cancer_prevalence_percentile": "raw_percentile_cancer_prevalence",
@@ -254,7 +259,6 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
         "project_costmillion": "cost_millions",
         "project_type": "raw_project_type",
         "product_type": "raw_product_type",
-        "classification": "raw_classification",  # NEW
         # "target_list": "raw_is_ally_target",
         # add tons per year units
         "sulfur_dioxide_so2": "sulfur_dioxide_so2_tpy",
@@ -345,6 +349,15 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
         proj.loc[:, "raw_industry_sector"].str.split(",", n=1).str[0]
     ).astype("string")
 
+    # Coerce lists to strings for SQL
+    proj[
+        ["operating_status_source_documents", "operating_status_source_documents_old"]
+    ] = proj[
+        ["operating_status_source_documents", "operating_status_source_documents_old"]
+    ].astype(
+        str
+    )
+
     # duplicative_columns = [  # these are raw names
     #     # These columns are just a concatenation of the names and IDs corresponding to the ID columns
     #     # They add no information but invite inconsistency
@@ -376,26 +389,21 @@ def air_construction_transform(raw_air_constr_df: pd.DataFrame) -> pd.DataFrame:
     # there are 7 columns with facility-wide criteria pollutant metrics, but they are
     # almost all null.
     air.drop(
-        columns=[col for col in air.columns if col.startswith("facilitywide_pte:")],
+        columns=[col for col in air.columns if col.startswith("facilitywide_pte")],
         inplace=True,
     )
     rename_dict = {  # add 'raw_' prefix to columns that need transformation
         "id": "air_construction_id",
         "id_qaqc": "unknown_id",
-        # 'name',
         "created_at": "raw_created_on",
         "updated_at": "raw_modified_on",
         "date_last_checked": "raw_date_last_checked",
-        # "project_id": "raw_project_id",
-        # "project",
         "permit_status": "raw_permit_status",
         "application_date": "raw_application_date",
         "draft_permit_issuance_date": "raw_draft_permit_issuance_date",
         "last_dayto_comment": "raw_last_day_to_comment",
         "final_permit_issuance_date": "raw_final_permit_issuance_date",
         "deadlineto_begin_construction": "raw_deadline_to_begin_construction",
-        # 'description',
-        # 'detailed_permitting_history',
     }
     air.rename(columns=rename_dict, inplace=True)
 
@@ -410,6 +418,11 @@ def air_construction_transform(raw_air_constr_df: pd.DataFrame) -> pd.DataFrame:
         val_to_replace="Withdrawn (UARG v. EPA 134 S. Ct. 2427 (2014))",
         replacement="Withdrawn",
         expected_count=14,
+    )
+
+    # Coerce lists to strings for SQL
+    air[["documents", "documents_old"]] = air[["documents", "documents_old"]].astype(
+        str
     )
 
     return air
@@ -450,15 +463,41 @@ def facilities_project_assn_transform(
     fac_proj = fac_proj.loc[fac_proj.Project.notnull()].reset_index(drop=True)
 
     for col in ["xata", "Facility", "Project"]:
-        fac_proj = _split_json_column(fac_proj, col=col, prefix=f"{col.lower()}_")
+        prefix = "" if col == "xata" else f"{col.lower()}_"
+        fac_proj = _split_json_column(fac_proj, col=col, prefix=prefix)
 
     fac_proj.columns = _format_column_names(fac_proj.columns)
 
-    rename_dict = {  # add 'raw_' prefix to columns that need transformation
+    # We only keep published facilities in the facilities table.
+    # Drop unpublished facilities, which are causing FK problems.
+    # https://oilandgaswatch.org/xata-api/01-00_FACILITIES/data/5608
+    # https://oilandgaswatch.org/xata-api/01-00_FACILITIES/data/6612
+    # https://oilandgaswatch.org/xata-api/01-00_FACILITIES/data/6683
+    # https://oilandgaswatch.org/xata-api/01-00_FACILITIES/data/7365
+    # https://oilandgaswatch.org/xata-api/01-00_FACILITIES/data/6658
+    # https://oilandgaswatch.org/xata-api/01-00_FACILITIES/data/rec_cp5p46vn1jkikfutr9jg
+    # TODO: Look into: https://oilandgaswatch.org/xata-api/01-00_FACILITIES/data/rec_cti6ekqab52bjrah4m4g
+    fac_proj = fac_proj.loc[
+        ~fac_proj.facility_id.isin(
+            ["5608", "6612", "6683", "7365", "6658", "rec_cp5p46vn1jkikfutr9jg"]
+        )
+    ]
+
+    rename_dict = {
         "id": "connection_id",
         "id_qaqc": "connection_unknown_id",
+        "updated_at": "raw_updated_at",
+        "created_at": "raw_created_at",
     }
     fac_proj.rename(columns=rename_dict, inplace=True)
+
+    fac_proj["date_modified"] = pd.to_datetime(  # ignore other date columns for now
+        fac_proj.loc[:, "raw_updated_at"], infer_datetime_format=True
+    )
+
+    fac_proj["date_created"] = pd.to_datetime(  # ignore other date columns for now
+        fac_proj.loc[:, "raw_created_at"], infer_datetime_format=True
+    )
 
     return fac_proj
 
@@ -504,7 +543,8 @@ def project_permit_assn_transform(
     )
 
     for col in ["xata", "Project", "AirConstruction"]:
-        proj_perm = _split_json_column(proj_perm, col=col, prefix=f"{col.lower()}_")
+        prefix = "" if col == "xata" else f"{col.lower()}_"
+        proj_perm = _split_json_column(proj_perm, col=col, prefix=prefix)
 
     proj_perm.columns = _format_column_names(proj_perm.columns)
 
@@ -512,8 +552,18 @@ def project_permit_assn_transform(
         "id": "connection_id",
         "id_qaqc": "connection_unknown_id",
         "airconstruction_id": "air_construction_id",
+        "updated_at": "raw_updated_at",
+        "created_at": "raw_created_at",
     }
     proj_perm.rename(columns=rename_dict, inplace=True)
+
+    proj_perm["date_modified"] = pd.to_datetime(  # ignore other date columns for now
+        proj_perm.loc[:, "raw_updated_at"], infer_datetime_format=True
+    )
+
+    proj_perm["date_created"] = pd.to_datetime(  # ignore other date columns for now
+        proj_perm.loc[:, "raw_created_at"], infer_datetime_format=True
+    )
 
     return proj_perm
 

@@ -28,6 +28,18 @@ from typing import Dict
 import numpy as np
 import pandas as pd
 
+from dbcp.extract.helpers import cache_gcs_archive_file_locally
+
+FILE_NAME_DICT = {
+    "eip_air_construction_permits",
+    "eip_air_construction_project_assn",
+    "eip_facilities",
+    "eip_facility_project_assn",
+    "eip_projects",
+}
+
+DATE = "2025-01-09"
+
 
 def _convert_object_to_string_dtypes(df: pd.DataFrame) -> None:
     strings = df.select_dtypes("object")
@@ -54,14 +66,16 @@ def extract(path: Path) -> Dict[str, pd.DataFrame]:
     Returns:
         Dict[str, pd.DataFrame]: output dictionary of dataframes
     """
-    files = Path(path).glob("*.csv")  # Get all CSV files in folder
     raw_dfs = {}
 
-    for file in files:
-        df = pd.read_csv(file)
+    for file in FILE_NAME_DICT:
+        file_name = f"{file}_{DATE}.csv"
+        uri = f"gs://dgm-archive/eip_infrastructure/{file_name}"
+        path = cache_gcs_archive_file_locally(uri=uri)
+        df = pd.read_csv(path)
         _convert_object_to_string_dtypes(df)
         _downcast_ints(df)
         # Get the first part of the name (e.g. eip_air_construction_permits) as the key
-        raw_dfs[file.name.rsplit("_", 1)[0]] = df
+        raw_dfs[file_name.rsplit("_", 1)[0]] = df
 
     return raw_dfs
