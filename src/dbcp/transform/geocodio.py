@@ -2,7 +2,6 @@
 
 import os
 from enum import Enum
-from pathlib import Path
 
 import pandas as pd
 from geocodio import GeocodioClient
@@ -10,7 +9,9 @@ from geocodio.exceptions import GeocodioAuthError
 from joblib import Memory
 from pydantic import BaseModel, confloat
 
-geocoder_local_cache = Path("/app/data/geocodio_cache")
+from dbcp.constants import DATA_DIR
+
+geocoder_local_cache = DATA_DIR / "geocodio_cache"
 # create geocoder_local_cache if it doesn't exist
 geocoder_local_cache.mkdir(parents=True, exist_ok=True)
 assert geocoder_local_cache.exists()
