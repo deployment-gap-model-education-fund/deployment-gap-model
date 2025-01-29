@@ -388,9 +388,7 @@ def add_county_fips_with_backup_geocoding(
             suffixes=("_geocodio", "_google"),
         )
 
-        county_eq = comp.geocoded_containing_county_geocodio.eq(
-            comp.geocoded_containing_county_google
-        )
+        county_eq = comp.county_id_fips_geocodio.eq(comp.county_id_fips_google)
         logger.info("---------------------")
         logger.info(
             f"---- pct of geocoded fip failures that don't match: {(~county_eq).sum() / len(comp)}"
