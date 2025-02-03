@@ -281,7 +281,7 @@ def test_county_long_vs_wide(engine: Engine):
         "Coal",
         "Oil",  # this name is shared between both power and infra
         "Liquefied Natural Gas",
-        "Synthetic Fertilizers",
+        "Ammonia and Synthetic Fertilizers",
         "Petrochemicals and Plastics",
     }
     string_wrapped = (f"'{item}'" for item in resources_to_keep)

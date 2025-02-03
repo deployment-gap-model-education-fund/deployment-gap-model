@@ -490,7 +490,11 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         {"fossil infrastructure": "infra", "power plant": ""}
     )
     long.loc[:, "resource_or_sector"] = long.loc[:, "resource_or_sector"].replace(
-        {"Natural Gas": "gas", "Liquefied Natural Gas": "lng"}
+        {
+            "Natural Gas": "gas",
+            "Liquefied Natural Gas": "lng",
+            "Ammonia and Synthetic Fertilizers": "ammonia_synth_fertilizers",
+        }
     )
     long.loc[:, "resource_or_sector"] = (
         long.loc[:, "resource_or_sector"].str.lower().str.replace(" ", "_", regex=False)
@@ -573,7 +577,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "lng",
         "oil",
         "petrochemicals_and_plastics",
-        "ammonia_and_synthetic_fertilizers",
+        "ammonia_synth_fertilizers",
     ]
     for measure in measures:
         infra_cols_to_sum = [f"infra_{sector}_{measure}" for sector in sectors]
