@@ -119,10 +119,10 @@ Fossil generation aggregates include coal, oil, and gas power plants.
 ||`infra_petrochemicals_and_plastics_proposed_facility_count`|Number of existing infrastructure facilities in the petrochemicals and plastics sector, excluding fertilizers.|EIP||
 ||`infra_petrochemicals_and_plastics_proposed_nox_tonnes_per_year`|Annual NOx emissions from all proposed petrochemical and plastics infrastructure projects, in metric tonnes.|EIP||
 ||`infra_petrochemicals_and_plastics_proposed_pm2_5_tonnes_per_yea`|Annual PM2.5 emissions from all proposed petrochemical and plastics infrastructure projects, in metric tonnes.|EIP||
-||`infra_synthetic_fertilizers_proposed_co2e_tonnes_per_year`|Annual CO2 equivalent emissions from proposed fertilizer infrastructure, in metric tonnes.|EIP||
-||`infra_synthetic_fertilizers_proposed_facility_count`|Number of existing infrastructure facilities in the fertilizers sector.|EIP||
-||`infra_synthetic_fertilizers_proposed_nox_tonnes_per_year`|Annual NOx emissions from all proposed fossil infrastructure projects, in metric tonnes.|EIP||
-||`infra_synthetic_fertilizers_proposed_pm2_5_tonnes_per_year`|Annual PM2.5 emissions from all proposed fossil infrastructure projects, in metric tonnes.|EIP||
+||`infra_ammonia_and_synthetic_fertilizers_proposed_co2e_tonnes_per_year`|Annual CO2 equivalent emissions from proposed fertilizer infrastructure, in metric tonnes.|EIP||
+||`infra_ammonia_and_synthetic_fertilizers_proposed_facility_count`|Number of existing infrastructure facilities in the fertilizers sector.|EIP||
+||`infra_ammonia_and_synthetic_fertilizers_proposed_nox_tonnes_per_year`|Annual NOx emissions from all proposed fossil infrastructure projects, in metric tonnes.|EIP||
+||`infra_ammonia_and_synthetic_fertilizers_proposed_pm2_5_tonnes_per_year`|Annual PM2.5 emissions from all proposed fossil infrastructure projects, in metric tonnes.|EIP||
 |Regulatory|`ordinance_text`|Summary text of the local ordinances in the given county, if any.|RELDI||
 ||`ordinance_via_reldi`|True when a county has banned wind or solar development according to RELDI's ordinance database.|derived from RELDI||
 ||`ordinance_earliest_year_mentioned`|Approximate year the local ordinance was enacted. This was automatically extracted from the ordinance text so is not perfectly accurate.|derived from RELDI||
