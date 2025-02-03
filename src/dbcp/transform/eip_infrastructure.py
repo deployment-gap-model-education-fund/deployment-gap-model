@@ -612,7 +612,7 @@ if __name__ == "__main__":
 
     from dbcp.extract.eip_infrastructure import extract
 
-    source_path = Path("/app/data/raw/eip_infrastructure")
+    source_path = DATA_DIR / "raw/eip_infrastructure"
     eip_raw_dfs = extract(source_path)
     eip_transformed_dfs = transform(eip_raw_dfs)
     print("yay")
