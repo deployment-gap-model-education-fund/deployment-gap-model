@@ -1,19 +1,37 @@
 """Helper functions for extracting data."""
+
+import json
 import logging
 import re
 from pathlib import Path
 from typing import Optional, Union
 
 import google.auth
+import pandas as pd
 from google.cloud import storage
 
 logger = logging.getLogger(__name__)
 
 
+def extract_airtable_data(path: Path) -> pd.DataFrame:
+    """
+    Extract data from an Airtable JSON file.
+
+    Args:
+        path: Path to the Airtable JSON file.
+    Returns:
+        the extracted data as a pandas DataFrame.
+    """
+    with open(path, "r") as f:
+        data = json.load(f)
+    records = [r["fields"] for r in data]
+    return pd.DataFrame.from_records(records)
+
+
 def cache_gcs_archive_file_locally(
     uri: str,
     local_cache_dir: Union[str, Path] = "/app/data/data_cache",
-    revision_num: Optional[str] = None,
+    generation_num: Optional[str] = None,
 ) -> Path:
     """
     Cache a file stored in the GCS archive locally to a local directory.
@@ -21,7 +39,7 @@ def cache_gcs_archive_file_locally(
     Args:
         uri: the full file GCS URI.
         local_cache_dir: the local directory to cache the data.
-        revision_num: The revision number of the object to access. If None,
+        generation_num: The generation number of the object to access. If None,
             the latest version of the object will be used. This is helpful
             if the ETL code is pinned to a specific version of an archive.
 
@@ -30,24 +48,25 @@ def cache_gcs_archive_file_locally(
     """
     bucket_url, object_name = re.match("gs://(.*?)/(.*)", str(uri)).groups()
     credentials, project_id = google.auth.default()
+    bucket = storage.Client(credentials=credentials, project=project_id).bucket(
+        bucket_url, user_project=project_id
+    )
 
     local_cache_dir = Path(local_cache_dir)
     filepath = local_cache_dir / object_name
-    if revision_num:
-        filepath = Path(str(filepath) + f"#{revision_num}")
+
+    if generation_num:
+        filepath = Path(str(filepath) + f"#{generation_num}")
+    else:
+        # Get the latest version of the object and add the generation number to the filepath name
+        generation_num = bucket.get_blob(str(object_name)).generation
+        filepath = Path(str(filepath) + f"#{generation_num}")
     if not filepath.exists():
         logger.info(
             f"{object_name} not found in {local_cache_dir}. Downloading from GCS bucket."
         )
 
-        bucket = storage.Client(credentials=credentials, project=project_id).bucket(
-            bucket_url, user_project=project_id
-        )
-
-        if revision_num:
-            blob = bucket.blob(str(object_name), generation=revision_num)
-        else:
-            blob = bucket.blob(str(object_name))
+        blob = bucket.blob(str(object_name), generation=generation_num)
 
         filepath.parent.mkdir(parents=True, exist_ok=True)
         with open(filepath, "wb+") as f:

@@ -1,7 +1,6 @@
 """The ETL module create the data warehouse tables."""
 
 import logging
-from pathlib import Path
 from typing import Callable, Dict
 
 import pandas as pd
@@ -10,12 +9,13 @@ import pyarrow.parquet as pq
 import sqlalchemy as sa
 
 import dbcp
-from dbcp.constants import OUTPUT_DIR
+from dbcp.archivers.utils import ExtractionSettings
+from dbcp.constants import DATA_DIR, OUTPUT_DIR
 from dbcp.extract.fips_tables import CENSUS_URI, TRIBAL_LANDS_URI
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.helpers import enforce_dtypes, psql_insert_copy
 from dbcp.transform.fips_tables import SPATIAL_CACHE
-from dbcp.transform.helpers import GEOCODER_CACHE
+from dbcp.transform.helpers import GEOCODER_CACHES
 from dbcp.validation.tests import validate_warehouse
 
 logger = logging.getLogger(__name__)
@@ -45,9 +45,11 @@ def etl_lbnl_iso_queue() -> Dict[str, pd.DataFrame]:
 def etl_columbia_local_opp() -> Dict[str, pd.DataFrame]:
     """Columbia Local Opposition ETL."""
     # Extract
-    source_path = Path(
-        "/app/data/raw/2023.05.30 Opposition to Renewable Energy Facilities - FINAL.docx"
+    source_path = (
+        DATA_DIR
+        / "raw/2023.05.30 Opposition to Renewable Energy Facilities - FINAL.docx"
     )
+
     extractor = dbcp.extract.local_opposition.ColumbiaDocxParser()
     extractor.load_docx(source_path)
     docx_dfs = extractor.extract()
@@ -66,7 +68,7 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
 
 def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
     """NCSL State Permitting for Wind ETL."""
-    source_path = Path("/app/data/raw/ncsl_state_permitting_wind.csv")
+    source_path = DATA_DIR / "raw/ncsl_state_permitting_wind.csv"
     if not source_path.exists():
         NCSLScraper().scrape_and_save_to_disk(source_path)
     raw_df = dbcp.extract.ncsl_state_permitting.extract(source_path)
@@ -91,7 +93,7 @@ def etl_fips_tables() -> Dict[str, pd.DataFrame]:
 
 def etl_justice40() -> dict[str, pd.DataFrame]:
     """ETL white house environmental justice dataset."""
-    source_path = Path("/app/data/raw/1.0-communities.csv")
+    source_path = DATA_DIR / "raw/1.0-communities.csv"
     raw = dbcp.extract.justice40.extract(source_path)
     out = dbcp.transform.justice40.transform(raw)
     return out
@@ -99,8 +101,8 @@ def etl_justice40() -> dict[str, pd.DataFrame]:
 
 def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
     """ETL NREL state and local ordinances for wind and solar."""
-    wind_source_path = Path("/app/data/raw/NREL_Wind_Ordinances.xlsx")
-    solar_source_path = Path("/app/data/raw/NREL_Solar_Ordinances.xlsx")
+    wind_source_path = DATA_DIR / "raw/NREL_Wind_Ordinances.xlsx"
+    solar_source_path = DATA_DIR / "raw/NREL_Solar_Ordinances.xlsx"
     wind_raw_dfs = dbcp.extract.nrel_wind_solar_ordinances.extract(
         wind_source_path, wind_or_solar="wind"
     )
@@ -118,15 +120,18 @@ def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
 
 def etl_offshore_wind() -> dict[str, pd.DataFrame]:
     """ETL manually curated offshore wind data."""
-    projects_path = (
-        "gs://dgm-archive/synapse/offshore_wind/offshore_wind_projects_2024-09-10.csv"
-    )
-    locations_path = (
-        "gs://dgm-archive/synapse/offshore_wind/offshore_wind_locations_2024-09-10.csv"
-    )
+    # get the latest version of the offshore wind data from the candidate yaml file
+    projects_uri = "airtable/Offshore Wind Locations Synapse Version/Projects.json"
+    locations_uri = "airtable/Offshore Wind Locations Synapse Version/Locations.json"
+
+    es = ExtractionSettings.from_yaml("/app/dbcp/settings.yaml")
+    es.update_archive_generation_numbers()
+
+    projects_uri = es.get_full_archive_uri(projects_uri)
+    locations_uri = es.get_full_archive_uri(locations_uri)
 
     raw_offshore_dfs = dbcp.extract.offshore_wind.extract(
-        locations_path=locations_path, projects_path=projects_path
+        locations_uri=locations_uri, projects_uri=projects_uri
     )
     offshore_transformed_dfs = dbcp.transform.offshore_wind.transform(raw_offshore_dfs)
 
@@ -135,7 +140,7 @@ def etl_offshore_wind() -> dict[str, pd.DataFrame]:
 
 def etl_protected_area_by_county() -> dict[str, pd.DataFrame]:
     """ETL the PAD-US intersection with TIGER county geometries."""
-    source_path = Path("/app/data/raw/padus_intersect_counties.parquet")
+    source_path = DATA_DIR / "raw/padus_intersect_counties.parquet"
     raw_df = dbcp.extract.protected_area_by_county.extract(source_path)
     transformed = dbcp.transform.protected_area_by_county.transform(raw_df)
     return transformed
@@ -143,7 +148,7 @@ def etl_protected_area_by_county() -> dict[str, pd.DataFrame]:
 
 def etl_energy_communities_by_county() -> dict[str, pd.DataFrame]:
     """ETL RMI's energy communities analysis."""
-    source_path = Path("/app/data/raw/rmi_energy_communities_counties.parquet")
+    source_path = DATA_DIR / "raw/rmi_energy_communities_counties.parquet"
     raw_df = dbcp.extract.rmi_energy_communities.extract(source_path)
     transformed = dbcp.transform.rmi_energy_communities.transform(raw_df)
     return transformed
@@ -160,9 +165,9 @@ def etl_ballot_ready() -> dict[str, pd.DataFrame]:
 def etl_epa_avert() -> dict[str, pd.DataFrame]:
     """ETL EPA AVERT avoided emissions data."""
     # https://github.com/USEPA/AVERT/blob/v4.1.0/utilities/data/county-fips.txt
-    path_county_region_xwalk = Path("/app/data/raw/avert_county-fips.txt")
+    path_county_region_xwalk = DATA_DIR / "raw/avert_county-fips.txt"
     # https://www.epa.gov/avert/avoided-emission-rates-generated-avert
-    path_emission_rates = Path("/app/data/raw/avert_emission_rates_04-25-23.xlsx")
+    path_emission_rates = DATA_DIR / "raw/avert_emission_rates_04-25-23.xlsx"
     raw_dfs = dbcp.extract.epa_avert.extract(
         county_crosswalk_path=path_county_region_xwalk,
         emission_rates_path=path_emission_rates,
@@ -240,7 +245,7 @@ def run_etl(funcs: dict[str, Callable], schema_name: str):
 def etl():
     """Run dbc ETL."""
     # Reduce size of caches if necessary
-    GEOCODER_CACHE.reduce_size()
+    GEOCODER_CACHES.reduce_cache_sizes()
     SPATIAL_CACHE.reduce_size()
 
     # Run public ETL functions
@@ -277,5 +282,5 @@ def etl():
 
 if __name__ == "__main__":
     # debugging entry point
-    etl(None)
+    etl()
     print("yay")

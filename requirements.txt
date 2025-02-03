@@ -4,6 +4,7 @@ psycopg2~=2.9.3
 pytest~=6.2.5
 tqdm>=4.64.1,<5.0.0
 python-docx~=0.8.11
+pygeocodio~=1.4.0
 googlemaps~=4.5.3
 pandas-gbq~=0.19.1
 pydata-google-auth~=1.7.0
@@ -16,6 +17,7 @@ plotly~=5.15.0
 gridstatus~=0.20.0
 s3fs>=2022.11.0
 click>=8.1.7
+pyairtable>=2.3.3
 numpy<2
 sqlalchemy<2
 coloredlogs~=15.0.1
@@ -23,3 +25,4 @@ scipy~=1.14.1
 google-cloud-storage~=2.18.2
 geopandas~=1.0.1
 gcsfs~=2024.10.0
+pydantic<2.10,>=2.9 # https://github.com/gtalarico/pyairtable/issues/411

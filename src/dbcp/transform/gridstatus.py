@@ -478,7 +478,7 @@ def _clean_resource_type(
         resource_locations["county_id_fips"].isin(coastal_county_id_fips.keys())
         & resource_locations.resource_clean.eq("Onshore Wind")
     ].project_id
-    expected_n_coastal_wind_projects = 88
+    expected_n_coastal_wind_projects = 81
     assert (
         len(nyiso_coastal_wind_project_project_ids) == expected_n_coastal_wind_projects
     ), f"Expected {expected_n_coastal_wind_projects} NYISO coastal wind projects but found {len(nyiso_coastal_wind_project_project_ids)}"
@@ -1120,7 +1120,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         intermediate_creator=_prep_for_deduplication,
     )
     dupes = pre_dedupe - len(deduped_projects)
-    logger.info(f"Deduplicated {dupes} ({dupes/pre_dedupe:.2%}) projects.")
+    logger.info(f"Deduplicated {dupes} ({dupes / pre_dedupe:.2%}) projects.")
 
     # Normalize data
     (

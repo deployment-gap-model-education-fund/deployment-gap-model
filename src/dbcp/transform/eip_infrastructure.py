@@ -7,6 +7,7 @@ from typing import Dict, List, Sequence
 import numpy as np
 import pandas as pd
 
+from dbcp.constants import DATA_DIR
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     replace_value_with_count_validation,
@@ -608,7 +609,6 @@ def transform(raw_eip_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
 
 if __name__ == "__main__":
     #  debugging entry point
-    from pathlib import Path
 
     from dbcp.extract.eip_infrastructure import extract
 

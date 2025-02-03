@@ -1,0 +1,12 @@
+- generation_num: 1734383480735473
+  metadata:
+    schema_generation_number: '1734383479747404'
+    table_id: tblu7b4Yj58Iq2xCF
+  name: airtable/Offshore Wind Locations Synapse Version/Locations.json
+  pinned: false
+- generation_num: 1734383480108046
+  metadata:
+    schema_generation_number: '1734383479747404'
+    table_id: tblVU9JPtahIwLbny
+  name: airtable/Offshore Wind Locations Synapse Version/Projects.json
+  pinned: false

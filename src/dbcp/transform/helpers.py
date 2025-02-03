@@ -1,6 +1,7 @@
 """Common transform operations."""
 
-from pathlib import Path
+import logging
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence
 
 import pandas as pd
@@ -8,7 +9,9 @@ from joblib import Memory
 
 from dbcp.constants import FIPS_CODE_VINTAGE
 from dbcp.helpers import add_fips_ids
-from dbcp.transform.geocoding import GoogleGeocoder
+from dbcp.transform import geocodio, google_maps
+
+logger = logging.getLogger(__name__)
 
 UNIX_EPOCH_ORIGIN = pd.Timestamp("01/01/1970")
 # Excel parser is simplified and will be one day off for dates < 1900/03/01
@@ -17,17 +20,30 @@ UNIX_EPOCH_ORIGIN = pd.Timestamp("01/01/1970")
 # See xlrd.xldate.py:xldate_as_datetime for complete implementation.
 EXCEL_EPOCH_ORIGIN = pd.Timestamp("12/30/1899")
 
-try:  # docker path
-    # 3 directories above current module
-    geocoder_local_cache = Path("/app/data/geocoder_cache")
-    assert geocoder_local_cache.exists()
-except AssertionError:  # local path
-    # 4 directories above current module
-    geocoder_local_cache = Path(__file__).resolve().parents[3] / "data/geocoder_cache"
-    assert geocoder_local_cache.exists()
-# cache needs to be accessed outside this module to call .clear()
-# limit cache size to 100 KB, keeps most recently accessed first
-GEOCODER_CACHE = Memory(location=geocoder_local_cache, bytes_limit=2**19)
+
+@dataclass
+class MemoryCaches:
+    """
+    Container for multiple Memory caches.
+
+    Attributes:
+        caches: list of Memory caches
+    """
+
+    caches: list[Memory]
+
+    def reduce_cache_sizes(self):
+        """Reduce the size of all caches."""
+        for cache in self.caches:
+            cache.reduce_size()
+
+    def clear_caches(self):
+        """Clear all caches."""
+        for cache in self.caches:
+            cache.clear()
+
+
+GEOCODER_CACHES = MemoryCaches([geocodio.GEOCODER_CACHE, google_maps.GEOCODER_CACHE])
 
 
 def normalize_multicolumns_to_rows(
@@ -241,66 +257,68 @@ def parse_dates(series: pd.Series, expected_mean_year=2020) -> pd.Series:
         return multiformat_string_date_parser(series)
 
 
-def _geocode_row(
-    ser: pd.Series, client: GoogleGeocoder, state_col="state", locality_col="county"
-) -> List[str]:
-    """Function to pass into pandas df.apply() to geocode state/locality pairs.
-
-    Args:
-        ser (pd.Series): a row of a larger dataframe to geocode
-        client (GoogleGeocoder): client for Google Maps Platform API
-        state_col (str, optional): name of the column of state names. Defaults to 'state'.
-        locality_col (str, optional): name of the column of locality names. Defaults to 'county'.
-
-    Returns:
-        List[str]: geocoded_locality_name, geocoded_locality_type, and geocoded_containing_county
-    """
-    client.geocode_request(name=ser[locality_col], state=ser[state_col])
-    return client.describe()
-
-
-@GEOCODER_CACHE.cache()
-def _geocode_locality(
-    state_locality_df: pd.DataFrame, state_col="state", locality_col="county"
+def _geocode_and_add_fips(
+    nan_fips: pd.DataFrame, state_col="state", locality_col="county", api="geocodio"
 ) -> pd.DataFrame:
-    """Use Google Maps Platform API to look up information about state/locality pairs in a dataframe.
+    """Geocode locality names in a dataframe and add FIPS codes.
+
+    This is used for records that are not assigned a FIPS code by the initial lookup.
 
     Args:
-        state_locality_df (pd.DataFrame): dataframe with state and locality columns
-        state_col (str, optional): name of the column of state names. Defaults to 'state'.
-        locality_col (str, optional): name of the column of locality names. Defaults to 'county'.
-
+        nan_fips: dataframe with state and locality columns
+        state_col: name of the state column
+        locality_col: name of the locality column
+        api: name of the geocoding API to use
     Returns:
-        pd.DataFrame: new columns 'geocoded_locality_name', 'geocoded_locality_type', 'geocoded_containing_county'
+        dataframe with geocoded locality information
     """
-    # NOTE: the purpose of the cache decorator is primarily to
-    # reduce API calls during development. A secondary benefit is to reduce
-    # execution time due to slow synchronous requests.
-    # That's why this is persisted to disk with joblib, not in memory with LRU_cache or something.
-    # Because it is on disk, caching the higher level dataframe function causes less IO overhead
-    # than caching individual API calls would.
-    # Because the entire input dataframe must be identical to the cached version, I
-    # recommend subsetting the dataframe to only state_col and locality_col when calling
-    # this function. That allows other, unrelated columns to change but still use the geocode cache.
-    geocoder = GoogleGeocoder()
-    new_cols = state_locality_df.apply(
-        _geocode_row,
-        axis=1,
-        result_type="expand",
-        client=geocoder,
+    # Deduplicate on the state and locality columns to minimize API calls
+    key_cols = [state_col, locality_col]
+    deduped_nan_fips = nan_fips.loc[:, key_cols].drop_duplicates()
+    if api == "google":
+        geocoding_module = google_maps
+    elif api == "geocodio":
+        geocoding_module = geocodio
+    else:
+        raise ValueError(f"Unknown API: {api}")
+
+    deduped_geocoded = geocoding_module._geocode_locality(
+        deduped_nan_fips,
+        # pass subset to _geocode_locality to maximize chance of a cache hit
+        # (this way other columns can change but caching still works)
         state_col=state_col,
         locality_col=locality_col,
     )
-    new_cols.columns = [
-        "geocoded_locality_name",
-        "geocoded_locality_type",
-        "geocoded_containing_county",
-    ]
-    return new_cols
+    # convert all columns of deduped_geocoded to dtype string
+    deduped_geocoded = deduped_geocoded.astype("string")
+
+    # recombine deduped geocoded data with original nan_fips
+    geocoded_deduped_nan_fips = pd.concat(
+        [deduped_nan_fips[key_cols], deduped_geocoded], axis=1
+    )
+    index_name = nan_fips.index.name
+    index_name = index_name if index_name is not None else "index"
+    geocoded = (
+        nan_fips.reset_index()
+        .merge(geocoded_deduped_nan_fips, on=key_cols, how="left", validate="m:1")
+        .set_index(index_name)[deduped_geocoded.columns]
+    )
+
+    nan_fips = pd.concat([nan_fips, geocoded], axis=1)
+    # add fips using geocoded names
+    return add_fips_ids(
+        nan_fips,
+        state_col=state_col,
+        county_col="geocoded_containing_county",
+        vintage=FIPS_CODE_VINTAGE,
+    )
 
 
 def add_county_fips_with_backup_geocoding(
-    state_locality_df: pd.DataFrame, state_col="state", locality_col="county"
+    state_locality_df: pd.DataFrame,
+    state_col="state",
+    locality_col="county",
+    debug=False,
 ) -> pd.DataFrame:
     """Add state and county FIPS codes to a DataFrame with state and locality columns.
 
@@ -315,50 +333,6 @@ def add_county_fips_with_backup_geocoding(
     Returns:
         pd.DataFrame: copy of state_locality_df with new columns 'geocoded_locality_name', 'geocoded_locality_type', 'geocoded_containing_county'
     """
-    filled_state_locality = state_locality_df.loc[:, [state_col, locality_col]].fillna(
-        ""
-    )  # copy
-    # first try a simple FIPS lookup and split by valid/invalid fips codes
-    # The only purpose of this step is to save API calls on the easy ones (most of them)
-    with_fips = add_fips_ids(
-        filled_state_locality,
-        state_col=state_col,
-        county_col=locality_col,
-        vintage=FIPS_CODE_VINTAGE,
-    )
-    fips_is_nan = with_fips.loc[:, "county_id_fips"].isna()
-    if not fips_is_nan.any():
-        # standardize output columns
-        with_fips["geocoded_locality_name"] = with_fips[locality_col]
-        with_fips["geocoded_locality_type"] = "county"
-        with_fips["geocoded_containing_county"] = with_fips[locality_col]
-        return with_fips
-
-    good_fips = with_fips.loc[~fips_is_nan, :].copy()
-    # standardize output columns
-    good_fips["geocoded_locality_name"] = good_fips[locality_col]
-    good_fips["geocoded_locality_type"] = "county"
-    good_fips["geocoded_containing_county"] = good_fips[locality_col]
-
-    # geocode the lookup failures - they are often city/town names (instead of counties) or simply mis-spelled
-    nan_fips = with_fips.loc[fips_is_nan, :].copy()
-    geocoded = _geocode_locality(
-        nan_fips.loc[:, [state_col, locality_col]],
-        # pass subset to _geocode_locality to maximize chance of a cache hit
-        # (this way other columns can change but caching still works)
-        state_col=state_col,
-        locality_col=locality_col,
-    )
-    nan_fips = pd.concat([nan_fips, geocoded], axis=1)
-    # add fips using geocoded names
-    filled_fips = add_fips_ids(
-        nan_fips,
-        state_col=state_col,
-        county_col="geocoded_containing_county",
-        vintage=FIPS_CODE_VINTAGE,
-    )
-
-    # recombine and restore row order
     cols_to_keep = [
         "state_id_fips",
         "county_id_fips",
@@ -366,7 +340,70 @@ def add_county_fips_with_backup_geocoding(
         "geocoded_locality_type",
         "geocoded_containing_county",
     ]
-    recombined = pd.concat([good_fips, filled_fips], axis=0).loc[
+
+    filled_state_locality = state_locality_df.loc[:, [state_col, locality_col]].fillna(
+        ""
+    )  # copy
+    # first try a simple FIPS lookup and split by valid/invalid fips codes
+    # The only purpose of this step is to save API calls on the easy ones (most of them)
+    add_fips_results = add_fips_ids(
+        filled_state_locality,
+        state_col=state_col,
+        county_col=locality_col,
+        vintage=FIPS_CODE_VINTAGE,
+    )
+    fips_code_is_nan = add_fips_results.loc[:, "county_id_fips"].isna()
+    has_fips_code = add_fips_results.loc[~fips_code_is_nan, :].copy()
+    # standardize output columns
+    has_fips_code["geocoded_locality_name"] = has_fips_code[locality_col]
+    has_fips_code["geocoded_locality_type"] = "county"
+    has_fips_code["geocoded_locality_type"] = has_fips_code[
+        "geocoded_locality_type"
+    ].astype("string")
+    has_fips_code["geocoded_containing_county"] = has_fips_code[locality_col]
+
+    # if all records have a FIPS code, no need to geocoded. Combine with original dataframe
+    if len(has_fips_code) == len(state_locality_df):
+        return pd.concat([state_locality_df, has_fips_code[cols_to_keep]], axis=1)
+
+    # geocode the lookup failures - they are often city/town names (instead of counties) or simply mis-spelled
+    nan_fips = add_fips_results.loc[fips_code_is_nan, :].copy()
+
+    # Compare google and geocodio results
+    geocodio_df = _geocode_and_add_fips(
+        nan_fips, state_col=state_col, locality_col=locality_col, api="geocodio"
+    )
+    if debug:
+        google_df = _geocode_and_add_fips(
+            nan_fips, state_col=state_col, locality_col=locality_col, api="google"
+        )
+
+        # combine the two geocoded dataframes
+        comp = geocodio_df.merge(
+            google_df,
+            left_index=True,
+            right_index=True,
+            how="outer",
+            validate="1:1",
+            suffixes=("_geocodio", "_google"),
+        )
+
+        county_eq = comp.geocoded_containing_county_geocodio.eq(
+            comp.geocoded_containing_county_google
+        )
+        logger.info("---------------------")
+        logger.info(
+            f"---- pct of geocoded fip failures that don't match: {(~county_eq).sum() / len(comp)}"
+        )
+        logger.info(
+            f"---- pct of all records that don't have the same county: {(~county_eq).sum() / len(state_locality_df)}"
+        )
+        logger.info("---------------------")
+
+    filled_fips = geocodio_df
+
+    # recombine and restore row order
+    recombined = pd.concat([has_fips_code, filled_fips], axis=0).loc[
         state_locality_df.index, cols_to_keep
     ]
 

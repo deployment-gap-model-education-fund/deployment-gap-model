@@ -5,6 +5,8 @@ services:
       - .env
     environment:
       - API_KEY_GOOGLE_MAPS=${API_KEY_GOOGLE_MAPS} # get this value from our google account: https://console.cloud.google.com/google/maps-apis/credentials?project=dbcp-dev&supportedpurview=project
+      - AIRTABLE_API_KEY=${AIRTABLE_API_KEY}
+      - GEOCODIO_API_KEY=${GEOCODIO_API_KEY} # This api key is stored GCP project secret manager as geocodio-api-key
     depends_on:
       postgres:
         condition: service_healthy
@@ -12,7 +14,7 @@ services:
       - ./src/dbcp:/app/dbcp:rw
       - ./notebooks:/app/notebooks:rw
       - ./data:/app/data:rw
-      - ./test:/app/test:ro
+      - ./test:/app/test:rw
       - ${GOOGLE_GHA_CREDS_PATH}:/app/gcloud_application_default_credentials.json:ro
     ports:
       - ${JUPYTER_PORT}:${JUPYTER_PORT}
@@ -25,7 +27,7 @@ services:
     ports:
       - ${POSTGRES_PORT}:5432
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U youruser"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
