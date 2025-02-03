@@ -309,9 +309,7 @@ eip_facility_project_association = Table(
     Column(
         "facility_id", String, ForeignKey("data_warehouse.eip_facilities.facility_id")
     ),
-    Column(
-        "project_id", String
-    ),  # TODO: This should have a fk with eip_projects.project_id. There are currently 5 ids not in eip_projects.
+    Column("project_id", String, ForeignKey("data_warehouse.eip_projects.project_id")),
     Column("connection_id", String, primary_key=True),
     Column("connection_unknown_id", String),
     Column("date_modified", DateTime, nullable=False),
@@ -332,7 +330,7 @@ eip_air_constr_permits = Table(
     Column("raw_date_last_checked", String),
     Column("raw_project_id", String),
     Column("raw_permit_status", String),
-    Column("description", String),
+    Column("description_or_purpose", String),
     Column("raw_application_date", String),
     Column("raw_draft_permit_issuance_date", String),
     Column("raw_last_day_to_comment", String),
@@ -362,7 +360,7 @@ eip_project_permit_association = Table(
         "air_construction_id",
         String,
         ForeignKey("data_warehouse.eip_air_constr_permits.air_construction_id"),
-    ),  # TODO: This field contains air_construction_id not present in eip_air_constr_permits.air_construction_id
+    ),
     Column("project_id", String, ForeignKey("data_warehouse.eip_projects.project_id")),
     Column("connection_id", String, primary_key=True),
     Column("connection_unknown_id", String),

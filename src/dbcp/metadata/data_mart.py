@@ -137,14 +137,16 @@ counties_wide_format = Table(
         nullable=True,
     ),
     Column(
-        "infra_synthetic_fertilizers_proposed_co2e_tonnes_per_year",
+        "infra_ammonia_and_synthetic_fertilizers_proposed_co2e_tonnes_per_year",
         Float,
         nullable=True,
     ),
-    Column("infra_synthetic_fertilizers_proposed_facility_count", Integer),
-    Column("infra_synthetic_fertilizers_proposed_nox_tonnes_per_year", Float),
+    Column("infra_ammonia_and_synthetic_fertilizers_proposed_facility_count", Integer),
     Column(
-        "infra_synthetic_fertilizers_proposed_pm2_5_tonnes_per_year",
+        "infra_ammonia_and_synthetic_fertilizers_proposed_nox_tonnes_per_year", Float
+    ),
+    Column(
+        "infra_ammonia_and_synthetic_fertilizers_proposed_pm2_5_tonnes_per_year",
         Float,
         nullable=True,
     ),

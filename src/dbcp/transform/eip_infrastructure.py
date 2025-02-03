@@ -397,6 +397,7 @@ def air_construction_transform(raw_air_constr_df: pd.DataFrame) -> pd.DataFrame:
         "id_qaqc": "unknown_id",
         "created_at": "raw_created_on",
         "updated_at": "raw_modified_on",
+        "description": "description_or_purpose",
         "date_last_checked": "raw_date_last_checked",
         "permit_status": "raw_permit_status",
         "application_date": "raw_application_date",
@@ -476,10 +477,18 @@ def facilities_project_assn_transform(
     # https://oilandgaswatch.org/xata-api/01-00_FACILITIES/data/7365
     # https://oilandgaswatch.org/xata-api/01-00_FACILITIES/data/6658
     # https://oilandgaswatch.org/xata-api/01-00_FACILITIES/data/rec_cp5p46vn1jkikfutr9jg
-    # TODO: Look into: https://oilandgaswatch.org/xata-api/01-00_FACILITIES/data/rec_cti6ekqab52bjrah4m4g
+    # https://oilandgaswatch.org/xata-api/01-00_FACILITIES/data/rec_cti6ekqab52bjrah4m4g
     fac_proj = fac_proj.loc[
         ~fac_proj.facility_id.isin(
-            ["5608", "6612", "6683", "7365", "6658", "rec_cp5p46vn1jkikfutr9jg"]
+            [
+                "5608",
+                "6612",
+                "6683",
+                "7365",
+                "6658",
+                "rec_cp5p46vn1jkikfutr9jg",
+                "rec_cti6ekqab52bjrah4m4g",
+            ]
         )
     ]
 
