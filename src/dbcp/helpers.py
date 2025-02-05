@@ -17,6 +17,7 @@ from google.cloud import bigquery
 from tqdm import tqdm
 
 import dbcp
+from dbcp.constants import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +153,7 @@ def get_pudl_resource(
     """
     PUDL_VERSION = os.environ["PUDL_VERSION"]
 
-    pudl_cache = Path("/app/data/data_cache/pudl/")
+    pudl_cache = DATA_DIR / "data_cache/pudl/"
     pudl_cache.mkdir(exist_ok=True)
     pudl_version_cache = pudl_cache / PUDL_VERSION
     pudl_version_cache.mkdir(exist_ok=True)

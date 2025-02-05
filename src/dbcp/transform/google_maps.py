@@ -3,7 +3,6 @@
 import os
 from functools import lru_cache
 from logging import getLogger
-from pathlib import Path
 from typing import Dict, List, Optional
 from warnings import warn
 
@@ -11,10 +10,12 @@ import googlemaps
 import pandas as pd
 from joblib import Memory
 
+from dbcp.constants import DATA_DIR
+
 logger = getLogger("__name__")
 
 
-geocoder_local_cache = Path("/app/data/google_geocoder_cache")
+geocoder_local_cache = DATA_DIR / "google_geocoder_cache"
 geocoder_local_cache.mkdir(parents=True, exist_ok=True)
 assert geocoder_local_cache.exists()
 # cache needs to be accessed outside this module to call .clear()
@@ -41,10 +42,9 @@ class GoogleGeocoder(object):
                 key = os.environ["API_KEY_GOOGLE_MAPS"]
             except ValueError as e:
                 if "google.com" in e.args[0]:
-                    # local.env wasn't updated properly
                     raise ValueError(
-                        "API_KEY_GOOGLE_MAPS must be defined in your local.env file."
-                        " See README.md for instructions."
+                        "API_KEY_GOOGLE_MAPS environment variable not set. "
+                        " See README.md for how to set it."
                     )
                 else:
                     raise e
