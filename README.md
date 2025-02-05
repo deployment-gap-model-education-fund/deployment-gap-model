@@ -77,10 +77,11 @@ export GOOGLE_GHA_CREDS_PATH=<path/to/your_credentials.json>
 `GOOGLE_GHA_CREDS_PATH` will be mounted into the container so
 the GCP APIs in the container can access the data stored in GCP.
 
-You'll also need to set an environment variable for the Google Maps API Key:
+You'll also need to set an environment variable for the Geocodio API Key. This api key is stored
+GCP project Secret Manager as `geocodio-api-key`.
 
 ```
-export API_KEY_GOOGLE_MAPS={Google Maps API key for GCP project dbcp-dev-350818}
+export GEOCODIO_API_KEY={geocodio api key}
 ```
 
 ## Git Pre-commit Hooks

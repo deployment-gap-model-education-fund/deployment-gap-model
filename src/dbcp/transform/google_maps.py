@@ -1,4 +1,5 @@
 """Classes and functions for geocoding address data using Google API."""
+
 import os
 from functools import lru_cache
 from logging import getLogger
@@ -6,8 +7,20 @@ from typing import Dict, List, Optional
 from warnings import warn
 
 import googlemaps
+import pandas as pd
+from joblib import Memory
+
+from dbcp.constants import DATA_DIR
 
 logger = getLogger("__name__")
+
+
+geocoder_local_cache = DATA_DIR / "google_geocoder_cache"
+geocoder_local_cache.mkdir(parents=True, exist_ok=True)
+assert geocoder_local_cache.exists()
+# cache needs to be accessed outside this module to call .clear()
+# limit cache size to keep most recently accessed first
+GEOCODER_CACHE = Memory(location=geocoder_local_cache, bytes_limit=2**19)
 
 
 class GoogleGeocoder(object):
@@ -29,10 +42,9 @@ class GoogleGeocoder(object):
                 key = os.environ["API_KEY_GOOGLE_MAPS"]
             except ValueError as e:
                 if "google.com" in e.args[0]:
-                    # local.env wasn't updated properly
                     raise ValueError(
-                        "API_KEY_GOOGLE_MAPS must be defined in your local.env file."
-                        " See README.md for instructions."
+                        "API_KEY_GOOGLE_MAPS environment variable not set. "
+                        " See README.md for how to set it."
                     )
                 else:
                     raise e
@@ -202,3 +214,61 @@ def _get_geocode_response(
         return response[0]
     except IndexError:  # empty list = not found
         return {}
+
+
+def _geocode_row(
+    ser: pd.Series, client: GoogleGeocoder, state_col="state", locality_col="county"
+) -> List[str]:
+    """Function to pass into pandas df.apply() to geocode state/locality pairs.
+
+    Args:
+        ser (pd.Series): a row of a larger dataframe to geocode
+        client (GoogleGeocoder): client for Google Maps Platform API
+        state_col (str, optional): name of the column of state names. Defaults to 'state'.
+        locality_col (str, optional): name of the column of locality names. Defaults to 'county'.
+
+    Returns:
+        List[str]: geocoded_locality_name, geocoded_locality_type, and geocoded_containing_county
+    """
+    client.geocode_request(name=ser[locality_col], state=ser[state_col])
+    return client.describe()
+
+
+@GEOCODER_CACHE.cache()
+def _geocode_locality(
+    state_locality_df: pd.DataFrame, state_col="state", locality_col="county"
+) -> pd.DataFrame:
+    """Use Google Maps Platform API to look up information about state/locality pairs in a dataframe.
+
+    Args:
+        state_locality_df (pd.DataFrame): dataframe with state and locality columns
+        state_col (str, optional): name of the column of state names. Defaults to 'state'.
+        locality_col (str, optional): name of the column of locality names. Defaults to 'county'.
+
+    Returns:
+        pd.DataFrame: new columns 'geocoded_locality_name', 'geocoded_locality_type', 'geocoded_containing_county'
+    """
+    # NOTE: the purpose of the cache decorator is primarily to
+    # reduce API calls during development. A secondary benefit is to reduce
+    # execution time due to slow synchronous requests.
+    # That's why this is persisted to disk with joblib, not in memory with LRU_cache or something.
+    # Because it is on disk, caching the higher level dataframe function causes less IO overhead
+    # than caching individual API calls would.
+    # Because the entire input dataframe must be identical to the cached version, I
+    # recommend subsetting the dataframe to only state_col and locality_col when calling
+    # this function. That allows other, unrelated columns to change but still use the geocode cache.
+    geocoder = GoogleGeocoder()
+    new_cols = state_locality_df.apply(
+        _geocode_row,
+        axis=1,
+        result_type="expand",
+        client=geocoder,
+        state_col=state_col,
+        locality_col=locality_col,
+    )
+    new_cols.columns = [
+        "geocoded_locality_name",
+        "geocoded_locality_type",
+        "geocoded_containing_county",
+    ]
+    return new_cols
