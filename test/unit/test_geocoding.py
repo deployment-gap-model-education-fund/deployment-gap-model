@@ -1,7 +1,10 @@
 """Test suite for dbcp.transform.geocoding module."""
+
+import pandas as pd
 import pytest
 
 from dbcp.transform.geocoding import GoogleGeocoder
+from dbcp.transform.helpers import add_county_fips_with_backup_geocoding
 
 
 class mock_geocoder(GoogleGeocoder):
@@ -294,3 +297,12 @@ def test_GoogleGeocoder_init_and_properties():
     full = GoogleGeocoder()
     full._response = mock_geocoder_town_and_county()._response
     assert full.locality_name == "Westport"
+
+
+def test_add_county_fips_with_backup_geocoding_empty_df():
+    """Test add_county_fips_with_backup_geocoding with an empty DataFrame."""
+    empty_df = pd.DataFrame(columns=["state", "county"])
+    with pytest.raises(
+        ValueError, match="There is no data in this DataFrame to geocode!"
+    ):
+        add_county_fips_with_backup_geocoding(empty_df)

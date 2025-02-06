@@ -315,6 +315,9 @@ def add_county_fips_with_backup_geocoding(
     Returns:
         pd.DataFrame: copy of state_locality_df with new columns 'geocoded_locality_name', 'geocoded_locality_type', 'geocoded_containing_county'
     """
+    # throw an error if the dataframe is empty
+    if state_locality_df.empty:
+        raise ValueError("There is no data in this DataFrame to geocode!")
     filled_state_locality = state_locality_df.loc[:, [state_col, locality_col]].fillna(
         ""
     )  # copy
