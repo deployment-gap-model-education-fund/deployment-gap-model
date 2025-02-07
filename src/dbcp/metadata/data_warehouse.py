@@ -1391,8 +1391,10 @@ br_positions_counties_assoc = Table(
         primary_key=True,
     ),
     Column(
-        "raw_county", String, nullable=False, primary_key=True
-    ),  # Can't use county_id_fips because Connecticut changed it's county system recently
+        "raw_county",
+        String,
+        nullable=False,
+    ),
     Column("raw_state", String, nullable=False),
     Column(
         "state_id_fips",
@@ -1404,8 +1406,9 @@ br_positions_counties_assoc = Table(
         "county_id_fips",
         String,
         ForeignKey("data_warehouse.county_fips.county_id_fips"),
-        nullable=True,
-    ),  # Should not be nullable in future updates
+        nullable=False,
+        primary_key=True,
+    ),
     schema=schema,
 )
 

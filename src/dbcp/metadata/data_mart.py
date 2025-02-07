@@ -609,7 +609,7 @@ br_election_data = Table(
     Column("race_created_at", DateTime, nullable=False),
     Column("race_updated_at", DateTime, nullable=False),
     Column("state_id_fips", String, nullable=False),
-    Column("county_id_fips", String),  # Should not be nullable in future updates
+    Column("county_id_fips", String, nullable=False),
     schema=schema,
 )
 
