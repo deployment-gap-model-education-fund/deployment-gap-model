@@ -10,7 +10,7 @@ from dbcp.commands.archive import run_archivers
 from dbcp.commands.publish import publish_outputs
 from dbcp.commands.settings import save_settings
 from dbcp.transform.fips_tables import SPATIAL_CACHE
-from dbcp.transform.helpers import GEOCODER_CACHE
+from dbcp.transform.helpers import GEOCODER_CACHES
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ def cli(loglevel):
 def etl(data_mart: bool, data_warehouse: bool, clear_cache: bool):
     """Run the ETL process to produce the data warehouse and mart."""
     if clear_cache:
-        GEOCODER_CACHE.clear()
+        GEOCODER_CACHES.clear_caches()
         SPATIAL_CACHE.clear()
 
     if data_warehouse:

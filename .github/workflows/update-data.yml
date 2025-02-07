@@ -93,6 +93,7 @@ jobs:
       matrix: ${{ fromJSON(needs.matrix_prep.outputs.matrix) }}
       fail-fast: false
     env:
+      GEOCODIO_API_KEY: ${{ secrets.GEOCODIO_API_KEY }}
       API_KEY_GOOGLE_MAPS: ${{ secrets.API_KEY_GOOGLE_MAPS }}
       GITHUB_REF: ${{ github.ref_name }} # This is changed to dev if running on a schedule
     steps:

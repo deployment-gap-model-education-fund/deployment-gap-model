@@ -1,5 +1,6 @@
 """DBCP constants."""
 
+import os
 from io import StringIO
 from pathlib import Path
 
@@ -119,4 +120,13 @@ US_TERRITORIES = set(
 )
 US_STATES_TERRITORIES = US_STATES.union(US_TERRITORIES)
 
-OUTPUT_DIR = Path("/app/data/output")
+try:
+    DATA_DIR_ENV_VAR = os.environ["DATA_DIR"]
+except KeyError:
+    raise KeyError(
+        "Please set the DATA_DIR environment variable to the path"
+        "of the data directory.\n"
+        "This is typically set in the .env file."
+    )
+DATA_DIR = Path(DATA_DIR_ENV_VAR)
+OUTPUT_DIR = DATA_DIR / "output"

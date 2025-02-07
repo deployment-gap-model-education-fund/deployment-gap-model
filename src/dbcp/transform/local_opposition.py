@@ -96,18 +96,39 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
 
     # manual corrections
     location_corrections = {
-        "Batavia Township (Clermont County)": "Batavia Township (Branch County)",
+        "Batavia Township (Clermont County)": "Branch County",
         "Town of Albion (Kennebec County)": "Albion (Kennebec County)",
         "Town of Lovell (Oxford County)": "Lovell (Oxford County)",
         "Town of Charlton (Worcester County)": "Charlton (Worcester County)",
         "City of Owasso (Rogers and Tulsa Counties)": "Owasso (Rogers and Tulsa Counties)",
         "City of Burleson (Tarrant and Johnson Counties)": "Burleson (Tarrant and Johnson Counties)",
         "Montrose City (Genesee County)": "Montrose (Genesee County)",
+        "Genoa Township (Livingston County)": "Livingston County",
+        "Maple Valley Township (Montcalm County)": "Montcalm County",
+        "Ellington Township (Tuscola County)": "Tuscola County",
+        "Almer Township (Tuscola County)": "Tuscola County",
+        "Beaver Township (Bay County)": "Bay County",
+        "Matteson Township (Branch County)": "Branch County",
+        "Monitor Township (Bay County)": "Bay County",
+        "Town of Porter (Niagara County)": "Niagara County",
     }
+    raw_locality = local["locality"].copy()
     local.loc[:, "locality"].replace(location_corrections, inplace=True)
+
+    # Remove (Count Name) from localities because geocodio performs better with just the locality name
+    local["locality"] = local["locality"].str.replace(r"\s?\(.*?\)", "", regex=True)
+
+    # Remove "City of" and "Town of" prefixes from localities that have them
+    # Geocodio thinks these prefixes are street names
+    local["locality"] = local["locality"].str.replace(
+        r"^(City of|Town of) ", "", regex=True
+    )
 
     # add fips codes to counties (but many names are cities)
     with_fips = add_county_fips_with_backup_geocoding(local, locality_col="locality")
+
+    # undo locality corrections so we can view the raw data
+    with_fips.loc[:, "locality"] = raw_locality
 
     year_summaries = _extract_years(local["ordinance_text"])
     local = pd.concat([with_fips, year_summaries], axis=1)
