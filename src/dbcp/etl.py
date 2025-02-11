@@ -11,6 +11,7 @@ import sqlalchemy as sa
 import dbcp
 from dbcp.archivers.utils import ExtractionSettings
 from dbcp.constants import DATA_DIR, OUTPUT_DIR
+from dbcp.extract.ballot_ready import BR_URI
 from dbcp.extract.fips_tables import CENSUS_URI, TRIBAL_LANDS_URI
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.helpers import enforce_dtypes, psql_insert_copy
@@ -156,7 +157,7 @@ def etl_energy_communities_by_county() -> dict[str, pd.DataFrame]:
 
 def etl_ballot_ready() -> dict[str, pd.DataFrame]:
     """ETL Ballot Ready election data."""
-    source_uri = "gs://dgm-archive/ballot_ready/Climate Partners_Upcoming Races_2025-2026_20240826.csv"
+    source_uri = BR_URI
     raw_df = dbcp.extract.ballot_ready.extract(source_uri)
     transformed = dbcp.transform.ballot_ready.transform(raw_df)
     return transformed

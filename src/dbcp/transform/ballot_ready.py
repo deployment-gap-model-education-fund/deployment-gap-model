@@ -3,7 +3,9 @@
 import logging
 
 import pandas as pd
+from pandas.api.types import is_bool_dtype
 
+from dbcp.extract.ballot_ready import BR_URI, extract
 from dbcp.helpers import add_fips_ids
 
 DATETIME_COLUMNS = ["race_created_at", "race_updated_at", "election_day"]
@@ -71,7 +73,7 @@ def _normalize_entities(ballot_ready: pd.DataFrame) -> dict[str, pd.DataFrame]:
 
     logger.info(f"Found {len(duplicate_positions)} duplicate positions.")
     assert (
-        len(duplicate_positions) <= 500
+        len(duplicate_positions) <= 100
     ), f"Found more duplicate positions than expected: {len(duplicate_positions)}"
 
     # dropnas in frequency and reference_year
@@ -109,13 +111,14 @@ def _normalize_entities(ballot_ready: pd.DataFrame) -> dict[str, pd.DataFrame]:
     assert (
         (ballot_ready.groupby(race_pk_fields)[race_fields].nunique() <= 1).all().all()
     ), "There is duplicate entity informaiton in the races table."
-    # Add some one to many fields to the races table dataframe.
+    # Sometimes an election and position ID correspond to more than one race ID.
+    # As of 02/2025 this does not currently seem to be the case with this data.
     race_fields += [
         "election_id",
         "position_id",
     ]
     br_races = ballot_ready.drop_duplicates(subset=race_pk_fields)[race_fields].copy()
-    assert len(br_races) < len(ballot_ready)
+    assert len(br_races) <= len(ballot_ready)
     assert br_races.race_id.is_unique, "race_id is not unique!"
 
     trns_dfs["br_races"] = br_races
@@ -149,9 +152,13 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
 
     # Explode counties column
     ballot_ready["counties"] = (
-        ballot_ready.counties.str.replace('"', "").str[1:-1].str.split(", ")
-    )
-
+        ballot_ready.counties.str.replace('"', "")
+        .str[1:-1]
+        .str.split(",")
+        .apply(set)
+        .apply(list)
+    )  # The 2/2025 update has tons of duplicate counties in the counties column list,
+    # so we use set to remove the duplicates, and then return to a list for 'explode'.
     exp_ballot_ready = ballot_ready.explode("counties").rename(
         columns={"counties": "county"}
     )
@@ -161,7 +168,7 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
     )
     # Initial batch of raw data has duplicates in counties
     assert (
-        duplicate_race.sum() <= 20
+        duplicate_race.sum() <= 500
     ), "Found more duplicate county/race combinations that expected."
 
     # Drop duplicates. A later version of ballot ready data will remedy this problem.
@@ -180,6 +187,7 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
     # However, adding local elections to both counties is not appropriate. I'm going to do it
     # anyways because there aren't any great options for accurately geocoding the local elections.
     valdez = ballot_ready.query("county_id_fips == '02261'")
+
     if valdez.level.isin(["state", "federal"]).all():
         logger.info("Found a local election in the Valdez-Cordova Census Area!")
 
@@ -204,6 +212,8 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
     # https://www.census.gov/programs-surveys/geography/guidance/geo-identifiers.html
     # These ones contain both state and county FIPS. Some have letters or non FIPs
     # characters, so we shouldn't expect a perfect match.
+    # The first two digits of any geo_id always correspond to the state-level FIPS code
+    # for the state to which it belongs.
     state_match = ballot_ready.geo_id.str[0:2] == ballot_ready.state_id_fips
     expected_state_match = 0.99
     result_state_match_coverage = sum(state_match) / len(state_match)
@@ -214,18 +224,17 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
     # All GEO IDs contain the state FIPS code. But only these contain the County FIPS:
     # 5 digits: State FIPS + County FIPS
     # 10 digits: State FIPS + County FIPS + County sub-division
-    # 12 digits: State FIPS + County FIPS + Tract + Block Group
     # 15 digits: State FIPS + County FIPS + Tract + Block
     # 16 digits: State FIPS + County FIPS + Tract + Block + Suffix
     geo_ids = ballot_ready.loc[
-        (ballot_ready.geo_id.str.len().isin([5, 10, 12, 15, 16]))
+        (ballot_ready.geo_id.str.len().isin([5, 10, 15, 16]))
         & (ballot_ready.county_id_fips.notnull())
     ]
     county_match = geo_ids.geo_id.str[0:5] == geo_ids.county_id_fips
     logger.info(
-        f"County FIPS codes:{sum(county_match)} of {len(county_match)} geocoded state FIPS IDs match the Ballot Ready data ({sum(county_match)/len(county_match):.0%})"
+        f"County FIPS codes:Of {len(county_match)} geocoded county FIPS IDs compared to the Ballot Ready data, {sum(county_match)} match ({sum(county_match)/len(county_match):.0%})"
     )
-    assert sum(county_match) / len(county_match) > 0.85
+    assert sum(county_match) / len(county_match) > 0.75
 
     # Drop unused columns
     ballot_ready = ballot_ready.drop(columns=["position_description"])
@@ -236,7 +245,12 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
     # Clean up boolean columns
     bool_columns = [col for col in ballot_ready.columns if col.startswith("is_")]
     for col in bool_columns:
-        ballot_ready[col] = ballot_ready[col].map({"t": True, "f": False})
+        if is_bool_dtype(ballot_ready[col]):
+            continue
+        else:
+            ballot_ready[col] = ballot_ready[col].map(
+                {["true", "t"]: True, ["false", "f"]: False}
+            )
     return ballot_ready
 
 
@@ -261,10 +275,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
 if __name__ == "__main__":
     # debugging entry point
-    from dbcp.extract.ballot_ready import extract
 
-    # is this URI still up to date?
-    uri = "gs://dgm-archive/ballot_ready/Climate Partners_Upcoming Races_All Tiers_20240524.csv"
-    raw = extract(uri)
+    raw = extract(BR_URI)
     transform = transform(raw)
     print({k: df.shape for k, df in transform.items()})

@@ -300,6 +300,14 @@ def test_GoogleGeocoder_init_and_properties():
     assert full.locality_name == "Westport"
 
 
+def test_add_county_fips_with_backup_geocoding_empty_df():
+    """Test add_county_fips_with_backup_geocoding with an empty DataFrame."""
+    empty_df = pd.DataFrame(columns=["state", "county"])
+    with pytest.raises(
+        ValueError, match="There is no data in this DataFrame to geocode!"
+    ):
+        add_county_fips_with_backup_geocoding(empty_df)
+
 @pytest.mark.parametrize(
     "raw_localities, expected",
     [

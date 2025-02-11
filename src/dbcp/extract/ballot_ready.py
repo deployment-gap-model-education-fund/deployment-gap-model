@@ -3,6 +3,8 @@ import pandas as pd
 
 import dbcp
 
+BR_URI = "gs://dgm-archive/ballot_ready/climate_partners_upcoming_races_with_counties_20250204.csv"
+
 
 def extract(uri: str) -> dict[str, pd.DataFrame]:
     """Extract raw Ballot Ready data.
