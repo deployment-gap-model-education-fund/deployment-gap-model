@@ -5,6 +5,7 @@ import logging
 import pandas as pd
 from pandas.api.types import is_bool_dtype
 
+from dbcp.extract.ballot_ready import BR_URI, extract
 from dbcp.helpers import add_fips_ids
 
 DATETIME_COLUMNS = ["race_created_at", "race_updated_at", "election_day"]
@@ -274,10 +275,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
 if __name__ == "__main__":
     # debugging entry point
-    from dbcp.extract.ballot_ready import extract
 
-    # is this URI still up to date?
-    uri = "gs://dgm-archive/ballot_ready/climate_partners_upcoming_races_with_counties_20250204.csv"
-    raw = extract(uri)
+    raw = extract(BR_URI)
     transform = transform(raw)
     print({k: df.shape for k, df in transform.items()})
