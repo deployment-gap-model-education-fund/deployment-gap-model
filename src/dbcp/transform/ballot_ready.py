@@ -232,7 +232,7 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
     ]
     county_match = geo_ids.geo_id.str[0:5] == geo_ids.county_id_fips
     logger.info(
-        f"County FIPS codes:Of {len(county_match)} geocoded state FIPS IDs compared to the Ballot Ready data, {sum(county_match)} match ({sum(county_match)/len(county_match):.0%})"
+        f"County FIPS codes:Of {len(county_match)} geocoded county FIPS IDs compared to the Ballot Ready data, {sum(county_match)} match ({sum(county_match)/len(county_match):.0%})"
     )
     assert sum(county_match) / len(county_match) > 0.75
 
