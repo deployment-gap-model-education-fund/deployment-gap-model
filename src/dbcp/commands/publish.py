@@ -80,39 +80,40 @@ def load_parquet_files_to_bigquery(
     dataset_ref = client.dataset(dataset_id)
 
     # get all parquet files in the bucket/{version} directory
-    blobs = output_bucket.list_blobs(prefix=f"{version}/{destination_blob_prefix}")
+    blobs = output_bucket.list_blobs(
+        prefix=f"{version}/{destination_blob_prefix}", match_glob="*.parquet"
+    )
 
     # Load each Parquet file to BigQuery
     for blob in blobs:
-        if blob.name.endswith(".parquet"):
-            # get the blob filename without the extension
-            table_name = blob.name.split("/")[-1].split(".")[0]
+        # get the blob filename without the extension
+        table_name = Path(blob.name).stem
 
-            # Construct the destination table
-            table_ref = dataset_ref.table(table_name)
+        # Construct the destination table
+        table_ref = dataset_ref.table(table_name)
 
-            # delete table if it exists
-            client.delete_table(table_ref, not_found_ok=True)
+        # delete table if it exists
+        client.delete_table(table_ref, not_found_ok=True)
 
-            # Load the Parquet file to BigQuery
-            job_config = bigquery.LoadJobConfig(
-                source_format=bigquery.SourceFormat.PARQUET,
-                write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
-            )
-            load_job = client.load_table_from_uri(
-                f"gs://{output_bucket.id}/{blob.name}", table_ref, job_config=job_config
-            )
+        # Load the Parquet file to BigQuery
+        job_config = bigquery.LoadJobConfig(
+            source_format=bigquery.SourceFormat.PARQUET,
+            write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+        )
+        load_job = client.load_table_from_uri(
+            f"gs://{output_bucket.id}/{blob.name}", table_ref, job_config=job_config
+        )
 
-            logger.info(f"Loading {blob.name} to {dataset_id}.{table_name}")
-            load_job.result()
+        logger.info(f"Loading {blob.name} to {dataset_id}.{table_name}")
+        load_job.result()
 
-            # add a label to the table
-            labels = {"version": version}
-            table = client.get_table(table_ref)
-            table.labels = labels
-            client.update_table(table, ["labels"])
+        # add a label to the table
+        labels = {"version": version}
+        table = client.get_table(table_ref)
+        table.labels = labels
+        client.update_table(table, ["labels"])
 
-            logger.info(f"Loaded {blob.name} to {dataset_id}.{table_name}")
+        logger.info(f"Loaded {blob.name} to {dataset_id}.{table_name}")
 
 
 class OutputMetadata(BaseModel):

@@ -186,7 +186,16 @@ def etl_gridstatus_isoqueues():
 
 def etl_manual_ordinances() -> dict[str, pd.DataFrame]:
     """ETL manually maintained ordinances."""
-    raw_dfs = dbcp.extract.manual_ordinances.extract()
+    county_level_control_uri = (
+        "airtable/Clean Build State Permitting Analysis/County Level Control.json"
+    )
+
+    es = ExtractionSettings.from_yaml("/app/dbcp/settings.yaml")
+    es.update_archive_generation_numbers()
+
+    projects_uri = es.get_full_archive_uri(county_level_control_uri)
+
+    raw_dfs = dbcp.extract.manual_ordinances.extract(projects_uri)
     transformed = dbcp.transform.manual_ordinances.transform(raw_dfs)
     return transformed
 
