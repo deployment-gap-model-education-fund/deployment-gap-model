@@ -33,7 +33,7 @@ SA_TO_PD_TYPES = {
     "VARCHAR": "string",
     "INTEGER": "Int64",
     "BIGINT": "Int64",
-    "FLOAT": "float64",
+    "FLOAT": "Float64",
     "BOOLEAN": "boolean",
     "DATETIME": "datetime64[ns]",
 }
@@ -123,6 +123,8 @@ def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str):
         # Add the column if it doesn't exist
         if col.name not in df.columns:
             df[col.name] = None
+        if pd.api.types.is_datetime64tz_dtype(df[col.name]):
+            df[col.name] = df[col.name].dt.tz_localize(None)
         df[col.name] = df[col.name].astype(SA_TO_PD_TYPES[str(col.type)])
 
     # convert datetime[ns] columns to milliseconds
@@ -321,7 +323,7 @@ def add_fips_ids(
 
     logger.info(
         f"Assigned state FIPS codes for "
-        f"{len(df[df.state_id_fips.notnull()])/len(df):.2%} of records."
+        f"{len(df[df.state_id_fips.notnull()]) / len(df):.2%} of records."
     )
     if county_col:
         df["county_id_fips"] = df.apply(
@@ -337,6 +339,6 @@ def add_fips_ids(
         df = df.astype({"county_id_fips": pd.StringDtype()})
         logger.info(
             f"Assigned county FIPS codes for "
-            f"{len(df[df.county_id_fips.notnull()])/len(df):.2%} of records."
+            f"{len(df[df.county_id_fips.notnull()]) / len(df):.2%} of records."
         )
     return df

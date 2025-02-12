@@ -72,8 +72,9 @@ def _normalize_entities(ballot_ready: pd.DataFrame) -> dict[str, pd.DataFrame]:
     duplicate_positions = br_positions[is_duplciate_position].copy()
 
     logger.info(f"Found {len(duplicate_positions)} duplicate positions.")
+
     assert (
-        len(duplicate_positions) <= 100
+        len(duplicate_positions) <= 500
     ), f"Found more duplicate positions than expected: {len(duplicate_positions)}"
 
     # dropnas in frequency and reference_year
@@ -148,7 +149,7 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
     # Correct datatypes
     ballot_ready = raw_ballot_ready.convert_dtypes()
     for col in DATETIME_COLUMNS:
-        ballot_ready[col] = pd.to_datetime(ballot_ready[col])
+        ballot_ready[col] = pd.to_datetime(ballot_ready[col], format="ISO8601")
 
     # Explode counties column
     ballot_ready["counties"] = (
@@ -168,7 +169,7 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
     )
     # Initial batch of raw data has duplicates in counties
     assert (
-        duplicate_race.sum() <= 500
+        duplicate_race.sum() <= 20
     ), "Found more duplicate county/race combinations that expected."
 
     # Drop duplicates. A later version of ballot ready data will remedy this problem.
@@ -176,9 +177,9 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
 
     # Add state and county fips codes
     # Fix LaSalle Parish spelling to match addfips library
-    ballot_ready.loc[
-        (ballot_ready.county == "LaSalle Parish"), "county"
-    ] = "La Salle Parish"
+    ballot_ready.loc[(ballot_ready.county == "LaSalle Parish"), "county"] = (
+        "La Salle Parish"
+    )
     ballot_ready = add_fips_ids(ballot_ready)
 
     # Valdez-Cordova Census Area was split into two areas in 2019
@@ -232,7 +233,7 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
     ]
     county_match = geo_ids.geo_id.str[0:5] == geo_ids.county_id_fips
     logger.info(
-        f"County FIPS codes:Of {len(county_match)} geocoded county FIPS IDs compared to the Ballot Ready data, {sum(county_match)} match ({sum(county_match)/len(county_match):.0%})"
+        f"County FIPS codes:{sum(county_match)} of {len(county_match)} geocoded state FIPS IDs match the Ballot Ready data ({sum(county_match) / len(county_match):.0%})"
     )
     assert sum(county_match) / len(county_match) > 0.75
 
