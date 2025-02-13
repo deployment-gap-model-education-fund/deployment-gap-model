@@ -58,7 +58,7 @@ conda install -c conda-forge google-cloud-sdk
 Finally, use ``gcloud`` to establish application default credentials
 
 ```
-  gcloud auth application-default login
+gcloud auth application-default login
 ```
 
 This will send you to an authentication page in your default browser. Once
@@ -121,7 +121,7 @@ during this step it means docker is not running.
 Now that we’ve built the image and set the environment variables run:
 
 ```
-make all_local
+make all
 ```
 
 to create and load the data warehouse and data mart tables into postgres.
@@ -167,12 +167,6 @@ make shell
 starts a bash interactive terminal. This is helpful for debugging.
 
 ```
-make run_etl_bq
-```
-
-runs the etl and loads the data to our BigQuery instance. Currently only @bendnorman has the permissions to load to BigQuery.
-
-```
 make jupyter_lab
 ```
 
@@ -186,4 +180,4 @@ export JUPYTER_PORT=8890
 
 DBCP roughly follows an ETL(T) architecture. `dbcp.etl.etl()` extracts the raw data, cleans it then loads it into a data warehouse, a local postgres database in ourcase. The tables in the data warehouse are normalized to a certain degree (we need to define a clear data model).
 
-Tableau doesn't handle normalized data tables very well so we create denomalized tables for specific dashboards we call "data marts". To create a new data mart, create a new python file in the `dbcp.data_mart` module and implement a `create_data_mart()` function that returns the data_mart as a pandas data frame.
+We then create denomalized tables for specific dashboards we call "data marts". To create a new data mart, create a new python file in the `dbcp.data_mart` module and implement a `create_data_mart()` function that returns the data_mart as a pandas data frame.
