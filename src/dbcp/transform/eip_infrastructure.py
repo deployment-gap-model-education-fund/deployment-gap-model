@@ -2,12 +2,12 @@
 
 import logging
 import re
+import ast
 from typing import Dict, List, Sequence
 
 import numpy as np
 import pandas as pd
 
-from dbcp.constants import DATA_DIR
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     replace_value_with_count_validation,
@@ -53,7 +53,9 @@ def _split_json_column(
     """
     raw_df = df.copy()
     if col in raw_df.columns:
-        json_cols = pd.json_normalize(raw_df[col].map(eval))
+        # Where a column contains JSON as a string, evaluate it as a dictionary and
+        # then normalize it into Pandas DataFrame columns.
+        json_cols = pd.json_normalize(raw_df[col].map(ast.literal_eval))
         if prefix:
             json_cols = json_cols.add_prefix(prefix)
         return pd.concat([raw_df, json_cols], axis="columns").drop(col, axis="columns")
@@ -92,6 +94,10 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
     fac = _split_json_column(fac, col="xata")
     fac.columns = _format_column_names(fac)
     # Drop facilities that aren't published by EIP
+    # These are a small number of facilities that were added to the database in
+    # error, have been reviewed and determined not to be suitable for display on the
+    # EIP site. Because these unpublished records are exposed through the API, we
+    # manually remove them.
     fac = fac.loc[fac["published"]]
     rename_dict = {  # add 'raw_' prefix to columns that need transformation
         "id": "facility_id",
@@ -129,7 +135,7 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         "epafrsid3": "raw_epa_frs_id_3",
         "id_qaqc": "unknown_id",
         "linkto_ejscreen_report": "link_to_ejscreen_report",
-        # New columns
+        # New columns from xata API
         "cancer_prevalence": "raw_percent_cancer_prevalence",
         "cancer_prevalence_percentile": "raw_percentile_cancer_prevalence",
         "county_fips_code_text": "raw_county_fips_code",
@@ -140,13 +146,6 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         "epafrsid3": "raw_epa_frs_id_3",
         "id_qaqc": "unknown_id",
         # FIND THESE!
-        # "associated_facilities_id": "raw_associated_facilities_id",
-        # "pipelines_id": "raw_pipelines_id",
-        # "air_operating_id": "raw_air_operating_id",
-        # "latest_updates": "raw_latest_updates",
-        # "cwa-npdes_id": "raw_cwa_npdes_id",
-        # "cwa_wetland_id": "raw_cwa_wetland_id",
-        # "other_permits_id": "raw_other_permits_id",
         # "congressional_representatives": "raw_congressional_representatives",
         # "ccs/ccus": "raw_is_ccs",
         # "respiratory_hazard_index": "raw_respiratory_hazard_index",
@@ -208,14 +207,23 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
     fac = add_county_fips_with_backup_geocoding(
         fac, state_col="state", locality_col="county"
     )
-    assert len(fac.loc[fac.county_id_fips != fac.county_fips_code]) == 0
+    assert (
+        len(fac.loc[fac.county_id_fips != fac.county_fips_code]) == 0
+    ), f"Found 1+ geocoded county FIPS IDs that did not match the EIP data:\n {fac.loc[fac.county_id_fips != fac.county_fips_code]}"
 
     fac.drop(
         columns=["state", "county", "county_fips_code"], inplace=True
     )  # drop intermediates
 
-    assert fac["longitude"].max() < 0  # USA longitudes
-    assert fac["latitude"].min() > 0  # USA latitudes
+    max_long = fac["longitude"].max()
+    min_lat = fac["latitude"].min()
+
+    assert (
+        max_long < 0
+    ), f"Max longitude found was {max_long}, expected <0."  # USA longitudes
+    assert (
+        min_lat > 0
+    ), f"Min latitude found was {min_lat}, expected >0."  # USA latitudes
 
     fac["date_modified"] = pd.to_datetime(
         fac.loc[:, "raw_modified_on"], infer_datetime_format=True
@@ -241,10 +249,6 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
         "actualor_expected_completion_year": "raw_actual_or_expected_completion_year",
         "current_expected_operating_year": "raw_current_expected_operating_year",  # NEW
         "original_expected_operating_year": "raw_original_expected_operating_year",  # NEW
-        # "air_construction_id": "raw_air_construction_id",
-        # "air_operating_id": "raw_air_operating_id",
-        # "ccs_id": "raw_ccs_id",
-        # "ccs": "raw_is_ccs",
         "construction_status_last_checked": "raw_construction_status_last_checked",
         "construction_status_last_updated": "raw_construction_status_last_updated",  # NEW
         "created_at": "raw_created_on",
@@ -253,14 +257,10 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
         "id_qaqc": "unknown_id",  # NEW
         "industry_sector": "raw_industry_sector",
         "updated_at": "raw_modified_on",
-        # "nga_id": "raw_nga_id",
-        # "number_of_jobs_promised": "raw_number_of_jobs_promised",
         "operating_status": "raw_operating_status",
-        # "other_permits_id": "raw_other_permits_id",
         "project_costmillion": "cost_millions",
         "project_type": "raw_project_type",
         "product_type": "raw_product_type",
-        # "target_list": "raw_is_ally_target",
         # add tons per year units
         "sulfur_dioxide_so2": "sulfur_dioxide_so2_tpy",
         "carbon_monoxide_co": "carbon_monoxide_co_tpy",
@@ -358,19 +358,6 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
     ].astype(
         str
     )
-
-    # duplicative_columns = [  # these are raw names
-    #     # These columns are just a concatenation of the names and IDs corresponding to the ID columns
-    #     # They add no information but invite inconsistency
-    #     "Facility",
-    #     "Air Construction",
-    #     "Air Operating",
-    #     "NGA",
-    #     "MARAD",
-    #     "Other Permits",
-    # ]
-    # duplicative_columns = _format_column_names(duplicative_columns)
-    # proj.drop(columns=duplicative_columns, inplace=True)
 
     return proj
 
@@ -612,7 +599,6 @@ if __name__ == "__main__":
 
     from dbcp.extract.eip_infrastructure import extract
 
-    source_path = DATA_DIR / "raw/eip_infrastructure"
-    eip_raw_dfs = extract(source_path)
+    eip_raw_dfs = extract()
     eip_transformed_dfs = transform(eip_raw_dfs)
     print("yay")

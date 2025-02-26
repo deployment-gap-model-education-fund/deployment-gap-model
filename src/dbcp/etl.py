@@ -24,8 +24,7 @@ logger = logging.getLogger(__name__)
 def etl_eip_infrastructure() -> Dict[str, pd.DataFrame]:
     """EIP Infrastructure ETL."""
     # Extract
-    source_path = DATA_DIR / "raw/eip_infrastructure"
-    eip_raw_dfs = dbcp.extract.eip_infrastructure.extract(source_path)
+    eip_raw_dfs = dbcp.extract.eip_infrastructure.extract()
 
     # Transform
     eip_transformed_dfs = dbcp.transform.eip_infrastructure.transform(eip_raw_dfs)

@@ -260,7 +260,6 @@ eip_facilities = Table(
     Column("raw_percent_cancer_prevalence", Float),
     Column("raw_percentile_cancer_prevalence", Float),
     # Column("raw_respiratory_hazard_index", Float),
-    # Column("raw_pm2_5_ug_per_m3", Float),
     # Column("raw_o3_ppb", Float),
     # Column("raw_wastewater_discharge_indicator", String),
     Column("raw_location", String),

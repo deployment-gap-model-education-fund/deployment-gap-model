@@ -5,24 +5,19 @@ air construction permit) has its own CSV file, and then there are two additional
 with IDs linking facilities to projects and projects to air construction permits.
 
 The following datasets are available but not currently downloaded:
-# TODO - update this!
 # 'Pipelines',
-# 'NGA',
-# 'NAICS',
+# 'Air Operating',
+# 'Other Permits',
+# 'Carbon UIC',
 # 'CWA-NPDES',
 # 'CWA Wetland',
-# 'Air Operating',
+# 'LNG Export',
+# 'NGA',
+# 'MARAD',
 # 'Glossary',  # useful for data dictionary
 # 'Data Sources',
 # 'Map Layers',
-# 'Other Permits',
-# 'Test Collection',
-# 'Featured Facility Descriptors',
-# 'MARAD',
-# 'TEST',
-# 'Pipeline Digitization',
 """
-from pathlib import Path
 from typing import Dict
 
 import numpy as np
@@ -57,14 +52,11 @@ def _downcast_ints(df: pd.DataFrame) -> None:
         df.loc[:, col] = ser.astype(pd.Int32Dtype())
 
 
-def extract(path: Path) -> Dict[str, pd.DataFrame]:
+def extract() -> Dict[str, pd.DataFrame]:
     """Read in EIP CSV files from a provided path to a folder.
 
-    Args:
-        path (Path): filepath
-
     Returns:
-        Dict[str, pd.DataFrame]: output dictionary of dataframes
+        An output dictionary of dataframes.
     """
     raw_dfs = {}
 
@@ -76,6 +68,11 @@ def extract(path: Path) -> Dict[str, pd.DataFrame]:
         _convert_object_to_string_dtypes(df)
         _downcast_ints(df)
         # Get the first part of the name (e.g. eip_air_construction_permits) as the key
-        raw_dfs[file_name.rsplit("_", 1)[0]] = df
+        try:
+            raw_dfs[file_name.rsplit("_", 1)[0]] = df
+        except IndexError:
+            raise IndexError(
+                f"We expect file names to be formatted as file_date.csv. This file name is formatted as follows: {file_name}"
+            )
 
     return raw_dfs
