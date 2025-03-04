@@ -1,9 +1,10 @@
 """Module for extracting Ballot Ready data."""
+
 import pandas as pd
 
 import dbcp
 
-BR_URI = "gs://dgm-archive/ballot_ready/climate_partners_upcoming_races_with_counties_20250204.csv"
+BR_URI = "gs://dgm-archive/ballot_ready/Climate Partners_Upcoming_Races_with_Counties_20250210.csv"
 
 
 def extract(uri: str) -> dict[str, pd.DataFrame]:
