@@ -2,14 +2,13 @@
     projects as (
         SELECT
             project_id,
-            name as project_name,
+            project_name,
             classification as project_classification,
             cost_millions,
             date_modified,
             industry_sector,
             project_description,
             raw_project_type,
-            raw_number_of_jobs_promised,
             -- First multiplier below is unit conversion
             -- The second is 15 percent haircut to account for realistic utilization, as per design doc.
             greenhouse_gases_co2e_tpy * 0.907185 * 0.85 as co2e_tonnes_per_year,
@@ -20,7 +19,6 @@
             particulate_matter_pm2_5_tpy * 0.907185 * 0.85 as pm2_5_tonnes_per_year,
             total_wetlands_affected_permanently_acres,
             total_wetlands_affected_temporarily_acres,
-            is_ally_target,
             operating_status
         FROM data_warehouse.eip_projects
         WHERE operating_status not in ('Operating', 'Under construction', 'Canceled')
@@ -30,7 +28,7 @@
             facility_id,
             county_id_fips,
             state_id_fips,
-            name as facility_name,
+            facility_name,
             latitude,
             longitude,
             -- concat with separator
@@ -39,9 +37,7 @@
             raw_estimated_population_within_3_miles,
             raw_percent_low_income_within_3_miles,
             raw_percent_people_of_color_within_3_miles,
-            raw_respiratory_hazard_index as raw_respiratory_hazard_index_within_3_miles,
-            raw_air_toxics_cancer_risk_nata_cancer_risk as raw_relative_cancer_risk_per_million_within_3_miles,
-            raw_wastewater_discharge_indicator
+            raw_air_toxics_cancer_risk_nata_cancer_risk as raw_relative_cancer_risk_per_million_within_3_miles
         FROM data_warehouse.eip_facilities
     ),
     permits as (
@@ -98,9 +94,7 @@
             fac.raw_estimated_population_within_3_miles,
             fac.raw_percent_low_income_within_3_miles,
             fac.raw_percent_people_of_color_within_3_miles,
-            fac.raw_respiratory_hazard_index_within_3_miles,
-            fac.raw_relative_cancer_risk_per_million_within_3_miles,
-            fac.raw_wastewater_discharge_indicator
+            fac.raw_relative_cancer_risk_per_million_within_3_miles
         FROM proj_facility_id as proj
         LEFT JOIN facilities as fac
         ON proj.facility_id = fac.facility_id
@@ -160,7 +154,6 @@
         facility_description,
         permit_description,
         cost_millions,
-        raw_number_of_jobs_promised,
         date_modified,
         co2e_tonnes_per_year,
         voc_tonnes_per_year,
@@ -173,10 +166,7 @@
         raw_estimated_population_within_3_miles,
         raw_percent_low_income_within_3_miles,
         raw_percent_people_of_color_within_3_miles,
-        raw_respiratory_hazard_index_within_3_miles,
-        raw_relative_cancer_risk_per_million_within_3_miles,
-        raw_wastewater_discharge_indicator,
-        is_ally_target
+        raw_relative_cancer_risk_per_million_within_3_miles
     FROM final
     ORDER BY 2, 1
     ;

@@ -41,12 +41,9 @@ Note: facilities that are already operating, under construction, or cancelled ha
 |Demographics|`raw_estimated_population_within_3_miles`|Population within 3 miles, based on EJScreen. "raw_" prefix indicates this column has not been quality controlled.|EIP||
 ||`raw_percent_low_income_within_3_miles`|Percentage of population within 3 miles that qualilfies as low income, based on EJScreen. "raw_" prefix indicates this column has not been quality controlled.|EIP||
 ||`raw_percent_people_of_color_within_3_miles`|Percentage of population within 3 miles that identify as people of color, based on EJScreen. "raw_" prefix indicates this column has not been quality controlled.|EIP||
-|Environmental|`raw_respiratory_hazard_index_within_3_miles`|Air Toxics Respiratory Hazard Index from EPA's 2014 National Air Toxics Assessment (NATA) within 3 miles, based on EJScreen. "raw_" prefix indicates this column has not been quality controlled.|EIP||
 ||`raw_relative_cancer_risk_per_million_within_3_miles`|Existing cancer risk per million people relative to baseline within 3 miles, based on EJScreen. "raw_" prefix indicates this column has not been quality controlled.|EIP||
-||`raw_wastewater_discharge_indicator`|Toxicity-weighted concentration of wastewater discharges within 3 miles, based on EJScreen. "raw_" prefix indicates this column has not been quality controlled.|EIP||
 ||`total_wetlands_affected_permanently_acres`|Acres of permanent wetland loss|EIP||
 ||`total_wetlands_affected_temporarily_acres`|Acres of temporary wetland loss|EIP||
-|Allies Interest|`is_ally_target`|Somebody else thinks this facility is interesting.||true/false, 116 true|
 
 ## Modeling Decisions
 
