@@ -243,7 +243,7 @@ def test_county_wide_coverage(engine: Engine):
         df.shape[0] == n_counties
     ), "counties_wide_format does not contain all counties"
     notnull = df.notnull()
-    n_expected_counties = 2459
+    n_expected_counties = 2458
     assert notnull.any(axis=1).sum() == n_expected_counties, (
         "counties_wide_format has unexpected county coverage."
         f" Expected {n_expected_counties}, found {notnull.any(axis=1).sum()}"
@@ -281,7 +281,7 @@ def test_county_long_vs_wide(engine: Engine):
         "Coal",
         "Oil",  # this name is shared between both power and infra
         "Liquefied Natural Gas",
-        "Synthetic Fertilizers",
+        "Ammonia and Synthetic Fertilizers",
         "Petrochemicals and Plastics",
     }
     string_wrapped = (f"'{item}'" for item in resources_to_keep)

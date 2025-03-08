@@ -137,14 +137,14 @@ counties_wide_format = Table(
         nullable=True,
     ),
     Column(
-        "infra_synthetic_fertilizers_proposed_co2e_tonnes_per_year",
+        "infra_ammonia_synth_fertilizers_proposed_co2e_tonnes_per_year",
         Float,
         nullable=True,
     ),
-    Column("infra_synthetic_fertilizers_proposed_facility_count", Integer),
-    Column("infra_synthetic_fertilizers_proposed_nox_tonnes_per_year", Float),
+    Column("infra_ammonia_synth_fertilizers_proposed_facility_count", Integer),
+    Column("infra_ammonia_synth_fertilizers_proposed_nox_tonnes_per_year", Float),
     Column(
-        "infra_synthetic_fertilizers_proposed_pm2_5_tonnes_per_year",
+        "infra_ammonia_synth_fertilizers_proposed_pm2_5_tonnes_per_year",
         Float,
         nullable=True,
     ),
@@ -219,7 +219,7 @@ existing_plants = Table(
 fossil_infrastructure_projects = Table(
     "fossil_infrastructure_projects",
     metadata,
-    Column("project_id", Integer, primary_key=True),
+    Column("project_id", String, primary_key=True),
     Column("project_name", String, nullable=False),
     Column("state", String),
     Column("county", String),
@@ -228,8 +228,8 @@ fossil_infrastructure_projects = Table(
     Column("latitude", Float),
     Column("longitude", Float),
     Column("raw_street_address", String),
-    Column("air_construction_id", Float),
-    Column("facility_id", Integer),
+    Column("air_construction_id", String),
+    Column("facility_id", String),
     Column("facility_name", String),
     Column("project_classification", String),
     Column("operating_status", String),
@@ -239,7 +239,6 @@ fossil_infrastructure_projects = Table(
     Column("facility_description", String),
     Column("permit_description", String),
     Column("cost_millions", Float),
-    Column("raw_number_of_jobs_promised", String),
     Column("date_modified", DateTime),
     Column("co2e_tonnes_per_year", Float),
     Column("voc_tonnes_per_year", Float),
@@ -252,10 +251,7 @@ fossil_infrastructure_projects = Table(
     Column("raw_estimated_population_within_3_miles", Float),
     Column("raw_percent_low_income_within_3_miles", Float),
     Column("raw_percent_people_of_color_within_3_miles", Float),
-    Column("raw_respiratory_hazard_index_within_3_miles", Float),
     Column("raw_relative_cancer_risk_per_million_within_3_miles", Float),
-    Column("raw_wastewater_discharge_indicator", Float),
-    Column("is_ally_target", String, nullable=False),
     schema=schema,
 )
 
@@ -609,7 +605,7 @@ br_election_data = Table(
     Column("race_created_at", DateTime, nullable=False),
     Column("race_updated_at", DateTime, nullable=False),
     Column("state_id_fips", String, nullable=False),
-    Column("county_id_fips", String),  # Should not be nullable in future updates
+    Column("county_id_fips", String, nullable=False),
     schema=schema,
 )
 
