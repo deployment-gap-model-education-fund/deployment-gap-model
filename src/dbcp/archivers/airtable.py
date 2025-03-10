@@ -103,6 +103,10 @@ class AirtableArchiver(AbstractArchiver):
                 base_id="appZHPwbPSqIMgphw",
                 base_name="Offshore Wind Locations Synapse Version",
             ),
+            AirtableBaseInfo(
+                base_id="appL1xwwGt5lOYUHs",
+                base_name="Clean Build State Permitting Analysis",
+            ),
         )
         for base in bases:
             self.archive_base(base)

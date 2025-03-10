@@ -1,30 +1,44 @@
 """Load manually maintained ordinances from BigQuery."""
-import google.auth
+
 import pandas as pd
-from pandas_gbq import read_gbq
+
+from dbcp.extract.helpers import cache_gcs_archive_file_locally, extract_airtable_data
 
 
-def extract() -> dict[str, pd.DataFrame]:
+def extract(counties_uri: str) -> dict[str, pd.DataFrame]:
     """Extract manually maintained ordinances from BigQuery.
 
     Returns:
         dfs: dictionary of dataframe name to raw dataframe.
     """
     dfs = {}
-    credentials, project_id = google.auth.default()
-    dfs["manual_ordinances"] = read_gbq(
-        """SELECT
-    county_id_fips,
-    CASE
-        WHEN ordinance_status IS NULL THEN NULL
-        WHEN ordinance_status IN ('Ordinance/moratorium change in process', 'Prohibitive ordinance/moratorium') THEN TRUE
-        ELSE FALSE
-    END as ordinance_via_self_maintained
-    FROM `local-jobs-econ-dev-fund.airtable_data.county_permitting_info`
-    """,
-        project_id=project_id,
-        credentials=credentials,
+    counties_uri, counties_generation_num = str(counties_uri).split("#")
+
+    counties_path = cache_gcs_archive_file_locally(
+        counties_uri, generation_num=counties_generation_num
     )
+
+    manual_ordinances_counties = extract_airtable_data(counties_path)
+    # drop all rows that are missing all data
+    manual_ordinances_counties = manual_ordinances_counties.dropna(how="all")
+
+    manual_ordinances_counties["Ordinance Status"] = manual_ordinances_counties[
+        "Ordinance Status"
+    ].isin(
+        ("Ordinance/moratorium change in process", "Prohibitive ordinance/moratorium")
+    )
+    manual_ordinances_counties = manual_ordinances_counties.rename(
+        columns={
+            "FIPS": "county_id_fips",
+            "Ordinance Status": "ordinance_via_self_maintained",
+        }
+    )
+
+    manual_ordinances_counties = manual_ordinances_counties[
+        ["county_id_fips", "ordinance_via_self_maintained"]
+    ].copy()
+
+    dfs["manual_ordinances"] = manual_ordinances_counties
     return dfs
 
 
