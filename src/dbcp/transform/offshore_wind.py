@@ -156,19 +156,20 @@ def _add_geocoded_locations(transformed_locs: pd.DataFrame) -> None:
     transformed_locs.drop(columns=["city_county"], inplace=True)
 
     nan_fips_idx = first_pass["county_id_fips"].isna()
-    second_pass = add_county_fips_with_backup_geocoding(
-        transformed_locs.loc[nan_fips_idx, ["raw_city", "raw_state_abbrev"]],
-        state_col="raw_state_abbrev",
-        locality_col="raw_city",
-    )
-
     cols_to_fill = [
         "county_id_fips",
         "geocoded_locality_name",
         "geocoded_locality_type",
         "geocoded_containing_county",
     ]
-    first_pass.update(second_pass.loc[:, cols_to_fill])
+    if nan_fips_idx.sum() > 0:
+        second_pass = add_county_fips_with_backup_geocoding(
+            transformed_locs.loc[nan_fips_idx, ["raw_city", "raw_state_abbrev"]],
+            state_col="raw_state_abbrev",
+            locality_col="raw_city",
+        )
+        first_pass.update(second_pass.loc[:, cols_to_fill])
+
     transformed_locs.loc[:, cols_to_fill] = first_pass[cols_to_fill]
     return
 

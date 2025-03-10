@@ -1,15 +1,39 @@
 """Retrieve data from EIP Infrastructure spreadsheets for analysis.
 
-This data was updated by contacting EIP directly for the latest version, but now they
-host an Excel file at oilandgaswatch.org -> Resources -> Downloads, which points to:
-https://drive.google.com/drive/folders/1udtw3XeezA5Lkb8Mfc_cntNTcV4oPuKi
-Note that this new data version has changed structure from the one extracted below.
+This data is accessed through a xata API hosted by EIP. Each entity (facility, project,
+air construction permit) has its own CSV file, and then there are two additional files
+with IDs linking facilities to projects and projects to air construction permits.
+
+The following datasets are available but not currently downloaded:
+# 'Pipelines',
+# 'Air Operating',
+# 'Other Permits',
+# 'Carbon UIC',
+# 'CWA-NPDES',
+# 'CWA Wetland',
+# 'LNG Export',
+# 'NGA',
+# 'MARAD',
+# 'Glossary',  # useful for data dictionary
+# 'Data Sources',
+# 'Map Layers',
 """
-from pathlib import Path
 from typing import Dict
 
 import numpy as np
 import pandas as pd
+
+from dbcp.extract.helpers import cache_gcs_archive_file_locally
+
+FILE_NAME_DICT = {
+    "eip_air_construction_permits",
+    "eip_air_construction_project_assn",
+    "eip_facilities",
+    "eip_facility_project_assn",
+    "eip_projects",
+}
+
+DATE = "2025-01-09"
 
 
 def _convert_object_to_string_dtypes(df: pd.DataFrame) -> None:
@@ -28,45 +52,27 @@ def _downcast_ints(df: pd.DataFrame) -> None:
         df.loc[:, col] = ser.astype(pd.Int32Dtype())
 
 
-def extract(path: Path) -> Dict[str, pd.DataFrame]:
-    """Read EIP excel database.
-
-    Args:
-        path (Path): filepath
+def extract() -> Dict[str, pd.DataFrame]:
+    """Read in EIP CSV files from a provided path to a folder.
 
     Returns:
-        Dict[str, pd.DataFrame]: output dictionary of dataframes
+        An output dictionary of dataframes.
     """
-    sheets_to_read = [
-        "Facility",
-        # 'Company',
-        "Project",
-        "Air Construction",  # permit status is key to identifying actionable projects
-        # 'Pipelines',
-        # 'NGA',
-        # 'NAICS',
-        # 'CWA-NPDES',
-        # 'CWA Wetland',
-        # 'Air Operating',
-        # 'Glossary',  # useful for data dictionary
-        # 'Data Sources',
-        # 'Map Layers',
-        # 'Other Permits',
-        # 'Test Collection',
-        # 'Featured Facility Descriptors',
-        # 'MARAD',
-        # 'TEST',
-        # 'Pipeline Digitization',
-    ]
-    raw_dfs = pd.read_excel(path, sheet_name=sheets_to_read)
-    rename_dict = {
-        "Facility": "eip_facilities",
-        "Project": "eip_projects",
-        "Air Construction": "eip_air_constr_permits",
-    }
-    raw_dfs = {rename_dict[key]: df for key, df in raw_dfs.items()}
-    for df in raw_dfs.values():
+    raw_dfs = {}
+
+    for file in FILE_NAME_DICT:
+        file_name = f"{file}_{DATE}.csv"
+        uri = f"gs://dgm-archive/eip_infrastructure/{file_name}"
+        path = cache_gcs_archive_file_locally(uri=uri)
+        df = pd.read_csv(path)
         _convert_object_to_string_dtypes(df)
         _downcast_ints(df)
+        # Get the first part of the name (e.g. eip_air_construction_permits) as the key
+        try:
+            raw_dfs[file_name.rsplit("_", 1)[0]] = df
+        except IndexError:
+            raise IndexError(
+                f"We expect file names to be formatted as file_date.csv. This file name is formatted as follows: {file_name}"
+            )
 
     return raw_dfs

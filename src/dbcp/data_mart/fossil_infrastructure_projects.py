@@ -12,8 +12,6 @@ from dbcp.helpers import get_sql_engine
 def _get_proposed_infra_projects(engine: sa.engine.Engine) -> pd.DataFrame:
     query = get_query("get_proposed_infra_projects.sql")
     df = pd.read_sql(query, engine)
-    # fix columns with mixed dtypes that break pyarrow and parquet (via pandas_gbq)
-    df.loc[:, "is_ally_target"] = df.loc[:, "is_ally_target"].astype(str)
     return df
 
 

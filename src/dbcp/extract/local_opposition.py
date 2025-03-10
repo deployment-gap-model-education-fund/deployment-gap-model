@@ -4,13 +4,12 @@ This dataset is a .docx file with a hierarchical structure.  The hierarchy is de
 formatting details (paragraph level, font, etc), but is surprisingly consistent. It is
 infrequently updated by a research group at Columbia University.
 """
-from pathlib import Path
 from typing import Dict, List, Optional
 
 import docx
 import pandas as pd
 
-from dbcp.constants import US_STATES
+from dbcp.constants import DATA_DIR, US_STATES
 
 
 class ColumbiaDocxParser(object):
@@ -63,7 +62,7 @@ class ColumbiaDocxParser(object):
         }
 
     def load_docx(
-        self, source_path=Path("/app/data/raw/RELDI report updated 9.10.21 (1).docx")
+        self, source_path=DATA_DIR / "raw/RELDI report updated 9.10.21 (1).docx"
     ) -> None:
         """Read the .docx file with python-docx.
 
@@ -91,7 +90,7 @@ class ColumbiaDocxParser(object):
                 return paragraphs[idx:]
         raise ValueError("Could not find starting state")
 
-    def _parse_values(self, text: str) -> None:
+    def _parse_values(self, text: str) -> None:  # noqa: C901
         """Parse and assign values to the correct dataset based on the current hierarchical headings.
 
         Args:

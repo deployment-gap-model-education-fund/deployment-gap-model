@@ -342,6 +342,10 @@ def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     # from data_mart.fossil_infrastructure_projects
     # group by 1, 2
 
+    infra.loc[:, "industry_sector"].replace(
+        "Liquefied Natural Gas (LNG)", "Liquefied Natural Gas", inplace=True
+    )  # Use shorthand code to shorten column names later on
+
     grp = infra.groupby(["county_id_fips", "industry_sector"])
     aggs = grp.agg(
         {
@@ -354,6 +358,7 @@ def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     aggs.loc[:, "co2e_tonnes_per_year"].replace(
         0, np.nan, inplace=True
     )  # sums of 0 are simply unmodeled
+
     aggs["facility_type"] = "fossil infrastructure"
     aggs["status"] = "proposed"
     aggs.reset_index(inplace=True)
@@ -474,7 +479,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "Coal",
         "Oil",  # this name is shared between both power and infra
         "Liquefied Natural Gas",
-        "Synthetic Fertilizers",
+        "Ammonia and Synthetic Fertilizers",
         "Petrochemicals and Plastics",
     }
     to_keep = long["resource_or_sector"].isin(resources_to_keep)
@@ -485,7 +490,11 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         {"fossil infrastructure": "infra", "power plant": ""}
     )
     long.loc[:, "resource_or_sector"] = long.loc[:, "resource_or_sector"].replace(
-        {"Natural Gas": "gas", "Liquefied Natural Gas": "lng"}
+        {
+            "Natural Gas": "gas",
+            "Liquefied Natural Gas": "lng",
+            "Ammonia and Synthetic Fertilizers": "ammonia_synth_fertilizers",
+        }
     )
     long.loc[:, "resource_or_sector"] = (
         long.loc[:, "resource_or_sector"].str.lower().str.replace(" ", "_", regex=False)
@@ -568,7 +577,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "lng",
         "oil",
         "petrochemicals_and_plastics",
-        "synthetic_fertilizers",
+        "ammonia_synth_fertilizers",
     ]
     for measure in measures:
         infra_cols_to_sum = [f"infra_{sector}_{measure}" for sector in sectors]

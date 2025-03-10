@@ -58,7 +58,7 @@ conda install -c conda-forge google-cloud-sdk
 Finally, use ``gcloud`` to establish application default credentials
 
 ```
-  gcloud auth application-default login
+gcloud auth application-default login
 ```
 
 This will send you to an authentication page in your default browser. Once
@@ -77,10 +77,11 @@ export GOOGLE_GHA_CREDS_PATH=<path/to/your_credentials.json>
 `GOOGLE_GHA_CREDS_PATH` will be mounted into the container so
 the GCP APIs in the container can access the data stored in GCP.
 
-You'll also need to set an environment variable for the Google Maps API Key:
+You'll also need to set an environment variable for the Geocodio API Key. This api key is stored
+GCP project Secret Manager as `geocodio-api-key`.
 
 ```
-export API_KEY_GOOGLE_MAPS={Google Maps API key for GCP project dbcp-dev-350818}
+export GEOCODIO_API_KEY={geocodio api key}
 ```
 
 ## Git Pre-commit Hooks
@@ -120,7 +121,7 @@ during this step it means docker is not running.
 Now that we’ve built the image and set the environment variables run:
 
 ```
-make all_local
+make all
 ```
 
 to create and load the data warehouse and data mart tables into postgres.
@@ -166,12 +167,6 @@ make shell
 starts a bash interactive terminal. This is helpful for debugging.
 
 ```
-make run_etl_bq
-```
-
-runs the etl and loads the data to our BigQuery instance. Currently only @bendnorman has the permissions to load to BigQuery.
-
-```
 make jupyter_lab
 ```
 
@@ -185,4 +180,4 @@ export JUPYTER_PORT=8890
 
 DBCP roughly follows an ETL(T) architecture. `dbcp.etl.etl()` extracts the raw data, cleans it then loads it into a data warehouse, a local postgres database in ourcase. The tables in the data warehouse are normalized to a certain degree (we need to define a clear data model).
 
-Tableau doesn't handle normalized data tables very well so we create denomalized tables for specific dashboards we call "data marts". To create a new data mart, create a new python file in the `dbcp.data_mart` module and implement a `create_data_mart()` function that returns the data_mart as a pandas data frame.
+We then create denomalized tables for specific dashboards we call "data marts". To create a new data mart, create a new python file in the `dbcp.data_mart` module and implement a `create_data_mart()` function that returns the data_mart as a pandas data frame.

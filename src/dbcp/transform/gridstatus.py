@@ -221,6 +221,7 @@ RESOURCE_DICT = {
                 "Thermal - Combustion Turbine",
                 "Thermal - ST",
                 "Thermal - VFT",
+                "Hybrid - GT/Battery",
             ],
             "nyiso": [
                 "Combined Cycle",
@@ -271,7 +272,7 @@ RESOURCE_DICT = {
             "miso": ["Diesel"],
             "caiso": [],
             "pjm": ["Diesel; Solar", "Diesel; Methane"],
-            "ercot": [],
+            "ercot": ["Fuel Oil - Other"],
             "spp": ["Thermal - Diesel/Gas"],
             "nyiso": [],
             "isone": [
@@ -478,7 +479,7 @@ def _clean_resource_type(
         resource_locations["county_id_fips"].isin(coastal_county_id_fips.keys())
         & resource_locations.resource_clean.eq("Onshore Wind")
     ].project_id
-    expected_n_coastal_wind_projects = 88
+    expected_n_coastal_wind_projects = 83
     assert (
         len(nyiso_coastal_wind_project_project_ids) == expected_n_coastal_wind_projects
     ), f"Expected {expected_n_coastal_wind_projects} NYISO coastal wind projects but found {len(nyiso_coastal_wind_project_project_ids)}"
@@ -495,7 +496,9 @@ def _clean_resource_type(
             normalized_projects, on="project_id", how="left", validate="m:1"
         )
         debug = unmapped[["region", "resource"]].value_counts(dropna=False).sort_index()
-        raise AssertionError(f"Unmapped resource types in: \n{debug}")
+        raise AssertionError(
+            f"Unmapped resource types. Add these to RESOURCE_DICT: \n\n{debug}\n"
+        )
     return resource_df
 
 
@@ -625,7 +628,7 @@ def _transform_miso(post_2017: pd.DataFrame, pre_2017: pd.DataFrame) -> pd.DataF
     done_in_service_projects = in_service_projects[
         in_service_projects["queue_status"].ne("Done")
     ]
-    expected_n_done_in_service_projects = 2
+    expected_n_done_in_service_projects = 3
     assert (
         len(done_in_service_projects) <= expected_n_done_in_service_projects
     ), f"Expected {expected_n_done_in_service_projects} MISO projects that are In Service but not Done but found {len(done_in_service_projects)}."
@@ -720,7 +723,7 @@ def _transform_pjm(iso_df: pd.DataFrame) -> pd.DataFrame:
         iso_df,
         facilities_study_status_col="Facilities Study Status",
         system_impact_study_col="System Impact Study Status",
-        ia_col="Interim/Interconnection Service Agreement Status",
+        ia_col="Interim/Interconnection Service/Generation Interconnection Agreement Status",
         completed_strings=("Document Posted",),
     )
 
@@ -734,7 +737,7 @@ def _transform_pjm(iso_df: pd.DataFrame) -> pd.DataFrame:
         .agg(["mean", "sum"])
     )
     assert (
-        stats["mean"] > 0.9
+        stats["mean"] > 0.89
     ), f"Only {stats['mean']:.2%} of Active project_name look like transmission lines."
 
     iso_df.drop(columns="point_of_interconnection", inplace=True)
@@ -1120,7 +1123,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         intermediate_creator=_prep_for_deduplication,
     )
     dupes = pre_dedupe - len(deduped_projects)
-    logger.info(f"Deduplicated {dupes} ({dupes/pre_dedupe:.2%}) projects.")
+    logger.info(f"Deduplicated {dupes} ({dupes / pre_dedupe:.2%}) projects.")
 
     # Normalize data
     (

@@ -1,17 +1,18 @@
 """Tranform raw FIPS tables to a database-ready form."""
 import logging
-from pathlib import Path
 from typing import Dict, Sequence
 
 import geopandas as gpd
 import pandas as pd
 from joblib import Memory
 
+from dbcp.constants import DATA_DIR
+
 logger = logging.getLogger(__name__)
 
 # cache needs to be accessed outside this module to call .clear()
 # limit cache size to 1 MB, keeps most recently accessed first
-SPATIAL_CACHE = Memory(location=Path("/app/data/spatial_cache"), bytes_limit=2**20)
+SPATIAL_CACHE = Memory(location=DATA_DIR / "spatial_cache", bytes_limit=2**20)
 
 
 @SPATIAL_CACHE.cache()

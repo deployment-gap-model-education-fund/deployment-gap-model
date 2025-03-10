@@ -1,7 +1,6 @@
 """The ETL module create the data warehouse tables."""
 
 import logging
-from pathlib import Path
 from typing import Callable, Dict
 
 import pandas as pd
@@ -11,12 +10,13 @@ import sqlalchemy as sa
 
 import dbcp
 from dbcp.archivers.utils import ExtractionSettings
-from dbcp.constants import OUTPUT_DIR
+from dbcp.constants import DATA_DIR, OUTPUT_DIR
+from dbcp.extract.ballot_ready import BR_URI
 from dbcp.extract.fips_tables import CENSUS_URI, TRIBAL_LANDS_URI
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.helpers import enforce_dtypes, psql_insert_copy
 from dbcp.transform.fips_tables import SPATIAL_CACHE
-from dbcp.transform.helpers import GEOCODER_CACHE
+from dbcp.transform.helpers import GEOCODER_CACHES
 from dbcp.validation.tests import validate_warehouse
 
 logger = logging.getLogger(__name__)
@@ -25,8 +25,7 @@ logger = logging.getLogger(__name__)
 def etl_eip_infrastructure() -> Dict[str, pd.DataFrame]:
     """EIP Infrastructure ETL."""
     # Extract
-    source_path = Path("/app/data/raw/2023.05.24 OGW database.xlsx")
-    eip_raw_dfs = dbcp.extract.eip_infrastructure.extract(source_path)
+    eip_raw_dfs = dbcp.extract.eip_infrastructure.extract()
 
     # Transform
     eip_transformed_dfs = dbcp.transform.eip_infrastructure.transform(eip_raw_dfs)
@@ -46,9 +45,11 @@ def etl_lbnl_iso_queue() -> Dict[str, pd.DataFrame]:
 def etl_columbia_local_opp() -> Dict[str, pd.DataFrame]:
     """Columbia Local Opposition ETL."""
     # Extract
-    source_path = Path(
-        "/app/data/raw/2023.05.30 Opposition to Renewable Energy Facilities - FINAL.docx"
+    source_path = (
+        DATA_DIR
+        / "raw/2023.05.30 Opposition to Renewable Energy Facilities - FINAL.docx"
     )
+
     extractor = dbcp.extract.local_opposition.ColumbiaDocxParser()
     extractor.load_docx(source_path)
     docx_dfs = extractor.extract()
@@ -67,7 +68,7 @@ def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
 
 def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
     """NCSL State Permitting for Wind ETL."""
-    source_path = Path("/app/data/raw/ncsl_state_permitting_wind.csv")
+    source_path = DATA_DIR / "raw/ncsl_state_permitting_wind.csv"
     if not source_path.exists():
         NCSLScraper().scrape_and_save_to_disk(source_path)
     raw_df = dbcp.extract.ncsl_state_permitting.extract(source_path)
@@ -92,7 +93,7 @@ def etl_fips_tables() -> Dict[str, pd.DataFrame]:
 
 def etl_justice40() -> dict[str, pd.DataFrame]:
     """ETL white house environmental justice dataset."""
-    source_path = Path("/app/data/raw/1.0-communities.csv")
+    source_path = DATA_DIR / "raw/1.0-communities.csv"
     raw = dbcp.extract.justice40.extract(source_path)
     out = dbcp.transform.justice40.transform(raw)
     return out
@@ -100,8 +101,8 @@ def etl_justice40() -> dict[str, pd.DataFrame]:
 
 def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
     """ETL NREL state and local ordinances for wind and solar."""
-    wind_source_path = Path("/app/data/raw/NREL_Wind_Ordinances.xlsx")
-    solar_source_path = Path("/app/data/raw/NREL_Solar_Ordinances.xlsx")
+    wind_source_path = DATA_DIR / "raw/NREL_Wind_Ordinances.xlsx"
+    solar_source_path = DATA_DIR / "raw/NREL_Solar_Ordinances.xlsx"
     wind_raw_dfs = dbcp.extract.nrel_wind_solar_ordinances.extract(
         wind_source_path, wind_or_solar="wind"
     )
@@ -139,7 +140,7 @@ def etl_offshore_wind() -> dict[str, pd.DataFrame]:
 
 def etl_protected_area_by_county() -> dict[str, pd.DataFrame]:
     """ETL the PAD-US intersection with TIGER county geometries."""
-    source_path = Path("/app/data/raw/padus_intersect_counties.parquet")
+    source_path = DATA_DIR / "raw/padus_intersect_counties.parquet"
     raw_df = dbcp.extract.protected_area_by_county.extract(source_path)
     transformed = dbcp.transform.protected_area_by_county.transform(raw_df)
     return transformed
@@ -147,7 +148,7 @@ def etl_protected_area_by_county() -> dict[str, pd.DataFrame]:
 
 def etl_energy_communities_by_county() -> dict[str, pd.DataFrame]:
     """ETL RMI's energy communities analysis."""
-    source_path = Path("/app/data/raw/rmi_energy_communities_counties.parquet")
+    source_path = DATA_DIR / "raw/rmi_energy_communities_counties.parquet"
     raw_df = dbcp.extract.rmi_energy_communities.extract(source_path)
     transformed = dbcp.transform.rmi_energy_communities.transform(raw_df)
     return transformed
@@ -155,7 +156,7 @@ def etl_energy_communities_by_county() -> dict[str, pd.DataFrame]:
 
 def etl_ballot_ready() -> dict[str, pd.DataFrame]:
     """ETL Ballot Ready election data."""
-    source_uri = "gs://dgm-archive/ballot_ready/Climate Partners_Upcoming Races_2025-2026_20240826.csv"
+    source_uri = BR_URI
     raw_df = dbcp.extract.ballot_ready.extract(source_uri)
     transformed = dbcp.transform.ballot_ready.transform(raw_df)
     return transformed
@@ -164,9 +165,9 @@ def etl_ballot_ready() -> dict[str, pd.DataFrame]:
 def etl_epa_avert() -> dict[str, pd.DataFrame]:
     """ETL EPA AVERT avoided emissions data."""
     # https://github.com/USEPA/AVERT/blob/v4.1.0/utilities/data/county-fips.txt
-    path_county_region_xwalk = Path("/app/data/raw/avert_county-fips.txt")
+    path_county_region_xwalk = DATA_DIR / "raw/avert_county-fips.txt"
     # https://www.epa.gov/avert/avoided-emission-rates-generated-avert
-    path_emission_rates = Path("/app/data/raw/avert_emission_rates_04-25-23.xlsx")
+    path_emission_rates = DATA_DIR / "raw/avert_emission_rates_04-25-23.xlsx"
     raw_dfs = dbcp.extract.epa_avert.extract(
         county_crosswalk_path=path_county_region_xwalk,
         emission_rates_path=path_emission_rates,
@@ -244,7 +245,7 @@ def run_etl(funcs: dict[str, Callable], schema_name: str):
 def etl():
     """Run dbc ETL."""
     # Reduce size of caches if necessary
-    GEOCODER_CACHE.reduce_size()
+    GEOCODER_CACHES.reduce_cache_sizes()
     SPATIAL_CACHE.reduce_size()
 
     # Run public ETL functions
