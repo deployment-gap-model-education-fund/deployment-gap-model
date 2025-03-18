@@ -202,14 +202,16 @@ class CountyOpposition(object):
 
     def agg_to_counties(
         self,
-        include_state_policies=True,
-        include_nrel_bans=False,
-        include_manual_ordinances=False,
+        include_state_policies: bool = True,
+        include_nrel_bans: bool = False,
+        include_manual_ordinances: bool = False,
     ) -> pd.DataFrame:
         """Aggregate local policies, and optionally state policies, to the county level.
 
         Args:
-            include_state_policies (bool, optional): whether to include state policies. Defaults to True.
+            include_state_policies: whether to include state policies. Defaults to True.
+            include_nrel_bans: whether to include NREL bans. Defaults to False.
+            include_manual_ordinances: whether to include manually maintained ordinances. Defaults to False.
 
         Returns:
             pd.DataFrame: county-level dataframe of policies
