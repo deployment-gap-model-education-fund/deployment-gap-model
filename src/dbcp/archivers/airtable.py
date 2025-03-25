@@ -29,7 +29,7 @@ class AirtableBaseInfo(BaseModel):
 class AirtableArchiver(AbstractArchiver):
     """Archiver for Airtable bases."""
 
-    archive_name = "airtable"
+    archive_name = "test"
 
     def __init__(self, api: Api = None):
         """
@@ -100,8 +100,8 @@ class AirtableArchiver(AbstractArchiver):
         """Archive raw tables for a list of Airtable bases to GCS."""
         bases = (
             AirtableBaseInfo(
-                base_id="appZHPwbPSqIMgphw",
-                base_name="Offshore Wind Locations Synapse Version",
+                base_id="appZxHCnAGklDJJkm",
+                base_name="TEST: Offshore Wind Locations Synapse Version",
             ),
         )
         for base in bases:
