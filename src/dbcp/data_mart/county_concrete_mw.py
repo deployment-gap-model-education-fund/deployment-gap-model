@@ -123,10 +123,10 @@ def create_data_mart(
     """API function to create the table of project aggregates.
 
     Args:
-        engine (Optional[sa.engine.Engine], optional): database connection. Defaults to None.
+        engine: database connection. Defaults to None.
 
     Returns:
-        pd.DataFrame: Dataframe of EIA860m and ACP projects.
+        Dataframe of EIA860m and ACP projects.
     """
     if engine is None:
         engine = get_sql_engine()
