@@ -121,8 +121,8 @@ def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
 def etl_offshore_wind() -> dict[str, pd.DataFrame]:
     """ETL manually curated offshore wind data."""
     # get the latest version of the offshore wind data from the candidate yaml file
-    projects_uri = "airtable/Offshore Wind Locations Synapse Version/Projects.json"
-    locations_uri = "airtable/Offshore Wind Locations Synapse Version/Locations.json"
+    projects_uri = "airtable/Offshore Wind Locations DBCP Version/Projects.json"
+    locations_uri = "airtable/Offshore Wind Locations DBCP Version/Locations.json"
 
     es = ExtractionSettings.from_yaml("/app/dbcp/settings.yaml")
     es.update_archive_generation_numbers()

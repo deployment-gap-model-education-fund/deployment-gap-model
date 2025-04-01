@@ -100,8 +100,8 @@ class AirtableArchiver(AbstractArchiver):
         """Archive raw tables for a list of Airtable bases to GCS."""
         bases = (
             AirtableBaseInfo(
-                base_id="appZHPwbPSqIMgphw",
-                base_name="Offshore Wind Locations Synapse Version",
+                base_id="appZxHCnAGklDJJkm",
+                base_name="Offshore Wind Locations DBCP Version",
             ),
         )
         for base in bases:
