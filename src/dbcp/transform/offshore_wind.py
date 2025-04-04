@@ -141,7 +141,7 @@ def _add_geocoded_locations(transformed_locs: pd.DataFrame) -> None:
     (Houston, TX is not in Houston County, TX).
 
     Args:
-        transformed_locs (pd.DataFrame): locations df after other cleaning has been performed
+        transformed_locs: locations df after other cleaning has been performed
     """
     # this code is ugly and procedural for the sake of making inplace operations.
     # And all to save copy operations on a dataframe that is... 50 rows lol. Dumb!
@@ -175,6 +175,12 @@ def _add_geocoded_locations(transformed_locs: pd.DataFrame) -> None:
 
 
 def _add_actionable_and_nearly_certain_classification(projects: pd.DataFrame) -> None:
+    """
+    Add actional and nearly certain classifications.
+
+    Args:
+        projects: raw projects data
+    """
     actionable_statuses = {
         "Site assessment underway",
         "Not started",
@@ -196,8 +202,8 @@ def _validate_raw_data(projs: pd.DataFrame, locs: pd.DataFrame) -> None:
     Validate the raw data.
 
     Args:
-        projs (pd.DataFrame): raw projects data
-        locs (pd.DataFrame): raw locations data
+        projs: raw projects data
+        locs: raw locations data
     """
 
     def assert_primary_key(df: pd.DataFrame, key: list[str] | str) -> None:
@@ -252,8 +258,8 @@ def _normalize_tables(
     - offshore_wind_port_association: association table between projects and locations for port locations
 
     Args:
-        proj (pd.DataFrame): raw projects data
-        locs (pd.DataFrame): raw locations data
+        proj: raw projects data
+        locs: raw locations data
 
     Returns:
         dictionary of normalized tables

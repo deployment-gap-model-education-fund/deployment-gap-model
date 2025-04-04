@@ -77,11 +77,22 @@ export GOOGLE_GHA_CREDS_PATH=<path/to/your_credentials.json>
 `GOOGLE_GHA_CREDS_PATH` will be mounted into the container so
 the GCP APIs in the container can access the data stored in GCP.
 
-You'll also need to set an environment variable for the Geocodio API Key. This api key is stored
-GCP project Secret Manager as `geocodio-api-key`.
+You'll also need to set an environment variable for the Geocodio API Key. This api key is stored in
+the GCP project Secret Manager as `geocodio-api-key`. To manage the Geocodio account and API key, log into
+[geocodio](https://dash.geocod.io/) using the `dbcp-dev@catalyst.coop`
+login stored in the Shared DBCP Logins Bitwarden collection.
 
 ```
 export GEOCODIO_API_KEY={geocodio api key}
+```
+
+You also need an Airtable personal access token. This PAT is stored in the GCP project Secret Manager
+as `airtable-api-key`. To add additional scopes or bases to this PAT, log into
+[the tokens section of Builder Hub](https://airtable.com/create/tokens) using the `dbcp-dev@catalyst.coop`
+login stored in the Shared DBCP Logins Bitwarden collection.
+
+```
+export AIRTABLE_API_KEY={airtable api key}
 ```
 
 ## Git Pre-commit Hooks
