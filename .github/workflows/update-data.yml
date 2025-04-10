@@ -7,9 +7,8 @@ on:
       - "dev"
       - "main"
   workflow_dispatch:
-  # Temporarily disable scheduled on runs because geocoding without a cache everytime is expensive
-  # schedule:
-  #   - cron: 5 7 * * 1-5
+  schedule:
+    - cron: 0 0 * * 0
 
 jobs:
   archive:
