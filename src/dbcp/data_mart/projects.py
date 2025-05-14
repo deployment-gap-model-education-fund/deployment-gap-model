@@ -820,13 +820,24 @@ def get_eia860m_current(engine: sa.engine.Engine) -> pd.DataFrame:
     return current_projects
 
 
-def get_eia860m_status_history(engine: sa.engine.Engine) -> pd.DataFrame:
-    """Get the EIA860M status for each project for each of the past 12 quarters.
+def get_eia860m_status_timeseries(
+    engine: sa.engine.Engine,
+    frequency: str = "Q",
+    lookback_years: int = 3,
+) -> pd.DataFrame:
+    """Get the EIA860M status for each project as a timeseries at given frequency and lookback window.
 
     Args:
         engine (sa.engine.Engine): connection to the data warehouse database
+        frequency (str): 'M' for monthly, 'Q' for quarterly, 'A' for yearly.
+        lookback_years (int): Number of years of data to generate
     """
-    end_date = (
+    if frequency not in ("M", "Q", "A"):
+        raise ValueError(
+            "frequency must be 'M' (monthly), 'Q' (quarterly), or 'A' (annually)"
+        )
+
+    last_report_date = (
         pd.read_sql(
             "SELECT max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog",
             engine,
@@ -840,7 +851,7 @@ def get_eia860m_status_history(engine: sa.engine.Engine) -> pd.DataFrame:
         generator_id,
         operational_status_code,
         min(report_date) as start_date,
-        max(COALESCE(valid_until_date, timestamp '{end_date}')) as end_date
+        max(COALESCE(valid_until_date, timestamp '{last_report_date}')) as end_date
     FROM data_warehouse.pudl_eia860m_changelog
     GROUP BY 1,2,3
     ORDER BY 1,2,3,4  -- must be sorted by date for the pandas groupby.first() to work
@@ -849,46 +860,69 @@ def get_eia860m_status_history(engine: sa.engine.Engine) -> pd.DataFrame:
     # The date fields are literally the first day of each month but in reality they
     # represent the whole month. I want to convert them to intervals, but first I need
     # to change end_date to the last day of the month.
-    status_history["end_date"] += pd.offsets.MonthEnd()
+    status_history["end_date"] = status_history["end_date"] + pd.offsets.MonthEnd()
     date_intervals = pd.IntervalIndex.from_arrays(
         status_history["start_date"], status_history["end_date"], closed="both"
     )
     status_history.set_index(date_intervals, inplace=True)
 
     # create quarterly timeseries
-    end_date_adjusted = pd.Timestamp(end_date) + pd.offsets.MonthEnd()
-    quarter_end_dates = pd.date_range(end=end_date_adjusted, periods=12, freq="Q")
+    last_end_date = pd.Timestamp(last_report_date) + pd.offsets.MonthEnd()
+
+    if frequency == "A":
+        freq_start, freq_end = "YS", "YE"
+        period_name = "year"
+        period_ct = lookback_years
+    elif frequency == "Q":
+        freq_start, freq_end = "QS", "QE"
+        period_name = "quarter"
+        period_ct = lookback_years * 4
+    elif frequency == "M":
+        freq_start, freq_end = "MS", "ME"
+        period_name = "month"
+        period_ct = lookback_years * 12
+    date_spine_start_dates = pd.date_range(
+        end=last_end_date, periods=period_ct, freq=freq_start
+    )
+    date_spine_end_dates = pd.date_range(
+        end=last_end_date, periods=period_ct, freq=freq_end
+    )
     gen_key = ["plant_id_eia", "generator_id"]
-    quarterly = pd.concat(
+    time_series = pd.concat(
         (
-            status_history.loc[date, :].assign(quarter_end=date)
-            for date in quarter_end_dates
+            status_history.loc[end, :].assign(
+                **{
+                    f"{period_name}_end": end,
+                    f"{period_name}_start": start,
+                }
+            )
+            for start, end in zip(date_spine_start_dates, date_spine_end_dates)
         ),
         ignore_index=True,  # intervals no longer needed
     )
-    idx_cols = gen_key + ["quarter_end"]
-    quarterly.sort_values(idx_cols, inplace=True)
-    quarterly.reset_index(inplace=True, drop=True)
+    idx_cols = gen_key + [f"{period_name}_start", f"{period_name}_end"]
+    time_series.sort_values(idx_cols, inplace=True)
+    time_series.reset_index(inplace=True, drop=True)
 
     # some duplicates are caused by NULL values in the valid_until_date coming from
     # PUDL, which is a bug. The coalesce() function in the SQL query then sets them to
-    # end_date, which is usually, but not always, appropriate.
+    # last_report_date, which is usually, but not always, appropriate.
     # I resolve these by selecting the value with the latest start_date.
-    dupes = quarterly.duplicated(subset=idx_cols, keep=False)
+    dupes = time_series.duplicated(subset=idx_cols, keep=False)
     # groupby is slow, so I subset to the duplicates, analyze them, then drop the
     # offending records
     is_last_start_date = (
-        quarterly.loc[dupes, :]
+        time_series.loc[dupes, :]
         .groupby(idx_cols, as_index=False)["start_date"]
         .transform(lambda x: x.eq(x.max()))
         .squeeze()
     )
     idxs_to_drop = is_last_start_date.index[~is_last_start_date]
-    dedupe = quarterly.drop(idxs_to_drop, axis=0)
+    dedupe = time_series.drop(idxs_to_drop, axis=0)
 
     # convert timeseries from sparse to dense; fill with null.
     out = (
-        dedupe.drop(columns=["start_date", "end_date"])
+        dedupe.drop(columns=["start_date", "end_date", "last_report_date"])
         .set_index(idx_cols)
         .unstack()
         .stack(dropna=False)
@@ -1065,7 +1099,9 @@ def create_data_mart(
     active_wide_format = _convert_long_to_wide(active_long_format)
 
     eia860m_current = get_eia860m_current(engine)
-    eia860m_history = get_eia860m_status_history(engine)
+    eia860m_status_monthly = get_eia860m_status_timeseries(engine, frequency="M")
+    eia860m_status_quarterly = get_eia860m_status_timeseries(engine, frequency="Q")
+    eia860m_status_yearly = get_eia860m_status_timeseries(engine, frequency="Y")
     eia860m_transition_dates = _get_eia860m_transition_dates(engine)
 
     data_marts.update(
@@ -1074,8 +1110,10 @@ def create_data_mart(
             "iso_projects_wide_format": active_wide_format,
             "iso_projects_change_log": iso_projects_change_log,
             "projects_current_860m": eia860m_current,
-            "projects_history_860m": eia860m_history,
-            "projects_transition_dates_860m": eia860m_transition_dates,
+            "projects_status_monthly_860m": eia860m_status_monthly,
+            "projects_status_quarterly_860m": eia860m_status_quarterly,
+            "projects_status_yearly_860m": eia860m_status_yearly,
+            "projects_status_transition_dates_860m": eia860m_transition_dates,
             "projects_status_codes_860m": _create_status_codes(),
         }
     )

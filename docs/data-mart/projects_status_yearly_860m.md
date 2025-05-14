@@ -1,16 +1,17 @@
-# projects_history_860m
+# projects_status_yearly_860m
 
-This table contains three years of operational status history for each generator in EIA 860m. The data are quarterly timeseries of the operational status code. Each row is a generator-quarter pair.
+This table contains three years of operational status history for each generator in EIA 860m. The data are yearly timeseries of the operational status code. Each row is a generator-year pair.
 
 ## Column Descriptions
 
-**Unique Key Column(s):** (`plant_id_eia`, `generator_id`, `quarter_end`)
+**Unique Key Column(s):** (`plant_id_eia`, `generator_id`, `year_start`, `year_end`)
 
 |Subject|Column|Description|Source|Notes|
 |----|----|----|----|----|
 |Identifiers|`plant_id_eia`|The EIA Plant ID number|EIA||
 ||`generator_id`|The EIA Generator ID string|EIA||
-||`quarter_end`|The date of the last day of each quarter|EIA||
+||`year_start`|The date of the last day of each year|EIA||
+||`year_end`|The date of the last day of each year|EIA||
 |Properties|`operational_status_code`|The operational status code defined internally|derived|See the table below for more details|
 ||`plant_name_eia`|The name of the plant|EIA||
 
