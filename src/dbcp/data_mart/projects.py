@@ -860,7 +860,7 @@ def get_eia860m_status_timeseries(
     # The date fields are literally the first day of each month but in reality they
     # represent the whole month. I want to convert them to intervals, but first I need
     # to change end_date to the last day of the month.
-    status_history["end_date"] = status_history["end_date"] + pd.offsets.MonthEnd()
+    status_history["end_date"] += pd.offsets.MonthEnd()
     date_intervals = pd.IntervalIndex.from_arrays(
         status_history["start_date"], status_history["end_date"], closed="both"
     )
