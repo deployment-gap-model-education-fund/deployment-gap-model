@@ -49,10 +49,10 @@ def _extract_pudl_eia860m_status_codes() -> pd.DataFrame:
     pudl_resource_path = dbcp.helpers.get_pudl_resource(
         pudl_resource="core_eia__codes_operational_status.parquet"
     )
-    pudl_eia860m_changelog = pd.read_parquet(
+    pudl_eia860m_status_codes = pd.read_parquet(
         pudl_resource_path, engine="pyarrow", use_nullable_dtypes=True
     )
-    return pudl_eia860m_changelog
+    return pudl_eia860m_status_codes
 
 
 def extract() -> dict[str, pd.DataFrame]:
