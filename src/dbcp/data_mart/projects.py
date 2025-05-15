@@ -832,9 +832,9 @@ def get_eia860m_status_timeseries(
         frequency (str): 'M' for monthly, 'Q' for quarterly, 'A' for yearly.
         lookback_years (int): Number of years of data to generate
     """
-    if frequency not in ("M", "Q", "A"):
+    if frequency not in ("M", "Q", "A", "Y"):
         raise ValueError(
-            "frequency must be 'M' (monthly), 'Q' (quarterly), or 'A' (annually)"
+            "frequency must be 'M' (monthly), 'Q' (quarterly), or 'A' / 'Y' (annually)"
         )
 
     last_report_date = (
@@ -869,16 +869,16 @@ def get_eia860m_status_timeseries(
     # create quarterly timeseries
     last_end_date = pd.Timestamp(last_report_date) + pd.offsets.MonthEnd()
 
-    if frequency == "A":
-        freq_start, freq_end = "YS", "YE"
+    if frequency in ("A", "Y"):
+        freq_start, freq_end = "YS", "Y"
         period_name = "year"
         period_ct = lookback_years
     elif frequency == "Q":
-        freq_start, freq_end = "QS", "QE"
+        freq_start, freq_end = "QS", "Q"
         period_name = "quarter"
         period_ct = lookback_years * 4
     elif frequency == "M":
-        freq_start, freq_end = "MS", "ME"
+        freq_start, freq_end = "MS", "M"
         period_name = "month"
         period_ct = lookback_years * 12
     date_spine_start_dates = pd.date_range(
@@ -922,7 +922,7 @@ def get_eia860m_status_timeseries(
 
     # convert timeseries from sparse to dense; fill with null.
     out = (
-        dedupe.drop(columns=["start_date", "end_date", "last_report_date"])
+        dedupe.drop(columns=["start_date", "end_date"])
         .set_index(idx_cols)
         .unstack()
         .stack(dropna=False)
@@ -1101,7 +1101,7 @@ def create_data_mart(
     eia860m_current = get_eia860m_current(engine)
     eia860m_status_monthly = get_eia860m_status_timeseries(engine, frequency="M")
     eia860m_status_quarterly = get_eia860m_status_timeseries(engine, frequency="Q")
-    eia860m_status_yearly = get_eia860m_status_timeseries(engine, frequency="Y")
+    eia860m_status_yearly = get_eia860m_status_timeseries(engine, frequency="A")
     eia860m_transition_dates = _get_eia860m_transition_dates(engine)
 
     data_marts.update(
