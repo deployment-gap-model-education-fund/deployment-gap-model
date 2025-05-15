@@ -87,7 +87,12 @@ def _transform_pudl_eia860m_changelog(
         ""
     )  # copy; don't want to fill actual table
 
-    fips = add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
+    fips = add_fips_ids(
+        filled_location,
+        vintage=FIPS_CODE_VINTAGE,
+        state_col="raw_state",
+        county_col="raw_county",
+    )
     pudl_eia860m_changelog = pd.concat(
         [pudl_eia860m_changelog, fips[["state_id_fips", "county_id_fips"]]],
         axis=1,
