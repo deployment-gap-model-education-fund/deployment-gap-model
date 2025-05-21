@@ -1109,12 +1109,12 @@ def create_data_mart(
             "iso_projects_long_format": active_long_format,
             "iso_projects_wide_format": active_wide_format,
             "iso_projects_change_log": iso_projects_change_log,
-            "projects_current_860m": eia860m_current,
-            "projects_status_monthly_860m": eia860m_status_monthly,
-            "projects_status_quarterly_860m": eia860m_status_quarterly,
-            "projects_status_yearly_860m": eia860m_status_yearly,
-            "projects_status_transition_dates_860m": eia860m_transition_dates,
-            "projects_status_codes_860m": _create_status_codes(),
+            "projects_current_eia860m": eia860m_current,
+            "projects_status_monthly_eia860m": eia860m_status_monthly,
+            "projects_status_quarterly_eia860m": eia860m_status_quarterly,
+            "projects_status_yearly_eia860m": eia860m_status_yearly,
+            "projects_status_transition_dates_eia860m": eia860m_transition_dates,
+            "projects_status_codes_eia860m": _create_status_codes(),
         }
     )
     return data_marts

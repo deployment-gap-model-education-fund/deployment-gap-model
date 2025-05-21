@@ -1,4 +1,4 @@
-# projects_status_transition_dates_860m
+# projects_status_transition_dates_eia860m
 
 This table contains the dates of each status transition for each generator in EIA 860m. Each row is one generator.
 

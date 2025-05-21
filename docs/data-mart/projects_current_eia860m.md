@@ -1,4 +1,4 @@
-# projects_current_860m
+# projects_current_eia860m
 
 This table contains the most recent information from EIA 860m for each generator. Each row represents one generator.
 

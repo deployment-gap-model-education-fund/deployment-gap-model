@@ -1,4 +1,4 @@
-# projects_status_quarterly_860m
+# projects_status_quarterly_eia860m
 
 This table contains three years of operational status history for each generator in EIA 860m. The data are quarterly timeseries of the operational status code. Each row is a generator-quarter pair.
 
