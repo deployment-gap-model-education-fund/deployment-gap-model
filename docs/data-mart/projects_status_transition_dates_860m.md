@@ -8,8 +8,8 @@ This table contains the dates of each status transition for each generator in EI
 
 |Subject|Column|Description|Source|Notes|
 |----|----|----|----|----|
-|Identifiers|`plant_id_eia`|The EIA Plant ID number|EIA||
-||`generator_id`|The EIA Generator ID string|EIA||
+|Identifiers|`plant_id_eia`|The EIA Plant ID number: a unique six-digit facility identification number, also called an ORISPL, assigned by the Energy Information Administration.|EIA||
+||`generator_id`|The EIA Generator ID string|EIA|Generator ID is usually numeric, but sometimes includes letters. Make sure you treat it as a string!|
 |Properties|`plant_name_eia`|The name of the plant|EIA||
 ||`date_entered_1`|The date the generator entered status code 1|EIA||
 ||`date_entered_2`|The date the generator entered status code 2|EIA||

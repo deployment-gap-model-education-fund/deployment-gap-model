@@ -8,8 +8,8 @@ This table contains the most recent information from EIA 860m for each generator
 
 |Subject|Column|Description|Source|Notes|
 |----|----|----|----|----|
-|Identifiers|`plant_id_eia`|The EIA Plant ID number|EIA||
-||`generator_id`|The EIA Generator ID string|EIA||
+|Identifiers|`plant_id_eia`|The EIA Plant ID number: a unique six-digit facility identification number, also called an ORISPL, assigned by the Energy Information Administration.|EIA||
+||`generator_id`|The EIA Generator ID string|EIA|Generator ID is usually numeric, but sometimes includes letters. Make sure you treat it as a string!|
 |Properties|`plant_name_eia`|The name of the plant|EIA||
 ||`utility_id_eia`|The EIA Utility ID number|EIA||
 ||`utility_name_eia`|The name of the utility|EIA||
