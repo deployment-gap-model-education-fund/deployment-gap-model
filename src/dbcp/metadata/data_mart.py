@@ -641,8 +641,8 @@ county_commission_election_info = Table(
     schema=schema,
 )
 
-projects_current_860m = Table(
-    "projects_current_860m",
+projects_current_eia860m = Table(
+    "projects_current_eia860m",
     metadata,
     Column("report_date", DateTime),  # not primary key. Only one row per generator here
     Column("plant_name_eia", String),
@@ -688,20 +688,45 @@ projects_current_860m = Table(
 )
 
 
-projects_history_860m = Table(
-    "projects_history_860m",
+projects_status_monthly_eia860m = Table(
+    "projects_status_monthly_eia860m",
     metadata,
     Column("plant_name_eia", String),
     Column("plant_id_eia", Integer, primary_key=True),
     Column("generator_id", String, primary_key=True),
+    Column("month_start", DateTime, primary_key=True),
+    Column("month_end", DateTime, primary_key=True),
+    Column("operational_status_code", Integer),
+    schema=schema,
+)
+
+projects_status_quarterly_eia860m = Table(
+    "projects_status_quarterly_eia860m",
+    metadata,
+    Column("plant_name_eia", String),
+    Column("plant_id_eia", Integer, primary_key=True),
+    Column("generator_id", String, primary_key=True),
+    Column("quarter_start", DateTime, primary_key=True),
     Column("quarter_end", DateTime, primary_key=True),
     Column("operational_status_code", Integer),
     schema=schema,
 )
 
+projects_status_yearly_eia860m = Table(
+    "projects_status_yearly_eia860m",
+    metadata,
+    Column("plant_name_eia", String),
+    Column("plant_id_eia", Integer, primary_key=True),
+    Column("generator_id", String, primary_key=True),
+    Column("year_start", DateTime, primary_key=True),
+    Column("year_end", DateTime, primary_key=True),
+    Column("operational_status_code", Integer),
+    schema=schema,
+)
 
-projects_transition_dates_860m = Table(
-    "projects_transition_dates_860m",
+
+projects_status_transition_dates_eia860m = Table(
+    "projects_status_transition_dates_eia860m",
     metadata,
     Column("plant_name_eia", String),
     Column("plant_id_eia", Integer, primary_key=True),
@@ -718,8 +743,8 @@ projects_transition_dates_860m = Table(
     schema=schema,
 )
 
-projects_status_codes_860m = Table(
-    "projects_status_codes_860m",
+projects_status_codes_eia860m = Table(
+    "projects_status_codes_eia860m",
     metadata,
     Column("operational_status_code", Integer, primary_key=True),
     Column("raw_operational_status_code", String),
