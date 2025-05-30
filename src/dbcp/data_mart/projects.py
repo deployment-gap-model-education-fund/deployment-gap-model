@@ -870,37 +870,35 @@ def get_eia860m_status_timeseries(
     last_end_date = pd.Timestamp(last_report_date) + pd.offsets.MonthEnd()
 
     if frequency in ("A", "Y"):
-        freq_start, freq_end = "YS", "Y"
+        freq_end, period_freq = "Y", "A"
         period_name = "year"
         period_ct = lookback_years
     elif frequency == "Q":
-        freq_start, freq_end = "QS", "Q"
+        freq_end, period_freq = "Q", "Q"
         period_name = "quarter"
         period_ct = lookback_years * 4
     elif frequency == "M":
-        freq_start, freq_end = "MS", "M"
+        freq_end, period_freq = "M", "M"
         period_name = "month"
         period_ct = lookback_years * 12
-    date_spine_start_dates = pd.date_range(
-        end=last_end_date, periods=period_ct, freq=freq_start
-    )
+
     date_spine_end_dates = pd.date_range(
         end=last_end_date, periods=period_ct, freq=freq_end
     )
+
     gen_key = ["plant_id_eia", "generator_id"]
     time_series = pd.concat(
         (
             status_history.loc[end, :].assign(
                 **{
                     f"{period_name}_end": end,
-                    f"{period_name}_start": start,
                 }
             )
-            for start, end in zip(date_spine_start_dates, date_spine_end_dates)
+            for end in date_spine_end_dates
         ),
         ignore_index=True,  # intervals no longer needed
     )
-    idx_cols = gen_key + [f"{period_name}_start", f"{period_name}_end"]
+    idx_cols = gen_key + [f"{period_name}_end"]
     time_series.sort_values(idx_cols, inplace=True)
     time_series.reset_index(inplace=True, drop=True)
 
@@ -928,6 +926,12 @@ def get_eia860m_status_timeseries(
         .stack(dropna=False)
     )
     out.reset_index(inplace=True)
+
+    out[f"{period_name}_start"] = (
+        pd.to_datetime(out[f"{period_name}_end"])
+        .dt.to_period(period_freq)
+        .dt.start_time
+    )
 
     # add plant names
     eia860m_plant_names = _get_plant_names(engine)
