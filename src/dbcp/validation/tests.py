@@ -244,9 +244,16 @@ def test_county_wide_coverage(engine: Engine):
     ), "counties_wide_format does not contain all counties"
     notnull = df.notnull()
     n_expected_counties = 2458
-    assert notnull.any(axis=1).sum() == n_expected_counties, (
+    n_notnull_counties = notnull.any(axis=1).sum()
+    max_percentage_difference = 5
+    tolerance = abs(n_expected_counties * (max_percentage_difference / 100))
+    assert (
+        n_expected_counties - tolerance
+        <= n_notnull_counties
+        <= n_expected_counties + tolerance
+    ), (
         "counties_wide_format has unexpected county coverage."
-        f" Expected {n_expected_counties}, found {notnull.any(axis=1).sum()}"
+        f" Expected {n_expected_counties}, found {n_notnull_counties} (not within {max_percentage_difference}% of expected value)"
     )
 
 

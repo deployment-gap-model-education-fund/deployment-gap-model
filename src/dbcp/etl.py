@@ -121,8 +121,8 @@ def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
 def etl_offshore_wind() -> dict[str, pd.DataFrame]:
     """ETL manually curated offshore wind data."""
     # get the latest version of the offshore wind data from the candidate yaml file
-    projects_uri = "airtable/Offshore Wind Locations Synapse Version/Projects.json"
-    locations_uri = "airtable/Offshore Wind Locations Synapse Version/Locations.json"
+    projects_uri = "airtable/Offshore Wind Locations DBCP Version/Projects.json"
+    locations_uri = "airtable/Offshore Wind Locations DBCP Version/Locations.json"
 
     es = ExtractionSettings.from_yaml("/app/dbcp/settings.yaml")
     es.update_archive_generation_numbers()
@@ -192,7 +192,7 @@ def etl_manual_ordinances() -> dict[str, pd.DataFrame]:
 
 def etl_acp_projects() -> dict[str, pd.DataFrame]:
     """ETL ACP projects."""
-    acp_uri = "gs://dgm-archive/acp/projects_Q3_2024.csv"
+    acp_uri = "gs://dgm-archive/acp/projects_Q4_2024.csv"
     raw_dfs = dbcp.extract.acp_projects.extract(acp_uri)
     transformed = dbcp.transform.acp_projects.transform(raw_dfs)
     return transformed
