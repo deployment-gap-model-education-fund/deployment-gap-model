@@ -1,4 +1,5 @@
 """Setup script to make DBCP directly installable with pip."""
+
 from setuptools import find_packages, setup
 
 setup(
@@ -8,7 +9,7 @@ setup(
     author="Catalyst Cooperative",
     author_email="hello@catalyst.coop",
     description="Data engineering for the Down Ballot Climate Project (DBCP)",
-    packages=find_packages("src"),
+    packages=find_packages(where="src"),
     package_dir={"": "src"},
     python_requires=">=3.9,<3.11",
     install_requires=[
