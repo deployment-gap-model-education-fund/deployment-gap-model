@@ -161,7 +161,9 @@ def _geocode_locality(
         dataframe with geocoded locality information
     """
     GEOCODIO_API_KEY = os.environ["GEOCODIO_API_KEY"]
-    client = GeocodioClient(GEOCODIO_API_KEY)
+    client = GeocodioClient(
+        GEOCODIO_API_KEY, version="1.9", auto_load_api_version=False
+    )
 
     geocoded_results = []
 
