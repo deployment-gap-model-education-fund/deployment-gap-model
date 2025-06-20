@@ -109,7 +109,12 @@ class ExtractionSettings:
         return f"gs://{self.bucket.name}/{archive.get_full_path}"
 
     def update_archive_generation_numbers(self):
-        """Update the generation numbers for the archived data."""
+        """
+        Update the generation numbers for the archived data.
+
+        If the dataset is pinned, the generation number is not updated.
+        If the dataset is not pinned, this method grabs the latest generation number from GCS.
+        """
         for archive in self.archived_data.values():
             if not archive.pinned or archive.generation_num is None:
                 blob = self.bucket.get_blob(archive.name)

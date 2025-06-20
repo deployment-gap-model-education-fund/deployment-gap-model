@@ -8,7 +8,7 @@ import pandas as pd
 from sqlalchemy.engine import Engine
 
 from dbcp.data_mart.counties import (
-    _add_derived_columns,
+    _add_combined_ordinance_columns,
     _get_county_properties,
     _get_offshore_wind_extra_cols,
 )
@@ -344,7 +344,9 @@ def test_manual_ordinance_fips_coverage(engine: Engine):
 def _get_non_county_cols_from_wide_format(engine: Engine) -> pd.Index:
     """Get the columns from counties_wide_format that are not derived from county-level data."""
     wide_cols = pd.Index([col.name for col in counties_wide_format.columns])
-    county_level_cols = _add_derived_columns(_get_county_properties(engine)).columns
+    county_level_cols = _add_combined_ordinance_columns(
+        _get_county_properties(engine)
+    ).columns
     cols_to_fetch = wide_cols.difference(county_level_cols)
     return cols_to_fetch
 

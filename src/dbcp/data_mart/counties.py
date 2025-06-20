@@ -440,19 +440,29 @@ def _get_ncsl_wind_permitting_df(engine: sa.engine.Engine) -> pd.DataFrame:
     return df
 
 
-def _add_derived_columns(mart: pd.DataFrame) -> pd.DataFrame:
+def _add_combined_ordinance_columns(mart: pd.DataFrame) -> pd.DataFrame:
+    """
+    Add a ordinance_is_restrictive column which combines multiple ordinance sources.
+
+    Args:
+        mart: data mart table with existing ordinance columns
+    Returns:
+        data mart table with combined ordinance columns
+    """
     out = mart.copy()
+    # Does the county have an ordinance?
     out["ordinance_via_reldi"] = out["ordinance_text"].notna()
+    # Does the county hve a self maintained ordinance?
     priority_ban = mart["ordinance_via_self_maintained"]
     secondary_ban_cols = [
         "ordinance_via_reldi",
         "ordinance_via_solar_nrel",
         "ordinance_via_wind_nrel",
     ]
+    # Fill in missing values in priority_ban with the values from secondary_ban_cols
     out["ordinance_is_restrictive"] = priority_ban.fillna(
         mart[secondary_ban_cols].fillna(False).any(axis=1)
     )
-
     return out
 
 
@@ -619,7 +629,7 @@ def create_long_format(
     # join it all
     out = pd.concat([iso, existing, infra], axis=0, ignore_index=True)
     out = out.merge(county_properties, on="county_id_fips", how="left")
-    out = _add_derived_columns(out)
+    out = _add_combined_ordinance_columns(out)
     return out
 
 
@@ -794,7 +804,7 @@ def _join_all_counties_to_wide_format(
     # this exists to create a row for every county, even if it is all nulls.
     # The long format data does not include rows for all counties, so
     # _convert_long_to_wide does not produce a row for each county.
-    county_properties = _add_derived_columns(county_properties)
+    county_properties = _add_combined_ordinance_columns(county_properties)
 
     county_properties = county_properties.merge(
         wide_format,
