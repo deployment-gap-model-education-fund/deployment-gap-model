@@ -176,6 +176,30 @@ starts a jupyter lab instance at `http://127.0.0.1:8888/`. If you have another j
 export JUPYTER_PORT=8890
 ```
 
+# Comparing Branches During Development
+
+In addition to inspecting the data warehouse and data mart tables that are loaded into postres,
+you may want to compare the data outputs between git branches. The `branch_compare_helper.py`
+script automates parts of this process in order to make it easier to compare the data
+in a target branch to a base branch (`dev` by default).
+
+It checks out the target branch, and then the base branch, and for each branch:
+* Runs `make all` to generate the data output files
+* Copies the parquet files that are generated during the run to compare
+to a newly created temporary data folder with the branch name as the subfolder
+
+This allows us to create a relatively standardized notebook for reading the
+data in these folders in order to make comparisons between branches.
+
+To run this script, run this from the command line with the comparison branch
+checked out:
+
+```
+branch-compare
+```
+This command accepts arguments for a target branch (your current working branch)
+and base branch (default is dev).
+
 ## Architecture
 
 DBCP roughly follows an ETL(T) architecture. `dbcp.etl.etl()` extracts the raw data, cleans it then loads it into a data warehouse, a local postgres database in ourcase. The tables in the data warehouse are normalized to a certain degree (we need to define a clear data model).
