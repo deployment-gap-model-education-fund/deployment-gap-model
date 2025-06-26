@@ -1,4 +1,42 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dbcp"
+version = "0.1.0"
+description = "Data engineering for the Down Ballot Climate Project (DBCP)"
+authors = [
+    { name = "Catalyst Cooperative", email = "hello@catalyst.coop" }
+]
+requires-python = ">=3.9,<3.11"
+readme = "README.md"
+license = { text = "MIT" }  # or SPDX ID if known
+dependencies = [
+    "catalystcoop.pudl>=0.5",
+    "psycopg2",
+    "tqdm",
+    "python-docx",
+    "googlemaps",
+    "pandas-gbq",
+    "pydata-google-auth",
+    "pandera",
+    "pandera[io]",
+]
+
+[project.urls]
+Homepage = "https://github.com/catalyst-cooperative/down_ballot_climate"
+
+[project.scripts]
+branch-compare = "scripts.branch_compare_helper:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.black]
 line-length = 88
-target-version = ["py38", "py39"]
+target-version = ["py39", "py310"]
 include = "\\.pyi?$"
