@@ -84,6 +84,18 @@ GCP project Secret Manager as `geocodio-api-key`.
 export GEOCODIO_API_KEY={geocodio api key}
 ```
 
+To set the environment variables each time the environment is activated,
+run the following with the environment activated:
+
+```bash
+mkdir -p $CONDA_PREFIX/etc/conda/activate.d
+```
+
+then set environment variables:
+```bash
+echo 'export GOOGLE_GHA_CREDS_PATH="value"' > $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
+```
+
 ## Git Pre-commit Hooks
 
 Git hooks let you automatically run scripts at various points as you manage your source code. “Pre-commit” hook scripts are run when you try to make a new commit. These scripts can review your code and identify bugs, formatting errors, bad coding habits, and other issues before the code gets checked in. This gives you the opportunity to fix those issues before publishing them.
@@ -178,7 +190,7 @@ export JUPYTER_PORT=8890
 
 # Comparing Branches During Development
 
-In addition to inspecting the data warehouse and data mart tables that are loaded into postres,
+In addition to inspecting the data warehouse and data mart tables that are loaded into postgres,
 you may want to compare the data outputs between git branches. The `branch_compare_helper.py`
 script automates parts of this process in order to make it easier to compare the data
 in a target branch to a base branch (`dev` by default).
@@ -188,17 +200,17 @@ It checks out the target branch, and then the base branch, and for each branch:
 * Copies the parquet files that are generated during the run to compare
 to a newly created temporary data folder with the branch name as the subfolder
 
-This allows us to create a relatively standardized notebook for reading the
-data in these folders in order to make comparisons between branches.
+With these Parquet files, one can create a notebook that reads the data in these
+folders and makes comparisons between branches.
 
-To run this script, run this from the command line with the comparison branch
-checked out:
+With the comparison branch checked out, run the following to generate and compare
+data outputs between two branches:
 
+```bash
+branch-compare [<target_branch>] [<base_branch>]
 ```
-branch-compare
-```
-This command accepts arguments for a target branch (your current working branch)
-and base branch (default is dev).
+- `target_branch` – the feature or target branch to compare (defaults to the currently checked-out branch)
+- `base_branch` – the base branch to compare against (defaults to `dev`)
 
 ## Architecture
 
