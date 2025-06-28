@@ -628,7 +628,7 @@ pudl_eia860m_changelog = Table(
     Column("utility_id_eia", Integer),
     Column("utility_name_eia", String),
     Column("capacity_mw", Float),
-    Column("county", String),
+    Column("raw_county", String),
     Column("current_planned_generator_operating_date", DateTime),
     Column("balancing_authority_code_eia", String),
     Column("data_maturity", String),
@@ -640,7 +640,7 @@ pudl_eia860m_changelog = Table(
     Column("latitude", Float),
     Column("longitude", Float),
     Column("net_capacity_mwdc", Float),
-    Column("operational_status", String),
+    Column("operational_status_category", String),
     Column(
         "raw_operational_status_code",
         String,
@@ -654,7 +654,7 @@ pudl_eia860m_changelog = Table(
     Column("planned_uprate_date", DateTime),
     Column("prime_mover_code", String),
     Column("sector_id_eia", Integer),
-    Column("state", String),
+    Column("raw_state", String),
     Column("summer_capacity_mw", Float),
     Column("technology_description", String),
     Column("winter_capacity_mw", Float),
@@ -670,6 +670,7 @@ pudl_eia860m_changelog = Table(
         ForeignKey("data_warehouse.county_fips.county_id_fips"),
         nullable=True,
     ),  # Should not be nullable in future updates
+    Column("iso_region", String),
     schema=schema,
 )
 

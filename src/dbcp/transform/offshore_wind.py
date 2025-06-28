@@ -216,7 +216,7 @@ def _validate_raw_data(projs: pd.DataFrame, locs: pd.DataFrame) -> None:
     assert_primary_key(projs, "name")
 
     small_projects = projs[projs["capacity_mw"].lt(100)]
-    n_small_projects = 2
+    n_small_projects = 4
     assert (
         len(small_projects) == n_small_projects
     ), f"Found {len(small_projects)} small projects, expected {n_small_projects}: {small_projects['name']}"

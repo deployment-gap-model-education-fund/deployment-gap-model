@@ -1,4 +1,4 @@
-# projects_status_codes_860m
+# projects_status_codes_eia860m
 
 The EIA defines 12 status codes for generators. We have simplified them down to 9 numbers, in the order a generator would typically go through in its lifecycle. The table is presented in its entirety here for reference.
 

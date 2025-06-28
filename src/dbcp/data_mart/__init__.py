@@ -75,6 +75,7 @@ def create_data_marts():  # noqa: max-complexity=11
                 index=False,
                 schema="data_mart",
                 method=psql_insert_copy,
+                chunksize=5000,  # adjust based on memory capacity
             )
             schema = dbcp.helpers.get_pyarrow_schema_from_metadata(
                 table.name, "data_mart"
