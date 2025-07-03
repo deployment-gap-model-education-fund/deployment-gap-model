@@ -73,7 +73,7 @@ def collect_artifacts(branch, output_dir="data/output/data_mart", tmp_root="data
     copy_files(files, tmp_path)
 
 
-def main(target_branch, base_branch="dev"):
+def compare_branches(target_branch, base_branch="dev"):
     """Script to compare target branch to base branch."""
     original_branch = get_current_branch()
 
@@ -85,19 +85,33 @@ def main(target_branch, base_branch="dev"):
         run_command(f"git checkout {original_branch}")
 
 
-if __name__ == "__main__":
+def main(target_branch=None, base_branch="dev"):
+    """Parse arguments and compare branches."""
     import argparse
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--target_branch", help="Branch to compare (default: current branch)"
-    )
-    parser.add_argument(
-        "--base_branch",
-        default="dev",
-        help="Base branch to compare against (default: dev)",
-    )
-    args = parser.parse_args()
+    if target_branch is None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--target_branch", help="Branch to compare (default: current branch)"
+        )
+        parser.add_argument(
+            "--base_branch",
+            default="dev",
+            help="Base branch to compare against (default: dev)",
+        )
+        args = parser.parse_args()
 
-    target = args.target_branch or get_current_branch()
-    main(target_branch=target, base_branch=args.base_branch)
+        target_branch = args.target_branch or get_current_branch()
+        base_branch = args.base_branch
+    compare_branches(target_branch=target_branch, base_branch=base_branch)
+
+
+# make it possible to call the script from the CLI entry
+# point without args.
+if __name__ == "__main__":
+    """Main function to call the script without arguments.
+    
+    This is a wrapper on the main function, which can
+    be called directly with arguments.
+    """
+    main()
