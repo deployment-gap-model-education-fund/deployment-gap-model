@@ -3,10 +3,6 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - pip~=23.0
-  - python~=3.10.0
-  - pre-commit~=2.17.0
-  - black~=22.3.0
-  - libpq~=14.2.0
-  - pip:
-    - -r requirements.txt
+  - pip~=25.0
+  - python>=3.12.0
+  - pre-commit
