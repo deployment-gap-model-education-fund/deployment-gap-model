@@ -1,5 +1,7 @@
 """Transform and clean ACP projects data."""
+
 import hashlib
+import logging
 import re
 from functools import partial
 from typing import Callable
@@ -10,6 +12,8 @@ import pandas as pd
 
 from dbcp.extract.fips_tables import CENSUS_URI, _extract_census_counties
 from dbcp.transform.helpers import add_county_fips_with_backup_geocoding
+
+logger = logging.getLogger(__name__)
 
 
 def _rename_columns(raw_cols: pd.Index) -> pd.Index:
@@ -122,7 +126,7 @@ def _col_transform_iso_rtos(ser: pd.Series) -> pd.Series:
     return out
 
 
-def _col_transform_owner_types(ser: pd.Series) -> pd.Series:
+def _col_transform_owner_types(ser: pd.Series, full_df: pd.DataFrame) -> pd.Series:
     # Simplify multi-valued items by taking the first array item.
     # Only 0.15% of proposed projects (1.4% overall) are multivalued.
     # But first check that multi-valued items are still a small minority of records
@@ -137,7 +141,20 @@ def _col_transform_owner_types(ser: pd.Series) -> pd.Series:
         .astype(pd.StringDtype())
         .replace("Unknown", pd.NA)
     )
-
+    # Map "Investor Owned" values to "IPP" when the owner is likely
+    # not a utility company. In the future, "Investor Owned" could refer
+    # to "Utility: IOU" instead of "IPP"
+    investor_owned_owner_type = out[out == "Investor Owned"]
+    n_known_investor_owned = 1
+    assert (
+        len(investor_owned_owner_type) == n_known_investor_owned
+    ), f"""
+        Found {len(investor_owned_owner_type)} 'Investor Owned' owner types, expected {n_known_investor_owned}:
+        {full_df[full_df["raw_owner_types"].str.contains("Investor Owned")][["raw_owner_types", "raw_owners"]]}
+        If this these are all IPPs, then increase the number of expected.
+        If there is a non-IPP, then replace owner type value with correct value, i.e. 'Utility: IOU'.
+        """
+    out.loc[out == "Investor Owned"] = "IPP"
     # set membership validation
     expected_values = {
         "C&I",
@@ -435,7 +452,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         "raw_developers": _str_strip,
         "raw_owners": _str_strip,
         "raw_iso_rtos": _col_transform_iso_rtos,
-        "raw_owner_types": _col_transform_owner_types,
+        "raw_owner_types": partial(_col_transform_owner_types, full_df=trans),
         "raw_mw_total_capacity": partial(
             _col_transform_mw_total_capacity, full_df=trans
         ),
