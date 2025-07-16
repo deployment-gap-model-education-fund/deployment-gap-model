@@ -57,7 +57,6 @@ def cache_gcs_archive_bucket_contents_locally(
             paths.append(
                 cache_gcs_archive_file_locally(uri, local_cache_dir, generation_num)
             )
-    logger.info(paths)
     return paths
 
 

@@ -484,12 +484,13 @@ def _transform_acp_projects(raw_df: pd.DataFrame) -> pd.DataFrame:
 
 def _transform_acp_changelog(raw_concat_df: pd.DataFrame) -> pd.DataFrame:
     """Create a changelog of the ACP data over time."""
-    # TODO: need to clean each quarters data before deduping?
-    # need to separate out quarters with groupby?
-    # might be the case for just saving the change log and then
-    # comparing to the latest year
-    raw_concat_df = raw_concat_df.sort_values(by="report_date")
-    dedupe_cols = raw_concat_df.columns - "report_date"
+    transformed_concat_df = raw_concat_df.groupby(
+        "report_date", group_keys=False
+    ).apply(
+        _transform_acp_projects
+    )  # TODO: hopefully this groupby apply isn't too slow
+    transformed_concat_df = transformed_concat_df.sort_values(by="report_date")
+    dedupe_cols = transformed_concat_df.columns - "report_date"
     deduped_df = raw_concat_df.drop_duplicates(subset=dedupe_cols)
     return deduped_df
 

@@ -266,7 +266,7 @@ def etl():
         "ncsl_state_permitting": etl_ncsl_state_permitting,
         "ballot_ready": etl_ballot_ready,
     }
-    # run_etl(etl_funcs, "data_warehouse")
+    run_etl(etl_funcs, "data_warehouse")
 
     # Run private ETL functions
     etl_funcs = {
