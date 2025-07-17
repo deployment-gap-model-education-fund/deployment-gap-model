@@ -1,6 +1,7 @@
 """Upload the parquet files to GCS and load them into BigQuery."""
 
 import logging
+import re
 import typing
 import uuid
 from datetime import datetime
@@ -59,7 +60,7 @@ def load_parquet_files_to_bigquery(
     output_bucket: storage.Bucket,
     destination_blob_prefix: DataDirectoryLiteral,
     version: str,
-    build_ref: str,
+    target: str,
 ):
     """
     Load Parquet files from GCS to BigQuery.
@@ -68,6 +69,7 @@ def load_parquet_files_to_bigquery(
         output_bucket: the GCS bucket containing the output Parquet files.
         destination_blob_prefix: the prefix of the GCS blobs to load.
         version: the version of the data to load.
+        target: the target schema, one of "prod" or "dev".
     """
     # Create a BigQuery client
     credentials, project_id = google.auth.default()
@@ -75,7 +77,7 @@ def load_parquet_files_to_bigquery(
 
     # Get the BigQuery dataset
     # the "production" bigquery datasets do not have a suffix
-    destination_suffix = "" if build_ref == "main" else f"_{build_ref}"
+    destination_suffix = "" if target == "prod" else f"_{target}"
     dataset_id = f"{destination_blob_prefix}{destination_suffix}"
     dataset_ref = client.dataset(dataset_id)
 
@@ -122,6 +124,7 @@ class OutputMetadata(BaseModel):
     Attributes:
         version: The uuid version of the outputs.
         git_ref: The git reference used to build the outputs.
+        target: The target for publishing the outputs (dev or prod).
         code_git_sha: The git sha of the code used to build the outputs.
         settings_file_git_sha: The git sha of the settings file used to build the outputs.
         github_action_run_id: The run id of the github action that built the outputs.
@@ -129,21 +132,33 @@ class OutputMetadata(BaseModel):
 
     version: str = str(uuid.uuid4())
     git_ref: str | None = None
+    target: str | None = None
     code_git_sha: str | None = None
     settings_file_git_sha: str | None = None
     github_action_run_id: str | None = None
     date_created: datetime = datetime.now()
 
     @validator("git_ref")
-    def git_ref_must_be_dev_or_tag(cls, git_ref: str | None) -> str | None:
-        """Validate that the git ref is either "dev" or "main"."""
+    def git_ref_must_be_main_or_tag(cls, git_ref: str | None) -> str | None:
+        """Validate that the git ref is either "main" or "vX.Y.Z"."""
         if git_ref:
-            if git_ref in ("dev", "sandbox", "main"):
+            if git_ref in ("main",) or re.fullmatch(r"^v\d+\.\d+\.\d+$", git_ref):
                 return git_ref
             raise ValueError(
-                f'{git_ref} is not a valid Git rev. Must be "dev" or "main".'
+                f'{git_ref} is not a valid Git ref. Must be "main" or a git tag starting with "v".'
             )
         return git_ref
+
+    @validator("target")
+    def target_must_be_dev_or_prod(cls, target: str | None) -> str | None:
+        """Validate that the target is either "dev" or "prod"."""
+        if target:
+            if target in ("dev", "prod"):
+                return target
+            raise ValueError(
+                f'{target} is not a valid target. Must be "dev" or "prod".'
+            )
+        return target
 
     def to_yaml(self) -> str:
         """Convert the metadata to a YAML string."""
@@ -165,6 +180,11 @@ class OutputMetadata(BaseModel):
     "--build-ref",
     default=None,
     help="The git reference used to build the outputs. Will typically be a tag or the dev branch",
+)
+@click.option(
+    "--target",
+    default=None,
+    help="The target for publishing the outputs. One of 'prod' or 'dev'",
 )
 @click.option(
     "--code-git-sha",
@@ -200,6 +220,7 @@ class OutputMetadata(BaseModel):
 )
 def publish_outputs(
     build_ref: str,
+    target: str,
     code_git_sha: str,
     github_action_run_id: str,
     settings_file_git_sha: str,
@@ -212,6 +233,7 @@ def publish_outputs(
 
     metadata = OutputMetadata(
         git_ref=build_ref,
+        target=target,
         code_git_sha=code_git_sha,
         settings_file_git_sha=settings_file_git_sha,
         github_action_run_id=github_action_run_id,
@@ -228,13 +250,13 @@ def publish_outputs(
     logger.info(f"Uploaded metadata to gs://{bucket_name}/{destination_blob_name}")
 
     if upload_to_big_query:
-        if build_ref:
+        if target:
             for directory in directories:
                 load_parquet_files_to_bigquery(
-                    output_bucket, directory, metadata.version, build_ref
+                    output_bucket, directory, metadata.version, target
                 )
         else:
-            logger.warning("No build reference provided. Skipping BigQuery upload.")
+            logger.warning("No target schema provided. Skipping BigQuery upload.")
 
 
 if __name__ == "__main__":
