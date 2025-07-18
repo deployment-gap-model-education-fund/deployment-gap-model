@@ -1,5 +1,5 @@
 # set base image (host OS)
-FROM python:3.10
+FROM python:3.11
 
 RUN apt-get -y update && apt-get -y install sqlite3
 RUN apt-get -y install libgdal-dev
