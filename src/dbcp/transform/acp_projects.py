@@ -148,7 +148,7 @@ def _col_transform_owner_types(ser: pd.Series, full_df: pd.DataFrame) -> pd.Seri
     ), f"""
         Found {len(investor_owned_owner_type)} 'Investor Owned' owner types, expected {n_known_investor_owned}:
         {full_df[full_df["raw_owner_types"].str.contains("Investor Owned")][["raw_owner_types", "raw_owners"]]}
-        If this these are all IPPs, then increase the number of expected.
+        If these are all IPPs, then increase the number of expected.
         If there is a non-IPP, then replace owner type value with correct value, i.e. 'Utility: IOU'.
         """
     out.loc[out == "Investor Owned"] = "IPP"
@@ -366,7 +366,19 @@ def _transform_location_cols(
 
 
 def _make_surrogate_key(raw_df: pd.DataFrame) -> pd.Series:
-    """Create a surrogate key from several data columns."""
+    """Create a surrogate key from several data columns.
+
+    The surrogate key is a hash of several columns that should uniquely
+    identify a row. Light string cleaning is performed on the raw data
+    to avoid minor changes breaking backwards compatibility. While
+    (ProjectName, PhaseName) is unique, it may not be a reliable key in
+    the future. Instead,
+    (ProjectName, PhaseName, PhaseType, MW_Total_Capacity, States, Counties)
+    is used as the unique key.
+
+    Arguments:
+        raw_df (pd.DataFrame): The raw dataframe to create a key for.
+    """
     # The surrogate key is a hash of several columns that should uniquely identify a row
     # The main design decisions are whether to use raw data or transformed data as
     # inputs, and how many columns to include in the hash.
@@ -428,11 +440,8 @@ def _int_id_from_str(s: str) -> int:
     return int_id
 
 
-def _transform_acp_projects(raw_df: pd.DataFrame) -> pd.DataFrame:
-    trans = raw_df.convert_dtypes()
-    surrogate_key = _make_surrogate_key(trans)  # uses raw column names
-    trans.columns = _rename_columns(trans.columns)
-    trans["proj_id"] = surrogate_key  # assign after renaming columns
+def _clean_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Conduct cleaning on columns of ACP data."""
 
     def _str_strip(ser):
         return ser.str.strip()
@@ -447,17 +456,15 @@ def _transform_acp_projects(raw_df: pd.DataFrame) -> pd.DataFrame:
         "raw_developers": _str_strip,
         "raw_owners": _str_strip,
         "raw_iso_rtos": _col_transform_iso_rtos,
-        "raw_owner_types": partial(_col_transform_owner_types, full_df=trans),
-        "raw_mw_total_capacity": partial(
-            _col_transform_mw_total_capacity, full_df=trans
-        ),
+        "raw_owner_types": partial(_col_transform_owner_types, full_df=df),
+        "raw_mw_total_capacity": partial(_col_transform_mw_total_capacity, full_df=df),
     }
     for raw_col, transform in col_transforms.items():
         new_col_name = raw_col[4:]  # remove 'raw_'
-        trans[new_col_name] = transform(trans[raw_col])
+        df[new_col_name] = transform(df[raw_col])
     county_shapes = _extract_census_counties(CENSUS_URI).set_geometry("geometry")
-    location_cols = _transform_location_cols(trans, county_shapes)
-    out = pd.concat((trans, location_cols), axis=1)
+    location_cols = _transform_location_cols(df, county_shapes)
+    out = pd.concat((df, location_cols), axis=1)
 
     # Drop raw_ columns where the transforms did ~zero semantic interpretation
     # Keep any with multi-valued entries, for example.
@@ -482,16 +489,41 @@ def _transform_acp_projects(raw_df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _transform_acp_changelog(raw_concat_df: pd.DataFrame) -> pd.DataFrame:
+def _clean_col_names_and_create_id(df) -> pd.DataFrame:
+    """Create surrogate key based on raw columns, then rename and assign ID.
+
+    The surrogate key is created based on raw data and column names.
+    Create the surrogate key, then clean column names and specify
+    which columns are raw, and assign the surrogate key ID column.
+    """
+    surrogate_key = _make_surrogate_key(df)  # uses raw column names
+    df.columns = _rename_columns(df.columns)
+    df["proj_id"] = surrogate_key  # assign after renaming columns
+    return df
+
+
+def _transform_acp_projects(raw_df: pd.DataFrame) -> pd.DataFrame:
+    trans = raw_df.convert_dtypes()
+    trans = _clean_col_names_and_create_id(trans)
+    out = _clean_columns(trans)
+
+    return out
+
+
+def _transform_acp_snapshots_to_changelog(
+    raw_snapshots_df: pd.DataFrame,
+) -> pd.DataFrame:
     """Create a changelog of the ACP data over time."""
-    transformed_concat_df = raw_concat_df.groupby(
-        "report_date", group_keys=False
-    ).apply(
-        _transform_acp_projects
+    trans_df = raw_snapshots_df.reset_index(drop=True).convert_dtypes()
+    trans_df = (
+        trans_df.groupby("report_date")
+        .apply(_clean_col_names_and_create_id)
+        .rename({"raw_report_date": "report_date"})
     )  # TODO: hopefully this groupby apply isn't too slow
-    transformed_concat_df = transformed_concat_df.sort_values(by="report_date")
-    dedupe_cols = transformed_concat_df.columns - "report_date"
-    deduped_df = raw_concat_df.drop_duplicates(subset=dedupe_cols)
+    trans_df = _clean_columns(trans_df)
+    trans_df = trans_df.sort_values(by="report_date")
+    dedupe_cols = [col for col in list(trans_df.columns) if col != "report_date"]
+    deduped_df = trans_df.drop_duplicates(subset=dedupe_cols)
     return deduped_df
 
 
@@ -501,8 +533,8 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     transformed_dfs["acp_projects"] = _transform_acp_projects(
         raw_dfs["raw_acp_projects"]
     )
-    transformed_dfs["acp_changelog"] = _transform_acp_changelog(
-        raw_dfs["raw_acp_projects_changelog_concat"]
+    transformed_dfs["acp_changelog"] = _transform_acp_snapshots_to_changelog(
+        raw_dfs["raw_acp_projects_snapshots"]
     )
 
     return transformed_dfs
