@@ -518,12 +518,21 @@ def _transform_acp_snapshots_to_changelog(
     trans_df = (
         trans_df.groupby("report_date")
         .apply(_clean_col_names_and_create_id)
-        .rename({"raw_report_date": "report_date"})
+        .rename(columns={"raw_report_date": "report_date"})
     )  # TODO: hopefully this groupby apply isn't too slow
     trans_df = _clean_columns(trans_df)
     trans_df = trans_df.sort_values(by="report_date")
-    dedupe_cols = [col for col in list(trans_df.columns) if col != "report_date"]
+    dedupe_cols = [
+        col
+        for col in list(trans_df.columns)
+        if (col not in ["report_date"] and not col.startswith("raw"))
+    ]
     deduped_df = trans_df.drop_duplicates(subset=dedupe_cols)
+    deduped_df["valid_until_date"] = (
+        deduped_df.sort_values(by="report_date")
+        .groupby("proj_id")["report_date"]
+        .shift(-1)
+    )
     return deduped_df
 
 
