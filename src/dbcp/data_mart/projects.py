@@ -845,28 +845,35 @@ def get_eia860m_status_timeseries(
         .iat[0, 0]
         .strftime("%Y-%m-%d")
     )
+
     query = f"""
     SELECT
         plant_id_eia,
         generator_id,
         operational_status_code,
-        min(report_date) as start_date,
-        max(COALESCE(valid_until_date, timestamp '{last_report_date}')) as end_date
+        capacity_mw,
+        min(report_date) AS start_date,
+        max(COALESCE(valid_until_date, timestamp '{last_report_date}')) AS end_date
     FROM data_warehouse.pudl_eia860m_changelog
-    GROUP BY 1,2,3
-    ORDER BY 1,2,3,4  -- must be sorted by date for the pandas groupby.first() to work
+    GROUP BY 1, 2, 3, 4
+    ORDER BY 1, 2, 3, 4
     """
+
     status_history = pd.read_sql(query, engine)
     # The date fields are literally the first day of each month but in reality they
     # represent the whole month. I want to convert them to intervals, but first I need
     # to change end_date to the last day of the month.
     status_history["end_date"] += pd.offsets.MonthEnd()
+
+    # Convert to interval-based index
     date_intervals = pd.IntervalIndex.from_arrays(
-        status_history["start_date"], status_history["end_date"], closed="both"
+        status_history["start_date"],
+        status_history["end_date"],
+        closed="both",
     )
     status_history.set_index(date_intervals, inplace=True)
 
-    # create quarterly timeseries
+    # Determine frequency and periods
     last_end_date = pd.Timestamp(last_report_date) + pd.offsets.MonthEnd()
 
     if frequency in ("A", "Y"):
@@ -889,19 +896,17 @@ def get_eia860m_status_timeseries(
     gen_key = ["plant_id_eia", "generator_id"]
     time_series = pd.concat(
         (
-            status_history.loc[end, :].assign(
-                **{
-                    f"{period_name}_end": end,
-                }
-            )
+            status_history.loc[end, :].assign(**{f"{period_name}_end": end})
             for end in date_spine_end_dates
         ),
-        ignore_index=True,  # intervals no longer needed
+        ignore_index=True,
     )
+
     idx_cols = gen_key + [f"{period_name}_end"]
     time_series.sort_values(idx_cols, inplace=True)
-    time_series.reset_index(inplace=True, drop=True)
+    time_series.reset_index(drop=True, inplace=True)
 
+    # Drop duplicates using latest start_date per generator-period
     # some duplicates are caused by NULL values in the valid_until_date coming from
     # PUDL, which is a bug. The coalesce() function in the SQL query then sets them to
     # last_report_date, which is usually, but not always, appropriate.
@@ -918,14 +923,16 @@ def get_eia860m_status_timeseries(
     idxs_to_drop = is_last_start_date.index[~is_last_start_date]
     dedupe = time_series.drop(idxs_to_drop, axis=0)
 
-    # convert timeseries from sparse to dense; fill with null.
-    out = (
-        dedupe.drop(columns=["start_date", "end_date"])
-        .set_index(idx_cols)
-        .unstack()
-        .stack(dropna=False)
+    # Densify: ensure all generator × period combos exist
+    generators = dedupe[gen_key].drop_duplicates()
+    date_spine = pd.DataFrame({f"{period_name}_end": date_spine_end_dates})
+    full_grid = generators.merge(date_spine, how="cross")
+
+    out = full_grid.merge(
+        dedupe.drop(columns=["start_date", "end_date"]),
+        on=idx_cols,
+        how="left",
     )
-    out.reset_index(inplace=True)
 
     out[f"{period_name}_start"] = (
         pd.to_datetime(out[f"{period_name}_end"])
@@ -933,7 +940,7 @@ def get_eia860m_status_timeseries(
         .dt.start_time
     )
 
-    # add plant names
+    # Add plant names
     eia860m_plant_names = _get_plant_names(engine)
     out = out.merge(eia860m_plant_names, on="plant_id_eia", how="left")
 
