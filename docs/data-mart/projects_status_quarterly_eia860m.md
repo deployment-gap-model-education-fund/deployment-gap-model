@@ -13,6 +13,7 @@ This table contains three years of operational status history for each generator
 ||`quarter_start`|The date of the first day of each quarter|EIA||
 ||`quarter_end`|The date of the last day of each quarter|EIA||
 |Properties|`operational_status_code`|The operational status code defined internally|derived|See the table below for more details|
+||`capacity_mw`|The generator's capacity in megawatts|EIA||
 ||`plant_name_eia`|The name of the plant|EIA||
 
 ## Operational Status Codes

@@ -697,6 +697,7 @@ projects_status_monthly_eia860m = Table(
     Column("month_start", DateTime, primary_key=True),
     Column("month_end", DateTime, primary_key=True),
     Column("operational_status_code", Integer),
+    Column("capacity_mw", Float),
     schema=schema,
 )
 
@@ -709,6 +710,7 @@ projects_status_quarterly_eia860m = Table(
     Column("quarter_start", DateTime, primary_key=True),
     Column("quarter_end", DateTime, primary_key=True),
     Column("operational_status_code", Integer),
+    Column("capacity_mw", Float),
     schema=schema,
 )
 
@@ -721,6 +723,7 @@ projects_status_yearly_eia860m = Table(
     Column("year_start", DateTime, primary_key=True),
     Column("year_end", DateTime, primary_key=True),
     Column("operational_status_code", Integer),
+    Column("capacity_mw", Float),
     schema=schema,
 )
 
