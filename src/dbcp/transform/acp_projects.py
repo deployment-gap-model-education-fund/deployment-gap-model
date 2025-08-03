@@ -49,9 +49,9 @@ def _col_transform_status(ser: pd.Series) -> pd.Series:
         pd.NA,
     }
     is_expected = out.isin(expected_values)
-    assert is_expected.all(), (
-        f"Unexpected status values: {out[~is_expected].value_counts()}"
-    )
+    assert (
+        is_expected.all()
+    ), f"Unexpected status values: {out[~is_expected].value_counts()}"
     return out
 
 
@@ -78,9 +78,9 @@ def _col_transform_phase_type(ser: pd.Series) -> pd.Series:
         pd.NA,
     }
     is_expected = out.isin(expected_values)
-    assert is_expected.all(), (
-        f"Unexpected status values: {out[~is_expected].value_counts()}"
-    )
+    assert (
+        is_expected.all()
+    ), f"Unexpected status values: {out[~is_expected].value_counts()}"
     return out
 
 
@@ -89,9 +89,9 @@ def _col_transform_iso_rtos(ser: pd.Series) -> pd.Series:
     # I think this is a reasonable simplification because only 0.37% are multivalued.
     # But first check that multi-valued items are still a small minority of records
     is_multi = ser.str.contains("|", regex=False).fillna(False)
-    assert is_multi.mean() < 0.01, (
-        f"Too many multi-valued ISO/RTOS: {ser[is_multi].value_counts()}"
-    )
+    assert (
+        is_multi.mean() < 0.01
+    ), f"Too many multi-valued ISO/RTOS: {ser[is_multi].value_counts()}"
     out = ser.str.split("|", regex=False).str[0].str.strip().astype(pd.StringDtype())
 
     # Standardize some variations
@@ -117,9 +117,9 @@ def _col_transform_iso_rtos(ser: pd.Series) -> pd.Series:
         pd.NA,
     }
     is_expected = out.isin(expected_values)
-    assert is_expected.all(), (
-        f"Unexpected ISO/RTOS values: {out[~is_expected].value_counts()}"
-    )
+    assert (
+        is_expected.all()
+    ), f"Unexpected ISO/RTOS values: {out[~is_expected].value_counts()}"
     return out
 
 
@@ -128,9 +128,9 @@ def _col_transform_owner_types(ser: pd.Series, full_df: pd.DataFrame) -> pd.Seri
     # Only 0.15% of proposed projects (1.4% overall) are multivalued.
     # But first check that multi-valued items are still a small minority of records
     is_multi = ser.str.contains("|", regex=False).fillna(False)
-    assert is_multi.mean() < 0.02, (
-        f"Too many multi-valued owner types: {ser[is_multi].value_counts()}"
-    )
+    assert (
+        is_multi.mean() < 0.02
+    ), f"Too many multi-valued owner types: {ser[is_multi].value_counts()}"
     out = (
         ser.str.split("|", regex=False, n=1)
         .str[0]
@@ -143,7 +143,9 @@ def _col_transform_owner_types(ser: pd.Series, full_df: pd.DataFrame) -> pd.Seri
     # to "Utility: IOU" instead of "IPP"
     investor_owned_owner_type = out[out == "Investor Owned"]
     n_known_investor_owned = 1
-    assert len(investor_owned_owner_type) == n_known_investor_owned, f"""
+    assert (
+        len(investor_owned_owner_type) == n_known_investor_owned
+    ), f"""
         Found {len(investor_owned_owner_type)} 'Investor Owned' owner types, expected {n_known_investor_owned}:
         {full_df[full_df["raw_owner_types"].str.contains("Investor Owned")][["raw_owner_types", "raw_owners"]]}
         If these are all IPPs, then increase the number of expected.
@@ -172,9 +174,9 @@ def _col_transform_owner_types(ser: pd.Series, full_df: pd.DataFrame) -> pd.Seri
         pd.NA,
     }
     is_expected = out.isin(expected_values)
-    assert is_expected.all(), (
-        f"Unexpected owner type values: {out[~is_expected].value_counts()}"
-    )
+    assert (
+        is_expected.all()
+    ), f"Unexpected owner type values: {out[~is_expected].value_counts()}"
     return out
 
 
@@ -216,12 +218,12 @@ def _transform_location_cols(
     #    have multivalued entries.
 
     # first check dtypes
-    assert full_df["raw_avg_latitude"].dtype == pd.Float64Dtype(), (
-        "Latitude is not float64"
-    )
-    assert full_df["raw_avg_longitude"].dtype == pd.Float64Dtype(), (
-        "Longitude is not float64"
-    )
+    assert (
+        full_df["raw_avg_latitude"].dtype == pd.Float64Dtype()
+    ), "Latitude is not float64"
+    assert (
+        full_df["raw_avg_longitude"].dtype == pd.Float64Dtype()
+    ), "Longitude is not float64"
     county_shapes["GEOID"] = county_shapes["GEOID"].astype(pd.StringDtype())
     points = gpd.GeoSeries.from_xy(
         full_df["raw_avg_longitude"].astype(np.float64),
@@ -403,9 +405,9 @@ def _make_surrogate_key(raw_df: pd.DataFrame) -> pd.Series:
     ]
     dupes = raw_df.duplicated(subset=pk, keep=False)
     assert not dupes.any(), f"Uniqueness violation: {dupes.sum()} duplicate PKs found."
-    assert raw_df["MW_Total_Capacity"].dtype == pd.Float64Dtype(), (
-        "Capacity is not float dtype"
-    )
+    assert (
+        raw_df["MW_Total_Capacity"].dtype == pd.Float64Dtype()
+    ), "Capacity is not float dtype"
 
     to_hash = raw_df.loc[:, pk].copy()
     str_cols = to_hash.select_dtypes(include="string").columns
@@ -519,19 +521,28 @@ def _transform_acp_snapshots_to_changelog(
         .rename(columns={"raw_report_date": "report_date"})
     )
     trans_df = _clean_columns(trans_df)
-    trans_df = trans_df.sort_values(by="report_date")
-    dedupe_cols = [
+    trans_df = trans_df.sort_values(by=["proj_id", "report_date"])
+    compare_cols = [
         col
         for col in list(trans_df.columns)
         if (col not in ["report_date"] and not col.startswith("raw"))
     ]
-    deduped_df = trans_df.drop_duplicates(subset=dedupe_cols)
-    deduped_df["valid_until_date"] = (
-        deduped_df.sort_values(by="report_date")
-        .groupby("proj_id")["report_date"]
-        .shift(-1)
+    # Shift to compare with previous row within each proj_id
+    trans_df["row_hash"] = (
+        trans_df[compare_cols]
+        .astype(str)
+        .apply(
+            lambda x: hashlib.sha256(str(tuple(x)).encode("utf-8")).hexdigest(), axis=1
+        )
     )
-    return deduped_df
+    trans_df["prev_hash"] = trans_df.groupby("proj_id")["row_hash"].shift()
+    out_df = trans_df[
+        (trans_df.prev_hash.isnull()) | (trans_df.row_hash != trans_df.prev_hash)
+    ]
+    out_df = out_df.drop(columns=["row_hash", "prev_hash"])
+    out_df["valid_until_date"] = out_df.groupby("proj_id")["report_date"].shift(-1)
+
+    return out_df
 
 
 def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
