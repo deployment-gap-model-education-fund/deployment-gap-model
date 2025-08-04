@@ -20,6 +20,7 @@ def _extract_acp_projects_snapshots() -> pd.DataFrame:
     )
     concat_df = pd.DataFrame()
     quarter_to_month = {"1": 1, "2": 4, "3": 7, "4": 10}
+    snapshots = []
     for path in file_paths:
         snapshot_df = pd.read_csv(path)
         filename = path.parts[-1].split(".")[0]
@@ -34,7 +35,8 @@ def _extract_acp_projects_snapshots() -> pd.DataFrame:
         month = quarter_to_month[quarter]
         year = int(match.group(2))
         snapshot_df["report_date"] = pd.to_datetime(f"{year}-{month:02d}-01")
-        concat_df = pd.concat([concat_df, snapshot_df])
+        snapshots.append(snapshot_df)
+    concat_df = pd.concat(snapshots)
     return concat_df
 
 
