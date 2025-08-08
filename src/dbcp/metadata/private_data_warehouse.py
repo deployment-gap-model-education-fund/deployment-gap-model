@@ -95,10 +95,11 @@ acp_changelog = Table(
     schema=schema,
 )
 
-acp_projects = Table(
-    "acp_projects",
+acp_projects_current = Table(
+    "acp_projects_current",
     metadata,
     Column("proj_id", BigInteger, primary_key=True),
+    Column("report_date", DateTime),
     Column("status", String),
     Column("plant_id_eia", Integer),
     Column("project_name", String),

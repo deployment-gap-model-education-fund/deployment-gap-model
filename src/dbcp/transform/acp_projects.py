@@ -141,13 +141,18 @@ def _col_transform_owner_types(ser: pd.Series, full_df: pd.DataFrame) -> pd.Seri
     # Map "Investor Owned" values to "IPP" when the owner is likely
     # not a utility company. In the future, "Investor Owned" could refer
     # to "Utility: IOU" instead of "IPP"
-    investor_owned_owner_type = out[out == "Investor Owned"]
+    n_max_investor_owned_owner_type_per_date = (
+        full_df[full_df["raw_owner_types"].str.contains("Investor Owned")]
+        .groupby("report_date")
+        .size()
+        .max()
+    )
     n_known_investor_owned = 1
     assert (
-        len(investor_owned_owner_type) == n_known_investor_owned
+        n_max_investor_owned_owner_type_per_date == n_known_investor_owned
     ), f"""
-        Found {len(investor_owned_owner_type)} 'Investor Owned' owner types, expected {n_known_investor_owned}:
-        {full_df[full_df["raw_owner_types"].str.contains("Investor Owned")][["raw_owner_types", "raw_owners"]]}
+        Found {n_max_investor_owned_owner_type_per_date} 'Investor Owned' owner types from one report date, expected {n_known_investor_owned}:
+        {full_df[full_df["raw_owner_types"].str.contains("Investor Owned")][["raw_owner_types", "raw_owners", "report_date"]]}
         If these are all IPPs, then increase the number of expected.
         If there is a non-IPP, then replace owner type value with correct value, i.e. 'Utility: IOU'.
         """
@@ -498,11 +503,12 @@ def _clean_col_names_and_create_id(df) -> pd.DataFrame:
     """
     surrogate_key = _make_surrogate_key(df)  # uses raw column names
     df.columns = _rename_columns(df.columns)
+    df = df.rename(columns={"raw_report_date": "report_date"})
     df["proj_id"] = surrogate_key  # assign after renaming columns
     return df
 
 
-def _transform_acp_projects(raw_df: pd.DataFrame) -> pd.DataFrame:
+def _transform_acp_projects_current(raw_df: pd.DataFrame) -> pd.DataFrame:
     trans = raw_df.convert_dtypes()
     trans = _clean_col_names_and_create_id(trans)
     out = _clean_columns(trans)
@@ -515,11 +521,7 @@ def _transform_acp_snapshots_to_changelog(
 ) -> pd.DataFrame:
     """Create a changelog of the ACP data over time."""
     trans_df = raw_snapshots_df.reset_index(drop=True).convert_dtypes()
-    trans_df = (
-        trans_df.groupby("report_date")
-        .apply(_clean_col_names_and_create_id)
-        .rename(columns={"raw_report_date": "report_date"})
-    )
+    trans_df = trans_df.groupby("report_date").apply(_clean_col_names_and_create_id)
     trans_df = _clean_columns(trans_df)
     trans_df = trans_df.sort_values(by=["proj_id", "report_date"])
     compare_cols = [
@@ -548,8 +550,13 @@ def _transform_acp_snapshots_to_changelog(
 def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """Transform and clean ACP projects data."""
     transformed_dfs = {}
-    transformed_dfs["acp_projects"] = _transform_acp_projects(
-        raw_dfs["raw_acp_projects"]
+    snapshots = raw_dfs["raw_acp_projects_snapshots"]
+    most_recent_report_date = raw_dfs["raw_acp_projects_snapshots"]["report_date"].max()
+    most_recent_snapshot = snapshots[
+        snapshots["report_date"] == most_recent_report_date
+    ]
+    transformed_dfs["acp_projects_current"] = _transform_acp_projects_current(
+        most_recent_snapshot
     )
     transformed_dfs["acp_changelog"] = _transform_acp_snapshots_to_changelog(
         raw_dfs["raw_acp_projects_snapshots"]
