@@ -4,8 +4,9 @@ name: update-data
 on:
   push:
     branches:
-      - "dev"
       - "main"
+    tags:
+      - "v*"              # used for production releases
   workflow_dispatch:
   schedule:
     - cron: 0 0 * * 0
@@ -72,17 +73,58 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - name: Set branch dynamically
+      - name: Check if this is a scheduled run
+        id: is_schedule
+        run: echo "::set-output name=scheduled::${{ github.event_name == 'schedule' }}"
+
+      - name: Fetch latest prod tag (only on schedule)
+        id: latest_tag
+        if: steps.is_schedule.outputs.scheduled == 'true'
+        run: |
+          # Install gh CLI
+          sudo apt-get update && sudo apt-get install -y gh
+
+          # Authenticate gh with token (use a PAT or GITHUB_TOKEN)
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+          # Get latest tag matching pattern (e.g. v*.*.*)
+          LATEST_TAG=$(gh release list --limit 1 --exclude-drafts --exclude-prereleases --pattern 'v*.*.*' --json tagName --jq '.[0].tagName')
+
+          echo "Latest tag: $LATEST_TAG"
+          echo "::set-output name=tag::$LATEST_TAG"
+
+      - name: Set matrix
         id: set-matrix
         run: |
-          if [ "${{ github.event_name }}" == "push" ]; then
-            echo "matrix={\"include\":[{\"branch\":\"${{ github.ref_name }}\"}]}" >> $GITHUB_OUTPUT
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            # Get the branch or tag that triggered the push event
+            BRANCH_OR_TAG="${{ github.ref_name }}"
+
+            # If it looks like a version tag starting with 'v', mark as prod
+            if [[ "$BRANCH_OR_TAG" == v* ]]; then
+              TARGET="prod"
+            else
+              # Otherwise treat as dev (branch like main)
+              TARGET="dev"
+            fi
+
+            # Set the matrix with target and the actual git ref
+            echo "matrix={\"include\":[{\"target\":\"$TARGET\",\"ref\":\"$BRANCH_OR_TAG\"}]}" >> $GITHUB_OUTPUT
+
+          elif [[ "${{ github.event_name }}" == "schedule" ]]; then
+            # On schedule, get the latest prod tag from previous step output
+            LATEST_TAG="${{ steps.latest_tag.outputs.tag }}"
+
+            # Run matrix with dev (main branch) and prod (latest tag)
+            echo "matrix={\"include\":[{\"target\":\"dev\",\"ref\":\"main\"},{\"target\":\"prod\",\"ref\":\"$LATEST_TAG\"}]}" >> $GITHUB_OUTPUT
+
           else
-            echo "matrix={\"include\":[{\"branch\":\"main\"},{\"branch\":\"dev\"}]}" >> $GITHUB_OUTPUT
+            # For manual or other events, default to dev (main branch)
+            echo "matrix={\"include\":[{\"target\":\"dev\",\"ref\":\"main\"}]}" >> $GITHUB_OUTPUT
           fi
 
-      - name: echo matrix
-        run: echo ${{ steps.set-matrix.outputs.matrix }}
+      - name: Echo matrix
+        run: echo "${{ steps.set-matrix.outputs.matrix }}"
 
   etl:
     needs: matrix_prep # Ensure archive job finishes first
@@ -96,14 +138,17 @@ jobs:
       API_KEY_GOOGLE_MAPS: ${{ secrets.API_KEY_GOOGLE_MAPS }}
       GITHUB_REF: ${{ github.ref_name }} # This is changed to dev if running on a schedule
     steps:
-      - name: print matrix
-        run: echo ${{ matrix.branch }}
+      - name: Print matrix info
+        run: |
+          echo "Target: ${{ matrix.target }}"
+          echo "Ref: ${{ matrix.ref }}"
 
       - name: Checkout Repository
         id: checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ matrix.branch }}
+          # Checkout the ref (branch or tag) from matrix
+          ref: ${{ matrix.ref }}
 
       - name: Who owns the workspace?
         run: ls -ld $GITHUB_WORKSPACE
@@ -167,23 +212,31 @@ jobs:
       - name: Give the dbcp user ownership of the workspace
         run: sudo chown -R 1000:1000 $GITHUB_WORKSPACE
 
-      # publish the outputs, grab the git sha of the commit step
+      # Publish the outputs, grab the git SHA of the commit step
       - name: Publish publish outputs
         run: |
           # Use the commit_settings_file hash if settings.yaml was updated
-          # If it wasn't updated that means there were no changes so use the
+          # If it wasn't updated, that means there were no changes, so use the
           # commit hash from the checkout step
           SETTINGS_FILE_SHA="${{ steps.commit_settings_file.outputs.commit_long_sha }}"
           if [ -z "$SETTINGS_FILE_SHA" ]; then
             SETTINGS_FILE_SHA="${{ steps.checkout.outputs.commit }}"
           fi
 
+          # Run the publish-outputs command inside the Docker container
+          # Pass:
+          # - build-ref (the git ref, e.g. a tag or branch) for versioning
+          # - code-git-sha (commit hash of the code used for build)
+          # - settings-file-git-sha (commit hash of the saved settings.yaml)
+          # - github-action-run-id (for tracking the GitHub Action run)
+          # - target (indicates if this is 'dev' or 'prod' environment target)
           docker compose run --rm app python dbcp/cli.py publish-outputs \
             -bq \
-            --build-ref ${{ matrix.branch }} \
+            --build-ref ${{ matrix.ref }} \
             --code-git-sha ${{ steps.checkout.outputs.commit }} \
             --settings-file-git-sha $SETTINGS_FILE_SHA \
-            --github-action-run-id ${{ github.run_id }}
+            --github-action-run-id ${{ github.run_id }} \
+            --target ${{ matrix.target }}
 
       - name: Stop Docker Compose services
         if: always()
