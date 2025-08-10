@@ -192,8 +192,7 @@ def etl_manual_ordinances() -> dict[str, pd.DataFrame]:
 
 def etl_acp_projects() -> dict[str, pd.DataFrame]:
     """ETL ACP projects."""
-    acp_uri = "gs://dgm-archive/acp/acp_projects_20250725.csv"
-    raw_dfs = dbcp.extract.acp_projects.extract(acp_uri)
+    raw_dfs = dbcp.extract.acp_projects.extract()
     transformed = dbcp.transform.acp_projects.transform(raw_dfs)
     return transformed
 
