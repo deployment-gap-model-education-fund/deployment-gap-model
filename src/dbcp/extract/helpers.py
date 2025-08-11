@@ -80,12 +80,12 @@ def cache_gcs_archive_file_locally(
     """
     bucket_url, object_name = re.match("gs://(.*?)/(.*)", str(uri)).groups()
     credentials, project_id = google.auth.default()
-    logger.info(f"[GCS] Project ID: {project_id}")
-    logger.info(f"[GCS] Credentials type: {type(credentials).__name__}")
+    logger.warning(f"[GCS] Project ID: {project_id}")
+    logger.warning(f"[GCS] Credentials type: {type(credentials).__name__}")
     client = storage.Client()
     try:
         _ = client.get_bucket(bucket_url)
-        logger.info(f"[GCS] Successfully accessed bucket: {bucket_url}")
+        logger.warning(f"[GCS] Successfully accessed bucket: {bucket_url}")
     except Exception as e:
         logger.error(f"[GCS] Could not access bucket: {bucket_url} - {e}")
         raise
@@ -99,19 +99,19 @@ def cache_gcs_archive_file_locally(
     if generation_num:
         filepath = Path(str(filepath) + f"#{generation_num}")
     else:
-        logger.info(f"[GCS] Fetching blob metadata for: {object_name}")
+        logger.warning(f"[GCS] Fetching blob metadata for: {object_name}")
         blob = bucket.get_blob(object_name)
         if not blob:
             logger.error(f"[GCS] Blob not found: {object_name} in bucket {bucket_url}")
             raise FileNotFoundError(
                 f"Blob not found: {object_name} in bucket {bucket_url}"
             )
-        logger.info(f"[GCS] Blob found. Generation: {blob.generation}")
+        logger.warning(f"[GCS] Blob found. Generation: {blob.generation}")
         # Get the latest version of the object and add the generation number to the filepath name
         generation_num = bucket.get_blob(str(object_name)).generation
         filepath = Path(str(filepath) + f"#{generation_num}")
     if not filepath.exists():
-        logger.info(
+        logger.warning(
             f"{object_name} not found in {local_cache_dir}. Downloading from GCS bucket."
         )
 
