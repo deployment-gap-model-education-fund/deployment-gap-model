@@ -740,6 +740,7 @@ projects_status_transition_dates_eia860m = Table(
     Column("date_entered_7", DateTime),
     Column("date_entered_8", DateTime),
     Column("date_entered_99", DateTime),
+    Column("latest_report_date", DateTime),
     schema=schema,
 )
 

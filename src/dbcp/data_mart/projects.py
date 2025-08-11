@@ -947,29 +947,50 @@ def _get_eia860m_transition_dates(engine: sa.engine.Engine) -> pd.DataFrame:
         engine (sa.engine.Engine): connection to the data warehouse database
     """
     query = """
+    WITH with_latest AS (
+        SELECT
+            plant_id_eia,
+            generator_id,
+            operational_status_code,
+            report_date,
+            MAX(report_date) OVER (PARTITION BY plant_id_eia, generator_id) AS latest_report_date
+        FROM data_warehouse.pudl_eia860m_changelog
+        WHERE operational_status_code IS NOT NULL
+    )
     SELECT
         plant_id_eia,
         generator_id,
         operational_status_code,
-        min(report_date) as status_date
-    FROM data_warehouse.pudl_eia860m_changelog
-    WHERE operational_status_code IS NOT NULL
-    group by 1,2,3
-    order by 1,2,3
+        MIN(report_date) AS status_date,
+        MAX(latest_report_date) AS latest_report_date
+    FROM with_latest
+    GROUP BY plant_id_eia, generator_id, operational_status_code
+    ORDER BY plant_id_eia, generator_id, operational_status_code;
     """
     transition_dates = pd.read_sql(query, engine)
-    # reshape to wide format
-    transition_dates = transition_dates.pivot(
+
+    # Separate latest_report_date before pivoting
+    latest_dates = transition_dates[
+        ["plant_id_eia", "generator_id", "latest_report_date"]
+    ].drop_duplicates()
+
+    # Pivot status_date into wide format
+    status_dates_wide = transition_dates.pivot(
         index=["plant_id_eia", "generator_id"],
         columns="operational_status_code",
         values="status_date",
     )
-    transition_dates.columns = [f"date_entered_{c}" for c in transition_dates.columns]
+    status_dates_wide.columns = [f"date_entered_{c}" for c in status_dates_wide.columns]
 
+    # Merge back latest_report_date
+    transition_dates = status_dates_wide.reset_index().merge(
+        latest_dates, on=["plant_id_eia", "generator_id"], how="left"
+    )
+
+    # Add plant names
     eia860m_plant_names = _get_plant_names(engine).set_index("plant_id_eia")
-    transition_dates = transition_dates.reset_index(
-        level="generator_id", drop=False
-    ).join(eia860m_plant_names, how="left")
+    transition_dates = transition_dates.join(eia860m_plant_names, on="plant_id_eia")
+
     return transition_dates.reset_index(drop=False)
 
 
