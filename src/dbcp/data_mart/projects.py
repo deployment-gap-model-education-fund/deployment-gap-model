@@ -953,7 +953,8 @@ def _get_eia860m_transition_dates(engine: sa.engine.Engine) -> pd.DataFrame:
             generator_id,
             operational_status_code,
             report_date,
-            MAX(report_date) OVER (PARTITION BY plant_id_eia, generator_id) AS latest_report_date
+            MAX(report_date) OVER (PARTITION BY plant_id_eia, generator_id) AS latest_report_date,
+            MAX(report_date) as data_freshness_date
         FROM data_warehouse.pudl_eia860m_changelog
         WHERE operational_status_code IS NOT NULL
     )
@@ -962,7 +963,8 @@ def _get_eia860m_transition_dates(engine: sa.engine.Engine) -> pd.DataFrame:
         generator_id,
         operational_status_code,
         MIN(report_date) AS status_date,
-        MAX(latest_report_date) AS latest_report_date
+        MAX(latest_report_date) AS latest_report_date,
+        MAX(data_freshness_date) as data_freshness_date
     FROM with_latest
     GROUP BY plant_id_eia, generator_id, operational_status_code
     ORDER BY plant_id_eia, generator_id, operational_status_code;
@@ -971,7 +973,7 @@ def _get_eia860m_transition_dates(engine: sa.engine.Engine) -> pd.DataFrame:
 
     # Separate latest_report_date before pivoting
     latest_dates = transition_dates[
-        ["plant_id_eia", "generator_id", "latest_report_date"]
+        ["plant_id_eia", "generator_id", "latest_report_date", "data_freshness_date"]
     ].drop_duplicates()
 
     # Pivot status_date into wide format
