@@ -953,21 +953,26 @@ def _get_eia860m_transition_dates(engine: sa.engine.Engine) -> pd.DataFrame:
             generator_id,
             operational_status_code,
             report_date,
-            MAX(report_date) OVER (PARTITION BY plant_id_eia, generator_id) AS latest_report_date,
-            MAX(report_date) as data_freshness_date
+            MAX(report_date) OVER (PARTITION BY plant_id_eia, generator_id) AS latest_report_date
         FROM data_warehouse.pudl_eia860m_changelog
         WHERE operational_status_code IS NOT NULL
+    ),
+    max_date AS (
+        SELECT MAX(report_date) AS data_freshness_date
+        FROM data_warehouse.pudl_eia860m_changelog
     )
     SELECT
-        plant_id_eia,
-        generator_id,
-        operational_status_code,
-        MIN(report_date) AS status_date,
-        MAX(latest_report_date) AS latest_report_date,
-        MAX(data_freshness_date) as data_freshness_date
-    FROM with_latest
-    GROUP BY plant_id_eia, generator_id, operational_status_code
-    ORDER BY plant_id_eia, generator_id, operational_status_code;
+        wl.plant_id_eia,
+        wl.generator_id,
+        wl.operational_status_code,
+        MIN(wl.report_date) AS status_date,
+        MAX(wl.latest_report_date) AS latest_report_date,
+        md.data_freshness_date
+    FROM with_latest wl
+    CROSS JOIN max_date md
+    GROUP BY wl.plant_id_eia, wl.generator_id, wl.operational_status_code, md.data_freshness_date
+    ORDER BY wl.plant_id_eia, wl.generator_id, wl.operational_status_code;
+
     """
     transition_dates = pd.read_sql(query, engine)
 
