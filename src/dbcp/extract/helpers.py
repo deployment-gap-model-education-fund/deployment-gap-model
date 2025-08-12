@@ -28,6 +28,38 @@ def extract_airtable_data(path: Path) -> pd.DataFrame:
     return pd.DataFrame.from_records(records)
 
 
+def cache_gcs_archive_bucket_contents_locally(
+    gcs_dir_name: str,
+    local_cache_dir: Union[str, Path] = "/app/data/data_cache",
+    generation_num: Optional[str] = None,
+) -> list[Path]:
+    """Cache all files in a folder of the GCS archive bucket.
+
+    Args:
+        uri: the full file GCS URI.
+        local_cache_dir: the local directory to cache the data.
+        generation_num: The generation number of the object to access. If None,
+            the latest version of the object will be used. This is helpful
+            if the ETL code is pinned to a specific version of an archive.
+
+    Returns:
+        Path to the local cache of the file.
+    """
+    archive_bucket_name = "dgm-archive"
+    if not gcs_dir_name.endswith("/"):
+        gcs_dir_name += "/"
+    storage_client = storage.Client()
+    blobs = storage_client.list_blobs(archive_bucket_name)
+    paths = []
+    for blob in blobs:
+        if blob.name != gcs_dir_name and blob.name.startswith(gcs_dir_name):
+            uri = f"gs://{archive_bucket_name}/{blob.name}"
+            paths.append(
+                cache_gcs_archive_file_locally(uri, local_cache_dir, generation_num)
+            )
+    return paths
+
+
 def cache_gcs_archive_file_locally(
     uri: str,
     local_cache_dir: Union[str, Path] = "/app/data/data_cache",
@@ -51,7 +83,6 @@ def cache_gcs_archive_file_locally(
     bucket = storage.Client(credentials=credentials, project=project_id).bucket(
         bucket_url, user_project=project_id
     )
-
     local_cache_dir = Path(local_cache_dir)
     filepath = local_cache_dir / object_name
 
