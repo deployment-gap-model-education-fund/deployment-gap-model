@@ -998,7 +998,7 @@ def _get_eia860m_transition_dates(engine: sa.engine.Engine) -> pd.DataFrame:
     eia860m_plant_names = _get_plant_names(engine).set_index("plant_id_eia")
     transition_dates = transition_dates.join(eia860m_plant_names, on="plant_id_eia")
 
-    return transition_dates.reset_index(drop=False)
+    return transition_dates
 
 
 def _get_plant_names(
