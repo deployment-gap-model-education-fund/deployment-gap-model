@@ -93,7 +93,7 @@ def cache_gcs_archive_file_locally(
         generation_num = bucket.get_blob(str(object_name)).generation
         filepath = Path(str(filepath) + f"#{generation_num}")
     if not filepath.exists():
-        logger.warning(
+        logger.info(
             f"{object_name} not found in {local_cache_dir}. Downloading from GCS bucket."
         )
 
