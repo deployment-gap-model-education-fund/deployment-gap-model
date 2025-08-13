@@ -321,7 +321,7 @@ def add_fips_ids(
 
     logger.info(
         f"Assigned state FIPS codes for "
-        f"{len(df[df.state_id_fips.notnull()])/len(df):.2%} of records."
+        f"{len(df[df.state_id_fips.notnull()]) / len(df):.2%} of records."
     )
     if county_col:
         df["county_id_fips"] = df.apply(
@@ -337,6 +337,6 @@ def add_fips_ids(
         df = df.astype({"county_id_fips": pd.StringDtype()})
         logger.info(
             f"Assigned county FIPS codes for "
-            f"{len(df[df.county_id_fips.notnull()])/len(df):.2%} of records."
+            f"{len(df[df.county_id_fips.notnull()]) / len(df):.2%} of records."
         )
     return df
