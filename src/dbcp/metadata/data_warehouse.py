@@ -591,6 +591,7 @@ pudl_generators = Table(
     Column("summer_estimated_capability_mw", Float),
     Column("supercritical_tech", String),
     Column("can_switch_oil_gas", Boolean),
+    Column("can_switch_when_operating", Boolean),
     Column("synchronized_transmission_grid", String),
     Column("technology_description", String),
     Column("time_cold_shutdown_full_load_code", String),
