@@ -199,11 +199,11 @@ jobs:
       # commit the settings file
       - uses: EndBug/add-and-commit@v9
         id: commit_settings_file
-        if: steps.write_settings.outcome == 'success'
+        if: steps.write_settings.outcome == 'success' && github.ref_type == 'branch'
         with:
           add: "src/dbcp/settings.yaml"
           author_name: "DBCP Bot"
-          author_email: "bennett.norman@catalyst.coop"
+          author_email: "katherine.lamb@catalyst.coop"
           message: "Update settings.yaml"
           push: true
 
