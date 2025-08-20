@@ -213,7 +213,7 @@ jobs:
         run: sudo chown -R 1000:1000 $GITHUB_WORKSPACE
 
       # Publish the outputs, grab the git SHA of the commit step
-      - name: Publish publish outputs
+      - name: Publish outputs
         run: |
           # Use the commit_settings_file hash if settings.yaml was updated
           # If it wasn't updated, that means there were no changes, so use the
