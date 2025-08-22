@@ -140,12 +140,23 @@ RESOURCE_DICT = {
             "miso": ["Hydro"],
             "caiso": ["Hydro"],
             "pjm": ["Hydro"],
-            "ercot": [],
+            "ercot": ["Water - Other"],
             "spp": [],
             "nyiso": [],
             "isone": [],
         },
         "type": "Renewable",
+    },
+    "Hydrogen": {
+        "codes": {
+            "ercot": ["Hydrogen - Other"],
+            "miso": [],
+            "caiso": [],
+            "pjm": [],
+            "spp": [],
+            "nyiso": [],
+            "isone": [],
+        }
     },
     "Landfill Gas": {
         "codes": {
@@ -222,6 +233,8 @@ RESOURCE_DICT = {
                 "Thermal - ST",
                 "Thermal - VFT",
                 "Hybrid - GT/Battery",
+                "Hybrid - Thermal/Storage",
+                "Thermal - Solar/Storage",
             ],
             "nyiso": [
                 "Combined Cycle",
@@ -272,7 +285,10 @@ RESOURCE_DICT = {
             "miso": ["Diesel"],
             "caiso": [],
             "pjm": ["Diesel; Solar", "Diesel; Methane"],
-            "ercot": ["Fuel Oil - Other"],
+            "ercot": [
+                "Fuel Oil - Other",
+                "Fuel Oil - Combustion (gas) Turbine, but not part of a Combined-Cycle",
+            ],
             "spp": ["Thermal - Diesel/Gas"],
             "nyiso": [],
             "isone": [
@@ -479,7 +495,7 @@ def _clean_resource_type(
         resource_locations["county_id_fips"].isin(coastal_county_id_fips.keys())
         & resource_locations.resource_clean.eq("Onshore Wind")
     ].project_id
-    expected_n_coastal_wind_projects = 83
+    expected_n_coastal_wind_projects = 93
     assert (
         len(nyiso_coastal_wind_project_project_ids) == expected_n_coastal_wind_projects
     ), f"Expected {expected_n_coastal_wind_projects} NYISO coastal wind projects but found {len(nyiso_coastal_wind_project_project_ids)}"
