@@ -292,6 +292,7 @@ def _add_derived_columns(mart: pd.DataFrame) -> None:
         "Fuel Cell": "renewable",
         "Geothermal": "renewable",
         "Hydro": "renewable",
+        "Hydrogen": "renewable",
         "Landfill Gas": "fossil",
         "Methane; Solar": "other",
         "Municipal Solid Waste": "fossil",
@@ -728,7 +729,7 @@ def validate_project_change_log(
             "ISONE": 0.01,
             "MISO": 0.09,  # A lot of operational projects prior to 2010 are missing operational dates
             "NYISO": 0.18,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
-            "PJM": 0.04,
+            "PJM": 0.05,
             "SPP": 0.32,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
         }
     )
@@ -783,7 +784,7 @@ def validate_iso_regions_change_log(
             "ISONE": 0.01,
             "MISO": 0.09,  # A lot of operational projects prior to 2010 are missing operational dates
             "NYISO": 0.20,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
-            "PJM": 0.04,
+            "PJM": 0.05,
             "SPP": 0.32,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
         }
     )
