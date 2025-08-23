@@ -9,19 +9,45 @@ description = "Data engineering for the Down Ballot Climate Project (DBCP)"
 authors = [
     { name = "Catalyst Cooperative", email = "hello@catalyst.coop" }
 ]
-requires-python = ">=3.9,<3.11"
+requires-python = ">=3.10,<3.14"
 readme = "README.md"
-license = { text = "MIT" }  # or SPDX ID if known
+license = "MIT"
 dependencies = [
-    "catalystcoop.pudl>=0.5",
-    "psycopg2",
-    "tqdm",
-    "python-docx",
-    "googlemaps",
-    "pandas-gbq",
-    "pydata-google-auth",
-    "pandera",
-    "pandera[io]",
+    "addfips>=0.4",
+    "fiona~=1.10.1",
+    "psycopg2-binary~=2.9.3",
+    "tqdm>=4.64.1,<5.0.0",
+    "python-docx~=0.8.11",
+    "pygeocodio~=1.4.0",
+    "googlemaps~=4.5.3",
+    "pandas-gbq>=0.19.1",
+    "pydata-google-auth~=1.7.0",
+    "pandera[io]~=0.8.1",
+    "jupyterlab~=4.3.0",
+    "pandas>=2.0.0",
+    "joblib~=1.2.0",
+    "beautifulsoup4~=4.11",
+    "plotly~=5.15.0",
+    "gridstatus~=0.20.0",
+    "s3fs>=2022.11.0",
+    "click>=8.1.7",
+    "pyairtable>=3.1",
+    "numpy<2",
+    "sqlalchemy<2",
+    "coloredlogs~=15.0.1",
+    "scipy~=1.14.1",
+    "google-cloud-storage~=2.18.2",
+    "geopandas>=1.0.1",
+    "gcsfs>=2025.1.0",
+    "pydantic>=2.11",
+    "us~=3.2.0",
+    "matplotlib~=3.10.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "pytest",
 ]
 
 [project.urls]
@@ -38,5 +64,5 @@ where = ["src"]
 
 [tool.black]
 line-length = 88
-target-version = ["py39", "py310"]
+target-version = ["py311", "py312"]
 include = "\\.pyi?$"
