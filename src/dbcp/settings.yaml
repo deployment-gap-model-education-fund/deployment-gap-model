@@ -10,3 +10,9 @@
     table_id: tblVK1P1eYblnevqo
   name: airtable/Offshore Wind Locations DBCP Version/Projects.json
   pinned: false
+- generation_num: 1739398209345752
+  metadata:
+    schema_generation_number: "1739398198176972"
+    table_id: tblWiomk63VgrDDIk
+  name: airtable/Clean Build State Permitting Analysis/County Level Control.json
+  pinned: false
