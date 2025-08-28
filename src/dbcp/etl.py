@@ -42,6 +42,17 @@ def etl_lbnl_iso_queue() -> Dict[str, pd.DataFrame]:
     return lbnl_transformed_dfs
 
 
+def etl_fyi_iso_queue() -> Dict[str, pd.DataFrame]:
+    """Interconnection.fyi ISO Queues ETL."""
+    fyi_uri = (
+        "gs://dgm-archive/fyi_iso_queue/interconnectionfyi_monthly_data_export_20250820"
+    )
+    fyi_raw_dfs = dbcp.extract.fyi_iso_queue.extract(fyi_uri)
+    fyi_transformed_dfs = dbcp.transform.fyi_iso_queue.transform(fyi_raw_dfs)
+
+    return fyi_transformed_dfs
+
+
 def etl_columbia_local_opp() -> Dict[str, pd.DataFrame]:
     """Columbia Local Opposition ETL."""
     # Extract
