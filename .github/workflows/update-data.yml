@@ -79,7 +79,7 @@ jobs:
 
       - name: Fetch latest prod tag (only on schedule)
         id: latest_tag
-        if: steps.is_schedule.outputs.scheduled == 'true'
+        # if: steps.is_schedule.outputs.scheduled == 'true'
         run: |
           # Install gh CLI
           sudo apt-get update && sudo apt-get install -y gh
@@ -90,8 +90,14 @@ jobs:
           # Get latest tag matching pattern (e.g. v*.*.*)
           LATEST_TAG=$(gh release list --limit 1 --exclude-drafts --exclude-pre-releases --pattern 'v*.*.*' --json tagName --jq '.[0].tagName')
 
+          LATEST_TAG=$(gh release list \
+            --exclude-drafts \
+            --exclude-pre-releases \
+            --json tagName \
+            --jq '[.[].tagName | select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))][0]')
+
           echo "Latest tag: $LATEST_TAG"
-          echo "::set-output name=tag::$LATEST_TAG"
+          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
 
       - name: Set matrix
         id: set-matrix
