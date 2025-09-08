@@ -81,17 +81,21 @@ jobs:
         id: latest_tag
         if: steps.is_schedule.outputs.scheduled == 'true'
         run: |
-          # Install gh CLI
-          sudo apt-get update && sudo apt-get install -y gh
-
           # Authenticate gh with token (use a PAT or GITHUB_TOKEN)
           echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
+          REPO="${{ github.repository }}"
+
           # Get latest tag matching pattern (e.g. v*.*.*)
-          LATEST_TAG=$(gh release list --limit 1 --exclude-drafts --exclude-pre-releases --pattern 'v*.*.*' --json tagName --jq '.[0].tagName')
+          LATEST_TAG=$(gh release list \
+            --repo "$REPO" \
+            --exclude-drafts \
+            --exclude-pre-releases \
+            --json tagName \
+            --jq '[.[].tagName | select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))][0]')
 
           echo "Latest tag: $LATEST_TAG"
-          echo "::set-output name=tag::$LATEST_TAG"
+          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
 
       - name: Set matrix
         id: set-matrix
