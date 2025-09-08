@@ -79,11 +79,8 @@ jobs:
 
       - name: Fetch latest prod tag (only on schedule)
         id: latest_tag
-        # if: steps.is_schedule.outputs.scheduled == 'true'
+        if: steps.is_schedule.outputs.scheduled == 'true'
         run: |
-          # Install gh CLI
-          # sudo apt-get update && sudo apt-get install -y gh
-
           # Authenticate gh with token (use a PAT or GITHUB_TOKEN)
           echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
