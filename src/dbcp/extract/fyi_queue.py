@@ -39,5 +39,5 @@ def extract(uri: str) -> Dict[str, pd.DataFrame]:
     }
     all_projects.rename(columns=rename_dict, inplace=True)
     return {
-        "lbnl_iso_queue": all_projects,
+        "fyi_queue": all_projects,
     }

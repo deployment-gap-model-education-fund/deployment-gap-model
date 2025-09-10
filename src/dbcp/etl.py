@@ -42,13 +42,13 @@ def etl_lbnl_iso_queue() -> Dict[str, pd.DataFrame]:
     return lbnl_transformed_dfs
 
 
-def etl_fyi_iso_queue() -> Dict[str, pd.DataFrame]:
+def etl_fyi_queue() -> Dict[str, pd.DataFrame]:
     """Interconnection.fyi ISO Queues ETL."""
     fyi_uri = (
-        "gs://dgm-archive/fyi_iso_queue/interconnectionfyi_monthly_data_export_20250820"
+        "gs://dgm-archive/inconnection.fyi/interconnection_fyi_dataset_2025-09-01.csv"
     )
-    fyi_raw_dfs = dbcp.extract.fyi_iso_queue.extract(fyi_uri)
-    fyi_transformed_dfs = dbcp.transform.fyi_iso_queue.transform(fyi_raw_dfs)
+    fyi_raw_dfs = dbcp.extract.fyi_queue.extract(fyi_uri)
+    fyi_transformed_dfs = dbcp.transform.fyi_queue.transform(fyi_raw_dfs)
 
     return fyi_transformed_dfs
 
@@ -272,6 +272,7 @@ def etl():
         "justice40_tracts": etl_justice40,
         "nrel_wind_solar_ordinances": etl_nrel_ordinances,
         "lbnl_iso_queue": etl_lbnl_iso_queue,
+        # "fyi_queue": etl_fyi_queue,
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
         "ballot_ready": etl_ballot_ready,
