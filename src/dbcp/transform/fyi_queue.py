@@ -8,6 +8,30 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
+def _validate_interconnection_status_fyi(statuses: pd.Series) -> pd.Series:
+    """Validate the interconnection_status_fyi values."""
+    statuses = statuses.str.strip()
+    allowed_statuses = {
+        "Cluster Study",
+        "Combined",
+        "Construction",
+        "Facility Study",
+        "Feasibility Study",
+        "IA Executed",
+        "IA Pending",
+        "In Progress (unknown study)",
+        "Not Started",
+        "Operational",
+        "Phase 4 Study",
+        "Suspended",
+        "System Impact Study",
+        "Withdrawn",
+    }
+
+    bad = statuses.loc[~statuses.isin(allowed_statuses) & statuses.notna()]
+    assert len(bad) == 0, f"Unknown interconnection status(es):\n{bad.value_counts()}"
+
+
 def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform active, operational and withdrawn iso queue projects."""
     projects = raw_projects.copy()
@@ -16,14 +40,14 @@ def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
         "county": "raw_county_name",
         "unique_id": "project_id",
     }
+    assert (
+        projects.unique_id.is_unique
+    ), "unique_id is not unique in the raw interconnection.FYI data!"
     projects = projects.rename(columns=rename_dict)
+    _validate_interconnection_status_fyi(projects.loc[:, "interconnection_status_fyi"])
     """
 
-    projects.loc[:, "interconnection_status_lbnl"] = (
-        _harmonize_interconnection_status_lbnl(
-            projects.loc[:, "interconnection_status_lbnl"]
-        )
-    )
+
     parse_date_columns(projects)
     # rename date_withdrawn to withdrawn_date and date_operational to actual_completion_date
     projects.rename(
