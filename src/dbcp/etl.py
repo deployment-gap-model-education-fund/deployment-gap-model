@@ -49,7 +49,7 @@ def etl_fyi_queue() -> Dict[str, pd.DataFrame]:
     )
     fyi_raw_dfs = dbcp.extract.fyi_queue.extract(fyi_uri)
     fyi_transformed_dfs = dbcp.transform.fyi_queue.transform(fyi_raw_dfs)
-
+    fyi_transformed_dfs["fyi_projects"].to_parquet("fyi_projects.parquet")
     return fyi_transformed_dfs
 
 
@@ -276,7 +276,7 @@ def etl():
         "ncsl_state_permitting": etl_ncsl_state_permitting,
         "ballot_ready": etl_ballot_ready,
     }
-    # run_etl(etl_funcs, "data_warehouse")
+    run_etl(etl_funcs, "data_warehouse")
 
     # Run private ETL functions
     etl_funcs = {
