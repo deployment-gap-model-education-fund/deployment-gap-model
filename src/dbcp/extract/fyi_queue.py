@@ -24,7 +24,7 @@ def extract(uri: str) -> Dict[str, pd.DataFrame]:
         "ia_date": "interconnection_date",
         # "on_date": "date_operational",  "actual_completion_date"
         "service": "interconnection_service_type",
-        # "poi_name": "point_of_interconnection", interconnection_location
+        "interconnection_location": "point_of_interconnection",
         # "type_clean": "resource_type_lbnl", this is canonical_generation_type
         # "prop_date": "date_proposed", this is proposed_completion_date
         # "prop_year": "year_proposed", make from proposed_completion date

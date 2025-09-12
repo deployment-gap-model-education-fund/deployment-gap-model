@@ -272,16 +272,16 @@ def etl():
         "justice40_tracts": etl_justice40,
         "nrel_wind_solar_ordinances": etl_nrel_ordinances,
         "lbnl_iso_queue": etl_lbnl_iso_queue,
-        # "fyi_queue": etl_fyi_queue,
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
         "ballot_ready": etl_ballot_ready,
     }
-    run_etl(etl_funcs, "data_warehouse")
+    # run_etl(etl_funcs, "data_warehouse")
 
     # Run private ETL functions
     etl_funcs = {
         "acp_projects": etl_acp_projects,
+        "fyi_queue": etl_fyi_queue,
     }
     run_etl(etl_funcs, "private_data_warehouse")
 

@@ -9,12 +9,10 @@ import pandas as pd
 from dbcp.helpers import enforce_dtypes
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
+    deduplicate_same_physical_entities,
     normalize_multicolumns_to_rows,
 )
-from dbcp.transform.lbnl_iso_queue import (
-    _normalize_point_of_interconnection,
-    deduplicate_active_projects,
-)
+from dbcp.transform.lbnl_iso_queue import _normalize_point_of_interconnection
 
 COLUMN_RENAME_DICT = {
     "Actual Completion Date": "actual_completion_date",
@@ -1108,7 +1106,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     # deduplicate active projects
     pre_dedupe = len(projects)
-    deduped_projects = deduplicate_active_projects(
+    deduped_projects = deduplicate_same_physical_entities(
         projects,
         key=[
             "point_of_interconnection_clean",  # derived in _prep_for_deduplication
