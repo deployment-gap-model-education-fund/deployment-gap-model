@@ -1,7 +1,7 @@
 """Functions to transform LBNL ISO queue tables."""
 
 import logging
-from typing import Callable, Dict, List, Sequence
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
@@ -9,8 +9,9 @@ import pandas as pd
 from dbcp.helpers import add_fips_ids
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
+    deduplicate_same_physical_entities,
     normalize_multicolumns_to_rows,
-    parse_dates,
+    parse_date_columns,
 )
 
 logger = logging.getLogger(__name__)
@@ -146,7 +147,7 @@ def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     ] = _harmonize_interconnection_status_lbnl(
         projects.loc[:, "interconnection_status_lbnl"]
     )
-    parse_date_columns(projects)
+    projects = parse_date_columns(projects)
     # rename date_withdrawn to withdrawn_date and date_operational to actual_completion_date
     projects.rename(
         columns={
@@ -159,7 +160,7 @@ def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     )
     # deduplicate
     pre_dedupe = len(projects)
-    projects = deduplicate_active_projects(
+    projects = deduplicate_same_physical_entities(
         projects,
         key=[
             "point_of_interconnection_clean",  # derived in _prep_for_deduplication
@@ -178,7 +179,7 @@ def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
         intermediate_creator=_prep_for_deduplication,
     )
     n_dupes = pre_dedupe - len(projects)
-    logger.info(f"Deduplicated {n_dupes} ({n_dupes/pre_dedupe:.2%}) projects.")
+    logger.info(f"Deduplicated {n_dupes} ({n_dupes / pre_dedupe:.2%}) projects.")
 
     projects.set_index("project_id", inplace=True)
     projects.sort_index(inplace=True)
@@ -192,7 +193,7 @@ def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     projects["is_nearly_certain"] = pd.NA
     is_active_project = projects.queue_status.eq("active")
     projects.loc[is_active_project] = _add_actionable_and_nearly_certain_classification(
-        projects.loc[is_active_project]
+        projects.loc[is_active_project], status_col="interconnection_status_lbnl"
     )
     # assert is_actionable and is_nearly_certain are all null for operational and withdrawn projects
     assert (
@@ -268,40 +269,6 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     ]["queue_status"].fillna("withdrawn")
 
     return lbnl_normalized_dfs
-
-
-def parse_date_columns(queue: pd.DataFrame) -> None:
-    """Identify date columns and parse them to pd.Timestamp.
-
-    Original (unparsed) date columns are preserved but with the suffix '_raw'.
-
-    Args:
-        queue (pd.DataFrame): an LBNL ISO queue dataframe
-    """
-    date_cols = [
-        col
-        for col in queue.columns
-        if (
-            (col.startswith("date_") or col.endswith("_date"))
-            # datetime columns don't need parsing
-            and not pd.api.types.is_datetime64_any_dtype(queue.loc[:, col])
-        )
-    ]
-
-    # add _raw suffix
-    rename_dict: dict[str, str] = dict(
-        zip(date_cols, [col + "_raw" for col in date_cols])
-    )
-    queue.rename(columns=rename_dict, inplace=True)
-
-    for date_col, raw_col in rename_dict.items():
-        new_dates = parse_dates(queue.loc[:, raw_col])
-        # set obviously bad values to null
-        # This is designed to catch NaN values improperly encoded by Excel to 1899 or 1900
-        bad = new_dates.dt.year.isin({1899, 1900})
-        new_dates.loc[bad] = pd.NaT
-        queue.loc[:, date_col] = new_dates
-    return
 
 
 def _normalize_resource_capacity(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
@@ -462,47 +429,6 @@ def _prep_for_deduplication(df: pd.DataFrame) -> None:
     return
 
 
-def deduplicate_active_projects(
-    df: pd.DataFrame,
-    key: Sequence[str],
-    tiebreak_cols: Sequence[str],
-    intermediate_creator: Callable[[pd.DataFrame], None],
-) -> pd.DataFrame:
-    """First draft deduplication of ISO queues.
-
-    The intention here is to identify rows that likely describe the same physical
-    project, but are duplicated due to different proposed start dates or IA statuses.
-    My assumption is that those kind of duplicates exist to cover contingency or by
-    mistake and that only one project can actually be built.
-
-    Args:
-        df (pd.DataFrame): a queue dataframe
-
-    Returns:
-        pd.DataFrame: queue dataframe with duplicates removed
-    """
-    df = df.copy()
-    original_cols = df.columns
-    # create whatever derived columns are needed
-    intermediate_creator(df)
-    intermediate_cols = df.columns.difference(original_cols)
-
-    tiebreak_cols = list(tiebreak_cols)
-    key = list(key)
-    # Where there are duplicates, keep the row with the largest values in tiebreak_cols
-    # (usually date_proposed, queue_date, and interconnection_status).
-    # note that NaT is always sorted to the end, so nth(0) will always choose it last.
-    dedupe = (
-        df.sort_values(key + tiebreak_cols, ascending=False)
-        .groupby(key, as_index=False, dropna=False)
-        .nth(0)
-    )
-
-    # remove whatever derived columns were created
-    dedupe.drop(columns=intermediate_cols, inplace=True)
-    return dedupe
-
-
 def _fix_independent_city_fips(location_df: pd.DataFrame) -> pd.DataFrame:
     """Fix about 50 independent cities with wrong name order.
 
@@ -600,14 +526,14 @@ def _manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _add_actionable_and_nearly_certain_classification(
-    queue: pd.DataFrame,
+    queue: pd.DataFrame, status_col: str
 ) -> pd.DataFrame:
     """Add columns is_actionable and is_nearly_certain that classify each project.
 
     This model was created by a consultant in Excel and translated to python.
     """
     if (
-        queue["interconnection_status_lbnl"]
+        queue[status_col]
         .isin(
             {
                 "Facilities Study",
@@ -630,12 +556,10 @@ def _add_actionable_and_nearly_certain_classification(
         "Operational",
     }
     queue["is_actionable"] = (
-        queue["interconnection_status_lbnl"].isin(actionable_ia_statuses).fillna(False)
+        queue[status_col].isin(actionable_ia_statuses).fillna(False)
     )
     queue["is_nearly_certain"] = (
-        queue["interconnection_status_lbnl"]
-        .isin(nearly_certain_ia_statuses)
-        .fillna(False)
+        queue[status_col].isin(nearly_certain_ia_statuses).fillna(False)
     )
 
     return queue
