@@ -257,45 +257,6 @@ def parse_dates(series: pd.Series, expected_mean_year=2020) -> pd.Series:
         return multiformat_string_date_parser(series)
 
 
-def parse_date_columns(df: pd.DataFrame) -> None:
-    """Identify date columns and parse them to pd.Timestamp.
-
-    Original (unparsed) date columns are preserved but with the suffix '_raw'.
-
-    Args:
-        df (pd.DataFrame): an input dataframe with data columns
-    Returns:
-        df (pd.DataFrame): the dataframe with '_raw' original columns and cleaned date columns.
-    """
-    date_cols = [
-        col
-        for col in df.columns
-        if (
-            (col.startswith("date_") or col.endswith("_date"))
-            # datetime columns don't need parsing
-            and not pd.api.types.is_datetime64_any_dtype(df.loc[:, col])
-        )
-    ]
-
-    # add _raw suffix
-    rename_dict: dict[str, str] = dict(
-        zip(date_cols, [col + "_raw" for col in date_cols])
-    )
-    df.rename(columns=rename_dict, inplace=True)
-
-    for date_col, raw_col in rename_dict.items():
-        new_dates = parse_dates(df.loc[:, raw_col])
-        # set obviously bad values to null
-        # This is designed to catch NaN values improperly encoded by Excel to 1899 or 1900
-        bad = new_dates.dt.year.isin({1899, 1900})
-        logger.info(
-            f"Set {len(bad)} dates in {date_col} to null because they were improperly encoded."
-        )
-        new_dates.loc[bad] = pd.NaT
-        df.loc[:, date_col] = new_dates
-    return df
-
-
 def deduplicate_same_physical_entities(
     df: pd.DataFrame,
     key: Sequence[str],

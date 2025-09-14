@@ -6,10 +6,7 @@ from typing import Dict, List
 import pandas as pd
 import yaml
 
-from dbcp.transform.helpers import (
-    deduplicate_same_physical_entities,
-    parse_date_columns,
-)
+from dbcp.transform.helpers import deduplicate_same_physical_entities, parse_dates
 from dbcp.transform.lbnl_iso_queue import (
     _add_actionable_and_nearly_certain_classification,
     _normalize_point_of_interconnection,
@@ -94,32 +91,47 @@ def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     # version of interconnection_status_raw, but validate to see
     # if there are any new or unexpected values
     _validate_interconnection_status_fyi(projects.loc[:, "interconnection_status_fyi"])
-    # TODO: return to this
-    # projects = parse_date_columns(projects)
+    # convert date columns to datetime dtype
+    date_cols = [
+        col
+        for col in projects.columns
+        if (
+            (col.startswith("date_") or col.endswith("_date"))
+            and not pd.api.types.is_datetime64_any_dtype(projects.loc[:, col])
+        )
+    ]
+    for col in date_cols:
+        # if a date col is numeric type then it may be either Unix or Excel encoding
+        # and may need to be parsed using dbcp.transform.helpers.parse_date_columns
+        if pd.api.types.is_numeric_dtype(projects[col]):
+            logger.info(
+                f"The {col} column is numeric and may be either Unix or Excel encoded, parsing into a pandas datetime column."
+            )
+            raw_col_name = col + "_raw"
+            projects = projects.rename(columns={col: raw_col_name})
+            projects[col] = parse_dates(projects[raw_col_name])
+        else:
+            projects[col] = pd.to_datetime(projects[col])
     # deduplicate
-    # TODO: return to this
     pre_dedupe = len(projects)
-    # TODO: come back to this
-    """
     projects = deduplicate_same_physical_entities(
         projects,
         key=[
             "point_of_interconnection_clean",  # derived in _prep_for_deduplication
-            "capacity_mw",  # TODO: fix this
-            "county", # TODO: fix this
+            "capacity_mw",
+            "raw_county_name",
             "raw_state_name",
             "utility_clean",  # derived in _prep_for_deduplication
-            "canonical_generation_types",  # TODO: fix this to not use combined resource
+            "canonical_generation_types",
             "queue_status",
         ],
         tiebreak_cols=[  # first priority to last
-            "date_proposed",
+            "proposed_completion_date",
             "status_rank",  # derived in _prep_for_deduplication
             "queue_date",
         ],
         intermediate_creator=_prep_for_deduplication,
     )
-    """
     n_dupes = pre_dedupe - len(projects)
     logger.info(f"Deduplicated {n_dupes} ({n_dupes / pre_dedupe:.2%}) projects.")
 
@@ -151,7 +163,19 @@ def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     return projects
 
 
-# TODO: fix this
+def parse_capacity(s, n=3):
+    """Parse the capacity_by_generation_type_breakdown column into separate columns."""
+    try:
+        data = yaml.safe_load(s)
+    except Exception:
+        return {}
+    out = {}
+    for i, item in enumerate(data[:n], start=1):
+        out[f"resource_type_{i}"] = item.get("canonical_gen_type")
+        out[f"capacity_mw_resource_{i}"] = item.get("mw")
+    return out
+
+
 def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     """Pull out the awkward one-to-many columns (type_1, capacity_1, type_2, capacity_2) to a separate dataframe.
 
@@ -161,19 +185,6 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
     Returns:
         Dict[str, pd.DataFrame]: dict with the projects and multivalues split into two dataframes
     """
-
-    # Function to parse the YAML string
-    def parse_capacity(s, n=3):
-        try:
-            data = yaml.safe_load(s)
-        except Exception:
-            return {}
-        out = {}
-        for i, item in enumerate(data[:n], start=1):
-            out[f"resource_type_{i}"] = item.get("canonical_gen_type")
-            out[f"capacity_mw_resource_{i}"] = item.get("mw")
-        return out
-
     # Apply parsing
     parsed = fyi_df["capacity_by_generation_type_breakdown"].apply(parse_capacity)
 
@@ -265,7 +276,7 @@ def transform(fyi_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     )  # sets index to project_id
 
     # Combine and normalize iso queue tables
-    # lbnl_normalized_dfs = normalize_fyi_dfs(transformed)
+    fyi_normalized_dfs = normalize_fyi_dfs(transformed)
     """
     # data enrichment
     # Add Fips Codes
@@ -307,7 +318,7 @@ def transform(fyi_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     return lbnl_normalized_dfs
 
     """
-    return {"fyi_projects": transformed}
+    return fyi_normalized_dfs
 
 
 if __name__ == "__main__":

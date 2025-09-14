@@ -11,7 +11,7 @@ from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     deduplicate_same_physical_entities,
     normalize_multicolumns_to_rows,
-    parse_date_columns,
+    parse_dates,
 )
 
 logger = logging.getLogger(__name__)
@@ -147,7 +147,7 @@ def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     ] = _harmonize_interconnection_status_lbnl(
         projects.loc[:, "interconnection_status_lbnl"]
     )
-    projects = parse_date_columns(projects)
+    parse_date_columns(projects)
     # rename date_withdrawn to withdrawn_date and date_operational to actual_completion_date
     projects.rename(
         columns={
@@ -269,6 +269,40 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     ]["queue_status"].fillna("withdrawn")
 
     return lbnl_normalized_dfs
+
+
+def parse_date_columns(queue: pd.DataFrame) -> None:
+    """Identify date columns and parse them to pd.Timestamp.
+
+    Original (unparsed) date columns are preserved but with the suffix '_raw'.
+
+    Args:
+        queue (pd.DataFrame): an LBNL ISO queue dataframe
+    """
+    date_cols = [
+        col
+        for col in queue.columns
+        if (
+            (col.startswith("date_") or col.endswith("_date"))
+            # datetime columns don't need parsing
+            and not pd.api.types.is_datetime64_any_dtype(queue.loc[:, col])
+        )
+    ]
+
+    # add _raw suffix
+    rename_dict: dict[str, str] = dict(
+        zip(date_cols, [col + "_raw" for col in date_cols])
+    )
+    queue.rename(columns=rename_dict, inplace=True)
+
+    for date_col, raw_col in rename_dict.items():
+        new_dates = parse_dates(queue.loc[:, raw_col])
+        # set obviously bad values to null
+        # This is designed to catch NaN values improperly encoded by Excel to 1899 or 1900
+        bad = new_dates.dt.year.isin({1899, 1900})
+        new_dates.loc[bad] = pd.NaT
+        queue.loc[:, date_col] = new_dates
+    return
 
 
 def _normalize_resource_capacity(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
