@@ -6,10 +6,16 @@ from typing import Dict, List
 import pandas as pd
 import yaml
 
-from dbcp.transform.helpers import deduplicate_same_physical_entities, parse_dates
+from dbcp.transform.helpers import (
+    add_county_fips_with_backup_geocoding,
+    deduplicate_same_physical_entities,
+    parse_dates,
+)
 from dbcp.transform.lbnl_iso_queue import (
     _add_actionable_and_nearly_certain_classification,
     _normalize_point_of_interconnection,
+    _manual_county_state_name_fixes,
+    clean_resource_type,
     normalize_multicolumns_to_rows,
 )
 
@@ -75,7 +81,7 @@ def _prep_for_deduplication(df: pd.DataFrame) -> None:
     return
 
 
-def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
+def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform active, operational and withdrawn iso queue projects."""
     projects = raw_projects.copy()
     rename_dict = {
@@ -83,9 +89,9 @@ def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
         "county": "raw_county_name",
         "unique_id": "project_id",
     }
-    assert (
-        projects.unique_id.is_unique
-    ), "unique_id is not unique in the raw interconnection.FYI data!"
+    assert projects.unique_id.is_unique, (
+        "unique_id is not unique in the raw interconnection.FYI data!"
+    )
     projects = projects.rename(columns=rename_dict)
     # the interconnection_status_fyi column is already a cleaned
     # version of interconnection_status_raw, but validate to see
@@ -155,7 +161,9 @@ def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
         .isna()
         .all()
         .all()
-    ), "Some operational or withdrawn projects have is_actionable or is_nearly_certain values."
+    ), (
+        "Some operational or withdrawn projects have is_actionable or is_nearly_certain values."
+    )
 
     # Replace ISO-NE values in region with ISONE to match gridstatus
     projects["power_market"] = projects["power_market"].replace({"ISO-NE": "ISONE"})
@@ -189,10 +197,10 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
     parsed = fyi_df["capacity_by_generation_type_breakdown"].apply(parse_capacity)
 
     # Expand into columns
-    parsed_df = pd.json_normalize(parsed)
+    parsed_df = pd.json_normalize(parsed).set_index(fyi_df.index)
 
-    # Merge back
-    fyi_df = pd.concat([fyi_df, parsed_df], axis=1)
+    # Join back
+    fyi_df = fyi_df.join(parsed_df)
     n_multicolumns = 3
     attr_columns = {
         "resource": ["resource_type_" + str(n) for n in range(1, n_multicolumns + 1)],
@@ -212,35 +220,21 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
     return {"resource_capacity_df": resource_capacity_df, "project_df": project_df}
 
 
-def _normalize_location(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
-    """Pull out the awkward one-to-many columns (county_1, county_2, etc) to a separate dataframe.
+def _normalize_location(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+    """Pull out the county and state columns to a separate dataframe.
 
     Args:
-        lbnl_df (pd.DataFrame): LBNL ISO queue dataframe
+        fyi_df (pd.DataFrame): FYI queue dataframe
 
     Returns:
         Dict[str, pd.DataFrame]: dict with the projects and locations split into two dataframes
     """
-    county_cols = ["county_" + str(n) for n in range(1, 4)]
-    """
-    location_df = normalize_multicolumns_to_rows(
-        lbnl_df,
-        attribute_columns_dict={"raw_county_name": county_cols},
-        preserve_original_names=False,
-        dropna=True,
-    )
-    location_df = location_df.merge(
-        lbnl_df.loc[:, "raw_state_name"], on="project_id", validate="m:1"
-    )
-    """
-    project_df = lbnl_df.drop(columns=county_cols + ["raw_state_name"])
-    """
+    location_df = fyi_df[["raw_county_name", "raw_state_name"]]
     location_df.dropna(
         subset=["raw_state_name", "raw_county_name"], how="all", inplace=True
     )
+    project_df = fyi_df.drop(columns=["raw_county_name", "raw_state_name"])
     return {"location_df": location_df, "project_df": project_df}
-    """
-    return {"project_df": project_df}
 
 
 def normalize_fyi_dfs(fyi_transformed_dfs: pd.DataFrame) -> Dict[str, pd.DataFrame]:
@@ -255,9 +249,9 @@ def normalize_fyi_dfs(fyi_transformed_dfs: pd.DataFrame) -> Dict[str, pd.DataFra
     resource_capacity_dfs = _normalize_resource_capacity(fyi_transformed_dfs)
     location_dfs = _normalize_location(resource_capacity_dfs["project_df"])
     return {
-        "iso_projects": location_dfs["project_df"],
-        # "iso_locations": location_dfs["location_df"],
-        "iso_resource_capacity": resource_capacity_dfs["resource_capacity_df"],
+        "fyi_projects": location_dfs["project_df"],
+        "fyi_locations": location_dfs["location_df"],
+        "fyi_resource_capacity": resource_capacity_dfs["resource_capacity_df"],
     }
 
 
@@ -271,53 +265,49 @@ def transform(fyi_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     Returns:
         lbnl_transformed_dfs: Dictionary of the transformed tables.
     """
-    transformed = _clean_all_iso_projects(
+    transformed = _clean_all_fyi_projects(
         fyi_raw_dfs["fyi_queue"]
     )  # sets index to project_id
 
     # Combine and normalize iso queue tables
     fyi_normalized_dfs = normalize_fyi_dfs(transformed)
-    """
     # data enrichment
     # Add Fips Codes
     # I write to a new variable because _manual_county_state_name_fixes overwrites
     # raw names with lowercase + manual corrections. I want to preserve raw names in the final
     # output but didn't want to refactor these functions to do it.
-    new_locs = _manual_county_state_name_fixes(lbnl_normalized_dfs["iso_locations"])
+    new_locs = _manual_county_state_name_fixes(fyi_normalized_dfs["fyi_locations"])
     new_locs = add_county_fips_with_backup_geocoding(
         new_locs, state_col="raw_state_name", locality_col="raw_county_name"
     )
-    new_locs = _fix_independent_city_fips(new_locs)
+    # new_locs = _fix_independent_city_fips(new_locs)
     new_locs.loc[:, ["raw_state_name", "raw_county_name"]] = (
-        lbnl_normalized_dfs["iso_locations"]
+        fyi_normalized_dfs["fyi_locations"]
         .loc[:, ["raw_state_name", "raw_county_name"]]
         .copy()
     )
     # Fix defunct county FIPS code
-    new_locs.loc[
-        new_locs.county_id_fips.eq("51515"), "county_id_fips"
-    ] = "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
-    lbnl_normalized_dfs["iso_locations"] = new_locs
+    new_locs.loc[new_locs.county_id_fips.eq("51515"), "county_id_fips"] = (
+        "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
+    )
+    fyi_normalized_dfs["fyi_locations"] = new_locs
 
     # Clean up and categorize resources
-    lbnl_normalized_dfs["iso_resource_capacity"] = clean_resource_type(
-        lbnl_normalized_dfs["iso_resource_capacity"]
+    fyi_normalized_dfs["fyi_resource_capacity"] = clean_resource_type(
+        fyi_normalized_dfs["fyi_resource_capacity"]
     )
-    if lbnl_normalized_dfs["iso_resource_capacity"].resource_clean.isna().any():
+    if fyi_normalized_dfs["fyi_resource_capacity"].resource_clean.isna().any():
         raise AssertionError("Missing Resources!")
-    lbnl_normalized_dfs["iso_projects"].reset_index(inplace=True)
+    fyi_normalized_dfs["fyi_projects"].reset_index(inplace=True)
 
     # Most projects missing queue_status are from the early 2000s so I'm going to assume
     # they were withrawn.
-    assert (
-        lbnl_normalized_dfs["iso_projects"]["queue_status"].isna().sum() <= 42
-    ), "Unexpected number of projects missing queue status."
-    lbnl_normalized_dfs["iso_projects"]["queue_status"] = lbnl_normalized_dfs[
-        "iso_projects"
-    ]["queue_status"].fillna("withdrawn")
-    return lbnl_normalized_dfs
-
-    """
+    assert fyi_normalized_dfs["fyi_projects"]["queue_status"].isna().sum() <= 42, (
+        "Unexpected number of projects missing queue status."
+    )
+    fyi_normalized_dfs["fyi_projects"]["queue_status"] = fyi_normalized_dfs[
+        "fyi_projects"
+    ]["queue_status"].fillna("Withdrawn")
     return fyi_normalized_dfs
 
 

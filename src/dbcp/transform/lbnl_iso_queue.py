@@ -6,6 +6,7 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 
+from dbcp.constants import QUEUE_RESOURCE_DICT
 from dbcp.helpers import add_fips_ids
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
@@ -15,77 +16,6 @@ from dbcp.transform.helpers import (
 )
 
 logger = logging.getLogger(__name__)
-
-RESOURCE_DICT = {
-    "Battery Storage": {
-        "codes": ["Battery", "Batteries", "BAT", "ES"],
-        "type": "Renewable",
-    },
-    "Biofuel": {"codes": ["Biogas"], "type": "Renewable"},
-    "Biomass": {"codes": ["Wood", "W", "BLQ WDS", "WDS"], "type": "Renewable"},
-    "Coal": {"codes": ["BIT", "C"], "type": "Fossil"},
-    "Combustion Turbine": {"codes": ["CT"], "type": "Fossil"},
-    "Fuel Cell": {"codes": ["Fuel Cell", "FC"], "type": "Fossil"},
-    "Geothermal": {"codes": [], "type": "Renewable"},
-    "Hydro": {"codes": ["WAT", "H", "Water"], "type": "Renewable"},
-    "Landfill Gas": {"codes": ["LFG", "L", "Landfill", "Waste"], "type": "Fossil"},
-    "Municipal Solid Waste": {"codes": ["MSW"], "type": "Fossil"},
-    "Natural Gas": {
-        "codes": [
-            "NG",
-            "Methane",
-            "Methane Gas",
-            "CT-NG",
-            "CC",
-            "CC-NG",
-            "ST-NG",
-            "CS-NG",
-            "Combined Cycle",
-            "Gas",
-            "Natural Gas; Other",
-            "DFO KER NG",
-            "DFO NG",
-            "Diesel; Methane",
-            "JF KER NG",
-            "NG WO",
-            "KER NG",
-            "Natural Gas; Diesel; Other; Storage",
-            "Natural Gas; Oil",
-            "Thermal",
-        ],
-        "type": "Fossil",
-    },
-    "Nuclear": {"codes": ["NU", "NUC"], "type": "Renewable"},
-    "Offshore Wind": {"codes": [], "type": "Renewable"},
-    "Oil": {
-        "codes": ["DFO", "Diesel", "CT-D", "CC-D", "JF", "KER", "DFO KER", "D"],
-        "type": "Fossil",
-    },
-    "Onshore Wind": {"codes": ["Wind", "WND", "Wind Turbine"], "type": "Renewable"},
-    "Other": {"codes": [], "type": "Unknown Resource"},
-    "Unknown": {
-        "codes": ["Wo", "F", "Hybrid", "M", "Byproduct", "Conventional"],
-        "type": "Unknown Resource",
-    },
-    "Other Storage": {
-        "codes": ["Flywheel", "Storage", "CAES", "Gravity Rail", "Hydrogen"],
-        "type": "Renewable",
-    },
-    "Pumped Storage": {
-        "codes": ["Pump Storage", "Pumped-Storage hydro", "PS"],
-        "type": "Renewable",
-    },
-    "Solar": {"codes": ["SUN", "S"], "type": "Renewable"},
-    "Steam": {"codes": ["ST", "Steam Turbine"], "type": "Fossil"},
-    "Waste Heat": {
-        "codes": [
-            "Waste Heat Recovery",
-            "Heat Recovery",
-            "Co-Gen",
-        ],
-        "type": "Fossil",
-    },
-}
 
 
 def _harmonize_interconnection_status_lbnl(statuses: pd.Series) -> pd.Series:
@@ -142,10 +72,10 @@ def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
 
     projects["project_id"] = np.arange(len(projects), dtype=np.int32)
     projects = projects.rename(columns=rename_dict)  # copy
-    projects.loc[
-        :, "interconnection_status_lbnl"
-    ] = _harmonize_interconnection_status_lbnl(
-        projects.loc[:, "interconnection_status_lbnl"]
+    projects.loc[:, "interconnection_status_lbnl"] = (
+        _harmonize_interconnection_status_lbnl(
+            projects.loc[:, "interconnection_status_lbnl"]
+        )
     )
     parse_date_columns(projects)
     # rename date_withdrawn to withdrawn_date and date_operational to actual_completion_date
@@ -201,7 +131,9 @@ def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
         .isna()
         .all()
         .all()
-    ), "Some operational or withdrawn projects have is_actionable or is_nearly_certain values."
+    ), (
+        "Some operational or withdrawn projects have is_actionable or is_nearly_certain values."
+    )
 
     # S-C utilities don't list the state which prevents them from being geocoded
     projects.loc[
@@ -246,9 +178,9 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         .copy()
     )
     # Fix defunct county FIPS code
-    new_locs.loc[
-        new_locs.county_id_fips.eq("51515"), "county_id_fips"
-    ] = "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
+    new_locs.loc[new_locs.county_id_fips.eq("51515"), "county_id_fips"] = (
+        "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
+    )
     lbnl_normalized_dfs["iso_locations"] = new_locs
 
     # Clean up and categorize resources
@@ -261,9 +193,9 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
 
     # Most projects missing queue_status are from the early 2000s so I'm going to assume
     # they were withrawn.
-    assert (
-        lbnl_normalized_dfs["iso_projects"]["queue_status"].isna().sum() <= 42
-    ), "Unexpected number of projects missing queue status."
+    assert lbnl_normalized_dfs["iso_projects"]["queue_status"].isna().sum() <= 42, (
+        "Unexpected number of projects missing queue status."
+    )
     lbnl_normalized_dfs["iso_projects"]["queue_status"] = lbnl_normalized_dfs[
         "iso_projects"
     ]["queue_status"].fillna("withdrawn")
@@ -391,9 +323,9 @@ def clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
 
     """
     resource_df = resource_df.copy()
-    # Modify RESOURCE DICT for mapping
+    # Modify QUEUE_RESOURCE DICT for mapping
     long_dict = {}
-    for clean_name, code_type_dict in RESOURCE_DICT.items():
+    for clean_name, code_type_dict in QUEUE_RESOURCE_DICT.items():
         long_dict[clean_name] = clean_name
         for code in code_type_dict["codes"]:
             long_dict[code] = clean_name
@@ -479,9 +411,7 @@ def _fix_independent_city_fips(location_df: pd.DataFrame) -> pd.DataFrame:
         raise ValueError("Use add_county_fips_with_backup_geocoding() first.")
     nan_fips = location_df.loc[
         location_df["county_id_fips"].isna(), ["raw_state_name", "raw_county_name"]
-    ].fillna(
-        ""
-    )  # copy
+    ].fillna("")  # copy
     nan_fips.loc[:, "raw_county_name"] = (
         nan_fips.loc[:, "raw_county_name"]
         .str.lower()
