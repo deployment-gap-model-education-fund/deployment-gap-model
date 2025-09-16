@@ -231,6 +231,8 @@ def _normalize_location(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     location_df.dropna(
         subset=["raw_state_name", "raw_county_name"], how="all", inplace=True
     )
+    # reset project_id index
+    location_df = location_df.reset_index()
     project_df = fyi_df.drop(columns=["raw_county_name", "raw_state_name"])
     return {"location_df": location_df, "project_df": project_df}
 
@@ -275,9 +277,11 @@ def transform(fyi_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     # raw names with lowercase + manual corrections. I want to preserve raw names in the final
     # output but didn't want to refactor these functions to do it.
     new_locs = _manual_county_state_name_fixes(fyi_normalized_dfs["fyi_locations"])
+    # add state_id_fips, county_id_fips, geocoded_locality_name, geocoded_locality_type, geocoded_containing_county
     new_locs = add_county_fips_with_backup_geocoding(
         new_locs, state_col="raw_state_name", locality_col="raw_county_name"
     )
+    # this doesn't seem to fix any missing FIPS codes in the FYI data
     # new_locs = _fix_independent_city_fips(new_locs)
     new_locs.loc[:, ["raw_state_name", "raw_county_name"]] = (
         fyi_normalized_dfs["fyi_locations"]
