@@ -49,7 +49,6 @@ def etl_fyi_queue() -> Dict[str, pd.DataFrame]:
     )
     fyi_raw_dfs = dbcp.extract.fyi_queue.extract(fyi_uri)
     fyi_transformed_dfs = dbcp.transform.fyi_queue.transform(fyi_raw_dfs)
-    fyi_transformed_dfs["fyi_projects"].to_parquet("fyi_projects.parquet")
     return fyi_transformed_dfs
 
 

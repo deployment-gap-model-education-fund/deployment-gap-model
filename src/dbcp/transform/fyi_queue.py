@@ -13,8 +13,8 @@ from dbcp.transform.helpers import (
 )
 from dbcp.transform.lbnl_iso_queue import (
     _add_actionable_and_nearly_certain_classification,
-    _normalize_point_of_interconnection,
     _manual_county_state_name_fixes,
+    _normalize_point_of_interconnection,
     clean_resource_type,
     normalize_multicolumns_to_rows,
 )
@@ -89,9 +89,9 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
         "county": "raw_county_name",
         "unique_id": "project_id",
     }
-    assert projects.unique_id.is_unique, (
-        "unique_id is not unique in the raw interconnection.FYI data!"
-    )
+    assert (
+        projects.unique_id.is_unique
+    ), "unique_id is not unique in the raw interconnection.FYI data!"
     projects = projects.rename(columns=rename_dict)
     # the interconnection_status_fyi column is already a cleaned
     # version of interconnection_status_raw, but validate to see
@@ -161,9 +161,7 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
         .isna()
         .all()
         .all()
-    ), (
-        "Some operational or withdrawn projects have is_actionable or is_nearly_certain values."
-    )
+    ), "Some operational or withdrawn projects have is_actionable or is_nearly_certain values."
 
     # Replace ISO-NE values in region with ISONE to match gridstatus
     projects["power_market"] = projects["power_market"].replace({"ISO-NE": "ISONE"})
@@ -287,9 +285,9 @@ def transform(fyi_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         .copy()
     )
     # Fix defunct county FIPS code
-    new_locs.loc[new_locs.county_id_fips.eq("51515"), "county_id_fips"] = (
-        "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
-    )
+    new_locs.loc[
+        new_locs.county_id_fips.eq("51515"), "county_id_fips"
+    ] = "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
     fyi_normalized_dfs["fyi_locations"] = new_locs
 
     # Clean up and categorize resources
@@ -302,9 +300,9 @@ def transform(fyi_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
 
     # Most projects missing queue_status are from the early 2000s so I'm going to assume
     # they were withrawn.
-    assert fyi_normalized_dfs["fyi_projects"]["queue_status"].isna().sum() <= 42, (
-        "Unexpected number of projects missing queue status."
-    )
+    assert (
+        fyi_normalized_dfs["fyi_projects"]["queue_status"].isna().sum() <= 42
+    ), "Unexpected number of projects missing queue status."
     fyi_normalized_dfs["fyi_projects"]["queue_status"] = fyi_normalized_dfs[
         "fyi_projects"
     ]["queue_status"].fillna("Withdrawn")
