@@ -505,3 +505,24 @@ def bedford_addfips_fix(df, state_col="state", county_col="county") -> None:
     is_bedford = df[county_col].str.lower().str.startswith("bedford")
     df.loc[is_va & is_bedford, county_col] = "Bedford County"
     return
+
+
+def normalize_point_of_interconnection(ser: pd.Series) -> pd.Series:
+    """String normalization for point_of_interconnection.
+
+    Essentially a poor man's bag-of-words model.
+    """
+    out = (
+        ser.astype("string")
+        .str.lower()
+        .str.replace("-", " ")
+        .str.replace(r"(?:sub)station|kv| at |tbd", "", regex=True)
+        .fillna("")
+    )
+    out = pd.Series(  # make permutation invariant by sorting
+        [" ".join(sorted(x)) for x in out.str.split()],
+        index=out.index,
+        dtype="string",
+    ).str.strip()
+    out.replace("", pd.NA, inplace=True)
+    return out
