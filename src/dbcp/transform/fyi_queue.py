@@ -9,14 +9,14 @@ import yaml
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     deduplicate_same_physical_entities,
-    parse_dates,
-)
-from dbcp.transform.lbnl_iso_queue import (
-    _add_actionable_and_nearly_certain_classification,
-    _manual_county_state_name_fixes,
-    _normalize_point_of_interconnection,
-    clean_resource_type,
     normalize_multicolumns_to_rows,
+)
+from dbcp.transform.interconnection_queue_helpers import (
+    add_actionable_and_nearly_certain_classification,
+    clean_resource_type,
+    manual_county_state_name_fixes,
+    normalize_point_of_interconnection,
+    parse_date_columns,
 )
 
 logger = logging.getLogger(__name__)
@@ -47,7 +47,7 @@ def _validate_interconnection_status_fyi(statuses: pd.Series) -> pd.Series:
 
 
 def _prep_for_deduplication(df: pd.DataFrame) -> None:
-    df["point_of_interconnection_clean"] = _normalize_point_of_interconnection(
+    df["point_of_interconnection_clean"] = normalize_point_of_interconnection(
         df["point_of_interconnection"]
     )
     df["utility_clean"] = df["utility"].fillna(df["power_market"])
@@ -98,26 +98,7 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     # if there are any new or unexpected values
     _validate_interconnection_status_fyi(projects.loc[:, "interconnection_status_fyi"])
     # convert date columns to datetime dtype
-    date_cols = [
-        col
-        for col in projects.columns
-        if (
-            (col.startswith("date_") or col.endswith("_date"))
-            and not pd.api.types.is_datetime64_any_dtype(projects.loc[:, col])
-        )
-    ]
-    for col in date_cols:
-        # if a date col is numeric type then it may be either Unix or Excel encoding
-        # and may need to be parsed using dbcp.transform.helpers.parse_date_columns
-        if pd.api.types.is_numeric_dtype(projects[col]):
-            logger.info(
-                f"The {col} column is numeric and may be either Unix or Excel encoded, parsing into a pandas datetime column."
-            )
-            raw_col_name = col + "_raw"
-            projects = projects.rename(columns={col: raw_col_name})
-            projects[col] = parse_dates(projects[raw_col_name])
-        else:
-            projects[col] = pd.to_datetime(projects[col])
+    parse_date_columns(projects)
     # deduplicate
     pre_dedupe = len(projects)
     projects = deduplicate_same_physical_entities(
@@ -152,7 +133,7 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     projects["is_actionable"] = pd.NA
     projects["is_nearly_certain"] = pd.NA
     is_active_project = projects.queue_status.eq("active")
-    projects.loc[is_active_project] = _add_actionable_and_nearly_certain_classification(
+    projects.loc[is_active_project] = add_actionable_and_nearly_certain_classification(
         projects.loc[is_active_project], status_col="interconnection_status_fyi"
     )
     # assert is_actionable and is_nearly_certain are all null for operational and withdrawn projects
@@ -171,6 +152,8 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
 
 def parse_capacity(s, n=3):
     """Parse the capacity_by_generation_type_breakdown column into separate columns."""
+    if s == "nan":
+        return {}
     try:
         data = yaml.safe_load(s)
     except Exception:
@@ -276,7 +259,7 @@ def transform(fyi_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     # I write to a new variable because _manual_county_state_name_fixes overwrites
     # raw names with lowercase + manual corrections. I want to preserve raw names in the final
     # output but didn't want to refactor these functions to do it.
-    new_locs = _manual_county_state_name_fixes(fyi_normalized_dfs["fyi_locations"])
+    new_locs = manual_county_state_name_fixes(fyi_normalized_dfs["fyi_locations"])
     # add state_id_fips, county_id_fips, geocoded_locality_name, geocoded_locality_type, geocoded_containing_county
     new_locs = add_county_fips_with_backup_geocoding(
         new_locs, state_col="raw_state_name", locality_col="raw_county_name"

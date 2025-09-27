@@ -11,8 +11,8 @@ from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     deduplicate_same_physical_entities,
     normalize_multicolumns_to_rows,
+    normalize_point_of_interconnection,
 )
-from dbcp.transform.lbnl_iso_queue import _normalize_point_of_interconnection
 
 COLUMN_RENAME_DICT = {
     "Actual Completion Date": "actual_completion_date",
@@ -1035,7 +1035,7 @@ def _normalize_projects(
 
 
 def _prep_for_deduplication(df: pd.DataFrame) -> None:
-    df["point_of_interconnection_clean"] = _normalize_point_of_interconnection(
+    df["point_of_interconnection_clean"] = normalize_point_of_interconnection(
         df["point_of_interconnection"]
     )
     df["utility_clean"] = df["utility"].fillna(df["region"])
