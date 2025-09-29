@@ -88,6 +88,7 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
         "state": "raw_state_name",
         "county": "raw_county_name",
         "unique_id": "project_id",
+        "raw_developer": "developer_raw",
     }
     assert (
         projects.unique_id.is_unique
@@ -128,7 +129,8 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     for col in projects.columns:
         if pd.api.types.is_object_dtype(projects.loc[:, col]):
             projects.loc[:, col] = projects.loc[:, col].str.strip()
-
+    # add queue_year
+    projects["queue_year"] = projects["queue_date"].dt.year
     # add is_actionable and is_nearly_certain classifications to active projects
     projects["is_actionable"] = pd.NA
     projects["is_nearly_certain"] = pd.NA
