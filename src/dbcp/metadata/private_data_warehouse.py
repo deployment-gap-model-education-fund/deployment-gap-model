@@ -210,7 +210,6 @@ fyi_projects = Table(
     Column("queue_status", String, nullable=False),
     Column("summer_capacity_mw", Float),
     Column("winter_capacity_mw", Float),
-    Column("queue_status", String, nullable=False),
     Column("current_phase_or_stage_raw", String),
     Column("project_spv", String),
     Column("utility", String),
@@ -250,21 +249,22 @@ fyi_locations = Table(
         String,
         nullable=True,
     ),
-    ForeignKeyConstraint(
-        ["county_id_fips"],
-        ["data_warehouse.county_fips.county_id_fips"],
-        link_to_name=True,
-    ),
+    Column("geocoded_locality_name", String),
+    Column("geocoded_locality_type", String),
+    Column("geocoded_containing_county", String),
     ForeignKeyConstraint(
         ["state_id_fips"],
         ["data_warehouse.state_fips.state_id_fips"],
         link_to_name=True,
     ),
-    Column("geocoded_locality_name", String),
-    Column("geocoded_locality_type", String),
-    Column("geocoded_containing_county", String),
+    ForeignKeyConstraint(
+        ["county_id_fips"],
+        ["data_warehouse.county_fips.county_id_fips"],
+        link_to_name=True,
+    ),
     schema=schema,
 )
+
 
 fyi_resource_capacity = Table(
     "fyi_resource_capacity",
