@@ -6,15 +6,21 @@ from sqlalchemy import (
     Column,
     DateTime,
     Float,
+    ForeignKey,
     Integer,
-    MetaData,
     String,
     Table,
 )
 
-metadata = MetaData()
+from dbcp.metadata.data_warehouse import metadata
+
+# metadata = MetaData()
+
 schema = "private_data_warehouse"
 
+##############
+# ACP Tables #
+##############
 acp_changelog = Table(
     "acp_changelog",
     metadata,
@@ -171,5 +177,102 @@ acp_projects_current = Table(
     Column("raw_nameplate_mws", String),
     Column("raw_storage_energies", String),
     Column("raw_storage_durations", String),
+    schema=schema,
+)
+
+######################################
+# Interconnection.fyi Project Queues #
+######################################
+fyi_projects = Table(
+    "fyi_projects",
+    metadata,
+    Column("project_id", String, primary_key=True, autoincrement=False),
+    Column("project_type", String),
+    Column("power_market", String, nullable=False),
+    Column("transmission_owner", String),
+    Column("developer", String),
+    Column("developer_raw", String),
+    Column("canonical_transmission_owners", String),
+    Column("interconnection_status_fyi", String),
+    Column("interconnection_status_raw", String),
+    Column("queue_id", String),
+    Column("project_name", String),
+    Column("actual_completion_date", DateTime, nullable=True),
+    Column("actual_completion_date_raw", String, nullable=True),
+    Column("proposed_completion_date", DateTime, nullable=True),
+    Column("proposed_completion_date_raw", DateTime, nullable=True),
+    Column("withdrawn_date", DateTime, nullable=True),
+    Column("withdrawn_date_raw", DateTime, nullable=True),
+    Column("queue_date", DateTime),
+    Column("queue_date_raw", DateTime),
+    Column("queue_year", Integer),
+    Column("county_state_pairs", String),
+    Column("point_of_interconnection", String),
+    Column("canonical_generation_types", String),
+    Column("interconnection_service_type", String),
+    Column("interconnection_date", DateTime),
+    Column("interconnection_date_raw", String),
+    Column("queue_status", String, nullable=False),
+    Column("summer_capacity_mw", Float),
+    Column("winter_capacity_mw", Float),
+    Column("current_phase_or_stage_raw", String),
+    Column("project_spv", String),
+    Column("utility", String),
+    Column("iso", String),
+    Column("cluster", String),
+    Column("general_comments", String),
+    Column("interconnection_voltage_kv", String),
+    Column("latitude", Float),
+    Column("longitude", Float),
+    Column("schedule_next_event_date", DateTime),
+    Column("schedule_next_event_name", String),
+    Column("most_recent_study_date", DateTime),
+    Column("most_recent_study_url", String),
+    Column("most_recent_allocated_network_upgrade_cost", Float),
+    Column("is_actionable", Boolean),
+    Column("is_nearly_certain", Boolean),
+    schema=schema,
+)
+
+fyi_locations = Table(
+    "fyi_locations",
+    metadata,
+    Column(
+        "project_id",
+        String,
+        ForeignKey("private_data_warehouse.fyi_projects.project_id"),
+    ),
+    Column("raw_county_name", String),
+    Column("raw_state_name", String),
+    Column(
+        "state_id_fips",
+        String,
+        ForeignKey("data_warehouse.state_fips.state_id_fips"),
+        nullable=True,
+    ),
+    Column(
+        "county_id_fips",
+        String,
+        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        nullable=True,
+    ),
+    Column("geocoded_locality_name", String),
+    Column("geocoded_locality_type", String),
+    Column("geocoded_containing_county", String),
+    schema=schema,
+)
+
+
+fyi_resource_capacity = Table(
+    "fyi_resource_capacity",
+    metadata,
+    Column(
+        "project_id",
+        String,
+        ForeignKey("private_data_warehouse.fyi_projects.project_id"),
+    ),
+    Column("resource", String),
+    Column("resource_clean", String),
+    Column("capacity_mw", Float),
     schema=schema,
 )
