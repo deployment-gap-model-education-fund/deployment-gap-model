@@ -7,14 +7,15 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
-    ForeignKeyConstraint,
     Integer,
-    MetaData,
     String,
     Table,
 )
 
-metadata = MetaData()
+from dbcp.metadata.data_warehouse import metadata
+
+# metadata = MetaData()
+
 schema = "private_data_warehouse"
 
 ##############
@@ -197,9 +198,13 @@ fyi_projects = Table(
     Column("queue_id", String),
     Column("project_name", String),
     Column("actual_completion_date", DateTime, nullable=True),
+    Column("actual_completion_date_raw", String, nullable=True),
     Column("proposed_completion_date", DateTime, nullable=True),
+    Column("proposed_completion_date_raw", DateTime, nullable=True),
     Column("withdrawn_date", DateTime, nullable=True),
+    Column("withdrawn_date_raw", DateTime, nullable=True),
     Column("queue_date", DateTime),
+    Column("queue_date_raw", DateTime),
     Column("queue_year", Integer),
     Column("county_state_pairs", String),
     Column("point_of_interconnection", String),
@@ -242,26 +247,18 @@ fyi_locations = Table(
     Column(
         "state_id_fips",
         String,
+        ForeignKey("data_warehouse.state_fips.state_id_fips"),
         nullable=True,
     ),
     Column(
         "county_id_fips",
         String,
+        ForeignKey("data_warehouse.county_fips.county_id_fips"),
         nullable=True,
     ),
     Column("geocoded_locality_name", String),
     Column("geocoded_locality_type", String),
     Column("geocoded_containing_county", String),
-    ForeignKeyConstraint(
-        ["state_id_fips"],
-        ["data_warehouse.state_fips.state_id_fips"],
-        link_to_name=True,
-    ),
-    ForeignKeyConstraint(
-        ["county_id_fips"],
-        ["data_warehouse.county_fips.county_id_fips"],
-        link_to_name=True,
-    ),
     schema=schema,
 )
 

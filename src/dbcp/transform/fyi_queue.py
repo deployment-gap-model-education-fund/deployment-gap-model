@@ -100,6 +100,9 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     _validate_interconnection_status_fyi(projects.loc[:, "interconnection_status_fyi"])
     # convert date columns to datetime dtype
     parse_date_columns(projects)
+    projects = projects.drop(
+        columns=["schedule_next_event_date_raw", "most_recent_study_date_raw"]
+    )
     # deduplicate
     pre_dedupe = len(projects)
     projects = deduplicate_same_physical_entities(
@@ -198,7 +201,9 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
         dropna=True,
     )
     combined_cols: List[str] = sum(attr_columns.values(), start=[])
-    project_df = fyi_df.drop(columns=combined_cols)
+    project_df = fyi_df.drop(
+        columns=combined_cols + ["capacity_mw", "capacity_by_generation_type_breakdown"]
+    )
 
     return {"resource_capacity_df": resource_capacity_df, "project_df": project_df}
 
@@ -219,6 +224,11 @@ def _normalize_location(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     # reset project_id index
     location_df = location_df.reset_index()
     project_df = fyi_df.drop(columns=["raw_county_name", "raw_state_name"])
+    # TODO: temporarily drop, but really should investigate whether
+    # to just use fips_code column directly instead of geocoding.
+    # probably we want to just rename this column in the extraction
+    # to county_id_fips and pad it with 0's, then geocode for missing ones.
+    project_df = project_df.drop(columns=["fips_codes"])
     return {"location_df": location_df, "project_df": project_df}
 
 

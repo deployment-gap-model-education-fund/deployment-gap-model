@@ -211,7 +211,7 @@ def run_etl(funcs: dict[str, Callable], schema_name: str):
     """Execute etl functions and save outputs to parquet and postgres."""
     engine = dbcp.helpers.get_sql_engine()
     with engine.connect() as con:
-        engine.execute(sa.text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
+        con.execute(sa.text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
 
     transformed_dfs = {}
     for dataset, etl_func in funcs.items():
@@ -220,8 +220,13 @@ def run_etl(funcs: dict[str, Callable], schema_name: str):
 
     # Delete any existing tables, and create them anew:
     metadata = dbcp.helpers.get_schema_sql_alchemy_metadata(schema_name)
-    metadata.drop_all(engine)
-    metadata.create_all(engine)
+    table_names = transformed_dfs.keys()
+    tables = [metadata.tables[schema_name + "." + name] for name in table_names]
+    if schema_name == "data_warehouse":
+        metadata.drop_all(engine)
+    else:
+        metadata.drop_all(engine, tables=tables)
+    metadata.create_all(engine, tables=tables)
 
     parquet_dir = OUTPUT_DIR / schema_name
     parquet_dir.mkdir(exist_ok=True)
@@ -229,26 +234,29 @@ def run_etl(funcs: dict[str, Callable], schema_name: str):
     # Load table into postgres and parquet
     with engine.connect() as con:
         for table in metadata.sorted_tables:
-            logger.info(f"Load {table.name} to postgres.")
-            df = enforce_dtypes(transformed_dfs[table.name], table.name, schema_name)
-            df = dbcp.helpers.trim_columns_length(df)
-            df.to_sql(
-                name=table.name,
-                con=con,
-                if_exists="append",
-                index=False,
-                schema=schema_name,
-                chunksize=1000,
-                method=psql_insert_copy,
-            )
+            if table in tables:
+                logger.info(f"Load {table.name} to postgres.")
+                df = enforce_dtypes(
+                    transformed_dfs[table.name], table.name, schema_name
+                )
+                df = dbcp.helpers.trim_columns_length(df)
+                df.to_sql(
+                    name=table.name,
+                    con=con,
+                    if_exists="append",
+                    index=False,
+                    schema=schema_name,
+                    chunksize=1000,
+                    method=psql_insert_copy,
+                )
 
-            schema = dbcp.helpers.get_pyarrow_schema_from_metadata(
-                table.name, schema_name
-            )
-            pa_table = pa.Table.from_pandas(df, schema=schema)
-            pq.write_table(pa_table, parquet_dir / f"{table.name}.parquet")
+                schema = dbcp.helpers.get_pyarrow_schema_from_metadata(
+                    table.name, schema_name
+                )
+                pa_table = pa.Table.from_pandas(df, schema=schema)
+                pq.write_table(pa_table, parquet_dir / f"{table.name}.parquet")
 
-    logger.info("Sucessfully finished ETL.")
+    logger.info(f"Sucessfully finished {schema_name} ETL.")
 
 
 def etl():
