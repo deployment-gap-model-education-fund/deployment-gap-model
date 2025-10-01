@@ -12,9 +12,9 @@ from sqlalchemy import (
     Table,
 )
 
-from dbcp.metadata.data_warehouse import metadata
+from dbcp.metadata import data_warehouse_metadata
 
-# metadata = MetaData()
+metadata = data_warehouse_metadata
 
 schema = "private_data_warehouse"
 
