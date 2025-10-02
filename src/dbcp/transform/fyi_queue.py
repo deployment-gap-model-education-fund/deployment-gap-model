@@ -134,6 +134,7 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
             projects.loc[:, col] = projects.loc[:, col].str.strip()
     # add queue_year
     projects["queue_year"] = projects["queue_date"].dt.year
+    projects["queue_status"] = projects["queue_status"].str.lower()
     # add is_actionable and is_nearly_certain classifications to active projects
     projects["is_actionable"] = pd.NA
     projects["is_nearly_certain"] = pd.NA
