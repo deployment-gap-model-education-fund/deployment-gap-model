@@ -27,6 +27,7 @@ import numpy as np
 import pandas as pd
 import sqlalchemy as sa
 
+from dbcp.constants import OUTPUT_DIR
 from dbcp.data_mart.co2_dashboard import (
     _estimate_existing_co2e,
     _get_existing_plant_fuel_data,
@@ -43,6 +44,7 @@ from dbcp.data_mart.helpers import (
     _subset_db_columns,
     get_query,
 )
+from dbcp.data_mart.projects import create_fyi_long_format
 from dbcp.data_mart.projects import create_long_format as create_iso_data_mart
 from dbcp.helpers import get_sql_engine
 
@@ -623,6 +625,89 @@ def create_long_format(
     return out
 
 
+def create_counties_fyi_proposed_projects(
+    postgres_engine: sa.engine.Engine, clean_projects_only: bool = True
+) -> pd.DataFrame:
+    """Create data mart table of projects in FYI queue data aggregated by county and resource.
+
+    Optionally only use clean resources.
+    """
+    fyi = create_fyi_long_format(postgres_engine)
+    # equivalent SQL query that translated to pandas to avoid dependency
+    # on the data_mart schema (which doesn't yet exist when this function runs)
+    """
+    SELECT
+        county_id_fips,
+        resource_clean as resource_or_sector,
+        count(project_id) as facility_count,
+        sum(co2e_tonnes_per_year * frac_locations_in_county) as co2e_tonnes_per_year,
+        sum(capacity_mw::float * frac_locations_in_county) as capacity_mw,
+        'power plant' as facility_type,
+        'proposed' as status
+    from data_mart.iso_projects_long_format
+    where county_id_fips is not null -- 9 rows as of 6/4/2023
+    group by 1, 2
+    ;
+    """
+    # Distribute project-level quantities across locations, when there are multiple.
+    # A handful of ISO projects are in multiple counties and the proprietary offshore
+    # wind projects have an entry for each cable landing.
+    # This approximation assumes an equal distribution between sites.
+    # Also note that this model represents everything relevant to each county,
+    # so multi-county projects are intentionally double-counted; for each relevant county.
+    if clean_projects_only:
+        # TODO: is there another list of clean resource somwerhe?
+        clean_resources = [
+            "Solar",
+            "Battery Storage",
+            "Wind",
+            "Onshore Wind",
+            "Hydro",
+            "Geothermal",
+            "Pumped Storage",
+            "Nuclear",
+        ]
+        fyi = fyi[fyi["resource_clean"].isin(clean_resources)]
+        fyi = fyi.drop(columns=["co2e_tonnes_per_year"])
+        fyi.loc[:, ["capacity_mw"]] = fyi.loc[:, ["capacity_mw"]].mul(
+            fyi["frac_locations_in_county"], axis=0
+        )
+        grp = fyi.groupby(["county_id_fips", "resource_clean"])
+        aggs = grp.agg(
+            {
+                "capacity_mw": "sum",
+                "project_id": "count",
+            }
+        )
+    else:
+        fyi.loc[:, ["capacity_mw", "co2e_tonnes_per_year"]] = fyi.loc[
+            :, ["capacity_mw", "co2e_tonnes_per_year"]
+        ].mul(fyi["frac_locations_in_county"], axis=0)
+        grp = fyi.groupby(["county_id_fips", "resource_clean"])
+        aggs = grp.agg(
+            {
+                "co2e_tonnes_per_year": "sum",  # type: ignore
+                "capacity_mw": "sum",
+                "project_id": "count",
+            }
+        )
+        aggs.loc[:, "co2e_tonnes_per_year"].replace(
+            0, np.nan, inplace=True
+        )  # sums of 0 are simply unmodeled
+    aggs["facility_type"] = "power plant"
+    aggs["status"] = "proposed"
+    aggs.reset_index(inplace=True)
+    aggs.rename(
+        columns={
+            "project_id": "facility_count",
+            "resource_clean": "resource_or_sector",
+        },
+        inplace=True,
+    )
+
+    return aggs
+
+
 def _get_offshore_wind_extra_cols(engine: sa.engine.Engine) -> pd.DataFrame:
     # create columns that count how much offshore wind capacity is associated
     # with a particular county:
@@ -688,12 +773,12 @@ def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
         "federal_fraction_unprotected_land",
     ]
     correlated_rounding_errors = areas["federal_fraction_unprotected_land"].gt(1)
-    assert (
-        correlated_rounding_errors.sum() == 1
-    ), f"Expected 1 bad rounding error, got {correlated_rounding_errors.sum()}"
-    areas.loc[
-        correlated_rounding_errors, "federal_fraction_unprotected_land"
-    ] = 1.0  # manually clip
+    assert correlated_rounding_errors.sum() == 1, (
+        f"Expected 1 bad rounding error, got {correlated_rounding_errors.sum()}"
+    )
+    areas.loc[correlated_rounding_errors, "federal_fraction_unprotected_land"] = (
+        1.0  # manually clip
+    )
 
     return areas.loc[:, out_cols].copy()
 
@@ -1053,9 +1138,13 @@ def create_data_mart(
         on=["county_id_fips", "resource_or_sector", "facility_type", "status"],
         how="left",
     )
+    counties_proposed_projects = create_counties_fyi_proposed_projects(
+        postgres_engine=postgres_engine, clean_projects_only=True
+    )
     out = {
         "counties_long_format": long_format,
         "counties_wide_format": wide_format,
+        "counties_proposed_projects": counties_proposed_projects,
     }
     return out
 
@@ -1064,4 +1153,8 @@ if __name__ == "__main__":
     # debugging entry point
     engine = get_sql_engine()
     marts = create_data_mart(engine=engine)
+    parquet_dir = OUTPUT_DIR / "data_mart"
+    marts["counties_proposed_projects"].to_parquet(
+        parquet_dir / "counties_proposed_projects.parquet",
+    )
     print("hooray")
