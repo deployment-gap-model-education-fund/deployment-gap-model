@@ -771,3 +771,13 @@ county_concrete_mw = Table(
     Column("capacity_total_proposed_mw", Float),
     schema=schema,
 )
+
+counties_proposed_clean_projects = Table(
+    "counties_proposed_clean_projects",
+    metadata,
+    Column("county_id_fips", String),
+    Column("resource_clean", String),
+    Column("renewable_and_battery_proposed_capacity_mw", Float),
+    Column("facility_count", Integer),
+    schema=schema,
+)
