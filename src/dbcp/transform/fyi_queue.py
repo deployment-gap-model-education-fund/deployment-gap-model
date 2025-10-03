@@ -27,7 +27,6 @@ def _validate_interconnection_status_fyi(statuses: pd.Series) -> pd.Series:
     statuses = statuses.str.strip()
     allowed_statuses = {
         "Cluster Study",
-        "Combined",
         "Construction",
         "Facility Study",
         "Feasibility Study",
@@ -36,7 +35,6 @@ def _validate_interconnection_status_fyi(statuses: pd.Series) -> pd.Series:
         "In Progress (unknown study)",
         "Not Started",
         "Operational",
-        "Phase 4 Study",
         "Suspended",
         "System Impact Study",
         "Withdrawn",
