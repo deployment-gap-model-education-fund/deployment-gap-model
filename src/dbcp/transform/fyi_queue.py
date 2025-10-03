@@ -201,13 +201,14 @@ def _normalize_location(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     Returns:
         Dict[str, pd.DataFrame]: dict with the projects and locations split into two dataframes
     """
-    location_df = fyi_df[["raw_county_name", "raw_state_name"]]
+    location_cols = ["raw_county_name", "raw_state_name", "latitude", "longitude"]
+    location_df = fyi_df[location_cols]
     location_df.dropna(
         subset=["raw_state_name", "raw_county_name"], how="all", inplace=True
     )
     # reset project_id index
     location_df = location_df.reset_index()
-    project_df = fyi_df.drop(columns=["raw_county_name", "raw_state_name"])
+    project_df = fyi_df.drop(columns=location_cols)
     # TODO: temporarily drop, but really should investigate whether
     # to just use fips_code column directly instead of geocoding.
     # probably we want to just rename this column in the extraction
