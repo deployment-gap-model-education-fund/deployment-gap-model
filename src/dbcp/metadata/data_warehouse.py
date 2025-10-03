@@ -8,12 +8,13 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
-    MetaData,
     String,
     Table,
 )
 
-metadata = MetaData()
+from dbcp.metadata import data_warehouse_metadata
+
+metadata = data_warehouse_metadata
 schema = "data_warehouse"
 
 ###############################
