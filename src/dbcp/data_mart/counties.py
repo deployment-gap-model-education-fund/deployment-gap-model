@@ -1053,6 +1053,7 @@ def create_data_mart(
         on=["county_id_fips", "resource_or_sector", "facility_type", "status"],
         how="left",
     )
+
     out = {
         "counties_long_format": long_format,
         "counties_wide_format": wide_format,
@@ -1064,4 +1065,5 @@ if __name__ == "__main__":
     # debugging entry point
     engine = get_sql_engine()
     marts = create_data_mart(engine=engine)
+
     print("hooray")
