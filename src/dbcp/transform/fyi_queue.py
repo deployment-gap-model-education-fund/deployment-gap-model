@@ -1,7 +1,7 @@
 """Functions to transform interconnection.FYI interconnection queue tables."""
 
 import logging
-from typing import Dict, List
+from typing import Dict
 
 import pandas as pd
 import yaml
@@ -9,7 +9,6 @@ import yaml
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     deduplicate_same_physical_entities,
-    normalize_multicolumns_to_rows,
 )
 from dbcp.transform.interconnection_queue_helpers import (
     add_actionable_and_nearly_certain_classification,
@@ -154,19 +153,19 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     return projects
 
 
-def parse_capacity(s, n=3):
+def parse_capacity(row, n=3):
     """Parse the capacity_by_generation_type_breakdown column into separate columns."""
-    if s == "nan":
-        return {}
+    capacity_yaml_str = row["capacity_by_generation_type_breakdown"]
+    if capacity_yaml_str == "nan":
+        return {"resource": None, "capacity_mw": None}
     try:
-        data = yaml.safe_load(s)
+        data = yaml.safe_load(capacity_yaml_str)
     except Exception:
-        return {}
-    out = {}
-    for i, item in enumerate(data[:n], start=1):
-        out[f"resource_type_{i}"] = item.get("canonical_gen_type")
-        out[f"capacity_mw_resource_{i}"] = item.get("mw")
-    return out
+        return {"resource": None, "capacity_mw": None}
+    return {
+        "resource": [item.get("canonical_gen_type") for item in data],
+        "capacity_mw": [item.get("mw") for item in data],
+    }
 
 
 def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
@@ -179,29 +178,15 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
         Dict[str, pd.DataFrame]: dict with the projects and multivalues split into two dataframes
     """
     # Apply parsing
-    parsed = fyi_df["capacity_by_generation_type_breakdown"].apply(parse_capacity)
+    parsed = fyi_df.apply(parse_capacity, result_type="expand", axis=1)
+    resource_capacity_df = parsed.explode(["resource", "capacity_mw"])
+    resource_capacity_df = resource_capacity_df[
+        resource_capacity_df["resource"].notnull()
+        & resource_capacity_df["capacity_mw"].notnull()
+    ]
 
-    # Expand into columns
-    parsed_df = pd.json_normalize(parsed).set_index(fyi_df.index)
-
-    # Join back
-    fyi_df = fyi_df.join(parsed_df)
-    n_multicolumns = 3
-    attr_columns = {
-        "resource": ["resource_type_" + str(n) for n in range(1, n_multicolumns + 1)],
-        "capacity_mw": [
-            "capacity_mw_resource_" + str(n) for n in range(1, n_multicolumns + 1)
-        ],
-    }
-    resource_capacity_df = normalize_multicolumns_to_rows(
-        fyi_df,
-        attribute_columns_dict=attr_columns,
-        preserve_original_names=False,
-        dropna=True,
-    )
-    combined_cols: List[str] = sum(attr_columns.values(), start=[])
     project_df = fyi_df.drop(
-        columns=combined_cols + ["capacity_mw", "capacity_by_generation_type_breakdown"]
+        columns=["capacity_mw", "capacity_by_generation_type_breakdown"]
     )
 
     return {"resource_capacity_df": resource_capacity_df, "project_df": project_df}
