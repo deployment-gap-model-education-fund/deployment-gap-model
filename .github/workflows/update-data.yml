@@ -5,11 +5,12 @@ on:
   push:
     branches:
       - "main"
-    tags:
-      - "v*"              # used for production releases
+    tags: [ 'v*' ]
   workflow_dispatch:
   schedule:
     - cron: 0 0 * * 0
+  release:
+    types: [published]   # immediately deploy prod when a release is published
 
 jobs:
   archive:
@@ -78,7 +79,7 @@ jobs:
         run: echo "::set-output name=scheduled::${{ github.event_name == 'schedule' }}"
 
       - name: Fetch latest prod tag (only on schedule)
-        id: latest_tag
+        id: latest_release
         if: steps.is_schedule.outputs.scheduled == 'true'
         run: |
           # Authenticate gh with token (use a PAT or GITHUB_TOKEN)
@@ -92,7 +93,7 @@ jobs:
             --exclude-drafts \
             --exclude-pre-releases \
             --json tagName \
-            --jq '[.[].tagName | select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))][0]')
+            --jq '.[0].tagName')
 
           echo "Latest tag: $LATEST_TAG"
           echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
@@ -101,29 +102,24 @@ jobs:
         id: set-matrix
         run: |
           if [[ "${{ github.event_name }}" == "push" ]]; then
-            # Get the branch or tag that triggered the push event
-            BRANCH_OR_TAG="${{ github.ref_name }}"
-
-            # If it looks like a version tag starting with 'v', mark as prod
-            if [[ "$BRANCH_OR_TAG" == v* ]]; then
-              TARGET="prod"
-            else
-              # Otherwise treat as dev (branch like main)
-              TARGET="dev"
-            fi
-
-            # Set the matrix with target and the actual git ref
-            echo "matrix={\"include\":[{\"target\":\"$TARGET\",\"ref\":\"$BRANCH_OR_TAG\"}]}" >> $GITHUB_OUTPUT
+            # Any push (branch or tag) runs as dev against that ref
+            REF="${{ github.ref_name }}"
+            # Set the matrix with dev target and the actual git ref
+            echo "matrix={\"include\":[{\"target\":\"dev\",\"ref\":\"$REF\"}]}" >> $GITHUB_OUTPUT
 
           elif [[ "${{ github.event_name }}" == "schedule" ]]; then
-            # On schedule, get the latest prod tag from previous step output
-            LATEST_TAG="${{ steps.latest_tag.outputs.tag }}"
-
+            # Scheduled run: deploy prod from latest *published release* tag
+            LATEST_RELEASE_TAG="${{ steps.latest_release.outputs.tag }}"
             # Run matrix with dev (main branch) and prod (latest tag)
-            echo "matrix={\"include\":[{\"target\":\"dev\",\"ref\":\"main\"},{\"target\":\"prod\",\"ref\":\"$LATEST_TAG\"}]}" >> $GITHUB_OUTPUT
+            echo "matrix={\"include\":[{\"target\":\"dev\",\"ref\":\"main\"},{\"target\":\"prod\",\"ref\":\"$LATEST_RELEASE_TAG\"}]}" >> $GITHUB_OUTPUT
+
+          elif [[ "${{ github.event_name }}" == "release" ]]; then
+            # Release published: deploy prod from this release tag
+            TAG="${{ github.event.release.tag_name }}"
+            echo "matrix={\"include\":[{\"target\":\"prod\",\"ref\":\"$TAG\"}]}" >> $GITHUB_OUTPUT
 
           else
-            # For manual or other events, default to dev (main branch)
+            # For workflow_dispatch or any other events, default to dev (main branch)
             echo "matrix={\"include\":[{\"target\":\"dev\",\"ref\":\"main\"}]}" >> $GITHUB_OUTPUT
           fi
 
@@ -200,10 +196,12 @@ jobs:
       - name: Give ownership of the workspace back to root
         run: sudo chown -R runner:docker $GITHUB_WORKSPACE
 
-      # commit the settings file
+      # commit the settings file to main only on branch pushes
       - uses: EndBug/add-and-commit@v9
         id: commit_settings_file
-        if: steps.write_settings.outcome == 'success' && github.ref_type == 'branch'
+        if: ${{ steps.write_settings.outcome == 'success'
+                && github.event_name == 'push'
+                && startsWith(github.ref, 'refs/heads/') }}
         with:
           add: "src/dbcp/settings.yaml"
           author_name: "DBCP Bot"
