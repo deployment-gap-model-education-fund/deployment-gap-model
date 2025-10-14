@@ -14,10 +14,6 @@ on:
         default: 'dev'
         type: choice
         options: [dev, prod]
-      branch_ref:
-        description: 'Branch to use for dev (ignored for prod)'
-        required: false
-        default: 'main'
       release_tag:
         description: 'Release tag to deploy to prod (leave blank to use latest published release)'
         required: false
