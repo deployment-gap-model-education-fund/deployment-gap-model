@@ -7,6 +7,21 @@ on:
       - "main"
     tags: [ 'v*' ]
   workflow_dispatch:
+    inputs:
+      target:
+        description: 'dev or prod'
+        required: true
+        default: 'dev'
+        type: choice
+        options: [dev, prod]
+      branch_ref:
+        description: 'Branch to use for dev (ignored for prod)'
+        required: false
+        default: 'main'
+      release_tag:
+        description: 'Release tag to deploy to prod (leave blank to use latest published release)'
+        required: false
+        default: ''
   schedule:
     - cron: 0 0 * * 0
   release:
@@ -74,17 +89,12 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - name: Check if this is a scheduled run
-        id: is_schedule
-        run: echo "::set-output name=scheduled::${{ github.event_name == 'schedule' }}"
+      - name: Authenticate gh (needed for release lookups)
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
       - name: Fetch latest prod tag (only on schedule)
         id: latest_release
-        if: steps.is_schedule.outputs.scheduled == 'true'
         run: |
-          # Authenticate gh with token (use a PAT or GITHUB_TOKEN)
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-
           REPO="${{ github.repository }}"
 
           # Get latest tag matching pattern (e.g. v*.*.*)
@@ -104,23 +114,53 @@ jobs:
           if [[ "${{ github.event_name }}" == "push" ]]; then
             # Any push (branch or tag) runs as dev against that ref
             REF="${{ github.ref_name }}"
-            # Set the matrix with dev target and the actual git ref
-            echo "matrix={\"include\":[{\"target\":\"dev\",\"ref\":\"$REF\"}]}" >> $GITHUB_OUTPUT
+            TARGET="dev"
 
           elif [[ "${{ github.event_name }}" == "schedule" ]]; then
             # Scheduled run: deploy prod from latest *published release* tag
-            LATEST_RELEASE_TAG="${{ steps.latest_release.outputs.tag }}"
-            # Run matrix with dev (main branch) and prod (latest tag)
-            echo "matrix={\"include\":[{\"target\":\"dev\",\"ref\":\"main\"},{\"target\":\"prod\",\"ref\":\"$LATEST_RELEASE_TAG\"}]}" >> $GITHUB_OUTPUT
+            TAG="${{ steps.latest_release.outputs.tag }}"
+            if [[ -z "${TAG:-}" ]]; then
+              echo "No published releases found; falling back to dev main."
+              TARGET="dev"; REF="main"
+            else
+              TARGET="prod"; REF="$TAG"
+            fi
 
           elif [[ "${{ github.event_name }}" == "release" ]]; then
             # Release published: deploy prod from this release tag
             TAG="${{ github.event.release.tag_name }}"
-            echo "matrix={\"include\":[{\"target\":\"prod\",\"ref\":\"$TAG\"}]}" >> $GITHUB_OUTPUT
+            TARGET="prod"; REF="$TAG"
+
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            REQ_TARGET="${{ inputs.target }}"
+              if [[ "$REQ_TARGET" == "prod" ]]; then
+                USER_TAG="${{ inputs.release_tag }}"
+                if [[ -n "$USER_TAG" ]]; then
+                  # validate the release exists and is published
+                  if gh release view "$USER_TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+                    TARGET="prod"; REF="$USER_TAG"
+                  else
+                    echo "Requested release tag '$USER_TAG' not found or not published."
+                    exit 1
+                  fi
+                else
+                  TAG="${{ steps.latest_release.outputs.tag }}"
+                  if [[ -z "${TAG:-}" ]]; then
+                    echo "No published releases found; cannot deploy prod."
+                    exit 1
+                  fi
+                  TARGET="prod"; REF="$TAG"
+                fi
+              else
+                REF_INPUT="${{ inputs.branch_ref }}"
+                TARGET="dev"; REF="${REF_INPUT:-main}"
+              fi
 
           else
-            # For workflow_dispatch or any other events, default to dev (main branch)
-            echo "matrix={\"include\":[{\"target\":\"dev\",\"ref\":\"main\"}]}" >> $GITHUB_OUTPUT
+            # fallback, default to dev (main branch)
+            TARGET="dev"; REF="main"
+
+          echo "matrix={\"include\":[{\"target\":\"$TARGET\",\"ref\":\"$REF\"}]}" >> $GITHUB_OUTPUT
           fi
 
       - name: Echo matrix
