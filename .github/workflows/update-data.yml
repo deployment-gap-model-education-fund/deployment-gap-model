@@ -148,7 +148,7 @@ jobs:
                   TARGET="prod"; REF="$TAG"
                 fi
               else
-                REF_INPUT="${{ inputs.branch_ref }}"
+                REF_INPUT="${{ github.ref_name }}"
                 TARGET="dev"; REF="${REF_INPUT:-main}"
               fi
 
