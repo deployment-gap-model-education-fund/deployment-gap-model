@@ -223,9 +223,9 @@ git tag v2025.08.01  # Example for the first release on August 1, 2025
 ```bash
 git push origin v2025.08.01
 ```
-5. On the repo home page, create a new release using the tag.
 
-This will trigger the deployment process to update the production schemas with the state of the code at the tagged commit.
+This will trigger creating a new release using the tag and kick off the deployment process
+to update the production schemas with the state of the code at the tagged commit.
 
 ## Comparing Branches During Development
 
