@@ -488,7 +488,7 @@ pudl_generators = Table(
     Column("report_date", DateTime, primary_key=True),
     Column("unit_id_pudl", Integer),
     Column("plant_id_pudl", Integer),
-    Column("plant_name_eia", String, nullable=False),
+    Column("plant_name_eia", String),
     Column("utility_id_eia", Integer),
     Column("utility_id_pudl", Integer),
     Column("utility_name_eia", String),
