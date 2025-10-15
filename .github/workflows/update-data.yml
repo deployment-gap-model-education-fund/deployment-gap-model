@@ -14,6 +14,10 @@ on:
         default: 'dev'
         type: choice
         options: [dev, prod]
+      branch_ref:
+        description: 'Branch to use for dev (ignored for prod)'
+        required: false
+        default: 'main'
       release_tag:
         description: 'Release tag to deploy to prod (leave blank to use latest published release)'
         required: false
@@ -160,7 +164,10 @@ jobs:
           echo "matrix={\"include\":[{\"target\":\"$TARGET\",\"ref\":\"$REF\"}]}" >> $GITHUB_OUTPUT
 
       - name: Echo matrix
-        run: echo "${{ steps.set-matrix.outputs.matrix }}"
+        run: |
+          echo "${{ steps.set-matrix.outputs.matrix }}"
+          echo "${{ github.ref_name }}"
+          echo "${{ inputs.branch_ref }}"
 
   etl:
     needs: matrix_prep # Ensure archive job finishes first
@@ -172,7 +179,7 @@ jobs:
     env:
       GEOCODIO_API_KEY: ${{ secrets.GEOCODIO_API_KEY }}
       API_KEY_GOOGLE_MAPS: ${{ secrets.API_KEY_GOOGLE_MAPS }}
-      GITHUB_REF: ${{ github.ref_name }} # This is changed to dev if running on a schedule
+      GITHUB_REF: ${{ github.ref_name }}
     steps:
       - name: Print matrix info
         run: |
