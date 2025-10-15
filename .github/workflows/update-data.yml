@@ -88,7 +88,7 @@ jobs:
       - name: Authenticate gh (needed for release lookups)
         run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
-      - name: Fetch latest prod tag (only on schedule)
+      - name: Fetch latest prod tag
         id: latest_release
         run: |
           REPO="${{ github.repository }}"
@@ -156,8 +156,8 @@ jobs:
             # fallback, default to dev (main branch)
             TARGET="dev"; REF="main"
 
-          echo "matrix={\"include\":[{\"target\":\"$TARGET\",\"ref\":\"$REF\"}]}" >> $GITHUB_OUTPUT
           fi
+          echo "matrix={\"include\":[{\"target\":\"$TARGET\",\"ref\":\"$REF\"}]}" >> $GITHUB_OUTPUT
 
       - name: Echo matrix
         run: echo "${{ steps.set-matrix.outputs.matrix }}"
