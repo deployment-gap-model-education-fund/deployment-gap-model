@@ -595,7 +595,7 @@ pudl_generators = Table(
     Column("synchronized_transmission_grid", String),
     Column("technology_description", String),
     Column("time_cold_shutdown_full_load_code", String),
-    Column("timezone", String, nullable=False),
+    Column("timezone", String),
     Column("topping_bottoming_code", String),
     Column("total_fuel_cost", Float),
     Column("total_mmbtu", Float),
