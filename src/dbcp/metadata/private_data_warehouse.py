@@ -231,7 +231,7 @@ fyi_projects = Table(
     Column("most_recent_allocated_network_upgrade_cost", Float),
     Column("is_actionable", Boolean),
     Column("is_nearly_certain", Boolean),
-    schema=schema,
+    schema="catalyst",
 )
 
 fyi_locations = Table(
@@ -259,7 +259,7 @@ fyi_locations = Table(
     Column("geocoded_locality_name", String),
     Column("geocoded_locality_type", String),
     Column("geocoded_containing_county", String),
-    schema=schema,
+    schema="catalyst",
 )
 
 
@@ -274,5 +274,5 @@ fyi_resource_capacity = Table(
     Column("resource", String),
     Column("resource_clean", String),
     Column("capacity_mw", Float),
-    schema=schema,
+    schema="catalyst",
 )
