@@ -4,7 +4,7 @@ import pandas as pd
 
 import dbcp
 
-BR_URI = "gs://dgm-archive/ballot_ready/Climate Partners_Upcoming_Races_with_Counties_20250210.csv"
+BR_URI = "gs://dgm-archive/ballot_ready/climate_partners_upcoming_races_with_counties_20251008.csv"
 
 
 def extract(uri: str) -> dict[str, pd.DataFrame]:
