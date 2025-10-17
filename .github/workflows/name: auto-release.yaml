@@ -10,20 +10,22 @@ permissions:
 jobs:
   create_release:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # gh prefers GH_TOKEN
+      REPO: ${{ github.repository }}
     steps:
       - name: Create release (if it doesn't already exist)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           TAG="${{ github.ref_name }}"
 
-          # If it already exists, exit quietly
-          if gh release view "$TAG" >/dev/null 2>&1; then
+          # Exit quietly if the release already exists
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
             echo "Release $TAG already exists. Nothing to do."
             exit 0
           fi
 
           # Create release with auto notes
           gh release create "$TAG" \
+            --repo "$REPO" \
             --generate-notes \
