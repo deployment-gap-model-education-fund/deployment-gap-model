@@ -295,6 +295,9 @@ def validate_geocoded_fips_against_raw_fyi_fips(
         f"{len(matches[~matches])} FIPS codes from raw FYI data don't "
         "match the geocoded FIPS code."
     )
+    assert (
+        len(matches[~matches]) < 50
+    ), "More than 50 geocoded FIPS codes don't match the raw FYI `fips_codes` column."
 
 
 def transform(fyi_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
