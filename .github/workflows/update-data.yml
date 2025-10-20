@@ -24,7 +24,7 @@ jobs:
       - name: Who owns the workspace?
         run: ls -ld $GITHUB_WORKSPACE
 
-      - uses: "google-github-actions/auth@v2"
+      - uses: "google-github-actions/auth@v3"
         with:
           credentials_json: "${{ secrets.DGM_GITHUB_ACTION_CREDENTIALS }}"
 
@@ -153,7 +153,7 @@ jobs:
       - name: Who owns the workspace?
         run: ls -ld $GITHUB_WORKSPACE
 
-      - uses: "google-github-actions/auth@v2"
+      - uses: "google-github-actions/auth@v3"
         with:
           credentials_json: "${{ secrets.DGM_GITHUB_ACTION_CREDENTIALS }}"
 
