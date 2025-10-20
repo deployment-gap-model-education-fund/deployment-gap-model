@@ -9,7 +9,7 @@ from dbcp.data_mart.projects import create_fyi_long_format
 from dbcp.helpers import get_sql_engine
 
 
-def create_counties_fyi_proposed_clean_projects(
+def create_fyi_counties_proposed_clean_projects(
     postgres_engine: sa.engine.Engine,
 ) -> pd.DataFrame:
     """Create data mart table of projects in FYI queue data aggregated by county and resource."""
@@ -58,7 +58,7 @@ def create_counties_fyi_proposed_clean_projects(
     return aggs
 
 
-def create_counties_fyi_proposed_clean_projects_wide(
+def create_fyi_counties_proposed_clean_projects_wide(
     fyi_counties_proposed_clean_projects: pd.DataFrame,
 ) -> pd.DataFrame:
     """Create wide version of FYI counties proposed table."""
@@ -82,7 +82,7 @@ def create_counties_fyi_proposed_clean_projects_wide(
     ).rename(columns=resource_name_map)
 
     # Create column with sum of all resources
-    wide_df["total_proposed_mw"] = wide_df.sum(axis="columns")
+    wide_df["total_proposed_capacity_mw"] = wide_df.sum(axis="columns")
 
     # Reindex so all counties are included
     wide_df = wide_df.reindex(
@@ -106,14 +106,15 @@ def create_data_mart(
     if postgres_engine is None:
         postgres_engine = get_sql_engine()
 
-    counties_proposed_clean_projects = create_counties_fyi_proposed_clean_projects(
+    counties_proposed_clean_projects = create_fyi_counties_proposed_clean_projects(
         postgres_engine=postgres_engine
     )
+
     counties_proposed_clean_projects_wide = (
-        create_counties_fyi_proposed_clean_projects_wide(
+        create_fyi_counties_proposed_clean_projects_wide(
             counties_proposed_clean_projects
         )
-    )
+    ).reset_index()
     out = {
         "fyi_counties_proposed_clean_projects": counties_proposed_clean_projects,
         "fyi_counties_proposed_clean_projects_wide_format": counties_proposed_clean_projects_wide,
