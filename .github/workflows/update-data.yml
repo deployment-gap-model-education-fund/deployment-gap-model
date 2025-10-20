@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         # This will checkout the main branch on "schedule" and the specified branch on "workflow_dispatch"
         # The archiver should probably be pulled out into its own repo so archive code and data don't diverge
 
@@ -145,7 +145,7 @@ jobs:
 
       - name: Checkout Repository
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Checkout the ref (branch or tag) from matrix
           ref: ${{ matrix.ref }}
