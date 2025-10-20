@@ -1,6 +1,6 @@
 addfips>=0.4
 fiona~=1.10.1
-psycopg2~=2.9.3
+psycopg2~=2.9.11
 pytest~=6.2.5
 tqdm>=4.64.1,<5.0.0
 python-docx~=0.8.11
