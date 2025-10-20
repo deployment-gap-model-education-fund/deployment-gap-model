@@ -58,6 +58,39 @@ def create_counties_fyi_proposed_clean_projects(
     return aggs
 
 
+def create_counties_fyi_proposed_clean_projects_wide(
+    fyi_counties_proposed_clean_projects: pd.DataFrame,
+) -> pd.DataFrame:
+    """Create wide version of FYI counties proposed table."""
+    # Filter to only desired resources and map to column names
+    resource_name_map = {
+        "Solar": "solar_mw",
+        "Onshore Wind": "onshore_wind_mw",
+        "Battery Storage": "battery_storage_mw",
+    }
+    tidy_df = fyi_counties_proposed_clean_projects[
+        fyi_counties_proposed_clean_projects["resource_clean"].isin(
+            resource_name_map.keys()
+        )
+    ]
+
+    # Pivot tidy table
+    wide_df = tidy_df.pivot(
+        index="county_id_fips",
+        columns="resource_clean",
+        values="renewable_and_battery_proposed_capacity_mw",
+    ).rename(columns=resource_name_map)
+
+    # Create column with sum of all resources
+    wide_df["total_proposed_mw"] = wide_df.sum(axis="columns")
+
+    # Reindex so all counties are included
+    wide_df = wide_df.reindex(
+        fyi_counties_proposed_clean_projects["county_id_fips"].unique()
+    )
+    return wide_df
+
+
 def create_data_mart(
     engine: Optional[sa.engine.Engine] = None,
 ) -> Dict[str, pd.DataFrame]:
@@ -76,8 +109,14 @@ def create_data_mart(
     counties_proposed_clean_projects = create_counties_fyi_proposed_clean_projects(
         postgres_engine=postgres_engine
     )
+    counties_proposed_clean_projects_wide = (
+        create_counties_fyi_proposed_clean_projects_wide(
+            counties_proposed_clean_projects
+        )
+    )
     out = {
-        "counties_proposed_clean_projects": counties_proposed_clean_projects,
+        "fyi_counties_proposed_clean_projects": counties_proposed_clean_projects,
+        "fyi_counties_proposed_clean_projects_wide_format": counties_proposed_clean_projects_wide,
     }
     return out
 
