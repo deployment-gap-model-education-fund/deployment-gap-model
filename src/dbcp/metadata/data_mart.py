@@ -789,6 +789,6 @@ fyi_counties_proposed_clean_projects_wide = Table(
     Column("battery_storage_mw", String),
     Column("onshore_wind_mw", String),
     Column("solar_mw", Float),
-    Column("total_proposed_capacity_mw", Integer),
+    Column("total_proposed_capacity_mw", Float),
     schema=schema,
 )

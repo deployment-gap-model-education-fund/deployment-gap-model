@@ -117,7 +117,7 @@ def create_data_mart(
     ).reset_index()
     out = {
         "fyi_counties_proposed_clean_projects": counties_proposed_clean_projects,
-        "fyi_counties_proposed_clean_projects_wide_format": counties_proposed_clean_projects_wide,
+        "fyi_counties_proposed_clean_projects_wide": counties_proposed_clean_projects_wide,
     }
     return out
 
