@@ -2,7 +2,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 import pandas as pd
 from joblib import Memory
@@ -257,6 +257,54 @@ def parse_dates(series: pd.Series, expected_mean_year=2020) -> pd.Series:
         return multiformat_string_date_parser(series)
 
 
+def deduplicate_same_physical_entities(
+    df: pd.DataFrame,
+    key: Sequence[str],
+    tiebreak_cols: Sequence[str],
+    intermediate_creator: Callable[[pd.DataFrame], None],
+) -> pd.DataFrame:
+    """Function to deduplicate rows that likely describe the same physical project.
+
+    Tables, namely the LBNL interconnection queue data, have rows that likely
+    describe the same physical entity/project, but are duplicated due to small
+    differences in columns, like different proposed start dates or IA statuses.
+    The assumption is that those kind of duplicates exist to cover contingency or by
+    mistake and that only one project can actually be built in a physical sense.
+    When deduplicating rows, keep the row with the largest values in ``tiebreak_col``.
+
+    Args:
+        df (pd.DataFrame): a dataframe that likely contains duplicates
+        key: column names which should uniquely identify a project or physical entity
+        tiebreak_cols: Column names that may differ between the same entity, use
+            these columns to determine which of those rows to keep.
+        intermediate_creator: Callable which processes the data and adds any
+            columns which may be needed for tie breaking.
+
+    Returns:
+        pd.DataFrame: dataframe with duplicates removed
+    """
+    df = df.copy()
+    original_cols = df.columns
+    # create whatever derived columns are needed
+    intermediate_creator(df)
+    intermediate_cols = df.columns.difference(original_cols)
+
+    tiebreak_cols = list(tiebreak_cols)
+    key = list(key)
+    # Where there are duplicates, keep the row with the largest values in tiebreak_cols
+    # (usually date_proposed, queue_date, and interconnection_status).
+    # note that NaT is always sorted to the end, so nth(0) will always choose it last.
+    dedupe = (
+        df.sort_values(key + tiebreak_cols, ascending=False)
+        .groupby(key, as_index=False, dropna=False)
+        .nth(0)
+    )
+
+    # remove whatever derived columns were created
+    dedupe.drop(columns=intermediate_cols, inplace=True)
+    return dedupe
+
+
 def _geocode_and_add_fips(
     nan_fips: pd.DataFrame, state_col="state", locality_col="county", api="geocodio"
 ) -> pd.DataFrame:
@@ -457,3 +505,24 @@ def bedford_addfips_fix(df, state_col="state", county_col="county") -> None:
     is_bedford = df[county_col].str.lower().str.startswith("bedford")
     df.loc[is_va & is_bedford, county_col] = "Bedford County"
     return
+
+
+def normalize_point_of_interconnection(ser: pd.Series) -> pd.Series:
+    """String normalization for point_of_interconnection.
+
+    Essentially a poor man's bag-of-words model.
+    """
+    out = (
+        ser.astype("string")
+        .str.lower()
+        .str.replace("-", " ")
+        .str.replace(r"(?:sub)station|kv| at |tbd", "", regex=True)
+        .fillna("")
+    )
+    out = pd.Series(  # make permutation invariant by sorting
+        [" ".join(sorted(x)) for x in out.str.split()],
+        index=out.index,
+        dtype="string",
+    ).str.strip()
+    out.replace("", pd.NA, inplace=True)
+    return out

@@ -78,6 +78,16 @@ def test_gridstatus_fips_coverage(engine: Engine):
     ), "More than 4 percent of Grid Status locations could not be geocoded."
 
 
+def test_fyi_fips_coverage(engine: Engine):
+    """Make sure we have high coverage for county_id_fips codes in the fyi_locations table."""
+    with engine.connect() as con:
+        fyi_locations = pd.read_sql_table("fyi_locations", con, schema="data_warehouse")
+    location_coverage = fyi_locations.county_id_fips.isna().sum() / len(fyi_locations)
+    assert (
+        location_coverage < 0.02
+    ), "More than 2 percent of FYI locations could not be geocoded."
+
+
 def test_iso_projects_sources(engine: Engine):
     """Check that the right resources come from the right sources."""
     # all offshore wind projects from the proprietary source
