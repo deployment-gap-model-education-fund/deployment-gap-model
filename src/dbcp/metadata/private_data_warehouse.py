@@ -222,8 +222,6 @@ fyi_projects = Table(
     Column("cluster", String),
     Column("general_comments", String),
     Column("interconnection_voltage_kv", String),
-    Column("latitude", Float),
-    Column("longitude", Float),
     Column("schedule_next_event_date", DateTime),
     Column("schedule_next_event_name", String),
     Column("most_recent_study_date", DateTime),
@@ -259,6 +257,8 @@ fyi_locations = Table(
     Column("geocoded_locality_name", String),
     Column("geocoded_locality_type", String),
     Column("geocoded_containing_county", String),
+    Column("latitude", Float),
+    Column("longitude", Float),
     schema=schema,
 )
 
