@@ -77,10 +77,10 @@ def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
 
     projects["project_id"] = np.arange(len(projects), dtype=np.int32)
     projects = projects.rename(columns=rename_dict)  # copy
-    projects.loc[
-        :, "interconnection_status_lbnl"
-    ] = _harmonize_interconnection_status_lbnl(
-        projects.loc[:, "interconnection_status_lbnl"]
+    projects.loc[:, "interconnection_status_lbnl"] = (
+        _harmonize_interconnection_status_lbnl(
+            projects.loc[:, "interconnection_status_lbnl"]
+        )
     )
     parse_date_columns(projects)
     # rename date_withdrawn to withdrawn_date and date_operational to actual_completion_date
@@ -136,7 +136,9 @@ def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
         .isna()
         .all()
         .all()
-    ), "Some operational or withdrawn projects have is_actionable or is_nearly_certain values."
+    ), (
+        "Some operational or withdrawn projects have is_actionable or is_nearly_certain values."
+    )
 
     # S-C utilities don't list the state which prevents them from being geocoded
     projects.loc[
@@ -181,9 +183,9 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         .copy()
     )
     # Fix defunct county FIPS code
-    new_locs.loc[
-        new_locs.county_id_fips.eq("51515"), "county_id_fips"
-    ] = "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
+    new_locs.loc[new_locs.county_id_fips.eq("51515"), "county_id_fips"] = (
+        "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
+    )
     lbnl_normalized_dfs["iso_locations"] = new_locs
 
     # Clean up and categorize resources
@@ -196,9 +198,9 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
 
     # Most projects missing queue_status are from the early 2000s so I'm going to assume
     # they were withrawn.
-    assert (
-        lbnl_normalized_dfs["iso_projects"]["queue_status"].isna().sum() <= 42
-    ), "Unexpected number of projects missing queue status."
+    assert lbnl_normalized_dfs["iso_projects"]["queue_status"].isna().sum() <= 42, (
+        "Unexpected number of projects missing queue status."
+    )
     lbnl_normalized_dfs["iso_projects"]["queue_status"] = lbnl_normalized_dfs[
         "iso_projects"
     ]["queue_status"].fillna("withdrawn")
@@ -253,8 +255,15 @@ def _normalize_location(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     location_df = location_df.merge(
         lbnl_df.loc[:, "raw_state_name"], on="project_id", validate="m:1"
     )
-
-    project_df = lbnl_df.drop(columns=county_cols + ["raw_state_name"])
+    # In 2024 the county_state_pairs and fips_codes columns were added.
+    # The fips_codes column needs some cleaning and has less coverage than
+    # our geocoded county FIPS. For now, drop the fips_codes column,
+    # but later we can update this to validate the geocoded county FIPS
+    # with the fips_codes column. The county_state_pairs column is not
+    # useful to us at this time.
+    project_df = lbnl_df.drop(
+        columns=county_cols + ["raw_state_name", "county_state_pairs", "fips_codes"]
+    )
 
     location_df.dropna(
         subset=["raw_state_name", "raw_county_name"], how="all", inplace=True
@@ -331,9 +340,7 @@ def _fix_independent_city_fips(location_df: pd.DataFrame) -> pd.DataFrame:
         raise ValueError("Use add_county_fips_with_backup_geocoding() first.")
     nan_fips = location_df.loc[
         location_df["county_id_fips"].isna(), ["raw_state_name", "raw_county_name"]
-    ].fillna(
-        ""
-    )  # copy
+    ].fillna("")  # copy
     nan_fips.loc[:, "raw_county_name"] = (
         nan_fips.loc[:, "raw_county_name"]
         .str.lower()
