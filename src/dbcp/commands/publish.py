@@ -10,11 +10,13 @@ from typing import Literal
 
 import click
 import google.auth
+import pandas as pd
 import yaml
 from google.cloud import bigquery, storage
 from pydantic import BaseModel, validator
 
 from dbcp.constants import OUTPUT_DIR
+from dbcp.helpers import get_sql_engine
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +56,23 @@ def upload_parquet_directory_to_gcs(
         logger.info(
             f"Uploaded {file} to gs://{output_bucket.id}/{destination_blob_name}"
         )
+
+
+def load_parquet_files_to_postgres(blobs: list[storage.Blob]):
+    """
+    Load Parquet files from GCS to production postgres db.
+
+    Args:
+        blobs: List of blobs pointing to fyi tables in GCS.
+    """
+    engine = get_sql_engine(production=True)
+    for blob in blobs:
+        # get the blob filename without the extension
+        table_name = blob.name.split("/")[-1].split(".")[0]
+
+        # Read parquet then write to postgres
+        df = pd.read_parquet(blob.path)
+        df.to_sql(table_name, engine, if_exists="replace")
 
 
 def load_parquet_files_to_bigquery(
@@ -211,6 +230,12 @@ class OutputMetadata(BaseModel):
     help="Upload the outputs to BigQuery",
 )
 @click.option(
+    "--upload-to-postgres",
+    default=False,
+    is_flag=True,
+    help="Upload the FYI outputs to Postgres",
+)
+@click.option(
     "-d",
     "--directories",
     type=click.Choice(VALID_DIRECTORIES),
@@ -226,6 +251,7 @@ def publish_outputs(
     settings_file_git_sha: str,
     directories: DataDirectoryLiteral,
     upload_to_big_query: bool,
+    upload_to_postgres: bool,
 ):
     """Publish outputs to Google Cloud Storage and Big Query."""
     bucket_name = "dgm-outputs"
@@ -257,6 +283,13 @@ def publish_outputs(
                 )
         else:
             logger.warning("No target schema provided. Skipping BigQuery upload.")
+    if upload_to_postgres:
+        fyi_tables = [
+            blob
+            for blob in output_bucket.list_blobs(prefix=f"{metadata.version}/")
+            if "fyi" in blob.name
+        ]
+        load_parquet_files_to_postgres(fyi_tables)
 
 
 if __name__ == "__main__":
