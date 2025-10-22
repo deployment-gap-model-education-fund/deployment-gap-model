@@ -177,14 +177,50 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
     Returns:
         Dict[str, pd.DataFrame]: dict with the projects and multivalues split into two dataframes
     """
-    # Apply parsing
+    # Apply parsing to capacity_by_generation_type_breakdown column
     parsed = fyi_df.apply(parse_capacity, result_type="expand", axis=1)
     resource_capacity_df = parsed.explode(["resource", "capacity_mw"])
     resource_capacity_df = resource_capacity_df[
         resource_capacity_df["resource"].notnull()
         & resource_capacity_df["capacity_mw"].notnull()
+    ].reset_index()
+    # Most of projects don't have a capacity_by_generation_type_breakdown
+    # and instead just have capacity_mw. Most of these projects only have a
+    # single resource listed, but some have multiple resources listed for only
+    # one capacity value, which is problematic.
+    # To try to fix some of these, we assume that any "Battery + x"
+    # resource type has a capacity value that pertains to the non-battery
+    # resource.
+    # Then, we drop any rows that have a mixed resource type (contains a +),
+    # this is a temporary solution
+    single_capacity_df = fyi_df[
+        (~fyi_df["capacity_mw"].isnull())
+        & (fyi_df["capacity_by_generation_type_breakdown"].isnull())
     ]
-
+    single_capacity_df["resource"] = (
+        single_capacity_df["canonical_generation_types"]
+        .str.replace(r"^Battery\s\+\s|\s\+\sBattery", "", regex=True)
+        .str.strip()
+        .replace("", pd.NA)
+        .dropna()
+    )
+    single_capacity_df = single_capacity_df[
+        ~single_capacity_df["resource"].str.contains("+", regex=False)
+    ]
+    resource_capacity_df = pd.concat(
+        [
+            resource_capacity_df,
+            single_capacity_df[["resource", "capacity_mw"]].reset_index(),
+        ]
+    ).drop_duplicates()
+    # TODO: look into these project IDs and maybe take this check out
+    assert (
+        len(resource_capacity_df.duplicated(subset=["project_id", "resource"])) > 10
+    ), "More than 10 resource types within a project have different capacity values in the capacity resource table."
+    # favor the capacity number pulled from capacity_by_generation_type_breakdown
+    resource_capacity_df = resource_capacity_df.drop_duplicates(
+        subset=["project_id", "resource"], keep="first"
+    )
     project_df = fyi_df.drop(
         columns=["capacity_mw", "capacity_by_generation_type_breakdown"]
     )
