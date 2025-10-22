@@ -1,0 +1,31 @@
+name: auto-release
+on:
+  push:
+    tags:
+      - 'v*'        # only version tags
+
+permissions:
+  contents: write
+
+jobs:
+  create_release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # gh prefers GH_TOKEN
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Create release (if it doesn't already exist)
+        run: |
+          set -euo pipefail
+          TAG="${{ github.ref_name }}"
+
+          # Exit quietly if the release already exists
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "Release $TAG already exists. Nothing to do."
+            exit 0
+          fi
+
+          # Create release with auto notes
+          gh release create "$TAG" \
+            --repo "$REPO" \
+            --generate-notes \

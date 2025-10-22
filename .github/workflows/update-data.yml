@@ -5,11 +5,23 @@ on:
   push:
     branches:
       - "main"
-    tags:
-      - "v*"              # used for production releases
+    tags: [ 'v*' ]
   workflow_dispatch:
+    inputs:
+      target:
+        description: 'dev or prod'
+        required: true
+        default: 'dev'
+        type: choice
+        options: [dev, prod]
+      release_tag:
+        description: 'Release tag to deploy to prod (leave blank to use latest published release)'
+        required: false
+        default: ''
   schedule:
     - cron: 0 0 * * 0
+  release:
+    types: [published]   # immediately deploy prod when a release is published
 
 jobs:
   archive:
@@ -73,58 +85,83 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - name: Check if this is a scheduled run
-        id: is_schedule
-        run: echo "::set-output name=scheduled::${{ github.event_name == 'schedule' }}"
+      - name: Authenticate gh (needed for release lookups)
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
-      - name: Fetch latest prod tag (only on schedule)
-        id: latest_tag
-        if: steps.is_schedule.outputs.scheduled == 'true'
+      - name: Fetch latest prod tag
+        id: latest_release
         run: |
-          # Install gh CLI
-          sudo apt-get update && sudo apt-get install -y gh
-
-          # Authenticate gh with token (use a PAT or GITHUB_TOKEN)
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          REPO="${{ github.repository }}"
 
           # Get latest tag matching pattern (e.g. v*.*.*)
-          LATEST_TAG=$(gh release list --limit 1 --exclude-drafts --exclude-pre-releases --pattern 'v*.*.*' --json tagName --jq '.[0].tagName')
+          LATEST_TAG=$(gh release list \
+            --repo "$REPO" \
+            --exclude-drafts \
+            --exclude-pre-releases \
+            --json tagName \
+            --jq '.[0].tagName')
 
           echo "Latest tag: $LATEST_TAG"
-          echo "::set-output name=tag::$LATEST_TAG"
+          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
 
       - name: Set matrix
         id: set-matrix
         run: |
           if [[ "${{ github.event_name }}" == "push" ]]; then
-            # Get the branch or tag that triggered the push event
-            BRANCH_OR_TAG="${{ github.ref_name }}"
-
-            # If it looks like a version tag starting with 'v', mark as prod
-            if [[ "$BRANCH_OR_TAG" == v* ]]; then
-              TARGET="prod"
-            else
-              # Otherwise treat as dev (branch like main)
-              TARGET="dev"
-            fi
-
-            # Set the matrix with target and the actual git ref
-            echo "matrix={\"include\":[{\"target\":\"$TARGET\",\"ref\":\"$BRANCH_OR_TAG\"}]}" >> $GITHUB_OUTPUT
+            # Any push (branch or tag) runs as dev against that ref
+            REF="${{ github.ref_name }}"
+            TARGET="dev"
 
           elif [[ "${{ github.event_name }}" == "schedule" ]]; then
-            # On schedule, get the latest prod tag from previous step output
-            LATEST_TAG="${{ steps.latest_tag.outputs.tag }}"
+            # Scheduled run: deploy prod from latest *published release* tag
+            TAG="${{ steps.latest_release.outputs.tag }}"
+            if [[ -z "${TAG:-}" ]]; then
+              echo "No published releases found; falling back to dev main."
+              TARGET="dev"; REF="main"
+            else
+              TARGET="prod"; REF="$TAG"
+            fi
 
-            # Run matrix with dev (main branch) and prod (latest tag)
-            echo "matrix={\"include\":[{\"target\":\"dev\",\"ref\":\"main\"},{\"target\":\"prod\",\"ref\":\"$LATEST_TAG\"}]}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "release" ]]; then
+            # Release published: deploy prod from this release tag
+            TAG="${{ github.event.release.tag_name }}"
+            TARGET="prod"; REF="$TAG"
+
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            REQ_TARGET="${{ inputs.target }}"
+              if [[ "$REQ_TARGET" == "prod" ]]; then
+                USER_TAG="${{ inputs.release_tag }}"
+                if [[ -n "$USER_TAG" ]]; then
+                  # validate the release exists and is published
+                  if gh release view "$USER_TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+                    TARGET="prod"; REF="$USER_TAG"
+                  else
+                    echo "Requested release tag '$USER_TAG' not found or not published."
+                    exit 1
+                  fi
+                else
+                  TAG="${{ steps.latest_release.outputs.tag }}"
+                  if [[ -z "${TAG:-}" ]]; then
+                    echo "No published releases found; cannot deploy prod."
+                    exit 1
+                  fi
+                  TARGET="prod"; REF="$TAG"
+                fi
+              else
+                REF_INPUT="${{ github.ref_name }}"
+                TARGET="dev"; REF="${REF_INPUT:-main}"
+              fi
 
           else
-            # For manual or other events, default to dev (main branch)
-            echo "matrix={\"include\":[{\"target\":\"dev\",\"ref\":\"main\"}]}" >> $GITHUB_OUTPUT
+            # fallback, default to dev (main branch)
+            TARGET="dev"; REF="main"
+
           fi
+          echo "matrix={\"include\":[{\"target\":\"$TARGET\",\"ref\":\"$REF\"}]}" >> $GITHUB_OUTPUT
 
       - name: Echo matrix
-        run: echo "${{ steps.set-matrix.outputs.matrix }}"
+        run: |
+          echo "${{ steps.set-matrix.outputs.matrix }}"
 
   etl:
     needs: matrix_prep # Ensure archive job finishes first
@@ -136,7 +173,7 @@ jobs:
     env:
       GEOCODIO_API_KEY: ${{ secrets.GEOCODIO_API_KEY }}
       API_KEY_GOOGLE_MAPS: ${{ secrets.API_KEY_GOOGLE_MAPS }}
-      GITHUB_REF: ${{ github.ref_name }} # This is changed to dev if running on a schedule
+      GITHUB_REF: ${{ github.ref_name }}
     steps:
       - name: Print matrix info
         run: |
@@ -196,10 +233,12 @@ jobs:
       - name: Give ownership of the workspace back to root
         run: sudo chown -R runner:docker $GITHUB_WORKSPACE
 
-      # commit the settings file
+      # commit the settings file to main only on branch pushes
       - uses: EndBug/add-and-commit@v9
         id: commit_settings_file
-        if: steps.write_settings.outcome == 'success' && github.ref_type == 'branch'
+        if: ${{ steps.write_settings.outcome == 'success'
+                && github.event_name == 'push'
+                && startsWith(github.ref, 'refs/heads/') }}
         with:
           add: "src/dbcp/settings.yaml"
           author_name: "DBCP Bot"

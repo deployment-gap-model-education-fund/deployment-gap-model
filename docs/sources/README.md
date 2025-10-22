@@ -6,9 +6,15 @@ This work would not be possible without generous support and open data sharing f
 
 [Catalyst Cooperative](https://catalyst.coop/) builds and maintains an [open database of electric power sector data](https://catalyst.coop/pudl/) compiled from EIA, FERC, and EPA sources. The dataset describes the fuel use, generation, operating costs, ownership, and emissions of power plants in the United States.
 
+## Interconnection Queue via interconnection.fyi
+This dataset tracks interconnection queue requests from 1995 to current. Interconnection queues show projects which
+have requested to connect to the electric grid. The team at interconnection.fyi builds this data using publicly-available data
+from ISOs/RTOS and non-ISO utilities. This is a non-public data source.
+
 ## Proposed Power Plants via LBNL
 
-Researchers at Lawrence Berkeley National Lab [compile a dataset](https://emp.lbl.gov/queues) of power plants from the interconnection queues of the 7 ISOs plus the 35 largest non-ISO utilities in the United States. In their own words: "Data from these queues ... provide a general indicator for mid-term trends in developer interest."
+Researchers at Lawrence Berkeley National Lab [compile a dataset](https://emp.lbl.gov/queues) of power plants from the interconnection queues of the 7 ISOs plus the 35 largest non-ISO utilities in the United States. In their own words: "Data from these queues ... provide a general indicator for mid-term trends in developer interest." This data is no longer the primary
+source for interconnection data, but is instead used for validating the interconnection.fyi queue data.
 
 ## Local Opposition to Renewable Energy via RELDI and NREL
 

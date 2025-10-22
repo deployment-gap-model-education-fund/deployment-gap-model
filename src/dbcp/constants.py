@@ -102,6 +102,84 @@ See
 https://github.com/catalyst-cooperative/pudl/issues/1264
 """
 
+QUEUE_RESOURCE_DICT = {
+    "Battery Storage": {
+        "codes": ["Battery", "Batteries", "BAT", "ES"],
+        "type": "Renewable",
+    },
+    "Biofuel": {"codes": ["Biogas"], "type": "Renewable"},
+    "Biomass": {"codes": ["Wood", "W", "BLQ WDS", "WDS"], "type": "Renewable"},
+    "Coal": {"codes": ["BIT", "C"], "type": "Fossil"},
+    "Combustion Turbine": {"codes": ["CT"], "type": "Fossil"},
+    "Fuel Cell": {"codes": ["Fuel Cell", "FC"], "type": "Fossil"},
+    "Geothermal": {"codes": [], "type": "Renewable"},
+    "Hydro": {"codes": ["WAT", "H", "Water", "Wave"], "type": "Renewable"},
+    "Landfill Gas": {"codes": ["LFG", "L", "Landfill", "Waste"], "type": "Fossil"},
+    "Municipal Solid Waste": {"codes": ["MSW"], "type": "Fossil"},
+    "Natural Gas": {
+        "codes": [
+            "NG",
+            "Methane",
+            "Methane Gas",
+            "CT-NG",
+            "CC",
+            "CC-NG",
+            "ST-NG",
+            "CS-NG",
+            "Combined Cycle",
+            "Gas",
+            "Natural Gas; Other",
+            "DFO KER NG",
+            "DFO NG",
+            "Diesel; Methane",
+            "JF KER NG",
+            "NG WO",
+            "KER NG",
+            "Natural Gas; Diesel; Other; Storage",
+            "Natural Gas; Oil",
+            "Thermal",
+        ],
+        "type": "Fossil",
+    },
+    "Nuclear": {"codes": ["NU", "NUC"], "type": "Renewable"},
+    "Offshore Wind": {"codes": [], "type": "Renewable"},
+    "Oil": {
+        "codes": ["DFO", "Diesel", "CT-D", "CC-D", "JF", "KER", "DFO KER", "D"],
+        "type": "Fossil",
+    },
+    "Onshore Wind": {"codes": ["Wind", "WND", "Wind Turbine"], "type": "Renewable"},
+    "Other": {"codes": [], "type": "Unknown Resource"},
+    "Unknown": {
+        "codes": ["Wo", "F", "Hybrid", "M", "Byproduct", "Conventional"],
+        "type": "Unknown Resource",
+    },
+    "Other Storage": {
+        "codes": [
+            "Flywheel",
+            "Storage",
+            "CAES",
+            "Gravity Rail",
+            "Hydrogen",
+            "Compressed Air",
+        ],
+        "type": "Renewable",
+    },
+    "Pumped Storage": {
+        "codes": ["Pump Storage", "Pumped-Storage hydro", "PS"],
+        "type": "Renewable",
+    },
+    "Solar": {"codes": ["SUN", "S"], "type": "Renewable"},
+    "Steam": {"codes": ["ST", "Steam Turbine"], "type": "Fossil"},
+    "Waste Heat": {
+        "codes": [
+            "Waste Heat Recovery",
+            "Heat Recovery",
+            "Co-Gen",
+        ],
+        "type": "Fossil",
+    },
+}
+
 FIPS_CODE_VINTAGE = 2020
 
 PUDL_LATEST_YEAR = 2024
