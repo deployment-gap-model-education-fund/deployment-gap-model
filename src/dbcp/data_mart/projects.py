@@ -146,11 +146,14 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     long = long_format.copy()
     # separate generation from storage
     is_storage = long.loc[:, "resource_clean"].str.contains("storage", flags=IGNORECASE)
-    long["storage_type"] = long.loc[:, "resource_clean"].where(is_storage)
-    long["generation_type"] = long.loc[:, "resource_clean"].where(~is_storage)
+    long["storage_type"] = (
+        long.loc[:, "resource_clean"].where(is_storage).astype("string")
+    )
+    long["generation_type"] = (
+        long.loc[:, "resource_clean"].where(~is_storage).astype("string")
+    )
     gen = long.loc[~is_storage, :]
     storage = long.loc[is_storage, :]
-
     group_keys = ["project_id", "source", "county_id_fips"]
     # create multiple generation columns
     group = gen.groupby(group_keys, dropna=False)[["generation_type", "capacity_mw"]]
@@ -169,15 +172,53 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     # shouldn't be any with 3 generation types
     assert group.nth(2).shape[0] == 0
     gen = pd.concat([gen_1, gen_2], axis=1, copy=False)
-
     # create storage column
-    assert storage.duplicated(subset=group_keys).sum() == 0  # no multi-storage projects
-    storage = storage.set_index(group_keys)[["capacity_mw"]].rename(
-        columns={"capacity_mw": "storage_capacity_mw"}
+    # Occassionally there are projects with multiple storage resources,
+    # i.e. battery storage and pumped storage
+    # In these cases, we sum the storage capacity the by doing a
+    # groupby and sum on capacity.
+    assert (
+        storage.duplicated(subset=group_keys).sum() < 10
+    )  # less than 10 multi-storage projects (assuming this isn't common)
+
+    storage = (
+        storage.groupby(group_keys, dropna=False)[["capacity_mw"]]
+        .sum()
+        .rename(columns={"capacity_mw": "storage_capacity_mw"})
     )
 
-    # combine gen and storage cols
-    gen_stor = gen.join(storage, how="outer")
+    # combine the storage_type column for these dupe storage projects
+    storage_concat = long.groupby(group_keys, dropna=False)["storage_type"].transform(
+        lambda s: " + ".join(pd.unique([x for x in s.dropna() if x != ""]))
+    )
+    # Count how many storage rows per group
+    storage_count = (
+        long.assign(_is_storage=is_storage)
+        .groupby(group_keys, dropna=False)["_is_storage"]
+        .transform("sum")
+    )
+    # Replace only for rows that are storage AND belong to groups with duplicates (>=2)
+    long["storage_type"] = np.where(
+        is_storage & (storage_count >= 2),
+        storage_concat,  # combined e.g. "Battery + Pumped storage"
+        long["storage_type"],  # leave untouched otherwise
+    )
+    long["storage_type"] = long["storage_type"].replace(
+        {"Pumped Storage + Battery Storage": "Battery Storage + Pumped Storage"}
+    )
+    # combine gen and storage cols, handling nans in county_id_fips
+    SENTINEL = "<NA_FIPS>"
+    g = gen.reset_index().assign(
+        county_id_fips=lambda d: d["county_id_fips"].astype("string").fillna(SENTINEL)
+    )
+    s = storage.reset_index().assign(
+        county_id_fips=lambda d: d["county_id_fips"].astype("string").fillna(SENTINEL)
+    )
+    gen_stor = g.merge(s, how="outer", on=group_keys, suffixes=("_gen", "_stor"))
+    # restore NaNs
+    gen_stor["county_id_fips"] = gen_stor["county_id_fips"].replace(SENTINEL, np.nan)
+    gen_stor = gen_stor.set_index(group_keys)
+
     assert (
         len(gen_stor) == long.groupby(group_keys, dropna=False).ngroups
     )  # all project-locations accounted for and 1:1
@@ -548,7 +589,7 @@ def create_geography_change_log(
 
 
 def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
-    """Create a change log of GridStatus projects.
+    """Create a change log of interconnection queue projects.
 
     There is a row for every time the status of a project changes.
     The effective_date column is the date the status changed and the end_date
@@ -724,7 +765,7 @@ def validate_project_change_log(
     # Create a dictionary of expected pct change for each iso_region
     expected_pct_change = pd.Series(
         {
-            "CAISO": 0.02,
+            "CAISO": 0.29,  # In 2024 CAISO required cluster 15 requests to be resubmitted, resulting in many withdrawals and some changes to requested capacity.
             "ISONE": 0.01,
             "MISO": 0.09,  # A lot of operational projects prior to 2010 are missing operational dates
             "NYISO": 0.18,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
@@ -740,7 +781,6 @@ def validate_project_change_log(
     long_format_region_capacity = iso_projects_long_format.groupby(
         "iso_region"
     ).capacity_mw.sum()
-
     pct_change = (
         long_format_region_capacity - iso_projects_change_log_region_capacity
     ) / iso_projects_change_log_region_capacity
@@ -779,7 +819,7 @@ def validate_iso_regions_change_log(
     # Create a dictionary of expected pct change for each iso_region
     expected_pct_change = pd.Series(
         {
-            "CAISO": 0.07,
+            "CAISO": 0.29,  # In 2024 CAISO required cluster 15 requests to be resubmitted, resulting in many withdrawals and some changes to requested capacity.
             "ISONE": 0.01,
             "MISO": 0.09,  # A lot of operational projects prior to 2010 are missing operational dates
             "NYISO": 0.20,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
