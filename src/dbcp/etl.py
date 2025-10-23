@@ -35,7 +35,7 @@ def etl_eip_infrastructure() -> Dict[str, pd.DataFrame]:
 
 def etl_lbnl_iso_queue() -> Dict[str, pd.DataFrame]:
     """LBNL ISO Queues ETL."""
-    lbnl_uri = "gs://dgm-archive/lbnl_iso_queue/queues_2023_clean_data.xlsx"
+    lbnl_uri = "gs://dgm-archive/lbnl_iso_queue/queues_2024_clean_data.xlsx"
     lbnl_raw_dfs = dbcp.extract.lbnl_iso_queue.extract(lbnl_uri)
     lbnl_transformed_dfs = dbcp.transform.lbnl_iso_queue.transform(lbnl_raw_dfs)
 

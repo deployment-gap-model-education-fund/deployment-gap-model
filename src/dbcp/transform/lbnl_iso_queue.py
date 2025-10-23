@@ -253,8 +253,15 @@ def _normalize_location(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     location_df = location_df.merge(
         lbnl_df.loc[:, "raw_state_name"], on="project_id", validate="m:1"
     )
-
-    project_df = lbnl_df.drop(columns=county_cols + ["raw_state_name"])
+    # In 2024 the county_state_pairs and fips_codes columns were added.
+    # The fips_codes column needs some cleaning and has less coverage than
+    # our geocoded county FIPS. For now, drop the fips_codes column,
+    # but later we can update this to validate the geocoded county FIPS
+    # with the fips_codes column. The county_state_pairs column is not
+    # useful to us at this time.
+    project_df = lbnl_df.drop(
+        columns=county_cols + ["raw_state_name", "county_state_pairs", "fips_codes"]
+    )
 
     location_df.dropna(
         subset=["raw_state_name", "raw_county_name"], how="all", inplace=True
