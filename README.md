@@ -193,18 +193,18 @@ export JUPYTER_PORT=8890
 ## Git Branches
 We have the following branch setup for updating the production and development tables:
 - development schema (`data_warehouse_dev`, `data_mart_dev`): updated using the HEAD of the `main` branch
-- production schema (`data_warehouse`, `data_mart`): updated using the most recent tagged version of the `main` branch
+- production schema (`data_warehouse`, `data_mart`): updated using the most recent tagged version release of the `main` branch
 
 Developing new features or adding new data is done by making a new branch off of `main`, and merging into main allows us to see the results of these changes in the `_dev` schema tables.
 
 ### Deploying a new version to production
-We use Git tags to deploy versioned releases to production. The format of these tags is `vYYYY-MM-xx`, where:
+We use Git tags to deploy versioned releases to production. The format of these tags is `vYYYY.MM.DD`, where:
 
 - `YYYY` = year
 - `MM` = month
-- `xx` = sequential release number (reset each month)
+- `DD` = day
 
-Only tagged commits are used to update the production schema (`data_warehouse`, `data_mart`). Follow the steps below to create and deploy a new version:
+Only tagged releases are used to update the production schema (`data_warehouse`, `data_mart`). Follow the steps below to create and deploy a new version:
 
 1. Make sure your main branch is up to date:
 ```bash
@@ -217,13 +217,15 @@ Ensure that the code in main is what you want deployed to production, and tests 
 3. Create a new version tag
 Replace the tag value with the appropriate version:
 ```bash
-git tag v2025-08-01  # Example for the first release in August 2025
+git tag v2025.08.01  # Example for the first release on August 1, 2025
 ```
 4. Push the tag to the remote repository:
 ```bash
-git push origin v2025-08-01
+git push origin v2025.08.01
 ```
-This will trigger the deployment process to update the production schemas with the state of the code at the tagged commit.
+
+This will trigger creating a new release using the tag and kick off the deployment process
+to update the production schemas with the state of the code at the tagged commit.
 
 ## Comparing Branches During Development
 
