@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import sqlalchemy as sa
 
+from dbcp.constants import OUTPUT_DIR
 from dbcp.data_mart.helpers import (
     CountyOpposition,
     _estimate_proposed_power_co2e,
@@ -68,6 +69,12 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
     df = pd.read_sql(query, engine)
     if non_iso_only:
         df = df[~df.iso_region.isin(GS_REGIONS)]
+    return df.drop(columns=["raw_county_name"])
+
+
+def _get_fyi_projects(engine: sa.engine.Engine) -> pd.DataFrame:
+    query = get_query("get_fyi_projects.sql")
+    df = pd.read_sql(query, engine)
     return df.drop(columns=["raw_county_name"])
 
 
@@ -377,6 +384,48 @@ def create_long_format(
     long_format["surrogate_id"] = range(len(long_format))
 
     # If we only want active projects, grab active projects and remove withdrawn_date and actual_completion_date
+    if active_projects_only:
+        active_long_format = long_format.query("queue_status == 'active'")
+        # drop actual_completion_date and withdrawn_date columns
+        active_long_format = active_long_format.drop(
+            columns=["actual_completion_date", "withdrawn_date"]
+        )
+        return active_long_format
+    return long_format
+
+
+def create_fyi_long_format(
+    engine: sa.engine.Engine,
+    active_projects_only: bool = True,
+    # use_proprietary_offshore: bool = True, # TODO: add this option?
+):
+    """Create long format FYI table."""
+    fyi = _get_fyi_projects(engine)
+    _estimate_proposed_power_co2e(fyi)
+    all_counties = _get_county_fips_df(engine)
+    all_states = _get_state_fips_df(engine)
+
+    # model local opposition
+    aggregator = CountyOpposition(
+        engine=engine, county_fips_df=all_counties, state_fips_df=all_states
+    )
+    combined_opp = aggregator.agg_to_counties(
+        include_state_policies=False,
+        include_nrel_bans=True,
+        include_manual_ordinances=True,
+    )
+    rename_dict = {
+        "geocoded_locality_name": "ordinance_jurisdiction_name",
+        "geocoded_locality_type": "ordinance_jurisdiction_type",
+        "earliest_year_mentioned": "ordinance_earliest_year_mentioned",
+    }
+    combined_opp.rename(columns=rename_dict, inplace=True)
+
+    long_format = fyi.merge(
+        combined_opp, on="county_id_fips", how="left", validate="m:1"
+    )
+    _add_derived_columns(long_format)
+    # long_format["surrogate_id"] = range(len(long_format))
     if active_projects_only:
         active_long_format = long_format.query("queue_status == 'active'")
         # drop actual_completion_date and withdrawn_date columns
@@ -1136,6 +1185,9 @@ def create_data_mart(
 
     active_long_format = create_long_format(engine, active_projects_only=True)
     active_wide_format = _convert_long_to_wide(active_long_format)
+    active_fyi_projects_long_format = create_fyi_long_format(
+        engine, active_projects_only=False
+    )
 
     eia860m_current = get_eia860m_current(engine)
     eia860m_status_monthly = get_eia860m_status_timeseries(engine, frequency="M")
@@ -1154,6 +1206,7 @@ def create_data_mart(
             "projects_status_monthly_eia860m": eia860m_status_monthly,
             "projects_status_transition_dates_eia860m": eia860m_transition_dates,
             "projects_status_codes_eia860m": _create_status_codes(),
+            "fyi_projects_long_format": active_fyi_projects_long_format,
         }
     )
     return data_marts
@@ -1162,4 +1215,8 @@ def create_data_mart(
 if __name__ == "__main__":
     # debugging entry point
     mart = create_data_mart()
+    parquet_dir = OUTPUT_DIR / "data_mart"
+    mart["fyi_projects_long_format"].to_parquet(
+        parquet_dir / "fyi_projects_long_format.parquet",
+    )
     print("yeehaw")
