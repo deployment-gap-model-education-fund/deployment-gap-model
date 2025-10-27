@@ -28,6 +28,7 @@ def create_fyi_counties_proposed_clean_projects(
         "Battery Storage",
         "Wind",
         "Onshore Wind",
+        "Offshore Wind",
         "Hydro",
         "Geothermal",
         "Pumped Storage",

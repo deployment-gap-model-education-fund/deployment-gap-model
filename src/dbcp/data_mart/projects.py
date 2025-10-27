@@ -54,12 +54,12 @@ def _merge_lbnl_with_gridstatus(lbnl: pd.DataFrame, gs: pd.DataFrame) -> pd.Data
 
     fields_in_gs_not_in_lbnl = gs.columns.difference(lbnl.columns)
     fields_in_lbnl_not_in_gs = lbnl.columns.difference(gs.columns)
-    assert fields_in_gs_not_in_lbnl.empty, (
-        f"These columns are in Grid Status but not LBNL: {fields_in_gs_not_in_lbnl}"
-    )
-    assert fields_in_lbnl_not_in_gs.empty, (
-        f"These columns are in LBNL but not Grid Status: {fields_in_lbnl_not_in_gs}"
-    )
+    assert (
+        fields_in_gs_not_in_lbnl.empty
+    ), f"These columns are in Grid Status but not LBNL: {fields_in_gs_not_in_lbnl}"
+    assert (
+        fields_in_lbnl_not_in_gs.empty
+    ), f"These columns are in LBNL but not Grid Status: {fields_in_lbnl_not_in_gs}"
 
     return pd.concat([gs, lbnl_non_isos], axis=0, ignore_index=True)
 
@@ -211,9 +211,9 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     loc1 = projects.nth(0).rename(
         columns={"county_id_fips": "county_id_fips_1", "county": "county_1"}
     )
-    assert not loc1.index.to_frame().isna().any().any(), (
-        "Nulls found in project_id or source."
-    )
+    assert (
+        not loc1.index.to_frame().isna().any().any()
+    ), "Nulls found in project_id or source."
     loc2 = (
         projects[["county_id_fips", "county"]]
         .nth(1)
@@ -425,7 +425,7 @@ def create_fyi_long_format(
         combined_opp, on="county_id_fips", how="left", validate="m:1"
     )
     _add_derived_columns(long_format)
-    long_format["surrogate_id"] = range(len(long_format))
+    # long_format["surrogate_id"] = range(len(long_format))
     if active_projects_only:
         active_long_format = long_format.query("queue_status == 'active'")
         # drop actual_completion_date and withdrawn_date columns
@@ -458,9 +458,9 @@ def create_total_active_project_change_logs(
     Returns:
         totals_chng_log: dataframe where each row contains the total active capacity or number of projects for a given region and time interval.
     """
-    assert active_iso_projects_change_log.queue_status.eq("new").all(), (
-        "Found rows with unexpected queue status."
-    )
+    assert active_iso_projects_change_log.queue_status.eq(
+        "new"
+    ).all(), "Found rows with unexpected queue status."
 
     chng_log = active_iso_projects_change_log.copy()
     min_date = chng_log.effective_date.min() - pd.offsets.QuarterBegin(startingMonth=1)
@@ -651,9 +651,9 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
     )
     # make sure pct_after_current_year is less than 0.001 of operational projects
     expected_missing = 0.002
-    assert pct_after_current_year < expected_missing, (
-        f"More than {expected_missing}% of operational projects have actual_completion_date after the current year."
-    )
+    assert (
+        pct_after_current_year < expected_missing
+    ), f"More than {expected_missing}% of operational projects have actual_completion_date after the current year."
 
     # map active projects to "new"
     long_format["queue_status"] = long_format["queue_status"].map(
@@ -709,9 +709,9 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
         )
 
         # set effective_date column to date_col for projects that == status
-        long_format.loc[long_format["queue_status"].eq(status), "effective_date"] = (
-            long_format[date_col]
-        )
+        long_format.loc[
+            long_format["queue_status"].eq(status), "effective_date"
+        ] = long_format[date_col]
 
     # Set end date to to null all projects.
     long_format["end_date"] = pd.NA
@@ -766,9 +766,9 @@ def validate_project_change_log(
     result_n_projects_change = abs(
         len(iso_projects_change_log) - len(iso_projects_long_format)
     ) / len(iso_projects_change_log)
-    assert result_n_projects_change < expected_n_projects_change, (
-        f"Found unexpected change in total projects count: {result_n_projects_change}"
-    )
+    assert (
+        result_n_projects_change < expected_n_projects_change
+    ), f"Found unexpected change in total projects count: {result_n_projects_change}"
 
     # Create a dictionary of expected pct change for each iso_region
     expected_pct_change = pd.Series(
@@ -793,9 +793,9 @@ def validate_project_change_log(
     pct_change = (
         long_format_region_capacity - iso_projects_change_log_region_capacity
     ) / iso_projects_change_log_region_capacity
-    assert pct_change.lt(expected_pct_change).all(), (
-        f"Found unexpected pct change in iso_projects_long_format: {pct_change}"
-    )
+    assert pct_change.lt(
+        expected_pct_change
+    ).all(), f"Found unexpected pct change in iso_projects_long_format: {pct_change}"
 
 
 def validate_iso_regions_change_log(
@@ -821,9 +821,9 @@ def validate_iso_regions_change_log(
     result_n_projects_change = abs(
         n_projects_iso_regions_change_log - len(iso_projects_long_format)
     ) / len(iso_projects_long_format)
-    assert result_n_projects_change < expected_n_projects_change, (
-        f"Found unexpected change in total projects count: {result_n_projects_change}"
-    )
+    assert (
+        result_n_projects_change < expected_n_projects_change
+    ), f"Found unexpected change in total projects count: {result_n_projects_change}"
 
     # Create a dictionary of expected pct change for each iso_region
     expected_pct_change = pd.Series(
@@ -853,9 +853,9 @@ def validate_iso_regions_change_log(
     pct_change = (
         long_format_region_capacity - iso_projects_change_log_region_capacity
     ) / iso_projects_change_log_region_capacity
-    assert pct_change.lt(expected_pct_change).all(), (
-        f"Found unexpected pct change in iso_projects_long_format: {pct_change}"
-    )
+    assert pct_change.lt(
+        expected_pct_change
+    ).all(), f"Found unexpected pct change in iso_projects_long_format: {pct_change}"
 
 
 def get_eia860m_current(engine: sa.engine.Engine) -> pd.DataFrame:
@@ -1170,13 +1170,13 @@ def create_data_mart(
             "queue_status == 'new'"
         )
         for metric in metrics:
-            data_marts[f"{geography}_active_projects_{metric}_change_log"] = (
-                create_total_active_project_change_logs(
-                    new_iso_projects_change_log,
-                    geography=geography_columns,
-                    metric=metric,
-                    freq="Q",
-                )
+            data_marts[
+                f"{geography}_active_projects_{metric}_change_log"
+            ] = create_total_active_project_change_logs(
+                new_iso_projects_change_log,
+                geography=geography_columns,
+                metric=metric,
+                freq="Q",
             )
 
     validate_iso_regions_change_log(

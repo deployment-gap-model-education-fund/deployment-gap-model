@@ -1,4 +1,5 @@
 """Retrieve data from the LBNL ISO Queue spreadsheet."""
+
 from typing import Dict
 
 import pandas as pd
@@ -16,7 +17,9 @@ def extract(uri: str) -> Dict[str, pd.DataFrame]:
         dfs: dictionary of dataframe name to raw dataframe.
     """
     path = dbcp.extract.helpers.cache_gcs_archive_file_locally(uri)
-    all_projects = pd.read_excel(path, sheet_name="data")
+    all_projects = pd.read_excel(
+        path, sheet_name="data", dtype={"fips_codes": "string"}
+    )
     rename_dict = {
         "q_id": "queue_id",
         "q_status": "queue_status",

@@ -5,13 +5,13 @@ WITH
             proj.queue_id,
             proj.proposed_completion_date as date_proposed_online,
             proj.developer,
-            proj.power_market, -- does entity in LBNL map to power_market?
+            proj.power_market, -- region in LBNL maps to power_market
             proj.interconnection_status_fyi as interconnection_status,
             proj.point_of_interconnection,
             proj.project_name,
             proj.queue_date as date_entered_queue,
             proj.queue_status,
-            proj.iso as iso_region, -- does region in LBNL map to iso?
+            proj.iso
             proj.utility,
             proj.is_actionable,
             proj.is_nearly_certain,
