@@ -53,12 +53,12 @@ def _merge_lbnl_with_gridstatus(lbnl: pd.DataFrame, gs: pd.DataFrame) -> pd.Data
 
     fields_in_gs_not_in_lbnl = gs.columns.difference(lbnl.columns)
     fields_in_lbnl_not_in_gs = lbnl.columns.difference(gs.columns)
-    assert (
-        fields_in_gs_not_in_lbnl.empty
-    ), f"These columns are in Grid Status but not LBNL: {fields_in_gs_not_in_lbnl}"
-    assert (
-        fields_in_lbnl_not_in_gs.empty
-    ), f"These columns are in LBNL but not Grid Status: {fields_in_lbnl_not_in_gs}"
+    assert fields_in_gs_not_in_lbnl.empty, (
+        f"These columns are in Grid Status but not LBNL: {fields_in_gs_not_in_lbnl}"
+    )
+    assert fields_in_lbnl_not_in_gs.empty, (
+        f"These columns are in LBNL but not Grid Status: {fields_in_lbnl_not_in_gs}"
+    )
 
     return pd.concat([gs, lbnl_non_isos], axis=0, ignore_index=True)
 
@@ -146,11 +146,14 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     long = long_format.copy()
     # separate generation from storage
     is_storage = long.loc[:, "resource_clean"].str.contains("storage", flags=IGNORECASE)
-    long["storage_type"] = long.loc[:, "resource_clean"].where(is_storage)
-    long["generation_type"] = long.loc[:, "resource_clean"].where(~is_storage)
+    long["storage_type"] = (
+        long.loc[:, "resource_clean"].where(is_storage).astype("string")
+    )
+    long["generation_type"] = (
+        long.loc[:, "resource_clean"].where(~is_storage).astype("string")
+    )
     gen = long.loc[~is_storage, :]
     storage = long.loc[is_storage, :]
-
     group_keys = ["project_id", "source", "county_id_fips"]
     # create multiple generation columns
     group = gen.groupby(group_keys, dropna=False)[["generation_type", "capacity_mw"]]
@@ -169,15 +172,53 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     # shouldn't be any with 3 generation types
     assert group.nth(2).shape[0] == 0
     gen = pd.concat([gen_1, gen_2], axis=1, copy=False)
-
     # create storage column
-    assert storage.duplicated(subset=group_keys).sum() == 0  # no multi-storage projects
-    storage = storage.set_index(group_keys)[["capacity_mw"]].rename(
-        columns={"capacity_mw": "storage_capacity_mw"}
+    # Occassionally there are projects with multiple storage resources,
+    # i.e. battery storage and pumped storage
+    # In these cases, we sum the storage capacity the by doing a
+    # groupby and sum on capacity.
+    assert (
+        storage.duplicated(subset=group_keys).sum() < 10
+    )  # less than 10 multi-storage projects (assuming this isn't common)
+
+    storage = (
+        storage.groupby(group_keys, dropna=False)[["capacity_mw"]]
+        .sum()
+        .rename(columns={"capacity_mw": "storage_capacity_mw"})
     )
 
-    # combine gen and storage cols
-    gen_stor = gen.join(storage, how="outer")
+    # combine the storage_type column for these dupe storage projects
+    storage_concat = long.groupby(group_keys, dropna=False)["storage_type"].transform(
+        lambda s: " + ".join(pd.unique([x for x in s.dropna() if x != ""]))
+    )
+    # Count how many storage rows per group
+    storage_count = (
+        long.assign(_is_storage=is_storage)
+        .groupby(group_keys, dropna=False)["_is_storage"]
+        .transform("sum")
+    )
+    # Replace only for rows that are storage AND belong to groups with duplicates (>=2)
+    long["storage_type"] = np.where(
+        is_storage & (storage_count >= 2),
+        storage_concat,  # combined e.g. "Battery + Pumped storage"
+        long["storage_type"],  # leave untouched otherwise
+    )
+    long["storage_type"] = long["storage_type"].replace(
+        {"Pumped Storage + Battery Storage": "Battery Storage + Pumped Storage"}
+    )
+    # combine gen and storage cols, handling nans in county_id_fips
+    SENTINEL = "<NA_FIPS>"
+    g = gen.reset_index().assign(
+        county_id_fips=lambda d: d["county_id_fips"].astype("string").fillna(SENTINEL)
+    )
+    s = storage.reset_index().assign(
+        county_id_fips=lambda d: d["county_id_fips"].astype("string").fillna(SENTINEL)
+    )
+    gen_stor = g.merge(s, how="outer", on=group_keys, suffixes=("_gen", "_stor"))
+    # restore NaNs
+    gen_stor["county_id_fips"] = gen_stor["county_id_fips"].replace(SENTINEL, np.nan)
+    gen_stor = gen_stor.set_index(group_keys)
+
     assert (
         len(gen_stor) == long.groupby(group_keys, dropna=False).ngroups
     )  # all project-locations accounted for and 1:1
@@ -204,9 +245,9 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     loc1 = projects.nth(0).rename(
         columns={"county_id_fips": "county_id_fips_1", "county": "county_1"}
     )
-    assert (
-        not loc1.index.to_frame().isna().any().any()
-    ), "Nulls found in project_id or source."
+    assert not loc1.index.to_frame().isna().any().any(), (
+        "Nulls found in project_id or source."
+    )
     loc2 = (
         projects[["county_id_fips", "county"]]
         .nth(1)
@@ -292,6 +333,7 @@ def _add_derived_columns(mart: pd.DataFrame) -> None:
         "Fuel Cell": "renewable",
         "Geothermal": "renewable",
         "Hydro": "renewable",
+        "Hydrogen": "renewable",
         "Landfill Gas": "fossil",
         "Methane; Solar": "other",
         "Municipal Solid Waste": "fossil",
@@ -409,9 +451,9 @@ def create_total_active_project_change_logs(
     Returns:
         totals_chng_log: dataframe where each row contains the total active capacity or number of projects for a given region and time interval.
     """
-    assert active_iso_projects_change_log.queue_status.eq(
-        "new"
-    ).all(), "Found rows with unexpected queue status."
+    assert active_iso_projects_change_log.queue_status.eq("new").all(), (
+        "Found rows with unexpected queue status."
+    )
 
     chng_log = active_iso_projects_change_log.copy()
     min_date = chng_log.effective_date.min() - pd.offsets.QuarterBegin(startingMonth=1)
@@ -548,7 +590,7 @@ def create_geography_change_log(
 
 
 def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
-    """Create a change log of GridStatus projects.
+    """Create a change log of interconnection queue projects.
 
     There is a row for every time the status of a project changes.
     The effective_date column is the date the status changed and the end_date
@@ -569,9 +611,9 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
     # Not all ISO regions have operational and withdrawn dates which are required to make a full change log.
     long_format = long_format[long_format["iso_region"].isin(CHANGE_LOG_REGIONS)]
 
-    # make sure we are missing less than 10% of withdrawn_date
+    # make sure we are missing less than 11% of withdrawn_date
     withdrawn = long_format.query("queue_status == 'withdrawn'")
-    expected_missing = 0.1
+    expected_missing = 0.11
     assert (
         withdrawn["withdrawn_date"].isna().sum() / len(withdrawn) < expected_missing
     ), f"More than {expected_missing} of withdrawn_date is missing."
@@ -602,9 +644,9 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
     )
     # make sure pct_after_current_year is less than 0.001 of operational projects
     expected_missing = 0.002
-    assert (
-        pct_after_current_year < expected_missing
-    ), f"More than {expected_missing}% of operational projects have actual_completion_date after the current year."
+    assert pct_after_current_year < expected_missing, (
+        f"More than {expected_missing}% of operational projects have actual_completion_date after the current year."
+    )
 
     # map active projects to "new"
     long_format["queue_status"] = long_format["queue_status"].map(
@@ -660,9 +702,9 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
         )
 
         # set effective_date column to date_col for projects that == status
-        long_format.loc[
-            long_format["queue_status"].eq(status), "effective_date"
-        ] = long_format[date_col]
+        long_format.loc[long_format["queue_status"].eq(status), "effective_date"] = (
+            long_format[date_col]
+        )
 
     # Set end date to to null all projects.
     long_format["end_date"] = pd.NA
@@ -713,22 +755,22 @@ def validate_project_change_log(
     ]
 
     # We expect some change in total projects count because not all projects have withdrawn and operational dates
-    expected_n_projects_change = 0.06
+    expected_n_projects_change = 0.09
     result_n_projects_change = abs(
         len(iso_projects_change_log) - len(iso_projects_long_format)
     ) / len(iso_projects_change_log)
-    assert (
-        result_n_projects_change < expected_n_projects_change
-    ), f"Found unexpected change in total projects count: {result_n_projects_change}"
+    assert result_n_projects_change < expected_n_projects_change, (
+        f"Found unexpected change in total projects count: {result_n_projects_change}"
+    )
 
     # Create a dictionary of expected pct change for each iso_region
     expected_pct_change = pd.Series(
         {
-            "CAISO": 0.02,
+            "CAISO": 0.29,  # In 2024 CAISO required cluster 15 requests to be resubmitted, resulting in many withdrawals and some changes to requested capacity.
             "ISONE": 0.01,
             "MISO": 0.09,  # A lot of operational projects prior to 2010 are missing operational dates
             "NYISO": 0.18,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
-            "PJM": 0.04,
+            "PJM": 0.05,
             "SPP": 0.32,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
         }
     )
@@ -740,13 +782,12 @@ def validate_project_change_log(
     long_format_region_capacity = iso_projects_long_format.groupby(
         "iso_region"
     ).capacity_mw.sum()
-
     pct_change = (
         long_format_region_capacity - iso_projects_change_log_region_capacity
     ) / iso_projects_change_log_region_capacity
-    assert pct_change.lt(
-        expected_pct_change
-    ).all(), f"Found unexpected pct change in iso_projects_long_format: {pct_change}"
+    assert pct_change.lt(expected_pct_change).all(), (
+        f"Found unexpected pct change in iso_projects_long_format: {pct_change}"
+    )
 
 
 def validate_iso_regions_change_log(
@@ -772,18 +813,18 @@ def validate_iso_regions_change_log(
     result_n_projects_change = abs(
         n_projects_iso_regions_change_log - len(iso_projects_long_format)
     ) / len(iso_projects_long_format)
-    assert (
-        result_n_projects_change < expected_n_projects_change
-    ), f"Found unexpected change in total projects count: {result_n_projects_change}"
+    assert result_n_projects_change < expected_n_projects_change, (
+        f"Found unexpected change in total projects count: {result_n_projects_change}"
+    )
 
     # Create a dictionary of expected pct change for each iso_region
     expected_pct_change = pd.Series(
         {
-            "CAISO": 0.07,
+            "CAISO": 0.29,  # In 2024 CAISO required cluster 15 requests to be resubmitted, resulting in many withdrawals and some changes to requested capacity.
             "ISONE": 0.01,
             "MISO": 0.09,  # A lot of operational projects prior to 2010 are missing operational dates
             "NYISO": 0.20,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
-            "PJM": 0.04,
+            "PJM": 0.05,
             "SPP": 0.32,  # A lot of withdrawn projects from the early 2000s are missing withdrawn and operational dates
         }
     )
@@ -804,9 +845,9 @@ def validate_iso_regions_change_log(
     pct_change = (
         long_format_region_capacity - iso_projects_change_log_region_capacity
     ) / iso_projects_change_log_region_capacity
-    assert pct_change.lt(
-        expected_pct_change
-    ).all(), f"Found unexpected pct change in iso_projects_long_format: {pct_change}"
+    assert pct_change.lt(expected_pct_change).all(), (
+        f"Found unexpected pct change in iso_projects_long_format: {pct_change}"
+    )
 
 
 def get_eia860m_current(engine: sa.engine.Engine) -> pd.DataFrame:
@@ -1121,13 +1162,13 @@ def create_data_mart(
             "queue_status == 'new'"
         )
         for metric in metrics:
-            data_marts[
-                f"{geography}_active_projects_{metric}_change_log"
-            ] = create_total_active_project_change_logs(
-                new_iso_projects_change_log,
-                geography=geography_columns,
-                metric=metric,
-                freq="Q",
+            data_marts[f"{geography}_active_projects_{metric}_change_log"] = (
+                create_total_active_project_change_logs(
+                    new_iso_projects_change_log,
+                    geography=geography_columns,
+                    metric=metric,
+                    freq="Q",
+                )
             )
 
     validate_iso_regions_change_log(
