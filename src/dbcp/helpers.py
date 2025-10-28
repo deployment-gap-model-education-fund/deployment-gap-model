@@ -131,12 +131,19 @@ def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str):
     return df
 
 
-def get_sql_engine() -> sa.engine.Engine:
+def get_sql_engine(production: bool = False) -> sa.engine.Engine:
     """Create a sql alchemy engine from environment vars."""
-    user = os.environ["POSTGRES_USER"]
-    password = os.environ["POSTGRES_PASSWORD"]
-    db = os.environ["POSTGRES_DB"]
-    return sa.create_engine(f"postgresql://{user}:{password}@{db}:5432")
+    if not production:
+        user = os.environ["DEV_POSTGRES_USER"]
+        password = os.environ["DEV_POSTGRES_PASSWORD"]
+        db = os.environ["DEV_POSTGRES_DB"]
+        engine = sa.create_engine(f"postgresql://{user}:{password}@{db}:5432")
+    else:
+        user = os.environ["PROD_POSTGRES_USER"]
+        password = os.environ["PROD_POSTGRES_PASSWORD"]
+        db = os.environ["PROD_POSTGRES_DB"]
+        engine = sa.create_engine(f"postgresql://{user}:{password}@{db}:6543/postgres")
+    return engine
 
 
 def get_pudl_resource(
