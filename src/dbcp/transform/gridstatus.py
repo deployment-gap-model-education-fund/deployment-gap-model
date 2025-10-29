@@ -55,7 +55,11 @@ RESOURCE_DICT = {
             ],
             "pjm": ["Storage", "Storage; Solar", "Storage; Wind"],
             "ercot": ["Other - Battery Energy Storage", "Other - Energy Storage"],
-            "spp": ["Battery/Storage", "Battery/Storage - WERE"],
+            "spp": [
+                "Battery/Storage",
+                "Battery/Storage - WERE",
+                "Battery/Storage - Battery",
+            ],
             "nyiso": ["Energy Storage"],
             "isone": ["BAT"],
         },
@@ -232,6 +236,7 @@ RESOURCE_DICT = {
                 "Thermal - VFT",
                 "Hybrid - GT/Battery",
                 "Hybrid - Thermal/Storage",
+                "Hybrid - Gas/Storage",
                 "Thermal - Solar/Storage",
             ],
             "nyiso": [
@@ -315,7 +320,13 @@ RESOURCE_DICT = {
             ],
             "pjm": ["Wind", "Wind; Solar", "Solar; Storage; Wind", "Wind; Storage"],
             "ercot": ["Wind - Wind Turbine"],
-            "spp": ["Wind", "Hybrid - Wind/Storage", "Hybrid - Wind/Solar", "WIND"],
+            "spp": [
+                "Wind",
+                "Hybrid - Wind/Storage",
+                "Hybrid - Wind/Solar",
+                "WIND",
+                "Wind - Wind",
+            ],
             "nyiso": ["Wind"],
             "isone": ["WND", "WND BAT"],
         },
@@ -349,11 +360,11 @@ RESOURCE_DICT = {
     },
     "Other Storage": {
         "codes": {
-            "miso": [],
+            "miso": ["Compressed Air Storage"],
             "caiso": [],
             "pjm": [],
             "ercot": [],
-            "spp": [],
+            "spp": ["Battery/Storage - Compressed Air"],
             "nyiso": ["Flywheel"],
             "isone": [],
         },
@@ -391,10 +402,13 @@ RESOURCE_DICT = {
             "ercot": ["Solar - Photovoltaic Solar", "Other - Photovoltaic Solar"],
             "spp": [
                 "Solar",
+                "Solar - Photovoltaic",
                 "Hybrid - Solar/Storage",
                 "Hybrid - Solar/Battery",
                 "Hybrid - Solar",
                 "Hybrid - Solar/Battery/Wind",
+                "Hybrid - Photovoltaic / Battery",
+                "Hybrid - Solar/Storage/Wind",
             ],
             "nyiso": ["Solar"],
             "isone": ["SUN", "SUN BAT", "SUN WAT"],
@@ -654,6 +668,8 @@ def _transform_miso(post_2017: pd.DataFrame, pre_2017: pd.DataFrame) -> pd.DataF
             "Withdrawn - Pending Cure": "Withdrawn",
             "Active": "Active",
             "Withdrawn": "Withdrawn",
+            "LEGACY: Archived": "Withdrawn",
+            "LEGACY: Done": "Operational",
         }
     )
     iso_df["queue_status"] = iso_df.queue_status.mask(
@@ -727,6 +743,8 @@ def _transform_pjm(iso_df: pd.DataFrame) -> pd.DataFrame:
         "Partially in Service - Under Construction": "Operational",  # LBNL consideres partially in service projects operational
         "Under Construction": "Active",
         "Annulled": "Withdrawn",
+        "Canceled": "Withdrawn",
+        "Pending": "Active",
     }
     iso_df["queue_status"] = iso_df["queue_status"].map(status_map)
 
@@ -801,11 +819,11 @@ def _transform_spp(iso_df: pd.DataFrame) -> pd.DataFrame:
     # so I'm going to mark them as active.
     status_map = {
         "DISIS STAGE": "Active",
-        "None": "Active",
         "IA FULLY EXECUTED/COMMERCIAL OPERATION": "Operational",
         "IA FULLY EXECUTED/ON SCHEDULE": "Active",
         "IA PENDING": "Active",
         "FACILITY STUDY STAGE": "Active",
+        "ERAS": "Active",  # Expedited Resource Adequacy Study -- fast tracks interconnection for projects that address urgent reliabiity needs
         "IA FULLY EXECUTED/ON SUSPENSION": "Suspended",
         "WITHDRAWN": "Withdrawn",
         "TERMINATED": "Withdrawn",
