@@ -467,7 +467,7 @@ def create_fyi_long_format(
         combined_opp, on="county_id_fips", how="left", validate="m:1"
     )
     _add_derived_columns(long_format)
-    long_format["surrogate_id"] = range(len(long_format))
+    # long_format["surrogate_id"] = range(len(long_format))
     if active_projects_only:
         active_long_format = long_format.query("queue_status == 'active'")
         # drop actual_completion_date and withdrawn_date columns

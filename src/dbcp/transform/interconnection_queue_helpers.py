@@ -51,7 +51,9 @@ def add_actionable_and_nearly_certain_classification(
     return queue
 
 
-def clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
+def clean_resource_type(
+    resource_df: pd.DataFrame, resource_dict: dict = QUEUE_RESOURCE_DICT
+) -> pd.DataFrame:
     """Standardize resource types used throughout iso queue tables.
 
     Args:
@@ -65,7 +67,7 @@ def clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
     resource_df = resource_df.copy()
     # Modify QUEUE_RESOURCE DICT for mapping
     long_dict = {}
-    for clean_name, code_type_dict in QUEUE_RESOURCE_DICT.items():
+    for clean_name, code_type_dict in resource_dict.items():
         long_dict[clean_name] = clean_name
         for code in code_type_dict["codes"]:
             long_dict[code] = clean_name

@@ -6,6 +6,7 @@ from typing import Dict
 import pandas as pd
 import yaml
 
+from dbcp.constants import FYI_RESOURCE_DICT, OUTPUT_DIR
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     deduplicate_same_physical_entities,
@@ -153,7 +154,7 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     return projects
 
 
-def parse_capacity(row, n=3):
+def parse_capacity(row):
     """Parse the capacity_by_generation_type_breakdown column into separate columns."""
     capacity_yaml_str = row["capacity_by_generation_type_breakdown"]
     if capacity_yaml_str == "nan":
@@ -162,14 +163,23 @@ def parse_capacity(row, n=3):
         data = yaml.safe_load(capacity_yaml_str)
     except Exception:
         return {"resource": None, "capacity_mw": None}
+    allowed_keys = ["canonical_gen_type", "mw", "mwh"]
+    unexpected_keys = {
+        key for item in data for key in item.keys() if key not in allowed_keys
+    }
+    assert (
+        len(unexpected_keys) == 0
+    ), f"New key found in the capacity_by_generation_type_breakdown yaml string: {unexpected_keys}. For project_id: {row.name}"
     return {
         "resource": [item.get("canonical_gen_type") for item in data],
-        "capacity_mw": [item.get("mw") for item in data],
+        "capacity_mw": [
+            item.get("mw") if "mw" in item else item.get("mwh") for item in data
+        ],
     }
 
 
 def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
-    """Pull out the awkward one-to-many columns (type_1, capacity_1, type_2, capacity_2) to a separate dataframe.
+    """Pull out capacity and resource values into a separate dataframe.
 
     Args:
         fyi_df (pd.DataFrame): FYI queue dataframe
@@ -177,50 +187,133 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
     Returns:
         Dict[str, pd.DataFrame]: dict with the projects and multivalues split into two dataframes
     """
+    # NYISO, CAISO, and West report capacity broken out by resource type
+    # for some projects.
     # Apply parsing to capacity_by_generation_type_breakdown column
+    assert set(
+        fyi_df[
+            ~fyi_df["capacity_by_generation_type_breakdown"].isnull()
+        ].power_market.unique()
+    ) == set(["CAISO", "West", "NYISO"]), (
+        "There's a new power market with non-null values in capacity_by_generation_type_breakdown, check to see how this column interacts with capacity_mw in this power market."
+        f"Power markets are: {set(fyi_df[~fyi_df['capacity_by_generation_type_breakdown'].isnull()].power_market.unique())}"
+    )
     parsed = fyi_df.apply(parse_capacity, result_type="expand", axis=1)
     resource_capacity_df = parsed.explode(["resource", "capacity_mw"])
     resource_capacity_df = resource_capacity_df[
         resource_capacity_df["resource"].notnull()
         & resource_capacity_df["capacity_mw"].notnull()
     ].reset_index()
-    # Most of projects don't have a capacity_by_generation_type_breakdown
-    # and instead just have capacity_mw. Most of these projects only have a
-    # single resource listed, but some have multiple resources listed for only
-    # one capacity value, which is problematic.
-    # To try to fix some of these, we assume that any "Battery + x"
-    # resource type has a capacity value that pertains to the non-battery
-    # resource.
-    # Then, we drop any rows that have a mixed resource type (contains a +),
-    # this is a temporary solution
-    single_capacity_df = fyi_df[
-        (~fyi_df["capacity_mw"].isnull())
-        & (fyi_df["capacity_by_generation_type_breakdown"].isnull())
+
+    # occasionally in CAISO the parsed capacity by generation type breakdown
+    # will list the same resource twice if there are two generators, in
+    # these cases, sum the resources
+    n_expected_duped_resources = 10
+    assert (
+        len(
+            resource_capacity_df[
+                resource_capacity_df.duplicated(subset=["project_id", "resource"])
+            ]
+        )
+        < n_expected_duped_resources
+    ), (
+        f"More than {n_expected_duped_resources} projects found with the same resource"
+        "listed twice in capacity_by_generation_type_breakdown. Ensure that their capacities should be summed."
+        f"They have project IDs: {resource_capacity_df[resource_capacity_df.duplicated(subset=['project_id', 'resource'])].project_id}"
+    )
+    # There are some projects where summing the duplicated resource's capacity
+    # doesn't make sense, i.e. when it seems like a mistake that there are
+    # two of the same resource listed or it's a cogen gas plant and only one
+    # of the generators provides capacity for the grid.
+    # This can be handled by dropping one of the rows
+    # of duplicated capacity for each of these projects.
+    proj_ids_resource_capacity_not_to_sum = [
+        ("ladwp-q57", "Gas", 750),
+        ("caiso-955", "Gas", 60),
+        ("tucson-electric-power-94", "Solar", 255),
+        ("tucson-electric-power-94", "Battery", 255),
     ]
-    single_capacity_df["resource"] = (
-        single_capacity_df["canonical_generation_types"]
+    indices_to_drop = []
+    for project_id, resource, cap in proj_ids_resource_capacity_not_to_sum:
+        row_to_drop = resource_capacity_df.loc[
+            (resource_capacity_df.project_id == project_id)
+            & (resource_capacity_df.resource == resource)
+            & (resource_capacity_df.capacity_mw == cap)
+        ]
+        if len(row_to_drop) > 0:
+            indices_to_drop.append(row_to_drop.index[0])
+    resource_capacity_df = resource_capacity_df.drop(indices_to_drop, axis=0)
+    resource_capacity_df = resource_capacity_df.groupby(
+        by=["project_id", "resource"], as_index=False
+    )["capacity_mw"].sum()
+    # NYISO lists only the battery storage capacity in
+    # capacity_by_generation_type_breakdown. Thus it's necessary
+    # to grab the capacity_mw value if there's a non-battery resource
+    # listed in canonical_generation_type.
+    # For CAISO and West it's fine to use capacity_by_generation_type_breakdown
+    # without grabbing additional resources with capacity_mw
+    nyiso_multi_cap = fyi_df[
+        (fyi_df.power_market == "NYISO")
+        & (~fyi_df["capacity_by_generation_type_breakdown"].isnull())
+    ].reset_index()
+    nyiso_multi_cap["canonical_generation_types"] = (
+        nyiso_multi_cap["canonical_generation_types"]
         .str.replace(r"^Battery\s\+\s|\s\+\sBattery", "", regex=True)
         .str.strip()
-        .replace("", pd.NA)
-        .dropna()
     )
-    single_capacity_df = single_capacity_df[
-        ~single_capacity_df["resource"].str.contains("+", regex=False)
-    ]
+    nyiso_multi_cap = nyiso_multi_cap[
+        nyiso_multi_cap["canonical_generation_types"] != "Battery"
+    ].rename(columns={"canonical_generation_types": "resource"})
+    # before concatenating the resource - capacity pairs parsed
+    # from the two different locations, differentiate which ones are
+    # parsed from the capacity_by_generation_type_breakdown column
+    # because we are going to prioritize keeping those rows when there
+    # are duplicate resources for one project
+    resource_capacity_df["parsed_from_capacity_by_generation_type_breakdown"] = True
+    nyiso_multi_cap["parsed_from_capacity_by_generation_type_breakdown"] = False
     resource_capacity_df = pd.concat(
         [
             resource_capacity_df,
-            single_capacity_df[["resource", "capacity_mw"]].reset_index(),
+            nyiso_multi_cap[
+                [
+                    "project_id",
+                    "resource",
+                    "capacity_mw",
+                    "parsed_from_capacity_by_generation_type_breakdown",
+                ]
+            ],
         ]
-    ).drop_duplicates()
-    # TODO: look into these project IDs and maybe take this check out
-    assert (
-        len(resource_capacity_df.duplicated(subset=["project_id", "resource"])) > 10
-    ), "More than 10 resource types within a project have different capacity values in the capacity resource table."
-    # favor the capacity number pulled from capacity_by_generation_type_breakdown
-    resource_capacity_df = resource_capacity_df.drop_duplicates(
-        subset=["project_id", "resource"], keep="first"
     )
+    # In the case of NYISO, where we've pulled capacity values from both capacity_mw and
+    # capacity_by_generation_type_breakdown, there may be two capacity
+    # values reported for the same resource. After looking at the raw queue
+    # values, the capacity in capacity_by_generation_type_breakdown more accurately
+    # reflects the complete energy storage capacity available, whereas the
+    # capacity_mw value reflects the summer or winter peak capacity. Thus, we
+    # choose to keep the capacity_by_generation_type_breakdown in these cases.
+    # If there are duplicate resources per project, only keep the one
+    # pulled from capacity_by_generation_type_breakdown.
+    resource_capacity_df = (
+        resource_capacity_df.sort_values(
+            by="parsed_from_capacity_by_generation_type_breakdown", ascending=False
+        )
+        .drop_duplicates(subset=["project_id", "resource"], keep="first")
+        .drop(columns=["parsed_from_capacity_by_generation_type_breakdown"])
+    )
+    # get the rest of the projects which just use capacity_mw and not
+    # capacity_by_generation_type_breakdown
+    single_capacity = (
+        fyi_df[fyi_df["capacity_by_generation_type_breakdown"].isnull()]
+        .reset_index()
+        .rename(columns={"canonical_generation_types": "resource"})
+    )
+    resource_capacity_df = pd.concat(
+        [
+            resource_capacity_df,
+            single_capacity[["project_id", "resource", "capacity_mw"]],
+        ]
+    )
+
     project_df = fyi_df.drop(
         columns=["capacity_mw", "capacity_by_generation_type_breakdown"]
     )
@@ -308,7 +401,7 @@ def transform(fyi_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
 
     # Clean up and categorize resources
     fyi_normalized_dfs["fyi_resource_capacity"] = clean_resource_type(
-        fyi_normalized_dfs["fyi_resource_capacity"]
+        fyi_normalized_dfs["fyi_resource_capacity"], FYI_RESOURCE_DICT
     )
     if fyi_normalized_dfs["fyi_resource_capacity"].resource_clean.isna().any():
         raise AssertionError("Missing Resources!")
@@ -329,10 +422,11 @@ if __name__ == "__main__":
     # debugging entry point
     import dbcp
 
-    fyi_uri = (
-        "gs://dgm-archive/inconnection.fyi/interconnection_fyi_dataset_2025-09-01.csv"
-    )
+    fyi_uri = "gs://dgm-archive/interconnection.fyi/interconnection_fyi_dataset_2025-10-01.csv"
     fyi_raw_dfs = dbcp.extract.fyi_queue.extract(fyi_uri)
     fyi_transformed_dfs = dbcp.transform.fyi_queue.transform(fyi_raw_dfs)
+    fyi_transformed_dfs["fyi_resource_capacity"].to_parquet(
+        OUTPUT_DIR / "private_data_warehouse/fyi_resource_capacity.parquet"
+    )
 
     assert fyi_transformed_dfs
