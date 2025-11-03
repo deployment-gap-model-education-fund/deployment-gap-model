@@ -113,6 +113,8 @@ iso_projects = Table(
     Column("interconnection_date", DateTime),
     Column("interconnection_date_raw", String),
     Column("interconnection_service_type", String),
+    Column("project_type", String),
+    Column("cluster", String),
     Column("queue_date_raw", String),
     Column("is_actionable", Boolean),
     Column("is_nearly_certain", Boolean),
