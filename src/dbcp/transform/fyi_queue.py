@@ -88,9 +88,9 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
         "unique_id": "project_id",
         "raw_developer": "developer_raw",
     }
-    assert (
-        projects.unique_id.is_unique
-    ), "unique_id is not unique in the raw interconnection.FYI data!"
+    assert projects.unique_id.is_unique, (
+        "unique_id is not unique in the raw interconnection.FYI data!"
+    )
     projects = projects.rename(columns=rename_dict)
     # the interconnection_status_fyi column is already a cleaned
     # version of interconnection_status_raw, but validate to see
@@ -146,7 +146,9 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
         .isna()
         .all()
         .all()
-    ), "Some operational or withdrawn projects have is_actionable or is_nearly_certain values."
+    ), (
+        "Some operational or withdrawn projects have is_actionable or is_nearly_certain values."
+    )
 
     # Replace ISO-NE values in region with ISONE to match gridstatus
     projects["power_market"] = projects["power_market"].replace({"ISO-NE": "ISONE"})
@@ -163,17 +165,22 @@ def parse_capacity(row):
         data = yaml.safe_load(capacity_yaml_str)
     except Exception:
         return {"resource": None, "capacity_mw": None}
+    # battery storage is reported with mwh, we don't actually
+    # do anything with this but it could be useful if
+    # we want to save total energy storage capacity later
     allowed_keys = ["canonical_gen_type", "mw", "mwh"]
     unexpected_keys = {
         key for item in data for key in item.keys() if key not in allowed_keys
     }
-    assert (
-        len(unexpected_keys) == 0
-    ), f"New key found in the capacity_by_generation_type_breakdown yaml string: {unexpected_keys}. For project_id: {row.name}"
+    assert len(unexpected_keys) == 0, (
+        f"New key found in the capacity_by_generation_type_breakdown yaml string: {unexpected_keys}. For project_id: {row.name}"
+    )
     return {
         "resource": [item.get("canonical_gen_type") for item in data],
         "capacity_mw": [
-            item.get("mw") if "mw" in item else item.get("mwh") for item in data
+            # item.get("mw") if "mw" in item else item.get("mwh") for item in data
+            item.get("mw")
+            for item in data
         ],
     }
 
@@ -246,6 +253,7 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
     resource_capacity_df = resource_capacity_df.groupby(
         by=["project_id", "resource"], as_index=False
     )["capacity_mw"].sum()
+    # TODO: update this
     # NYISO lists only the battery storage capacity in
     # capacity_by_generation_type_breakdown. Thus it's necessary
     # to grab the capacity_mw value if there's a non-battery resource
@@ -261,9 +269,15 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
         .str.replace(r"^Battery\s\+\s|\s\+\sBattery", "", regex=True)
         .str.strip()
     )
+    """
     nyiso_multi_cap = nyiso_multi_cap[
         nyiso_multi_cap["canonical_generation_types"] != "Battery"
     ].rename(columns={"canonical_generation_types": "resource"})
+    """
+    nyiso_multi_cap = nyiso_multi_cap.rename(
+        columns={"canonical_generation_types": "resource"}
+    )
+    # TODO: update this comment
     # before concatenating the resource - capacity pairs parsed
     # from the two different locations, differentiate which ones are
     # parsed from the capacity_by_generation_type_breakdown column
@@ -293,9 +307,10 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
     # choose to keep the capacity_by_generation_type_breakdown in these cases.
     # If there are duplicate resources per project, only keep the one
     # pulled from capacity_by_generation_type_breakdown.
+    # TODO: update this comment
     resource_capacity_df = (
         resource_capacity_df.sort_values(
-            by="parsed_from_capacity_by_generation_type_breakdown", ascending=False
+            by="parsed_from_capacity_by_generation_type_breakdown", ascending=True
         )
         .drop_duplicates(subset=["project_id", "resource"], keep="first")
         .drop(columns=["parsed_from_capacity_by_generation_type_breakdown"])
@@ -394,9 +409,9 @@ def transform(fyi_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         .copy()
     )
     # Fix defunct county FIPS code
-    new_locs.loc[
-        new_locs.county_id_fips.eq("51515"), "county_id_fips"
-    ] = "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
+    new_locs.loc[new_locs.county_id_fips.eq("51515"), "county_id_fips"] = (
+        "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
+    )
     fyi_normalized_dfs["fyi_locations"] = new_locs
 
     # Clean up and categorize resources
@@ -409,9 +424,9 @@ def transform(fyi_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
 
     # Most projects missing queue_status are from the early 2000s so I'm going to assume
     # they were withrawn.
-    assert (
-        fyi_normalized_dfs["fyi_projects"]["queue_status"].isna().sum() <= 42
-    ), "Unexpected number of projects missing queue status."
+    assert fyi_normalized_dfs["fyi_projects"]["queue_status"].isna().sum() <= 42, (
+        "Unexpected number of projects missing queue status."
+    )
     fyi_normalized_dfs["fyi_projects"]["queue_status"] = fyi_normalized_dfs[
         "fyi_projects"
     ]["queue_status"].fillna("Withdrawn")
