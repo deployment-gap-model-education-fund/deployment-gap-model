@@ -5,6 +5,7 @@ from typing import Dict, Optional
 import pandas as pd
 import sqlalchemy as sa
 
+from dbcp.constants import FYI_RESOURCE_DICT
 from dbcp.data_mart.projects import create_fyi_long_format
 from dbcp.helpers import get_sql_engine
 
@@ -21,18 +22,10 @@ def create_fyi_counties_proposed_clean_projects(
     # This approximation assumes an equal distribution between sites.
     # Also note that this model represents everything relevant to each county,
     # so multi-county projects are intentionally double-counted; for each relevant county.
-
-    # TODO: is there another list of clean resource somwerhe?
     clean_resources = [
-        "Solar",
-        "Battery Storage",
-        "Wind",
-        "Onshore Wind",
-        "Offshore Wind",
-        "Hydro",
-        "Geothermal",
-        "Pumped Storage",
-        "Nuclear",
+        resource
+        for resource, codes_dict in FYI_RESOURCE_DICT.items()
+        if codes_dict["type"] == "Renewable"
     ]
     fyi = fyi[fyi["resource_clean"].isin(clean_resources)]
     fyi = fyi.drop(columns=["co2e_tonnes_per_year"])
