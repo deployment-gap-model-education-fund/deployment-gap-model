@@ -7,14 +7,51 @@ import pkgutil
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
+import sqlalchemy as sa
 
 import dbcp
 from dbcp.constants import OUTPUT_DIR
 from dbcp.helpers import enforce_dtypes, psql_insert_copy
-from dbcp.metadata.data_mart import metadata
 from dbcp.validation.tests import validate_data_mart
 
 logger = logging.getLogger(__name__)
+
+
+def write_to_postgres_and_parquet(
+    data_marts: dict[str, pd.DataFrame], engine: sa.engine.Engine, schema_name: str
+):
+    """Write data mart tables from a schema to postgres and parquet."""
+    # Setup postgres
+    with engine.connect() as con:
+        engine.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
+
+    # Delete any existing tables, and create them anew
+    metadata = dbcp.helpers.get_schema_sql_alchemy_metadata(schema_name)
+    metadata.drop_all(engine)
+    metadata.create_all(engine)
+
+    parquet_dir = OUTPUT_DIR / f"{schema_name}"
+
+    # Load table into postgres and parquet
+    with engine.connect() as con:
+        for table in metadata.sorted_tables:
+            logger.info(f"Load {table.name} to postgres.")
+            df = dbcp.helpers.trim_columns_length(data_marts[table.name])
+            df = enforce_dtypes(df, table.name, schema_name)
+            df.to_sql(
+                name=table.name,
+                con=con,
+                if_exists="append",
+                index=False,
+                schema=schema_name,
+                method=psql_insert_copy,
+                chunksize=5000,  # adjust based on memory capacity
+            )
+            schema = dbcp.helpers.get_pyarrow_schema_from_metadata(
+                table.name, schema_name
+            )
+            pa_table = pa.Table.from_pandas(df, schema=schema)
+            pq.write_table(pa_table, parquet_dir / f"{table.name}.parquet")
 
 
 def create_data_marts():  # noqa: max-complexity=11
@@ -51,36 +88,9 @@ def create_data_marts():  # noqa: max-complexity=11
             raise TypeError(
                 f"Expecting pd.DataFrame or dict of dataframes. Got {type(data)}"
             )
-
-    # Setup postgres
-    with engine.connect() as con:
-        engine.execute("CREATE SCHEMA IF NOT EXISTS data_mart")
-
-    # Create the schemas
-    metadata.drop_all(engine)
-    metadata.create_all(engine)
-
-    parquet_dir = OUTPUT_DIR / "data_mart"
-
-    # Load table into postgres and parquet
-    with engine.connect() as con:
-        for table in metadata.sorted_tables:
-            logger.info(f"Load {table.name} to postgres.")
-            df = dbcp.helpers.trim_columns_length(data_marts[table.name])
-            df = enforce_dtypes(df, table.name, "data_mart")
-            df.to_sql(
-                name=table.name,
-                con=con,
-                if_exists="append",
-                index=False,
-                schema="data_mart",
-                method=psql_insert_copy,
-                chunksize=5000,  # adjust based on memory capacity
-            )
-            schema = dbcp.helpers.get_pyarrow_schema_from_metadata(
-                table.name, "data_mart"
-            )
-            pa_table = pa.Table.from_pandas(df, schema=schema)
-            pq.write_table(pa_table, parquet_dir / f"{table.name}.parquet")
+    for schema_name in ["data_mart", "private_data_mart"]:
+        write_to_postgres_and_parquet(
+            data_marts=data_marts, engine=engine, schema_name=schema_name
+        )
 
     validate_data_mart(engine=engine)
