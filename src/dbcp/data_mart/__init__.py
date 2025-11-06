@@ -31,6 +31,7 @@ def write_to_postgres_and_parquet(
     metadata.create_all(engine)
 
     parquet_dir = OUTPUT_DIR / f"{schema_name}"
+    parquet_dir.mkdir(exist_ok=True)
 
     # Load table into postgres and parquet
     with engine.connect() as con:
