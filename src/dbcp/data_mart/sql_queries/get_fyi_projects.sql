@@ -11,7 +11,7 @@ WITH
             proj.project_name,
             proj.queue_date as date_entered_queue,
             proj.queue_status,
-            proj.iso
+            proj.iso,
             proj.utility,
             proj.is_actionable,
             proj.is_nearly_certain,

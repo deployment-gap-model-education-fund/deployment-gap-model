@@ -163,17 +163,30 @@ def parse_capacity(row):
         data = yaml.safe_load(capacity_yaml_str)
     except Exception:
         return {"resource": None, "capacity_mw": None}
-    allowed_keys = ["canonical_gen_type", "mw", "mwh"]
-    unexpected_keys = {
-        key for item in data for key in item.keys() if key not in allowed_keys
-    }
+    # in NYISO battery storage is reported with mwh, we don't actually
+    # do anything with this but it could be useful if
+    # we want to save total energy storage capacity later
+    allowed_keys = {"canonical_gen_type", "mw", "mwh"}
+    keys = {key for item in data for key in item.keys()}
     assert (
-        len(unexpected_keys) == 0
-    ), f"New key found in the capacity_by_generation_type_breakdown yaml string: {unexpected_keys}. For project_id: {row.name}"
+        len(keys - allowed_keys) == 0
+    ), f"New key found in the capacity_by_generation_type_breakdown yaml string: {keys - allowed_keys}. For project_id: {row.name}"
+    # remove the mwh keys, we don't do anything with the total battery
+    # storage capacity right now
+    data = [item for item in data if "mwh" not in item.keys()]
+    # if a row is from NYISO we expect it to only have "mwh"
+    if row["power_market"] == "NYISO":
+        assert len(data) == 0, (
+            "A key that isn't 'mwh' was found in capacity_by_generation_type_breakdown of an NYISO project."
+            f"Check how this resource should be handled. Row: {row}"
+        )
+        return {"resource": None, "capacity_mw": None}
     return {
         "resource": [item.get("canonical_gen_type") for item in data],
         "capacity_mw": [
-            item.get("mw") if "mw" in item else item.get("mwh") for item in data
+            # item.get("mw") if "mw" in item else item.get("mwh") for item in data
+            item.get("mw")
+            for item in data
         ],
     }
 
@@ -198,6 +211,10 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
         "There's a new power market with non-null values in capacity_by_generation_type_breakdown, check to see how this column interacts with capacity_mw in this power market."
         f"Power markets are: {set(fyi_df[~fyi_df['capacity_by_generation_type_breakdown'].isnull()].power_market.unique())}"
     )
+    # We don't actually grab any capacity from NYISO, because it's
+    # just the total energy storage capacity that's reported in
+    # capacity_by_generation_type_breakdown, but we check in parse_capacity
+    # that there is nothing unexpected in this column of NYISO projects.
     parsed = fyi_df.apply(parse_capacity, result_type="expand", axis=1)
     resource_capacity_df = parsed.explode(["resource", "capacity_mw"])
     resource_capacity_df = resource_capacity_df[
@@ -246,10 +263,10 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
     resource_capacity_df = resource_capacity_df.groupby(
         by=["project_id", "resource"], as_index=False
     )["capacity_mw"].sum()
-    # NYISO lists only the battery storage capacity in
+    """
+    # NYISO lists only the battery storage total energy storage capacity in
     # capacity_by_generation_type_breakdown. Thus it's necessary
-    # to grab the capacity_mw value if there's a non-battery resource
-    # listed in canonical_generation_type.
+    # to grab the capacity_mw value.
     # For CAISO and West it's fine to use capacity_by_generation_type_breakdown
     # without grabbing additional resources with capacity_mw
     nyiso_multi_cap = fyi_df[
@@ -258,12 +275,15 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
     ].reset_index()
     nyiso_multi_cap["canonical_generation_types"] = (
         nyiso_multi_cap["canonical_generation_types"]
-        .str.replace(r"^Battery\s\+\s|\s\+\sBattery", "", regex=True)
+        .str.replace(r"^Battery\s\+\s|\s\+\sBattery", "", regex=True) # noqa: W605
         .str.strip()
     )
     nyiso_multi_cap = nyiso_multi_cap[
         nyiso_multi_cap["canonical_generation_types"] != "Battery"
     ].rename(columns={"canonical_generation_types": "resource"})
+    nyiso_multi_cap = nyiso_multi_cap.rename(
+        columns={"canonical_generation_types": "resource"}
+    )
     # before concatenating the resource - capacity pairs parsed
     # from the two different locations, differentiate which ones are
     # parsed from the capacity_by_generation_type_breakdown column
@@ -300,10 +320,16 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
         .drop_duplicates(subset=["project_id", "resource"], keep="first")
         .drop(columns=["parsed_from_capacity_by_generation_type_breakdown"])
     )
+    """
     # get the rest of the projects which just use capacity_mw and not
-    # capacity_by_generation_type_breakdown
+    # capacity_by_generation_type_breakdown.
+    # Additionally grab all the NYISO projects, which we didn't actually
+    # get from capacity_by_generation_type_breakdown
     single_capacity = (
-        fyi_df[fyi_df["capacity_by_generation_type_breakdown"].isnull()]
+        fyi_df[
+            (fyi_df["capacity_by_generation_type_breakdown"].isnull())
+            | (fyi_df["power_market"] == "NYISO")
+        ]
         .reset_index()
         .rename(columns={"canonical_generation_types": "resource"})
     )

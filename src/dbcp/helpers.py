@@ -63,6 +63,8 @@ def get_schema_sql_alchemy_metadata(schema: str) -> sa.MetaData:
         return dbcp.metadata.data_warehouse.metadata
     elif schema == "private_data_warehouse":
         return dbcp.metadata.private_data_warehouse.metadata
+    elif schema == "private_data_mart":
+        return dbcp.metadata.private_data_mart.metadata
     else:
         raise ValueError(f"{schema} is not a valid schema.")
 

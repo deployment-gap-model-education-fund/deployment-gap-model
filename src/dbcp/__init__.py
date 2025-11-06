@@ -32,6 +32,7 @@ import dbcp.extract.rmi_energy_communities  # noqa: F401
 import dbcp.helpers  # noqa: F401
 import dbcp.metadata.data_mart  # noqa: F401
 import dbcp.metadata.data_warehouse  # noqa: F401
+import dbcp.metadata.private_data_mart  # noqa: F401
 import dbcp.metadata.private_data_warehouse  # noqa: F401
 import dbcp.transform.acp_projects  # noqa: F401
 import dbcp.transform.ballot_ready  # noqa: F401

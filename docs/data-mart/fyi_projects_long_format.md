@@ -1,0 +1,128 @@
+# fyi_projects_long_format
+
+This table gives insight into proposed projects in the interconnection queues by resource type and location. It is created from data from interconnection.fyi. The rows are rather abstract: each row represents a combination of project\_id, resource\_clean, and county\_id\_fips with other information joined on for convenience (county, ordinance, and project information). The additional data sources are local ordinances (via Columbia), state wind permitting types (via NCSL), and standard state/county IDs (from the Census).
+
+Note that **this duplicate projects with multiple prospective locations.** Use the frac_locations_in_county column to allocate capacity and co2e estimates to counties when aggregating. Otherwise they will be double-counted.
+
+## Column Descriptions
+
+The primary key is (`project_id`, `resource_clean`, `county_id_fips`).
+
+Subject|Column|Description|Source|Notes|
+|----|----|----|----|----|
+|Identifiers|`project_id`|An unique ID in the interconnection.fyi dataset. Combines power_market and queue_id.|FYI||
+||`source`|"fyi" or "proprietary" (for offshore wind projects from manually compiled data)|derived||
+||`resource_clean`|Fuel type, cleaned from the FYI canonical_generation_types column.|FYI||
+|Location|`state`|US State name|Census||
+||`county`|County name|Census||
+||`state_id_fips`|State FIPS ID|Census||
+||`county_id_fips`|County FIPS ID|Census||
+|Properties|`project_name`|Name of the project|FYI||
+||`is_hybrid`|True/False indicator of whether the project has both generation and storage|derived from FYI||
+||`is_actionable`|True/False indicator of whether the project development process is in the actionable zone.|derived from FYI||
+||`is_nearly_certain`|True/False indicator of whether the project development process is in the actionable zone or nearly completed.|derived from FYI||
+||`resource_class`|Renewable or Fossil|derived from FYI||
+||`power_market`|Name of the power market the project participates in.|FYI||
+||`iso`|Name of the ISO the region containing the project.|FYI||
+||`entity`|Similar to iso_region, but non-ISO projects are identified by utility|FYI||
+||`utility`|The utility within which the project will operate.|FYI||
+||`interconnection_status`|FYI's status category for the interconnection agreement ("not started", "in progress", "IA executed")|FYI||
+||`point_of_interconnection`|The name of the substation where the plant connects to the grid|FYI||
+||`developer`|The name of the project developer.|FYI|mostly missing|
+||`queue_status`|These projects have already been filtered to proposed projects, so this column is all "active".|FYI||
+|Dates|`date_proposed_online`|The date the developer expects the project to be completed.|FYI||
+||`date_entered_queue`|The date the project entered the ISO queue.|FYI||
+|Technical|`capacity_mw`|Export capacity of the generator or storage facility, in megawatts. |FYI||
+||`co2e_tonnes_per_year`|Estimate of annual equivalent CO2 emissions of proposed gas plants, in metric tonnes.|derived from FYI||
+||`frac_locations_in_county`|Fraction of this project's total locations in this county.|derived||
+|Regulatory|`ordinance_text`|Summary text of the local ordinances in the given county, if any.|RELDI||
+||`ordinance_via_reldi`|True when a county has banned wind or solar development according to RELDI's ordinance database.|derived from RELDI||
+||`ordinance_earliest_year_mentioned`|Approximate year the local ordinance was enacted. This was automatically extracted from the ordinance text so is not perfectly accurate.|derived from RELDI||
+||`ordinance_jurisdiction_name`|Name of the jurisdiction with a local ordinance. This is usually a county or town within that county. "multiple" if more than one jurisdiction within the county has an ordinance.|RELDI||
+||`ordinance_jurisdiction_type`|Category of jurisdiction: county, town, or city. "multiple" if more than one jurisdiction type within the county has an ordinance.|derived from RELDI||
+||`ordinance_via_solar_nrel`|True when a county has banned solar development according to NREL's ordinance database.|NREL|See 'NREL Ordinance Interpretation' section below|
+||`ordinance_via_wind_nrel`|True when a county has banned wind development according to NREL's ordinance database.|NREL|See 'NREL Ordinance Interpretation' section below|
+||`ordinance_via_nrel_is_de_facto`|True when a wind/solar ban is based on technical criteria like setback distances, as opposed to an outright ban.|NREL|See 'NREL Ordinance Interpretation' section below|
+||`ordinance_via_self_maintained`|True when a county has banned wind development according to internal data.|proprietary||
+||`ordinance_is_restrictive`|Same as `ordinance_via_self_maintained`, but replace `NULL` values with True when *any* of `ordinance_via_solar_nrel`, `ordinance_via_wind_nrel`, or `ordinance_via_reldi` are True|proprietary/NREL/RELDI||
+||`state_permitting_text`|Summary text of the wind permitting rules of the given state.|NCSL||
+||`state_permitting_type`|Category of the state's wind permitting jurisdiction: state, local, or hybrid.|NCSL||
+
+## Modeling Decisions
+
+### Definition of “Hybrid”
+
+Currently any project with more than one resource\_clean is classified as “hybrid”, even if the second resource is a second source of generation rather than storage. So a combined wind/solar plant, or solar/gas plant, as well as solar/battery plant, will all have values of True in the is\_hybrid column.
+
+### Omitted Columns
+
+The following raw FYI columns were not included in this table:
+
+* queue\_id – it is not quite unique
+* proposed\_on\_year – it already exists in date\_proposed, which is included
+* ia\_status\_raw – interconnection\_status\_lbnl (called ia\_status\_clean in the raw data) is standardized and easier to interpret
+* withdrawn\_year – it already exists in withdrawn\_date, which is included
+* on\_year – it already exists in date\_operational, which is included
+
+NCSL columns:
+
+* link – A link to state legislation. Too detailed.
+
+Columbia Local Opposition:
+
+* latest\_year\_mentioned – an additional metric to help estimate the year an ordinance was enacted. I thought one metric plus the actual description was enough
+* n\_years\_mentioned – an additional metric to help estimate the year an ordinance was enacted. I thought one metric plus the actual description was enough
+
+### Local Ordinance Resolution Mismatch
+
+Queue projects are only geolocated by state/county. Local ordinances can be either at the county level (60 out of 103, 58% as of the 2020 data) or some smaller jurisdiction like a town (43/103, 42%). Without more precise queue project locations, we don’t know if the ordinance directly effects the project. So far we have taken the conservative approach and assumed that if a project and ordinance share the same county, they are related.
+
+Furthermore, there are 6 state-level laws affecting RE siting in some capacity, but these laws are not included in the scope of local ordinances. The law in NY is pro-RE and the law in ME was repealed. The law in OH simply adds a level of veto power to county jurisdictions. Laws in KS, OR, and CT restrict development on certain types of land; their severity can only be assessed by an expert.
+
+### NREL Ordinance Interpretation
+
+See the description in the NREL_ordinance section for details.
+
+{% content-ref url="../NREL_ordinance_bans.md" %}
+[NREL_ordinance_bans.md](../NREL_ordinance_bans.md)
+{% endcontent-ref %}
+
+Additionally, as with the RELDI local ordinance dataset above, some ordinances belong to sub-county level jurisdictions such as townships. In those cases, the ban is propagated up to the entire county when represented in this county-level table.
+
+### CO2e Estimates
+
+We estimated annual CO2e production for proposed gas and coal plants. See the page on CO2 estimation for details:
+
+{% content-ref url="../co2-estimation.md" %}
+[co2-estimation.md](../co2-estimation.md)
+{% endcontent-ref %}
+
+### "Actionable" and "Nearly Certain" Projects
+
+These values are based on where a project is in the interconnection process. An "actionable" project is one that meets the following criteria:
+
+* proposed operating date in the latest year queue data or later (forward looking)
+* is active in the queue
+* is in one of the following stages of interconnection, as classified by LBNL:
+  * Facility Study
+  * System Impact Study
+  * Phase 4 Study
+  * "IA Pending"
+  * "IA in Progress"
+Offshore wind projects come from a separate source, so their only "actionable" qualification is to have a `construction_status` of "Site assessment underway" or "Not started".
+
+A "nearly certain" project is one that meets the "actionable" criteria but with the following additional allowable interconnection stages:
+
+* Construction
+* IA Executed
+* Operational
+Offshore wind projects come from a separate source, so their only "nearly certain" qualification is to have a `construction_status` of "Construction underway".
+
+### Avoided CO2e Emissons
+
+Avoided emissions estimates are based on the EPA's AVERT model. In this model, the avoided emissions are calculated as the difference between the emissions of the proposed generator (zero for renewables) and the emissions of the existing generator that would be displaced by the proposed generator. This gives an esimate of the short term emissions impact of the proposed generator.
+
+The marginal generator is determined by the proposed generator's location and the time of day/year. Avoided emissions are scaled by the capacity of the proposed generator times an average capacity factor for the proposed generator's resource type and location.
+
+The equation for avoided emissions is:
+(Capacity of proposed generator [MW]) *(Average capacity factor of proposed generator [MWh/hour/MW])* (8766 [average hours/year]) * (Emissions factor of marginal generator [tonnes/MWh])
