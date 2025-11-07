@@ -30,6 +30,7 @@ jobs:
         with:
           service_account: "dgm-github-action@dbcp-dev-350818.iam.gserviceaccount.com"
           workload_identity_provider: "projects/405575189241/locations/global/workloadIdentityPools/github/providers/dgm-gha-provider"
+          create_credentials_file: true
 
       - name: Display env variables
         run: |
