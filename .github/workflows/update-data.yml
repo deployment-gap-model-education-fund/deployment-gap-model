@@ -174,6 +174,9 @@ jobs:
       GEOCODIO_API_KEY: ${{ secrets.GEOCODIO_API_KEY }}
       API_KEY_GOOGLE_MAPS: ${{ secrets.API_KEY_GOOGLE_MAPS }}
       GITHUB_REF: ${{ github.ref_name }}
+      PROD_POSTGRES_USER: ${{ secrets.PROD_POSTGRES_USER }}
+      PROD_POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD }}
+      PROD_POSTGRES_HOST: ${{ secrets.PROD_POSTGRES_HOST }}
     steps:
       - name: Print matrix info
         run: |
@@ -271,6 +274,7 @@ jobs:
           # - target (indicates if this is 'dev' or 'prod' environment target)
           docker compose run --rm app python dbcp/cli.py publish-outputs \
             -bq \
+            --upload-to-postgres \
             --build-ref ${{ matrix.ref }} \
             --code-git-sha ${{ steps.checkout.outputs.commit }} \
             --settings-file-git-sha $SETTINGS_FILE_SHA \
