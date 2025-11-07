@@ -11,6 +11,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: "read"
+      id-token: "write"
 
     env:
       GEOCODIO_API_KEY: ${{ secrets.GEOCODIO_API_KEY }}
