@@ -60,15 +60,23 @@ def upload_parquet_directory_to_gcs(
         )
 
 
-def load_parquet_files_to_postgres(blobs: list[storage.Blob]):
+def load_parquet_files_to_postgres(
+    output_bucket: storage.Bucket,
+    destination_blob_prefix: DataDirectoryLiteral,
+    version: str,
+):
     """
     Load Parquet files from GCS to production postgres db.
 
     Args:
-        blobs: List of blobs pointing to fyi tables in GCS.
+        output_bucket: the GCS bucket containing the output Parquet files.
+        destination_blob_prefix: the prefix of the GCS blobs to load.
+        version: the version of the data to load.
     """
     engine = get_sql_engine(production=True)
-    for blob in blobs:
+    for blob in output_bucket.list_blobs(prefix=f"{version}/{destination_blob_prefix}"):
+        if not blob.name.endswith(".parquet"):
+            continue
         # get the blob filename without the extension
         table_name = blob.name.split("/")[-1].split(".")[0]
 
@@ -277,21 +285,23 @@ def publish_outputs(
     blob.upload_from_string(metadata.to_yaml())
     logger.info(f"Uploaded metadata to gs://{bucket_name}/{destination_blob_name}")
 
-    if upload_to_big_query:
-        if target:
-            for directory in directories:
+    if target is not None:
+        for directory in directories:
+            if upload_to_big_query:
                 load_parquet_files_to_bigquery(
                     output_bucket, directory, metadata.version, target
                 )
-        else:
-            logger.warning("No target schema provided. Skipping BigQuery upload.")
-    if upload_to_postgres:
-        fyi_tables = [
-            blob
-            for blob in output_bucket.list_blobs(prefix=f"{metadata.version}/")
-            if "fyi" in blob.name
-        ]
-        load_parquet_files_to_postgres(fyi_tables)
+            # At this point postgres is only used for production data mart tables
+            if (
+                upload_to_postgres
+                and ("data_mart" in str(directory))
+                and (target == "prod")
+            ):
+                load_parquet_files_to_postgres(
+                    output_bucket, directory, metadata.version
+                )
+    else:
+        logger.warning("No target schema provided. Skipping BigQuery/Postgres upload.")
 
 
 if __name__ == "__main__":
