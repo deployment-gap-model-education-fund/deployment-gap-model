@@ -262,6 +262,16 @@ jobs:
             SETTINGS_FILE_SHA="${{ steps.checkout.outputs.commit }}"
           fi
 
+          CODE_SHA="${{ steps.checkout.outputs.commit }}"
+
+          # Conform to publish-outputs validation:
+          # dev -> build-ref=main; prod -> build-ref=v* tag
+          if [[ "${{ matrix.target }}" == "dev" ]]; then
+            BUILD_REF="main"
+          else
+            BUILD_REF="${{ matrix.ref }}"   # should be the release tag (v*)
+          fi
+
           # Run the publish-outputs command inside the Docker container
           # Pass:
           # - build-ref (the git ref, e.g. a tag or branch) for versioning
@@ -271,8 +281,8 @@ jobs:
           # - target (indicates if this is 'dev' or 'prod' environment target)
           docker compose run --rm app python dbcp/cli.py publish-outputs \
             -bq \
-            --build-ref ${{ matrix.ref }} \
-            --code-git-sha ${{ steps.checkout.outputs.commit }} \
+            --build-ref "$BUILD_REF" \
+            --code-git-sha "$CODE_SHA" \
             --settings-file-git-sha $SETTINGS_FILE_SHA \
             --github-action-run-id ${{ github.run_id }} \
             --target ${{ matrix.target }}
