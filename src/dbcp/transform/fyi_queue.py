@@ -79,6 +79,37 @@ def _prep_for_deduplication(df: pd.DataFrame) -> None:
     return
 
 
+def _conduct_manual_state_county_fixes(projects: pd.DataFrame) -> None:
+    """Manually fix and fill in some county and state pairs that are wrong or missing."""
+    manual_fixes = [
+        {
+            "project_id": "wapa-rocky-mountain-region-2019-g2",
+            "county": "Jackson",
+            "state": "Colorado",
+        },
+        {
+            "project_id": "wapa-rocky-mountain-region-2023-g7",
+            "county": "Jackson",
+            "state": "Colorado",
+        },
+        {"project_id": "pjm-ag1-471", "county": "Wayne", "state": "Kentucky"},
+        {
+            "project_id": "miso-j2729",
+            "county": "West Baton Rouge",
+            "state": "Louisiana",
+        },
+    ]
+
+    for override in manual_fixes:
+        projects.loc[
+            projects["project_id"] == override["project_id"], "county"
+        ] = override["county"]
+        projects.loc[
+            projects["project_id"] == override["project_id"], "state"
+        ] = override["state"]
+    return projects
+
+
 def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform active, operational and withdrawn iso queue projects."""
     projects = raw_projects.copy()
@@ -101,6 +132,7 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     projects = projects.drop(
         columns=["schedule_next_event_date_raw", "most_recent_study_date_raw"]
     )
+    projects = _conduct_manual_state_county_fixes(projects=projects)
     # deduplicate
     pre_dedupe = len(projects)
     projects = deduplicate_same_physical_entities(
@@ -263,64 +295,6 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
     resource_capacity_df = resource_capacity_df.groupby(
         by=["project_id", "resource"], as_index=False
     )["capacity_mw"].sum()
-    """
-    # NYISO lists only the battery storage total energy storage capacity in
-    # capacity_by_generation_type_breakdown. Thus it's necessary
-    # to grab the capacity_mw value.
-    # For CAISO and West it's fine to use capacity_by_generation_type_breakdown
-    # without grabbing additional resources with capacity_mw
-    nyiso_multi_cap = fyi_df[
-        (fyi_df.power_market == "NYISO")
-        & (~fyi_df["capacity_by_generation_type_breakdown"].isnull())
-    ].reset_index()
-    nyiso_multi_cap["canonical_generation_types"] = (
-        nyiso_multi_cap["canonical_generation_types"]
-        .str.replace(r"^Battery\s\+\s|\s\+\sBattery", "", regex=True) # noqa: W605
-        .str.strip()
-    )
-    nyiso_multi_cap = nyiso_multi_cap[
-        nyiso_multi_cap["canonical_generation_types"] != "Battery"
-    ].rename(columns={"canonical_generation_types": "resource"})
-    nyiso_multi_cap = nyiso_multi_cap.rename(
-        columns={"canonical_generation_types": "resource"}
-    )
-    # before concatenating the resource - capacity pairs parsed
-    # from the two different locations, differentiate which ones are
-    # parsed from the capacity_by_generation_type_breakdown column
-    # because we are going to prioritize keeping those rows when there
-    # are duplicate resources for one project
-    resource_capacity_df["parsed_from_capacity_by_generation_type_breakdown"] = True
-    nyiso_multi_cap["parsed_from_capacity_by_generation_type_breakdown"] = False
-    resource_capacity_df = pd.concat(
-        [
-            resource_capacity_df,
-            nyiso_multi_cap[
-                [
-                    "project_id",
-                    "resource",
-                    "capacity_mw",
-                    "parsed_from_capacity_by_generation_type_breakdown",
-                ]
-            ],
-        ]
-    )
-    # In the case of NYISO, where we've pulled capacity values from both capacity_mw and
-    # capacity_by_generation_type_breakdown, there may be two capacity
-    # values reported for the same resource. After looking at the raw queue
-    # values, the capacity in capacity_by_generation_type_breakdown more accurately
-    # reflects the complete energy storage capacity available, whereas the
-    # capacity_mw value reflects the summer or winter peak capacity. Thus, we
-    # choose to keep the capacity_by_generation_type_breakdown in these cases.
-    # If there are duplicate resources per project, only keep the one
-    # pulled from capacity_by_generation_type_breakdown.
-    resource_capacity_df = (
-        resource_capacity_df.sort_values(
-            by="parsed_from_capacity_by_generation_type_breakdown", ascending=False
-        )
-        .drop_duplicates(subset=["project_id", "resource"], keep="first")
-        .drop(columns=["parsed_from_capacity_by_generation_type_breakdown"])
-    )
-    """
     # get the rest of the projects which just use capacity_mw and not
     # capacity_by_generation_type_breakdown.
     # Additionally grab all the NYISO projects, which we didn't actually
@@ -448,7 +422,7 @@ if __name__ == "__main__":
     # debugging entry point
     import dbcp
 
-    fyi_uri = "gs://dgm-archive/interconnection.fyi/interconnection_fyi_dataset_2025-10-01.csv"
+    fyi_uri = "gs://dgm-archive/interconnection.fyi/interconnection_fyi_dataset_2025-11-04.csv"
     fyi_raw_dfs = dbcp.extract.fyi_queue.extract(fyi_uri)
     fyi_transformed_dfs = dbcp.transform.fyi_queue.transform(fyi_raw_dfs)
     fyi_transformed_dfs["fyi_resource_capacity"].to_parquet(
