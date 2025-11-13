@@ -11,6 +11,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: "read"
+      id-token: "write"
 
     env:
       GEOCODIO_API_KEY: ${{ secrets.GEOCODIO_API_KEY }}
@@ -23,9 +26,10 @@ jobs:
       - name: Who owns the workspace?
         run: ls -ld $GITHUB_WORKSPACE
 
-      - uses: "google-github-actions/auth@v2"
+      - uses: "google-github-actions/auth@v3"
         with:
-          credentials_json: "${{ secrets.DGM_GITHUB_ACTION_CREDENTIALS }}"
+          service_account: "dgm-github-action@dbcp-dev-350818.iam.gserviceaccount.com"
+          workload_identity_provider: "projects/405575189241/locations/global/workloadIdentityPools/github/providers/dgm-gha-provider"
 
       - name: Display env variables
         run: |
