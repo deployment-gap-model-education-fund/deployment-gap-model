@@ -139,7 +139,7 @@ class OutputMetadata(BaseModel):
     date_created: datetime = datetime.now()
 
     @validator("git_ref")
-    def git_ref_must_be_main_or_tag(cls, git_ref: str | None) -> str | None:
+    def git_ref_must_be_branch_or_tag(cls, git_ref: str | None) -> str | None:
         """Validate that the git ref is 'main', a tag like vX.Y.Z, or a valid branch name."""
         if not git_ref:
             return git_ref
