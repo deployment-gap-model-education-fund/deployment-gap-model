@@ -140,14 +140,21 @@ class OutputMetadata(BaseModel):
 
     @validator("git_ref")
     def git_ref_must_be_main_or_tag(cls, git_ref: str | None) -> str | None:
-        """Validate that the git ref is either "main" or "vX.Y.Z"."""
-        if git_ref:
-            if git_ref in ("main",) or re.fullmatch(r"^v\d+\.\d+\.\d+$", git_ref):
-                return git_ref
-            raise ValueError(
-                f'{git_ref} is not a valid Git ref. Must be "main" or a git tag starting with "v".'
-            )
-        return git_ref
+        """Validate that the git ref is 'main', a tag like vX.Y.Z, or a valid branch name."""
+        if not git_ref:
+            return git_ref
+
+        # main or semantic version tag
+        if git_ref == "main" or re.fullmatch(r"^v\d+\.\d+\.\d+$", git_ref):
+            return git_ref
+
+        # allow typical branch names: feature/foo, fix-bar, dev, etc.
+        if re.fullmatch(r"^(?!/)(?!.*//)[A-Za-z0-9._\-/]+(?<!/)$", git_ref):
+            return git_ref
+
+        raise ValueError(
+            f"{git_ref} is not a valid Git ref. Must be 'main', a git tag starting with 'v', or a valid branch name."
+        )
 
     @validator("target")
     def target_must_be_dev_or_prod(cls, target: str | None) -> str | None:
