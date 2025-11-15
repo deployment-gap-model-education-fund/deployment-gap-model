@@ -14,7 +14,7 @@ from dbcp.transform.helpers import (
 from dbcp.transform.interconnection_queue_helpers import (
     add_actionable_and_nearly_certain_classification,
     clean_resource_type,
-    manual_county_state_name_fixes,
+    fyi_manual_county_state_name_fill_ins,
     normalize_point_of_interconnection,
     parse_date_columns,
 )
@@ -79,37 +79,6 @@ def _prep_for_deduplication(df: pd.DataFrame) -> None:
     return
 
 
-def _conduct_manual_state_county_fixes(projects: pd.DataFrame) -> None:
-    """Manually fix and fill in some county and state pairs that are wrong or missing."""
-    manual_fixes = [
-        {
-            "project_id": "wapa-rocky-mountain-region-2019-g2",
-            "county": "Jackson",
-            "state": "Colorado",
-        },
-        {
-            "project_id": "wapa-rocky-mountain-region-2023-g7",
-            "county": "Jackson",
-            "state": "Colorado",
-        },
-        {"project_id": "pjm-ag1-471", "county": "Wayne", "state": "Kentucky"},
-        {
-            "project_id": "miso-j2729",
-            "county": "West Baton Rouge",
-            "state": "Louisiana",
-        },
-    ]
-
-    for override in manual_fixes:
-        projects.loc[
-            projects["project_id"] == override["project_id"], "county"
-        ] = override["county"]
-        projects.loc[
-            projects["project_id"] == override["project_id"], "state"
-        ] = override["state"]
-    return projects
-
-
 def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     """Transform active, operational and withdrawn iso queue projects."""
     projects = raw_projects.copy()
@@ -132,7 +101,7 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     projects = projects.drop(
         columns=["schedule_next_event_date_raw", "most_recent_study_date_raw"]
     )
-    projects = _conduct_manual_state_county_fixes(projects=projects)
+
     # deduplicate
     pre_dedupe = len(projects)
     projects = deduplicate_same_physical_entities(
@@ -155,7 +124,6 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     )
     n_dupes = pre_dedupe - len(projects)
     logger.info(f"Deduplicated {n_dupes} ({n_dupes / pre_dedupe:.2%}) projects.")
-
     projects.set_index("project_id", inplace=True)
     projects.sort_index(inplace=True)
     # clean up whitespace
@@ -373,40 +341,48 @@ def transform(fyi_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     transformed = _clean_all_fyi_projects(
         fyi_raw_dfs["fyi_queue"]
     )  # sets index to project_id
-
     # Combine and normalize iso queue tables
     fyi_normalized_dfs = normalize_fyi_dfs(transformed)
+    fyi_normalized_dfs["fyi_projects"].reset_index(inplace=True)
     # data enrichment
     # Add Fips Codes
     # I write to a new variable because _manual_county_state_name_fixes overwrites
     # raw names with lowercase + manual corrections. I want to preserve raw names in the final
     # output but didn't want to refactor these functions to do it.
-    new_locs = manual_county_state_name_fixes(fyi_normalized_dfs["fyi_locations"])
+    new_locs = fyi_manual_county_state_name_fill_ins(
+        fyi_normalized_dfs["fyi_locations"]
+    )
+    # we may have manually filled in locations for projects that are no
+    # longer in the projects table. If so, they should be removed
+    # from the manual fill ins.
+    in_locations_not_in_projects = new_locs[
+        ~new_locs["project_id"].isin(fyi_normalized_dfs["fyi_projects"]["project_id"])
+    ]
+    if len(in_locations_not_in_projects) >= 0:
+        logger.warning(
+            "Found projects in the locations table that aren't in the fyi_projects table. "
+            "Remove these projects from the FYI manual county-state locations fill ins."
+            f"{in_locations_not_in_projects}"
+        )
+    new_locs = new_locs[
+        new_locs["project_id"].isin(fyi_normalized_dfs["fyi_projects"]["project_id"])
+    ]
     # add state_id_fips, county_id_fips, geocoded_locality_name, geocoded_locality_type, geocoded_containing_county
     new_locs = add_county_fips_with_backup_geocoding(
         new_locs, state_col="raw_state_name", locality_col="raw_county_name"
     )
-    # this doesn't seem to fix any missing FIPS codes in the FYI data
-    # new_locs = _fix_independent_city_fips(new_locs)
     new_locs.loc[:, ["raw_state_name", "raw_county_name"]] = (
         fyi_normalized_dfs["fyi_locations"]
         .loc[:, ["raw_state_name", "raw_county_name"]]
         .copy()
     )
-    # Fix defunct county FIPS code
-    new_locs.loc[
-        new_locs.county_id_fips.eq("51515"), "county_id_fips"
-    ] = "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
     fyi_normalized_dfs["fyi_locations"] = new_locs
-
     # Clean up and categorize resources
     fyi_normalized_dfs["fyi_resource_capacity"] = clean_resource_type(
         fyi_normalized_dfs["fyi_resource_capacity"], FYI_RESOURCE_DICT
     )
     if fyi_normalized_dfs["fyi_resource_capacity"].resource_clean.isna().any():
         raise AssertionError("Missing Resources!")
-    fyi_normalized_dfs["fyi_projects"].reset_index(inplace=True)
-
     # Most projects missing queue_status are from the early 2000s so I'm going to assume
     # they were withrawn.
     assert (
