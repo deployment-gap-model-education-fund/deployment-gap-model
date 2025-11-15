@@ -358,10 +358,10 @@ def transform(fyi_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     in_locations_not_in_projects = new_locs[
         ~new_locs["project_id"].isin(fyi_normalized_dfs["fyi_projects"]["project_id"])
     ]
-    if len(in_locations_not_in_projects) >= 0:
+    if len(in_locations_not_in_projects) > 0:
         logger.warning(
             "Found projects in the locations table that aren't in the fyi_projects table. "
-            "Remove these projects from the FYI manual county-state locations fill ins."
+            "Remove these projects from the FYI manual county-state locations fill ins:\n"
             f"{in_locations_not_in_projects}"
         )
     new_locs = new_locs[

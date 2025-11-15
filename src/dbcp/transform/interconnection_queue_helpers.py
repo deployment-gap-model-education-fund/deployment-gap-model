@@ -82,8 +82,17 @@ def clean_resource_type(
 
 
 def fyi_manual_county_state_name_fill_ins(location_df: pd.DataFrame) -> pd.DataFrame:
-    """Manually fill in some county and state pairs in FYI that are wrong or missing."""
+    """Manually fill in some county and state pairs in FYI that are wrong or missing.
 
+    There are some projects which are missing county/state information in FYI
+    but have that location information in the GridStatus/LBNL data. This fills
+    in the missing county/state pairs in FYI with manually compiled fill-ins
+    copied over from GridStatus/LBNL. The FYI data update notebook should find
+    any new fill-ins that aren't recorded here. New fill-ins need to be copied over
+    when they arise and projects that are no longer in the queue should be taken
+    out of this list (there's a logging warning that says when one of these fill in
+    projects are no longer in the queue.)
+    """
     manual_fill_ins = [
         ["wapa-rocky-mountain-region-2019-g2", "Jackson", "Colorado"],
         ["wapa-rocky-mountain-region-2023-g7", "Jackson", "Colorado"],

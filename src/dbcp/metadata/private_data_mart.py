@@ -1,6 +1,15 @@
 """SQL Alchemy metadata for the private data mart tables."""
 
-from sqlalchemy import Boolean, Column, DateTime, Float, MetaData, String, Table
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    Integer,
+    MetaData,
+    String,
+    Table,
+)
 
 metadata = MetaData()
 schema = "private_data_mart"
@@ -46,5 +55,26 @@ fyi_projects_long_format = Table(
     Column("resource_class", String),
     Column("frac_locations_in_county", Float, nullable=False),
     Column("source", String, nullable=False),
+    schema=schema,
+)
+
+fyi_counties_proposed_clean_projects = Table(
+    "fyi_counties_proposed_clean_projects",
+    metadata,
+    Column("county_id_fips", String),
+    Column("resource_clean", String),
+    Column("renewable_and_battery_proposed_capacity_mw", Float),
+    Column("facility_count", Integer),
+    schema=schema,
+)
+
+fyi_counties_proposed_clean_projects_wide = Table(
+    "fyi_counties_proposed_clean_projects_wide",
+    metadata,
+    Column("county_id_fips", String, primary_key=True),
+    Column("battery_storage_mw", String),
+    Column("onshore_wind_mw", String),
+    Column("solar_mw", Float),
+    Column("total_proposed_capacity_mw", Float),
     schema=schema,
 )

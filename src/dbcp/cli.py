@@ -57,9 +57,9 @@ def etl(data_mart: bool, data_warehouse: bool, clear_cache: bool):
         SPATIAL_CACHE.clear()
 
     if data_warehouse:
-        dbcp.etl.etl()
+        dbcp.etl.etl(schema="data_warehouse")
     if data_mart:
-        dbcp.data_mart.create_data_marts()
+        dbcp.etl.etl(schema="data_mart")
     else:
         raise ValueError(
             "Please specify a target for the ETL process: --data-warehouse and/or --data-mart."
