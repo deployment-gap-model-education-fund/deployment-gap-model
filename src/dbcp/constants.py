@@ -180,6 +180,94 @@ QUEUE_RESOURCE_DICT = {
     },
 }
 
+FYI_RESOURCE_DICT = {
+    "Battery Storage": {
+        "codes": ["Battery"],
+        "type": "Renewable",
+    },
+    "Biofuel": {"codes": ["Biogas"], "type": "Renewable"},
+    "Biomass": {
+        "codes": [],
+        "type": "Renewable",
+    },
+    "Coal": {"codes": ["Coal + Gas", "Coal + Oil"], "type": "Fossil"},
+    "Fuel Cell": {"codes": [], "type": "Fossil"},
+    "Geothermal": {
+        "codes": ["Geothermal + Solar"],
+        "type": "Renewable",
+    },
+    "Hydro": {"codes": ["Battery + Hydro", "Wave"], "type": "Renewable"},
+    "Landfill Gas": {"codes": ["Landfill", "Waste"], "type": "Fossil"},
+    "Natural Gas": {
+        "codes": [
+            "Gas",
+            "Battery + Gas",
+            "Gas + Oil",
+            "Battery + Gas + Solar",
+            "Gas + Solar",
+            "Gas + Wind",
+            "Compressed Air + Gas",
+            "Methane",
+        ],
+        "type": "Fossil",
+    },
+    "Nuclear": {
+        "codes": [],
+        "type": "Renewable",
+    },
+    "Oil": {
+        "codes": [
+            "Diesel + Methane",
+            "Battery + Oil",
+            "Battery + Diesel + Gas",
+            "Diesel + Gas",
+            "Diesel",
+        ],
+        "type": "Fossil",
+    },
+    "Onshore Wind": {
+        "codes": [
+            "Wind",
+            "Battery + Wind",
+            "Battery + Solar + Wind",
+            "Solar + Wind",
+            "Pumped Storage + Solar + Wind",
+        ],
+        "type": "Renewable",
+    },
+    "Offshore Wind": {"codes": [], "type": "Renewable"},
+    "Other": {
+        "codes": [
+            "Biomass + Oil",
+            "Biomass + Gas",
+            "Biomass + Coal",
+            "Biomass + Solar",
+            "Methane + Solar",
+            "Diesel + Solar",
+            "Geothermal + Waste Heat",
+        ],
+        "type": "Unknown Resource",
+    },
+    "Other Storage": {
+        "codes": [
+            "Battery + Compressed Air",
+            "Compressed Air",
+            "Flywheel",
+            "Hydrogen",
+        ],
+        "type": "Renewable",
+    },
+    "Pumped Storage": {
+        "codes": [],
+        "type": "Renewable",
+    },
+    "Solar": {"codes": ["Battery + Solar", "Hydro + Solar"], "type": "Renewable"},
+    "Waste Heat": {
+        "codes": [],
+        "type": "Fossil",
+    },
+}
+
 FIPS_CODE_VINTAGE = 2020
 
 PUDL_LATEST_YEAR = 2024

@@ -18,7 +18,9 @@ from dbcp.constants import OUTPUT_DIR
 
 logger = logging.getLogger(__name__)
 
-DataDirectoryLiteral = Literal["data_warehouse", "data_mart", "private_data_warehouse"]
+DataDirectoryLiteral = Literal[
+    "data_warehouse", "data_mart", "private_data_warehouse", "private_data_mart"
+]
 VALID_DIRECTORIES = typing.get_args(DataDirectoryLiteral)
 
 
