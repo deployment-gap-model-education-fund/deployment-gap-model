@@ -1235,11 +1235,6 @@ def create_data_mart(
     active_fyi_projects_long_format = create_fyi_long_format(
         engine, active_projects_only=True
     )
-
-    active_fyi_projects_long_format = create_fyi_long_format(
-        engine, active_projects_only=True
-    )
-
     eia860m_current = get_eia860m_current(engine)
     eia860m_status_monthly = get_eia860m_status_timeseries(engine, frequency="M")
     eia860m_status_quarterly = get_eia860m_status_timeseries(engine, frequency="Q")

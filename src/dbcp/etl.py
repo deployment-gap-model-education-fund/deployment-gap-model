@@ -221,7 +221,7 @@ def write_to_postgres_and_parquet(
     # private data warehouse (and data_mart and private_data_mart),
     # so they share the same metadata respectively. Thus, only drop
     # a subset of tables when creating the private data warehouse.
-    if schema_name == "data_warehouse" or "data_mart":
+    if (schema_name == "data_warehouse") or (schema_name == "data_mart"):
         metadata.drop_all(engine)
     else:
         metadata.drop_all(engine, tables=tables)
