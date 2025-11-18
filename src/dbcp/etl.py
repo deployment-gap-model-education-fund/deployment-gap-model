@@ -297,11 +297,18 @@ def create_data_warehouse():
     run_etl(etl_funcs, "private_data_warehouse")
 
 
-def create_data_mart(engine):
+def create_data_mart(engine, private_only: bool = False):  # noqa: C901
     """Create data mart tables by calling create_data_mart in each data mart module."""
     modules = dbcp.data_mart.get_data_mart_modules()
-    data_mart_tables = {}
+    data_mart_tables: dict[str, pd.DataFrame] = {}
+    private_table_names: set[str] = set()
     for module, module_info in modules:
+        module_private = set(getattr(module, "PRIVATE_DATA_MART_TABLES", set()))
+        # If we're creating the private data mart only
+        # and this module doesn't have any private tables
+        # in it, skip it.
+        if private_only and not module_private:
+            continue
         try:
             data = module.create_data_mart(engine=engine)
         except AttributeError:
@@ -310,44 +317,58 @@ def create_data_mart(engine):
                 "Make sure the data mart module implements create_data_mart function."
             )
         if isinstance(data, pd.DataFrame):
+            name = module_info.name
+            # If we're creating the private data mart only
+            # and this specific table is not private, skip it.
+            if private_only and name not in module_private:
+                continue
             assert (
-                module_info.name not in data_mart_tables.keys()
-            ), f"Key {module_info.name} already exists in data mart"
-            data_mart_tables[module_info.name] = data
+                name not in data_mart_tables.keys()
+            ), f"Key {name} already exists in data mart"
+            data_mart_tables[name] = data
+            if name in module_private:
+                private_table_names.add(name)
         elif isinstance(data, dict):
+            # if only creating private tables, drop non private tables right away
+            if private_only:
+                data = {k: v for k, v in data.items() if k in module_private}
+            # if no private tables are left from this module, skip
+            if not data:
+                continue
             assert (
                 len([key for key in data.keys() if key in data_mart_tables.keys()]) == 0
             ), f"Dict key from {module_info.name} already exists"
             data_mart_tables.update(data)
+            private_table_names.update(module_private.intersection(data.keys()))
         else:
             raise TypeError(
                 f"Expecting pd.DataFrame or dict of dataframes. Got {type(data)}"
             )
-    # TODO: make this cleaner
-    private_data_mart_tables = [
-        "fyi_projects_long_format",
-        "fyi_counties_proposed_clean_projects",
-        "fyi_counties_proposed_clean_projects_wide",
-    ]
+
     data_mart_dfs = {
         name: df
         for name, df in data_mart_tables.items()
-        if name not in private_data_mart_tables
+        if name not in private_table_names
     }
     private_data_mart_dfs = {
-        name: df
-        for name, df in data_mart_tables.items()
-        if name in private_data_mart_tables
+        name: df for name, df in data_mart_tables.items() if name in private_table_names
     }
-    for schema_name in ["data_mart", "private_data_mart"]:
-        if schema_name == "data_mart":
-            write_to_postgres_and_parquet(
-                dfs=data_mart_dfs, engine=engine, schema_name=schema_name
-            )
-        else:
-            write_to_postgres_and_parquet(
-                dfs=private_data_mart_dfs, engine=engine, schema_name=schema_name
-            )
+    if private_only:
+        write_to_postgres_and_parquet(
+            dfs=private_data_mart_dfs,
+            engine=engine,
+            schema_name="private_data_mart",
+        )
+    else:
+        for schema_name in ["data_mart", "private_data_mart"]:
+            if schema_name == "data_mart":
+                write_to_postgres_and_parquet(
+                    dfs=data_mart_dfs, engine=engine, schema_name=schema_name
+                )
+            else:
+                write_to_postgres_and_parquet(
+                    dfs=private_data_mart_dfs, engine=engine, schema_name=schema_name
+                )
 
 
 def etl(schema="all"):
@@ -364,6 +385,8 @@ def etl(schema="all"):
     if (schema == "data_mart") or (schema == "all"):
         create_data_mart(engine=engine)
         validate_data_mart(engine=engine)
+    if schema == "private_data_mart":
+        create_data_mart(engine=engine, private_only=True)
 
     logger.info("Sucessfully finished ETL.")
 

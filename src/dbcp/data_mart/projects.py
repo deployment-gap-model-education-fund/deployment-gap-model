@@ -24,6 +24,10 @@ logger = logging.getLogger(__name__)
 CHANGE_LOG_REGIONS = ("MISO", "NYISO", "ISONE", "PJM", "CAISO", "SPP")
 GS_REGIONS = ("MISO", "NYISO", "ISONE", "PJM", "ERCOT", "SPP")
 
+# Specify which tables should be part of the private
+# data mart schema
+PRIVATE_DATA_MART_TABLES = {"fyi_projects_long_format"}
+
 
 def _get_gridstatus_projects(engine: sa.engine.Engine) -> pd.DataFrame:
     # drops transmission projects
