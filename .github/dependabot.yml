@@ -2,7 +2,6 @@ version: 2
 updates:
   - package-ecosystem: "pip"
     directory: "/"
-    target-branch: "dev"
     labels:
       - "dependencies"
     schedule:
@@ -10,6 +9,5 @@ updates:
 
   - package-ecosystem: "github-actions"
     directory: "/"
-    target-branch: "dev"
     schedule:
       interval: "weekly"
