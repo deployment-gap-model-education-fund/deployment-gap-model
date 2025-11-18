@@ -12,6 +12,9 @@ data_warehouse:
 data_mart:
 	$(APP_RUN_COMMAND) python -m dbcp.cli etl --data-mart
 
+private_data_mart:
+	$(APP_RUN_COMMAND) python -m dbcp.cli etl --private-data-mart
+
 all:
 	$(APP_RUN_COMMAND) python -m dbcp.cli etl --data-mart --data-warehouse
 
