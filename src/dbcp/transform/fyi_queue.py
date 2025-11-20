@@ -231,6 +231,22 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
 def _normalize_location(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     """Pull out the county and state columns to a separate dataframe.
 
+    The FYI data contains a column called county_state_pairs which provides
+    the county and state as one comma separated string. In some cases,
+    this column contains multiple county and state pairs, when a project
+    spans across multiple counties. The raw_county_name and raw_state_name
+    column only provides the first county and state listed in the
+    county_state_pairs column. Thus, we just use raw_county_name
+    and raw_county_name to create the normalized location table, but
+    keep the county_state_pairs column on the projects table.
+
+    Similarly the fips_codes column in the raw data provides
+    the 5-digit county FIPS code for the county, but can provide a list of
+    multiple FIPS codes if the project spans multiple counties. We
+    currently drop this column from the location table and use geocoding
+    to fill in a FIPS code that is consistent with the FIPS codes in
+    other datasets.
+
     Args:
         fyi_df (pd.DataFrame): FYI queue dataframe
 
@@ -265,6 +281,59 @@ def normalize_fyi_dfs(fyi_transformed_dfs: pd.DataFrame) -> Dict[str, pd.DataFra
         "fyi_locations": location_dfs["location_df"],
         "fyi_resource_capacity": resource_capacity_dfs["resource_capacity_df"],
     }
+
+
+def validate_geocoded_fips_against_raw_fyi_fips(
+    geocoded_fips_codes: pd.Series, raw_fyi_fips_codes: pd.Series
+) -> pd.Series:
+    """Validate geocoded county_id_fips against the raw FIPS codes in the FYI data.
+
+    FYI publishes a column called fips_codes which contains 5 digit county FIPS
+    codes. However, this column has many null values and requires some cleaning,
+    so we opt for geocoding the county_id_fips column instead of using this
+    column directly. We can use the fips_codes column in FYI data to validate
+    the geocoded county_id_fips and fill in values where present in the raw
+    data. Conduct cleaning on this fips_codes column, namely in some cases
+    this column contains multiple count FIPS codes, when a project
+    spans across multiple counties. Keep the first one and enforce that all
+    values are 5 digit codes.
+
+    Args:
+        geocoded_fips_codes: A pandas series of the 5 digit county FIPS codes created
+            by the geocoding process.
+        raw_fyi_fips_codes: The raw fips_codes column from the FYI data.
+
+    Returns:
+        The geocoded_fips_codes series with null values filled in where present in
+        the raw FYI data.
+    """
+    # clean the FYI fips_codes column
+    raw_fyi_fips_codes = raw_fyi_fips_codes.dropna()
+    comma_separated_fips_regex = r"^\d{5}(?:,\d{5})*$"
+    bad_values = raw_fyi_fips_codes[
+        ~raw_fyi_fips_codes.str.contains(comma_separated_fips_regex)
+    ]
+    logger.info(
+        f"{len(bad_values)} values found in the FYI fips_codes "
+        "column which are not 5-digit comma separated strings."
+        f"They are: {bad_values}"
+    )
+    # drop these bad values
+    clean_fips = raw_fyi_fips_codes.drop(bad_values.index, axis=0)
+    # only use the first FIPS code in the list
+    five_digit_fips_regex = r"^(\d{5})"
+    clean_fips = clean_fips.str.extract(five_digit_fips_regex)[0]
+    common_index = geocoded_fips_codes.index.intersection(clean_fips.index)
+    matches = geocoded_fips_codes.loc[common_index].reset_index(
+        drop=True
+    ) == clean_fips.loc[common_index].reset_index(drop=True)
+    logger.info(
+        f"{len(matches[~matches])} FIPS codes from raw FYI data don't "
+        "match the geocoded FIPS code."
+    )
+    assert (
+        len(matches[~matches]) < 50
+    ), "More than 50 geocoded FIPS codes don't match the raw FYI `fips_codes` column."
 
 
 def transform(fyi_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
@@ -304,6 +373,10 @@ def transform(fyi_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     new_locs.loc[
         new_locs.county_id_fips.eq("51515"), "county_id_fips"
     ] = "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
+    validate_geocoded_fips_against_raw_fyi_fips(
+        new_locs.set_index("project_id")["county_id_fips"],
+        fyi_raw_dfs["fyi_queue"].set_index("project_id")["fips_codes"],
+    )
     fyi_normalized_dfs["fyi_locations"] = new_locs
 
     # Clean up and categorize resources
