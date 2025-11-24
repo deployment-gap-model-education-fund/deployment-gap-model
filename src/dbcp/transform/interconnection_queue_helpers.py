@@ -51,7 +51,9 @@ def add_actionable_and_nearly_certain_classification(
     return queue
 
 
-def clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
+def clean_resource_type(
+    resource_df: pd.DataFrame, resource_dict: dict = QUEUE_RESOURCE_DICT
+) -> pd.DataFrame:
     """Standardize resource types used throughout iso queue tables.
 
     Args:
@@ -65,7 +67,7 @@ def clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
     resource_df = resource_df.copy()
     # Modify QUEUE_RESOURCE DICT for mapping
     long_dict = {}
-    for clean_name, code_type_dict in QUEUE_RESOURCE_DICT.items():
+    for clean_name, code_type_dict in resource_dict.items():
         long_dict[clean_name] = clean_name
         for code in code_type_dict["codes"]:
             long_dict[code] = clean_name
@@ -77,6 +79,60 @@ def clean_resource_type(resource_df: pd.DataFrame) -> pd.DataFrame:
         debug = resource_df.loc[unmapped, "resource"].value_counts()
         raise AssertionError(f"Unmapped resource types: {debug}")
     return resource_df
+
+
+def fyi_manual_county_state_name_fill_ins(location_df: pd.DataFrame) -> pd.DataFrame:
+    """Manually fill in some county and state pairs in FYI that are wrong or missing.
+
+    There are some projects which are missing county/state information in FYI
+    but have that location information in the GridStatus/LBNL data. This fills
+    in the missing county/state pairs in FYI with manually compiled fill-ins
+    copied over from GridStatus/LBNL. The FYI data update notebook should find
+    any new fill-ins that aren't recorded here. New fill-ins need to be copied over
+    when they arise and projects that are no longer in the queue should be taken
+    out of this list (there's a logging warning that says when one of these fill in
+    projects are no longer in the queue.)
+    """
+    manual_fill_ins = [
+        ["wapa-rocky-mountain-region-2019-g2", "Jackson", "Colorado"],
+        ["wapa-rocky-mountain-region-2023-g7", "Jackson", "Colorado"],
+        ["pjm-ag1-471", "Wayne", "Kentucky"],
+        ["miso-j2729", "West Baton Rouge", "Louisiana"],
+        ["wapa-rocky-mountain-region-2008-g9", "Yuma", "Colorado"],
+        ["wapa-rocky-mountain-region-2017-g2", "Banner", "Nebraska"],
+        ["wapa-rocky-mountain-region-2018-g6", "San Juan", "New Mexico"],
+        ["wapa-rocky-mountain-region-2022-g7", "Weld", "Colorado"],
+        ["wapa-rocky-mountain-region-2023-g1", "Scotts Bluff", "Nebraska"],
+        ["wapa-rocky-mountain-region-2023-g10-1", "Coconino", "Arizona"],
+        ["wapa-rocky-mountain-region-2023-g2", "Albany", "Wyoming"],
+        ["wapa-rocky-mountain-region-2023-g5-2", "Coconino", "Arizona"],
+        ["wapa-rocky-mountain-region-2024-g3", "Weld", "Colorado"],
+        ["wapa-rocky-mountain-region-2024-g4", "Morgan", "Colorado"],
+    ]
+    manual_fill_ins_df = pd.DataFrame(
+        manual_fill_ins,
+        columns=["project_id", "county", "state"],
+    )
+    locs = location_df.copy()
+    # It's necessary to do an outer merge here because a project
+    # that has a null county and state name won't show up
+    # in the locations table. We still want to manually fill in
+    # location information for those projects. Later we'll check
+    # to make sure they also show up in the projects table.
+    locs = locs.merge(
+        manual_fill_ins_df,
+        how="outer",
+        on=["project_id"],
+    )
+    locs.loc[:, "raw_county_name"] = locs.loc[:, "county"].fillna(
+        locs.loc[:, "raw_county_name"]
+    )
+    locs.loc[:, "raw_state_name"] = locs.loc[:, "state"].fillna(
+        locs.loc[:, "raw_state_name"]
+    )
+    locs = locs.drop(["county", "state"], axis=1)
+
+    return locs
 
 
 def manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
@@ -139,6 +195,7 @@ def manual_county_state_name_fixes(location_df: pd.DataFrame) -> pd.DataFrame:
         locs.loc[:, "raw_state_name"]
     )
     locs = locs.drop(["clean_county", "clean_state"], axis=1)
+
     return locs
 
 
