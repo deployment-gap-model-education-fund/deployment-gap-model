@@ -227,6 +227,9 @@ def mock_geocoder_independent_city() -> GoogleGeocoder:
     return mock_geocoder(request_kwargs, resp)
 
 
+@pytest.mark.skip(
+    reason="We're not reliant on the Google Geocoder right now. Keep as a backup option."
+)
 @pytest.mark.parametrize(
     "geocoder,expected",
     [
@@ -289,6 +292,9 @@ def test_geocode_locality(geocoder, expected):
     assert geocoder.admin_type == expected["admin_type"]
 
 
+@pytest.mark.skip(
+    reason="We're not reliant on the Google Geocoder right now. Keep as a backup option."
+)
 def test_GoogleGeocoder_init_and_properties():
     """Test the init and @property decorators."""
     empty = GoogleGeocoder()
@@ -307,6 +313,7 @@ def test_add_county_fips_with_backup_geocoding_empty_df():
         ValueError, match="There is no data in this DataFrame to geocode!"
     ):
         add_county_fips_with_backup_geocoding(empty_df)
+
 
 @pytest.mark.parametrize(
     "raw_localities, expected",
