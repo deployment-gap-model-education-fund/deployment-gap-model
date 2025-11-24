@@ -211,7 +211,7 @@ def write_to_postgres_and_parquet(
     """Write data mart tables from a schema to postgres and parquet."""
     # Setup postgres
     with engine.connect() as con:
-        engine.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
+        con.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
 
     # Delete any existing tables, and create them anew
     metadata = dbcp.helpers.get_schema_sql_alchemy_metadata(schema_name)
