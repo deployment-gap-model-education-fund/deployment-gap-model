@@ -16,7 +16,7 @@ from google.cloud import bigquery, storage
 from pydantic import BaseModel, validator
 
 from dbcp.constants import OUTPUT_DIR
-from dbcp.helpers import get_sql_engine
+from dbcp.helpers import get_sql_engine, write_to_postgres
 
 logger = logging.getLogger(__name__)
 
@@ -81,8 +81,15 @@ def load_parquet_files_to_postgres(
         table_name = blob.name.split("/")[-1].split(".")[0]
 
         # Read parquet then write to postgres
-        df = pd.read_parquet(blob.path)
-        df.to_sql(table_name, engine, if_exists="replace")
+        df = pd.read_parquet(f"gs://{output_bucket.id}/{blob.name}")
+        write_to_postgres(
+            df,
+            table_name=table_name,
+            engine=engine,
+            schema_name=destination_blob_prefix,
+            if_exists="replace",
+            use_catalyst_schema=True,
+        )
 
 
 def load_parquet_files_to_bigquery(
