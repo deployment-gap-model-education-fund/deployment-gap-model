@@ -27,18 +27,22 @@ jobs:
   archive:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    permissions:
+      contents: "read"
+      id-token: "write"
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         # This will checkout the main branch on "schedule" and the specified branch on "workflow_dispatch"
         # The archiver should probably be pulled out into its own repo so archive code and data don't diverge
 
       - name: Who owns the workspace?
         run: ls -ld $GITHUB_WORKSPACE
 
-      - uses: "google-github-actions/auth@v2"
+      - uses: "google-github-actions/auth@v3"
         with:
-          credentials_json: "${{ secrets.DGM_GITHUB_ACTION_CREDENTIALS }}"
+          service_account: "dgm-github-action@dbcp-dev-350818.iam.gserviceaccount.com"
+          workload_identity_provider: "projects/405575189241/locations/global/workloadIdentityPools/github/providers/dgm-gha-provider"
 
       - name: Display env variables
         run: |
@@ -50,14 +54,9 @@ jobs:
       - name: Give the dbcp user ownership of the workspace
         run: sudo chown -R 1000:1000 $GITHUB_WORKSPACE
 
-      - name: Set up Docker Compose
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose
-
       - name: Build and run Docker Compose services
         run: |
-          docker-compose up -d
+          docker compose up -d
 
       - name: Run the archive
         env:
@@ -185,7 +184,7 @@ jobs:
 
       - name: Checkout Repository
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # Checkout the ref (branch or tag) from matrix
           ref: ${{ matrix.ref }}
@@ -207,14 +206,9 @@ jobs:
       - name: Give the dbcp user ownership of the workspace
         run: sudo chown -R 1000:1000 $GITHUB_WORKSPACE
 
-      - name: Set up Docker Compose
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose
-
       - name: Build and run Docker Compose services
         run: |
-          docker-compose up -d
+          docker compose up -d
 
       - name: Run full ETL
         if: ${{ success() }}
@@ -284,7 +278,7 @@ jobs:
       - name: Stop Docker Compose services
         if: always()
         run: |
-          docker-compose down
+          docker compose down
 
       # The google-github-actions/auth step is run as runner:docker,
       # so we need to give the workspace back to runner:docker

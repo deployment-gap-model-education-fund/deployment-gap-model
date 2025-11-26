@@ -24,6 +24,10 @@ logger = logging.getLogger(__name__)
 CHANGE_LOG_REGIONS = ("MISO", "NYISO", "ISONE", "PJM", "CAISO", "SPP")
 GS_REGIONS = ("MISO", "NYISO", "ISONE", "PJM", "ERCOT", "SPP")
 
+# Specify which tables should be part of the private
+# data mart schema
+PRIVATE_DATA_MART_TABLES = {"fyi_projects_long_format"}
+
 
 def _get_gridstatus_projects(engine: sa.engine.Engine) -> pd.DataFrame:
     # drops transmission projects
@@ -439,10 +443,17 @@ def create_long_format(
 def create_fyi_long_format(
     engine: sa.engine.Engine,
     active_projects_only: bool = True,
-    # use_proprietary_offshore: bool = True, # TODO: add this option?
+    use_proprietary_offshore: bool = True,
 ):
     """Create long format FYI table."""
     fyi = _get_fyi_projects(engine)
+    if use_proprietary_offshore:
+        offshore = _get_proprietary_proposed_offshore(engine)
+        offshore["project_id"] = offshore["project_id"].astype("string")
+        offshore["date_proposed_online"] = pd.to_datetime(
+            offshore["date_proposed_online"]
+        )
+        fyi = _replace_iso_offshore_with_proprietary(fyi, offshore)
     _estimate_proposed_power_co2e(fyi)
     all_counties = _get_county_fips_df(engine)
     all_states = _get_state_fips_df(engine)
@@ -467,7 +478,6 @@ def create_fyi_long_format(
         combined_opp, on="county_id_fips", how="left", validate="m:1"
     )
     _add_derived_columns(long_format)
-    # long_format["surrogate_id"] = range(len(long_format))
     if active_projects_only:
         active_long_format = long_format.query("queue_status == 'active'")
         # drop actual_completion_date and withdrawn_date columns
@@ -1229,7 +1239,6 @@ def create_data_mart(
     active_fyi_projects_long_format = create_fyi_long_format(
         engine, active_projects_only=True
     )
-
     eia860m_current = get_eia860m_current(engine)
     eia860m_status_monthly = get_eia860m_status_timeseries(engine, frequency="M")
     eia860m_status_quarterly = get_eia860m_status_timeseries(engine, frequency="Q")
@@ -1256,7 +1265,7 @@ def create_data_mart(
 if __name__ == "__main__":
     # debugging entry point
     mart = create_data_mart()
-    parquet_dir = OUTPUT_DIR / "data_mart"
+    parquet_dir = OUTPUT_DIR / "private_data_mart"
     mart["fyi_projects_long_format"].to_parquet(
         parquet_dir / "fyi_projects_long_format.parquet",
     )

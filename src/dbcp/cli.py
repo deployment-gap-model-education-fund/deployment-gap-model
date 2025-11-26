@@ -44,25 +44,36 @@ def cli(loglevel):
     is_flag=True,
 )
 @click.option(
+    "-pdm",
+    "--private-data-mart",
+    help="Load the private data mart tables to the database",
+    default=False,
+    is_flag=True,
+)
+@click.option(
     "-clr",
     "--clear-cache",
     help="Delete saved geocoder and spatial join results, forcing fresh API calls and computation.",
     default=False,
     is_flag=True,
 )
-def etl(data_mart: bool, data_warehouse: bool, clear_cache: bool):
+def etl(
+    data_mart: bool, data_warehouse: bool, private_data_mart: bool, clear_cache: bool
+):
     """Run the ETL process to produce the data warehouse and mart."""
     if clear_cache:
         GEOCODER_CACHES.clear_caches()
         SPATIAL_CACHE.clear()
 
     if data_warehouse:
-        dbcp.etl.etl()
+        dbcp.etl.etl(schema="data_warehouse")
     if data_mart:
-        dbcp.data_mart.create_data_marts()
-    else:
+        dbcp.etl.etl(schema="data_mart")
+    if private_data_mart:
+        dbcp.etl.etl(schema="private_data_mart")
+    if (not data_warehouse) and (not data_mart) and (not private_data_mart):
         raise ValueError(
-            "Please specify a target for the ETL process: --data-warehouse and/or --data-mart."
+            "Please specify a target for the ETL process: --data-warehouse and/or --data-mart or --private-data-mart."
         )
 
 

@@ -9,6 +9,13 @@ from dbcp.constants import FYI_RESOURCE_DICT
 from dbcp.data_mart.projects import create_fyi_long_format
 from dbcp.helpers import get_sql_engine
 
+# Specify which tables should be part of the private
+# data mart schema
+PRIVATE_DATA_MART_TABLES = {
+    "fyi_counties_proposed_clean_projects",
+    "fyi_counties_proposed_clean_projects_wide",
+}
+
 
 def create_fyi_counties_proposed_clean_projects(
     postgres_engine: sa.engine.Engine,

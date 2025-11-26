@@ -19,6 +19,7 @@ def test__resource_capacity_normalization():
                 "caiso-1056",
                 "caiso-955",
                 "ladwp-q57",
+                "nyiso-c24-325",
             ],
             "power_market": [
                 "West",
@@ -30,6 +31,7 @@ def test__resource_capacity_normalization():
                 "CAISO",
                 "CAISO",
                 "West",
+                "NYISO",
             ],
             "canonical_generation_types": [
                 "Battery + Solar + Wind",
@@ -41,6 +43,7 @@ def test__resource_capacity_normalization():
                 "Battery + Gas + Solar",
                 "Gas",
                 "Gas + Solar",
+                "Battery",
             ],
             "capacity_by_generation_type_breakdown": [
                 "- canonical_gen_type: Solar\n  mw: 100\n- canonical_gen_type: Battery\n  mw: 185\n- canonical_gen_type: Wind\n  mw: 275\n",
@@ -52,8 +55,9 @@ def test__resource_capacity_normalization():
                 "- canonical_gen_type: Solar\n  mw: 30\n- canonical_gen_type: Battery\n  mw: 60\n- canonical_gen_type: Gas\n  mw: 448\n",
                 "- canonical_gen_type: Gas\n  mw: 48.3\n- canonical_gen_type: Gas\n  mw: 60\n",
                 "- canonical_gen_type: Solar\n  mw: 100\n- canonical_gen_type: Gas\n  mw: 750\n- canonical_gen_type: Gas\n  mw: 750\n",
+                "- canonical_gen_type: Battery\n mwh: 600\n",
             ],
-            "capacity_mw": [375.0, 50.0, 500.0, 240.0, 20, 120, 538, 48.3, 850],
+            "capacity_mw": [375.0, 50.0, 500.0, 240.0, 20, 120, 538, 48.3, 850, 150],
         }
     ).set_index("project_id")
 
@@ -78,6 +82,7 @@ def test__resource_capacity_normalization():
                     "caiso-955",
                     "ladwp-q57",
                     "ladwp-q57",
+                    "nyiso-c24-325",
                 ],
                 "resource": [
                     "Solar",
@@ -97,6 +102,7 @@ def test__resource_capacity_normalization():
                     "Gas",
                     "Solar",
                     "Gas",
+                    "Battery",
                 ],
                 "capacity_mw": [
                     100.0,
@@ -116,6 +122,7 @@ def test__resource_capacity_normalization():
                     48.3,
                     100,
                     750,
+                    150,
                 ],
             }
         )

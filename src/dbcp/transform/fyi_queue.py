@@ -14,7 +14,7 @@ from dbcp.transform.helpers import (
 from dbcp.transform.interconnection_queue_helpers import (
     add_actionable_and_nearly_certain_classification,
     clean_resource_type,
-    manual_county_state_name_fixes,
+    fyi_manual_county_state_name_fill_ins,
     normalize_point_of_interconnection,
     parse_date_columns,
 )
@@ -101,6 +101,7 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     projects = projects.drop(
         columns=["schedule_next_event_date_raw", "most_recent_study_date_raw"]
     )
+
     # deduplicate
     pre_dedupe = len(projects)
     projects = deduplicate_same_physical_entities(
@@ -123,7 +124,6 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     )
     n_dupes = pre_dedupe - len(projects)
     logger.info(f"Deduplicated {n_dupes} ({n_dupes / pre_dedupe:.2%}) projects.")
-
     projects.set_index("project_id", inplace=True)
     projects.sort_index(inplace=True)
     # clean up whitespace
@@ -263,64 +263,6 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
     resource_capacity_df = resource_capacity_df.groupby(
         by=["project_id", "resource"], as_index=False
     )["capacity_mw"].sum()
-    """
-    # NYISO lists only the battery storage total energy storage capacity in
-    # capacity_by_generation_type_breakdown. Thus it's necessary
-    # to grab the capacity_mw value.
-    # For CAISO and West it's fine to use capacity_by_generation_type_breakdown
-    # without grabbing additional resources with capacity_mw
-    nyiso_multi_cap = fyi_df[
-        (fyi_df.power_market == "NYISO")
-        & (~fyi_df["capacity_by_generation_type_breakdown"].isnull())
-    ].reset_index()
-    nyiso_multi_cap["canonical_generation_types"] = (
-        nyiso_multi_cap["canonical_generation_types"]
-        .str.replace(r"^Battery\s\+\s|\s\+\sBattery", "", regex=True) # noqa: W605
-        .str.strip()
-    )
-    nyiso_multi_cap = nyiso_multi_cap[
-        nyiso_multi_cap["canonical_generation_types"] != "Battery"
-    ].rename(columns={"canonical_generation_types": "resource"})
-    nyiso_multi_cap = nyiso_multi_cap.rename(
-        columns={"canonical_generation_types": "resource"}
-    )
-    # before concatenating the resource - capacity pairs parsed
-    # from the two different locations, differentiate which ones are
-    # parsed from the capacity_by_generation_type_breakdown column
-    # because we are going to prioritize keeping those rows when there
-    # are duplicate resources for one project
-    resource_capacity_df["parsed_from_capacity_by_generation_type_breakdown"] = True
-    nyiso_multi_cap["parsed_from_capacity_by_generation_type_breakdown"] = False
-    resource_capacity_df = pd.concat(
-        [
-            resource_capacity_df,
-            nyiso_multi_cap[
-                [
-                    "project_id",
-                    "resource",
-                    "capacity_mw",
-                    "parsed_from_capacity_by_generation_type_breakdown",
-                ]
-            ],
-        ]
-    )
-    # In the case of NYISO, where we've pulled capacity values from both capacity_mw and
-    # capacity_by_generation_type_breakdown, there may be two capacity
-    # values reported for the same resource. After looking at the raw queue
-    # values, the capacity in capacity_by_generation_type_breakdown more accurately
-    # reflects the complete energy storage capacity available, whereas the
-    # capacity_mw value reflects the summer or winter peak capacity. Thus, we
-    # choose to keep the capacity_by_generation_type_breakdown in these cases.
-    # If there are duplicate resources per project, only keep the one
-    # pulled from capacity_by_generation_type_breakdown.
-    resource_capacity_df = (
-        resource_capacity_df.sort_values(
-            by="parsed_from_capacity_by_generation_type_breakdown", ascending=False
-        )
-        .drop_duplicates(subset=["project_id", "resource"], keep="first")
-        .drop(columns=["parsed_from_capacity_by_generation_type_breakdown"])
-    )
-    """
     # get the rest of the projects which just use capacity_mw and not
     # capacity_by_generation_type_breakdown.
     # Additionally grab all the NYISO projects, which we didn't actually
@@ -399,40 +341,48 @@ def transform(fyi_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     transformed = _clean_all_fyi_projects(
         fyi_raw_dfs["fyi_queue"]
     )  # sets index to project_id
-
     # Combine and normalize iso queue tables
     fyi_normalized_dfs = normalize_fyi_dfs(transformed)
+    fyi_normalized_dfs["fyi_projects"].reset_index(inplace=True)
     # data enrichment
     # Add Fips Codes
     # I write to a new variable because _manual_county_state_name_fixes overwrites
     # raw names with lowercase + manual corrections. I want to preserve raw names in the final
     # output but didn't want to refactor these functions to do it.
-    new_locs = manual_county_state_name_fixes(fyi_normalized_dfs["fyi_locations"])
+    new_locs = fyi_manual_county_state_name_fill_ins(
+        fyi_normalized_dfs["fyi_locations"]
+    )
+    # we may have manually filled in locations for projects that are no
+    # longer in the projects table. If so, they should be removed
+    # from the manual fill ins.
+    in_locations_not_in_projects = new_locs[
+        ~new_locs["project_id"].isin(fyi_normalized_dfs["fyi_projects"]["project_id"])
+    ]
+    if len(in_locations_not_in_projects) > 0:
+        logger.warning(
+            "Found projects in the locations table that aren't in the fyi_projects table. "
+            "Remove these projects from the FYI manual county-state locations fill ins:\n"
+            f"{in_locations_not_in_projects}"
+        )
+    new_locs = new_locs[
+        new_locs["project_id"].isin(fyi_normalized_dfs["fyi_projects"]["project_id"])
+    ]
     # add state_id_fips, county_id_fips, geocoded_locality_name, geocoded_locality_type, geocoded_containing_county
     new_locs = add_county_fips_with_backup_geocoding(
         new_locs, state_col="raw_state_name", locality_col="raw_county_name"
     )
-    # this doesn't seem to fix any missing FIPS codes in the FYI data
-    # new_locs = _fix_independent_city_fips(new_locs)
     new_locs.loc[:, ["raw_state_name", "raw_county_name"]] = (
         fyi_normalized_dfs["fyi_locations"]
         .loc[:, ["raw_state_name", "raw_county_name"]]
         .copy()
     )
-    # Fix defunct county FIPS code
-    new_locs.loc[
-        new_locs.county_id_fips.eq("51515"), "county_id_fips"
-    ] = "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
     fyi_normalized_dfs["fyi_locations"] = new_locs
-
     # Clean up and categorize resources
     fyi_normalized_dfs["fyi_resource_capacity"] = clean_resource_type(
         fyi_normalized_dfs["fyi_resource_capacity"], FYI_RESOURCE_DICT
     )
     if fyi_normalized_dfs["fyi_resource_capacity"].resource_clean.isna().any():
         raise AssertionError("Missing Resources!")
-    fyi_normalized_dfs["fyi_projects"].reset_index(inplace=True)
-
     # Most projects missing queue_status are from the early 2000s so I'm going to assume
     # they were withrawn.
     assert (
@@ -448,7 +398,7 @@ if __name__ == "__main__":
     # debugging entry point
     import dbcp
 
-    fyi_uri = "gs://dgm-archive/interconnection.fyi/interconnection_fyi_dataset_2025-10-01.csv"
+    fyi_uri = "gs://dgm-archive/interconnection.fyi/interconnection_fyi_dataset_2025-11-04.csv"
     fyi_raw_dfs = dbcp.extract.fyi_queue.extract(fyi_uri)
     fyi_transformed_dfs = dbcp.transform.fyi_queue.transform(fyi_raw_dfs)
     fyi_transformed_dfs["fyi_resource_capacity"].to_parquet(
