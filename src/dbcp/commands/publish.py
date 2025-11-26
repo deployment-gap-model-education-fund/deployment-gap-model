@@ -83,7 +83,7 @@ def load_parquet_files_to_postgres(
         # Read parquet then write to postgres
         df = pd.read_parquet(f"gs://{output_bucket.id}/{blob.name}")
 
-        logger.info(f"Publishing table {table_name} to postgres.")
+        logger.info(f"Publishing table {table_name} to production postgres DB.")
         write_to_postgres(
             df,
             table_name=table_name,
@@ -92,6 +92,7 @@ def load_parquet_files_to_postgres(
             if_exists="replace",
             use_catalyst_schema=True,
         )
+        logger.info(f"Successfully wrote table {table_name} to production postgres DB.")
 
 
 def load_parquet_files_to_bigquery(
