@@ -291,7 +291,7 @@ def publish_outputs(
                 load_parquet_files_to_bigquery(
                     output_bucket, directory, metadata.version, target
                 )
-            # At this point postgres is only used for production data mart tables
+            # At this point postgres is only used for production data mart and private data mart tables
             if (
                 upload_to_postgres
                 and ("data_mart" in str(directory))
