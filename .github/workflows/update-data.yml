@@ -54,14 +54,9 @@ jobs:
       - name: Give the dbcp user ownership of the workspace
         run: sudo chown -R 1000:1000 $GITHUB_WORKSPACE
 
-      - name: Set up Docker Compose
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose
-
       - name: Build and run Docker Compose services
         run: |
-          docker-compose up -d
+          docker compose up -d
 
       - name: Run the archive
         env:
@@ -208,14 +203,9 @@ jobs:
       - name: Give the dbcp user ownership of the workspace
         run: sudo chown -R 1000:1000 $GITHUB_WORKSPACE
 
-      - name: Set up Docker Compose
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose
-
       - name: Build and run Docker Compose services
         run: |
-          docker-compose up -d
+          docker compose up -d
 
       - name: Run full ETL
         if: ${{ success() }}
@@ -284,7 +274,7 @@ jobs:
       - name: Stop Docker Compose services
         if: always()
         run: |
-          docker-compose down
+          docker compose down
 
       # The google-github-actions/auth step is run as runner:docker,
       # so we need to give the workspace back to runner:docker
