@@ -266,6 +266,26 @@ def upload_schema_to_bigquery(schema: str, dev: bool = True) -> None:
         logger.info(f"Finished: {full_table_name}")
 
 
+def _get_dbapi_connection(conn):
+    """Normalize whatever pandas / SQLAlchemy passes in (Engine, Connection, raw DBAPI connection).
+
+    Output object shoudl have .cursor.
+    """
+    # SQLAlchemy Connection (1.4 / 2.0)
+    if isinstance(conn, sa.engine.Connection):
+        return conn.connection  # underlying DBAPI conn
+
+    # SQLAlchemy Engine
+    if isinstance(conn, sa.engine.Engine):
+        return conn.raw_connection()  # DBAPI conn
+
+    # Already a DBAPI connection?
+    if hasattr(conn, "cursor"):
+        return conn
+
+    raise TypeError(f"Don't know how to get DBAPI connection from {type(conn)}")
+
+
 def psql_insert_copy(table, conn, keys, data_iter):
     """Insert data via COPY statement, which is much faster than INSERT.
 
@@ -278,12 +298,7 @@ def psql_insert_copy(table, conn, keys, data_iter):
     data_iter : Iterable that iterates the values to be inserted
     """
     # gets a DBAPI connection that can provide a cursor
-    if hasattr(conn, "connection"):  # SQLAlchemy Connection
-        dbapi_conn = conn.connection
-    elif hasattr(conn, "raw_connection"):  # SQLAlchemy Engine
-        dbapi_conn = conn.raw_connection()
-    else:  # already a DBAPI connection
-        dbapi_conn = conn
+    dbapi_conn = _get_dbapi_connection(conn)
     with dbapi_conn.cursor() as cur:
         s_buf = StringIO()
         writer = csv.writer(s_buf)
