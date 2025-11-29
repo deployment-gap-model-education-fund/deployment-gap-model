@@ -272,13 +272,18 @@ def psql_insert_copy(table, conn, keys, data_iter):
     Parameters
     ----------
     table : pandas.io.sql.SQLTable
-    conn : sqlalchemy.engine.Engine or sqlalchemy.engine.Connection
+    conn : sqlalchemy.engine.Engine or sqlalchemy.engine.Connection or DBAPI conn
     keys : list of str
         Column names
     data_iter : Iterable that iterates the values to be inserted
     """
     # gets a DBAPI connection that can provide a cursor
-    dbapi_conn = conn.connection
+    if hasattr(conn, "connection"):  # SQLAlchemy Connection
+        dbapi_conn = conn.connection
+    elif hasattr(conn, "raw_connection"):  # SQLAlchemy Engine
+        dbapi_conn = conn.raw_connection()
+    else:  # already a DBAPI connection
+        dbapi_conn = conn
     with dbapi_conn.cursor() as cur:
         s_buf = StringIO()
         writer = csv.writer(s_buf)
@@ -293,6 +298,8 @@ def psql_insert_copy(table, conn, keys, data_iter):
 
         sql = f"COPY {table_name} ({columns}) FROM STDIN WITH CSV"
         cur.copy_expert(sql=sql, file=s_buf)
+        # Commit if the DBAPI connection supports it
+    if hasattr(dbapi_conn, "commit"):
         dbapi_conn.commit()
 
 
