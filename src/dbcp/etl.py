@@ -231,26 +231,25 @@ def write_to_postgres_and_parquet(
     parquet_dir.mkdir(exist_ok=True)
 
     # Load table into postgres and parquet
-    with engine.connect() as con:
-        for table in metadata.sorted_tables:
-            if table in tables:
-                logger.info(f"Load {table.name} to postgres.")
-                df = dbcp.helpers.trim_columns_length(dfs[table.name])
-                df = enforce_dtypes(df, table.name, schema_name)
-                df.to_sql(
-                    name=table.name,
-                    con=con,
-                    if_exists="append",
-                    index=False,
-                    schema=schema_name,
-                    method=psql_insert_copy,
-                    chunksize=5000,  # adjust based on memory capacity
-                )
-                schema = dbcp.helpers.get_pyarrow_schema_from_metadata(
-                    table.name, schema_name
-                )
-                pa_table = pa.Table.from_pandas(df, schema=schema)
-                pq.write_table(pa_table, parquet_dir / f"{table.name}.parquet")
+    for table in metadata.sorted_tables:
+        if table in tables:
+            logger.info(f"Load {table.name} to postgres.")
+            df = dbcp.helpers.trim_columns_length(dfs[table.name])
+            df = enforce_dtypes(df, table.name, schema_name)
+            df.to_sql(
+                name=table.name,
+                con=engine,
+                if_exists="append",
+                index=False,
+                schema=schema_name,
+                method=psql_insert_copy,
+                chunksize=5000,  # adjust based on memory capacity
+            )
+            schema = dbcp.helpers.get_pyarrow_schema_from_metadata(
+                table.name, schema_name
+            )
+            pa_table = pa.Table.from_pandas(df, schema=schema)
+            pq.write_table(pa_table, parquet_dir / f"{table.name}.parquet")
 
 
 def run_etl(funcs: dict[str, Callable], schema_name: str):
