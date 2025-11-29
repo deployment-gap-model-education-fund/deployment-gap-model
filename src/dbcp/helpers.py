@@ -126,10 +126,15 @@ def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str):
         if col.name not in df.columns:
             df[col.name] = None
         if str(col.type) == "DATETIME":
+            if not pd.api.types.is_datetime64_any_dtype(df[col.name]):
+                df[col.name] = pd.to_datetime(df[col.name], errors="coerce")
+            # normalize the timezone
             if df[col.name].dt.tz is None:
                 df[col.name] = df[col.name].dt.tz_localize(None)
             else:
                 df[col.name] = df[col.name].dt.tz_convert("UTC").dt.tz_localize(None)
+        else:
+            df[col.name] = df[col.name].astype(SA_TO_PD_TYPES[str(col.type)])
 
     # convert datetime[ns] columns to milliseconds
     for col in df.select_dtypes(include=["datetime64[ns]"]).columns:
