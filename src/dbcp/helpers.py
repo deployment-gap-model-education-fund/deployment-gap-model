@@ -125,7 +125,11 @@ def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str):
         # Add the column if it doesn't exist
         if col.name not in df.columns:
             df[col.name] = None
-        df[col.name] = df[col.name].astype(SA_TO_PD_TYPES[str(col.type)])
+        if str(col.type) == "DATETIME":
+            if df[col.name].dt.tz is None:
+                df[col.name] = df[col.name].dt.tz_localize(None)
+            else:
+                df[col.name] = df[col.name].dt.tz_convert("UTC").dt.tz_localize(None)
 
     # convert datetime[ns] columns to milliseconds
     for col in df.select_dtypes(include=["datetime64[ns]"]).columns:
