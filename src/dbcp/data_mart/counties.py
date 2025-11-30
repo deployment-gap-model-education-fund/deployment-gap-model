@@ -43,7 +43,7 @@ from dbcp.data_mart.helpers import (
     _subset_db_columns,
     get_query,
 )
-from dbcp.data_mart.projects import create_long_format as create_iso_data_mart
+from dbcp.data_mart.projects import create_fyi_long_format as create_fyi_data_mart
 from dbcp.helpers import get_sql_engine
 
 JUSTICE40_AGGREGATES = pd.read_csv(
@@ -372,10 +372,10 @@ def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     return aggs
 
 
-def _iso_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
+def _fyi_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     # Avoid db dependency order by recreating the df.
     # Could also make an orchestration script.
-    iso = create_iso_data_mart(engine, active_projects_only=True)
+    queue = create_fyi_data_mart(engine, active_projects_only=True)
 
     # equivalent SQL query that I translated to pandas to avoid dependency
     # on the data_mart schema (which doesn't yet exist when this function runs)
@@ -388,7 +388,7 @@ def _iso_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
         sum(capacity_mw::float * frac_locations_in_county) as capacity_mw,
         'power plant' as facility_type,
         'proposed' as status
-    from data_mart.iso_projects_long_format
+    from data_mart.fyi_projects_long_format
     where county_id_fips is not null -- 9 rows as of 6/4/2023
     group by 1, 2
     ;
@@ -399,11 +399,11 @@ def _iso_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     # This approximation assumes an equal distribution between sites.
     # Also note that this model represents everything relevant to each county,
     # so multi-county projects are intentionally double-counted; for each relevant county.
-    iso.loc[:, ["capacity_mw", "co2e_tonnes_per_year"]] = iso.loc[
+    queue.loc[:, ["capacity_mw", "co2e_tonnes_per_year"]] = queue.loc[
         :, ["capacity_mw", "co2e_tonnes_per_year"]
-    ].mul(iso["frac_locations_in_county"], axis=0)
+    ].mul(queue["frac_locations_in_county"], axis=0)
 
-    grp = iso.groupby(["county_id_fips", "resource_clean"])
+    grp = queue.groupby(["county_id_fips", "resource_clean"])
     aggs = grp.agg(
         {
             "co2e_tonnes_per_year": "sum",  # type: ignore
@@ -608,7 +608,7 @@ def create_long_format(
     all_counties = _get_county_fips_df(postgres_engine)
     all_states = _get_state_fips_df(postgres_engine)
     county_properties = _get_county_properties(postgres_engine=postgres_engine)
-    iso = _iso_projects_counties(postgres_engine)
+    projects = _fyi_projects_counties(postgres_engine)
     infra = _fossil_infrastructure_counties(postgres_engine)
     existing = _existing_plants_counties(
         postgres_engine=postgres_engine,
@@ -617,7 +617,7 @@ def create_long_format(
     )
 
     # join it all
-    out = pd.concat([iso, existing, infra], axis=0, ignore_index=True)
+    out = pd.concat([projects, existing, infra], axis=0, ignore_index=True)
     out = out.merge(county_properties, on="county_id_fips", how="left")
     out = _add_derived_columns(out)
     return out
@@ -808,37 +808,37 @@ def _get_actionable_aggs_for_wide_format(engine: sa.engine.Engine) -> pd.DataFra
     """Create aggregates of renewables filtered by is_actionable and is_nearly_certain."""
     # Had to do this separately because including the is_actionable condition in
     # the long format data would be too ugly.
-    iso = create_iso_data_mart(engine)
-    iso = _add_avoided_co2e(iso, engine)
+    fyi = create_fyi_data_mart(engine)
+    fyi = _add_avoided_co2e(fyi, engine)
 
     # Distribute project-level quantities across locations, when there are multiple.
-    # A handful of ISO projects are in multiple counties and the proprietary offshore
+    # A handful of projects are in multiple counties and the proprietary offshore
     # wind projects have an entry for each cable landing.
     # This approximation assumes an equal distribution.
-    iso.loc[:, "capacity_mw"] = iso.loc[:, "capacity_mw"].mul(
-        iso["frac_locations_in_county"]
+    fyi.loc[:, "capacity_mw"] = fyi.loc[:, "capacity_mw"].mul(
+        fyi["frac_locations_in_county"]
     )
-    iso.loc[:, "avoided_co2e_tonnes_per_year"] = iso.loc[
+    fyi.loc[:, "avoided_co2e_tonnes_per_year"] = fyi.loc[
         :, "avoided_co2e_tonnes_per_year"
-    ].mul(iso["frac_locations_in_county"])
+    ].mul(fyi["frac_locations_in_county"])
 
     resources = ["Onshore Wind", "Offshore Wind", "Solar", "renewable_and_battery"]
     aggs = []
     for resource in resources:
         if resource == "renewable_and_battery":
-            resource_filter = iso["resource_clean"].isin(set(RENEWABLE_TYPES))
+            resource_filter = fyi["resource_clean"].isin(set(RENEWABLE_TYPES))
         else:
-            resource_filter = iso["resource_clean"] == resource
+            resource_filter = fyi["resource_clean"] == resource
         resource_name = resource.lower().replace(" ", "_")
         for status in ["actionable", "nearly_certain"]:
-            filter_ = resource_filter & iso[f"is_{status}"]
+            filter_ = resource_filter & fyi[f"is_{status}"]
             rename_dict = {
                 "capacity_mw": f"{resource_name}_proposed_capacity_mw_{status}",
                 "project_id": f"{resource_name}_proposed_facility_count_{status}",
                 "avoided_co2e_tonnes_per_year": f"{resource_name}_proposed_avoided_co2e_{status}",
             }
             agg = (
-                iso.loc[filter_, :]
+                fyi.loc[filter_, :]
                 .groupby("county_id_fips")
                 .agg(
                     {
@@ -852,7 +852,7 @@ def _get_actionable_aggs_for_wide_format(engine: sa.engine.Engine) -> pd.DataFra
             aggs.append(agg)
         # and avoided co2 totals. This doesn't belong in this function but c'est la vie.
         agg = (
-            iso.loc[resource_filter, :]
+            fyi.loc[resource_filter, :]
             .groupby("county_id_fips")["avoided_co2e_tonnes_per_year"]
             .sum()
             .rename(f"{resource_name}_proposed_avoided_co2e_tonnes_per_year")
@@ -867,14 +867,14 @@ def _get_actionable_aggs_for_wide_format(engine: sa.engine.Engine) -> pd.DataFra
 def _get_actionable_aggs_for_long_format(engine: sa.engine.Engine) -> pd.DataFrame:
     """Calculate fraction of MW considered actionable."""
     # This should be refactored and combined with the wide format version above.
-    iso = create_iso_data_mart(engine)
+    fyi = create_fyi_data_mart(engine)
 
     # Distribute project-level quantities across locations, when there are multiple.
-    # A handful of ISO projects are in multiple counties and the proprietary offshore
+    # A handful of projects are in multiple counties and the proprietary offshore
     # wind projects have an entry for each cable landing.
     # This approximation assumes an equal distribution.
-    iso["capacity_mw"] = iso.loc[:, "capacity_mw"].mul(iso["frac_locations_in_county"])
-    grp = iso.groupby(["county_id_fips", "resource_clean", "is_actionable"])
+    fyi["capacity_mw"] = fyi.loc[:, "capacity_mw"].mul(fyi["frac_locations_in_county"])
+    grp = fyi.groupby(["county_id_fips", "resource_clean", "is_actionable"])
     actionable_sums = grp["capacity_mw"].sum().unstack(level=-1)
     frac_actionable = (
         actionable_sums[True].div(actionable_sums.sum(axis=1), axis=0).to_frame()
@@ -995,29 +995,29 @@ def _get_category_project_counts(engine: sa.engine.Engine) -> pd.DataFrame:
     """
     # Avoid db dependency order by recreating the df.
     # Could also make an orchestration script.
-    iso = create_iso_data_mart(engine)
-    iso["surrogate_project_id"] = iso["project_id"].astype(str) + iso["source"]
+    fyi = create_fyi_data_mart(engine)
+    fyi["surrogate_project_id"] = fyi["project_id"].astype(str) + fyi["source"]
     # equivalent SQL query that I translated to pandas to avoid dependency
     # on the data_mart schema (which doesn't yet exist when this function runs)
     """
     SELECT
         county_id_fips,
         count(DISTINCT (project_id, source)) as facility_count,
-    FROM data_mart.iso_projects_long_format
+    FROM data_mart.fyi_projects_long_format
     WHERE resource_clean IN ('Solar', 'Offshore Wind', 'Onshore Wind', 'Battery Storage')
     -- and repeat for fossil types
     group by 1
     ;
     """
-    is_renewable_and_battery = iso["resource_clean"].isin(set(RENEWABLE_TYPES))
-    is_fossil = iso["resource_clean"].isin(set(FOSSIL_TYPES))
+    is_renewable_and_battery = fyi["resource_clean"].isin(set(RENEWABLE_TYPES))
+    is_fossil = fyi["resource_clean"].isin(set(FOSSIL_TYPES))
     aggs = []
     for name, filter_ in {
         "renewable_and_battery": is_renewable_and_battery,
         "fossil": is_fossil,
     }.items():
         agg = (
-            iso.loc[filter_, :]
+            fyi.loc[filter_, :]
             .groupby("county_id_fips")["surrogate_project_id"]
             .nunique()  # "count" would over-count multi-resource projects
             .rename(f"{name}_proposed_facility_count")
