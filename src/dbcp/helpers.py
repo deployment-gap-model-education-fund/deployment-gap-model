@@ -133,12 +133,54 @@ def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str):
     return df
 
 
-def get_sql_engine() -> sa.engine.Engine:
+def get_sql_engine(production: bool = False) -> sa.engine.Engine:
     """Create a sql alchemy engine from environment vars."""
-    user = os.environ["POSTGRES_USER"]
-    password = os.environ["POSTGRES_PASSWORD"]
-    db = os.environ["POSTGRES_DB"]
-    return sa.create_engine(f"postgresql://{user}:{password}@{db}:5432")
+    if not production:
+        user = os.environ["POSTGRES_USER"]
+        password = os.environ["POSTGRES_PASSWORD"]
+        db = os.environ["POSTGRES_DB"]
+        engine = sa.create_engine(f"postgresql://{user}:{password}@{db}:5432")
+    else:
+        user = os.environ["PROD_POSTGRES_USER"]
+        password = os.environ["PROD_POSTGRES_PASSWORD"]
+        db = os.environ["PROD_POSTGRES_DB"]
+        engine = sa.create_engine(f"postgresql://{user}:{password}@{db}:6543/postgres")
+    return engine
+
+
+def write_to_postgres(
+    df: pd.DataFrame,
+    table_name: str,
+    engine: sa.engine.Engine,
+    schema_name: str,
+    if_exists: str = "append",
+    use_catalyst_schema: bool = False,
+):
+    """Create data from a DataFrame to a postgres table.
+
+    Args:
+        df: DataFrame with table data.
+        table_name: Name of table to create/append to in postgres.
+        engine: sqlalchemy engine.
+        schema_name: Name of schema like ``data_mart`` or ``data_warehouse``.
+        if_exists: What to do if table already exists in postgres. See Pandas ``to_sql`` for options.
+        use_catalyst_schema: In the production postgres instance we only use the schema 'catalyst'
+            but still need the actual schema name for ``enforce_dtypes``.
+    """
+    df = trim_columns_length(df)
+    df = enforce_dtypes(df, table_name, schema_name)
+    df.to_sql(
+        name=table_name,
+        con=engine,
+        if_exists=if_exists,
+        index=False,
+        schema="catalyst" if use_catalyst_schema else schema_name,
+        method=psql_insert_copy,
+        chunksize=5000,  # adjust based on memory capacity
+    )
+
+    # Return DataFrame with enforced dtypes
+    return df
 
 
 def get_pudl_resource(
