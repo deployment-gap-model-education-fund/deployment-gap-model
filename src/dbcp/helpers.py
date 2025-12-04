@@ -125,7 +125,16 @@ def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str):
         # Add the column if it doesn't exist
         if col.name not in df.columns:
             df[col.name] = None
-        df[col.name] = df[col.name].astype(SA_TO_PD_TYPES[str(col.type)])
+        if str(col.type) == "DATETIME":
+            if not pd.api.types.is_datetime64_any_dtype(df[col.name]):
+                df[col.name] = pd.to_datetime(df[col.name], errors="coerce")
+            # normalize the timezone
+            if df[col.name].dt.tz is None:
+                df[col.name] = df[col.name].dt.tz_localize(None)
+            else:
+                df[col.name] = df[col.name].dt.tz_convert("UTC").dt.tz_localize(None)
+        else:
+            df[col.name] = df[col.name].astype(SA_TO_PD_TYPES[str(col.type)])
 
     # convert datetime[ns] columns to milliseconds
     for col in df.select_dtypes(include=["datetime64[ns]"]).columns:
@@ -257,19 +266,39 @@ def upload_schema_to_bigquery(schema: str, dev: bool = True) -> None:
         logger.info(f"Finished: {full_table_name}")
 
 
+def _get_dbapi_connection(conn):
+    """Normalize whatever pandas / SQLAlchemy passes in (Engine, Connection, raw DBAPI connection).
+
+    Output object shoudl have .cursor.
+    """
+    # SQLAlchemy Connection (1.4 / 2.0)
+    if isinstance(conn, sa.engine.Connection):
+        return conn.connection  # underlying DBAPI conn
+
+    # SQLAlchemy Engine
+    if isinstance(conn, sa.engine.Engine):
+        return conn.raw_connection()  # DBAPI conn
+
+    # Already a DBAPI connection?
+    if hasattr(conn, "cursor"):
+        return conn
+
+    raise TypeError(f"Don't know how to get DBAPI connection from {type(conn)}")
+
+
 def psql_insert_copy(table, conn, keys, data_iter):
     """Insert data via COPY statement, which is much faster than INSERT.
 
     Parameters
     ----------
     table : pandas.io.sql.SQLTable
-    conn : sqlalchemy.engine.Engine or sqlalchemy.engine.Connection
+    conn : sqlalchemy.engine.Engine or sqlalchemy.engine.Connection or DBAPI conn
     keys : list of str
         Column names
     data_iter : Iterable that iterates the values to be inserted
     """
     # gets a DBAPI connection that can provide a cursor
-    dbapi_conn = conn.connection
+    dbapi_conn = _get_dbapi_connection(conn)
     with dbapi_conn.cursor() as cur:
         s_buf = StringIO()
         writer = csv.writer(s_buf)
@@ -284,6 +313,8 @@ def psql_insert_copy(table, conn, keys, data_iter):
 
         sql = f"COPY {table_name} ({columns}) FROM STDIN WITH CSV"
         cur.copy_expert(sql=sql, file=s_buf)
+        # Commit if the DBAPI connection supports it
+    if hasattr(dbapi_conn, "commit"):
         dbapi_conn.commit()
 
 
