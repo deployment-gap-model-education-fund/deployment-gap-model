@@ -135,7 +135,8 @@ def multiformat_string_date_parser(
     Returns:
         pd.Series: dates converted to pd.Timestamp
     """
-    if not pd.api.types.is_string_dtype(dates):
+    dates = dates.fillna(value=pd.NaT)
+    if not pd.api.types.is_string_dtype(dates[dates.notna()]):
         raise ValueError(f"Column is not a string dtype. Given {dates.dtype}.")
 
     # Fill incomplete dates that contain only a year, eg "2020"

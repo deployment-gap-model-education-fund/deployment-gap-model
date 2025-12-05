@@ -10,7 +10,7 @@ pandas-gbq~=0.31.0
 pydata-google-auth~=1.7.0
 pandera[io]~=0.26.1
 jupyterlab~=4.3.0
-pandas~=1.4.0
+pandas~=2.3.3
 joblib~=1.2.0
 beautifulsoup4~=4.11
 plotly~=5.15.0
@@ -18,8 +18,8 @@ gridstatus~=0.20.0
 s3fs>=2022.11.0
 click>=8.1.7
 pyairtable>=2.3.3
-numpy<2
-sqlalchemy<2.0
+numpy<3
+sqlalchemy<3.0
 coloredlogs~=15.0.1
 scipy~=1.14.1
 google-cloud-storage~=3.6.0
