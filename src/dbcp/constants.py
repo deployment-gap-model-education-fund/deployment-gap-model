@@ -208,6 +208,7 @@ FYI_RESOURCE_DICT = {
             "Gas + Wind",
             "Compressed Air + Gas",
             "Methane",
+            "Battery + Fuel Cell + Gas",
         ],
         "type": "Fossil",
     },
