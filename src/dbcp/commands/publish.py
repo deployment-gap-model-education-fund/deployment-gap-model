@@ -260,7 +260,7 @@ class OutputMetadata(BaseModel):
     "--upload-to-postgres",
     default=False,
     is_flag=True,
-    help="Upload the FYI outputs to Postgres",
+    help="Upload the data mart tables to production Postgres",
 )
 @click.option(
     "-d",
