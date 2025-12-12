@@ -4,8 +4,8 @@ import os
 from enum import Enum
 
 import pandas as pd
-from geocodio import GeocodioClient
-from geocodio.exceptions import GeocodioAuthError
+from geocodio import Geocodio
+from geocodio.exceptions import AuthenticationError
 from joblib import Memory
 from pydantic import BaseModel, confloat
 
@@ -97,7 +97,7 @@ class AddressData(BaseModel):
 
 
 def _geocode_batch(
-    batch: pd.DataFrame, client: GeocodioClient, state_col: str, locality_col: str
+    batch: pd.DataFrame, client: Geocodio, state_col: str, locality_col: str
 ) -> pd.DataFrame:
     """Geocode a batch of addresses.
 
@@ -113,8 +113,8 @@ def _geocode_batch(
     batch["address"] = batch[locality_col] + ", " + batch[state_col]
     try:
         responses = client.geocode(batch["address"].tolist())
-    except GeocodioAuthError:
-        raise GeocodioAuthError(
+    except AuthenticationError:
+        raise AuthenticationError(
             "Geocodio API key is invalid or you hit the daily geocoding limit which you can change in the Geocodio billing tab."
         )
 
@@ -163,9 +163,7 @@ def _geocode_locality(
     GEOCODIO_API_KEY = os.environ["GEOCODIO_API_KEY"]
     # turn off automatic loading of latest Geocodio API version
     # to ensure backwards compatibility
-    client = GeocodioClient(
-        GEOCODIO_API_KEY, version="1.9", auto_load_api_version=False
-    )
+    client = Geocodio(api_key=GEOCODIO_API_KEY)
 
     geocoded_results = []
 
