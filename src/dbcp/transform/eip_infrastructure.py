@@ -207,6 +207,9 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
     fac = add_county_fips_with_backup_geocoding(
         fac, state_col="state", locality_col="county"
     )
+    # TODO: this is a temporary spot fix for mysterious geocoder changes
+    # make sure this is correctly geocoded when we switch to the official
+    # Python client library
     fac.loc[
         fac.county_id_fips != fac.county_fips_code, "geocoded_containing_county"
     ] = "DeSoto Parish"

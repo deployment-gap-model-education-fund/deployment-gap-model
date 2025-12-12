@@ -369,6 +369,8 @@ def test_add_county_fips_with_backup_geocoding_empty_df():
                 "geocoded_containing_county": "Sonoma County",
             },
         ),
+        # TODO: fix this / catch unknown location when official
+        # python client library is integrated
         pytest.param(
             {"state": "XX", "county": "Random locality name"},
             {

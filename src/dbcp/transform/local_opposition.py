@@ -94,6 +94,8 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
     for col in string_cols:
         local.loc[:, col] = local.loc[:, col].str.strip()
 
+    # TODO: check if Saratoga County still needs a correction
+    # when geocodio-library-python goes in
     # manual corrections
     location_corrections = {
         "Batavia Township (Clermont County)": "Branch County",
