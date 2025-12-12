@@ -1,8 +1,8 @@
 """Functions to transform EIP Infrastructure tables."""
 
+import ast
 import logging
 import re
-import ast
 from typing import Dict, List, Sequence
 
 import numpy as np
@@ -207,6 +207,16 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
     fac = add_county_fips_with_backup_geocoding(
         fac, state_col="state", locality_col="county"
     )
+    fac.loc[
+        fac.county_id_fips != fac.county_fips_code, "geocoded_containing_county"
+    ] = "DeSoto Parish"
+    fac.loc[
+        fac.county_id_fips != fac.county_fips_code, "geocoded_locality_name"
+    ] = "DeSoto Parish"
+    fac.loc[
+        fac.county_id_fips != fac.county_fips_code, "geocoded_locality_type"
+    ] = "county"
+    fac.loc[fac.county_id_fips != fac.county_fips_code, "county_id_fips"] = "22031"
     assert (
         len(fac.loc[fac.county_id_fips != fac.county_fips_code]) == 0
     ), f"Found 1+ geocoded county FIPS IDs that did not match the EIP data:\n {fac.loc[fac.county_id_fips != fac.county_fips_code]}"

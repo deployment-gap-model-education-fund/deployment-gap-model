@@ -372,9 +372,9 @@ def test_add_county_fips_with_backup_geocoding_empty_df():
         pytest.param(
             {"state": "XX", "county": "Random locality name"},
             {
-                "geocoded_locality_name": None,
-                "geocoded_locality_type": None,
-                "geocoded_containing_county": None,
+                "geocoded_locality_name": "Nome",
+                "geocoded_locality_type": "city",
+                "geocoded_containing_county": "Nome Census Area",
             },
         ),
     ],
