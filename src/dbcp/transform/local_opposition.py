@@ -94,6 +94,8 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
     for col in string_cols:
         local.loc[:, col] = local.loc[:, col].str.strip()
 
+    # TODO: check if Saratoga County still needs a correction
+    # when geocodio-library-python goes in
     # manual corrections
     location_corrections = {
         "Batavia Township (Clermont County)": "Branch County",
@@ -111,6 +113,7 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
         "Matteson Township (Branch County)": "Branch County",
         "Monitor Township (Bay County)": "Bay County",
         "Town of Porter (Niagara County)": "Niagara County",
+        "Town of Ballston (Saratoga County)": "Saratoga County",
     }
     raw_locality = local["locality"].copy()
     local.loc[:, "locality"].replace(location_corrections, inplace=True)
