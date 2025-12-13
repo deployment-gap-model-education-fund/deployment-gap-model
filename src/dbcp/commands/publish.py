@@ -10,11 +10,13 @@ from typing import Literal
 
 import click
 import google.auth
+import pandas as pd
 import yaml
 from google.cloud import bigquery, storage
 from pydantic import BaseModel, validator
 
 from dbcp.constants import OUTPUT_DIR
+from dbcp.helpers import get_sql_engine, write_to_postgres
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +58,41 @@ def upload_parquet_directory_to_gcs(
         logger.info(
             f"Uploaded {file} to gs://{output_bucket.id}/{destination_blob_name}"
         )
+
+
+def load_parquet_files_to_postgres(
+    output_bucket: storage.Bucket,
+    destination_blob_prefix: DataDirectoryLiteral,
+    version: str,
+):
+    """
+    Load Parquet files from GCS to production postgres db.
+
+    Args:
+        output_bucket: the GCS bucket containing the output Parquet files.
+        destination_blob_prefix: the prefix of the GCS blobs to load.
+        version: the version of the data to load.
+    """
+    engine = get_sql_engine(production=True)
+    for blob in output_bucket.list_blobs(prefix=f"{version}/{destination_blob_prefix}"):
+        if not blob.name.endswith(".parquet"):
+            continue
+        # get the blob filename without the extension
+        table_name = blob.name.split("/")[-1].split(".")[0]
+
+        # Read parquet then write to postgres
+        df = pd.read_parquet(f"gs://{output_bucket.id}/{blob.name}")
+
+        logger.info(f"Publishing table {table_name} to production postgres DB.")
+        write_to_postgres(
+            df,
+            table_name=table_name,
+            engine=engine,
+            schema_name=destination_blob_prefix,
+            if_exists="replace",
+            use_catalyst_schema=True,
+        )
+        logger.info(f"Successfully wrote table {table_name} to production postgres DB.")
 
 
 def load_parquet_files_to_bigquery(
@@ -220,6 +257,12 @@ class OutputMetadata(BaseModel):
     help="Upload the outputs to BigQuery",
 )
 @click.option(
+    "--upload-to-postgres",
+    default=False,
+    is_flag=True,
+    help="Upload the data mart tables to production Postgres",
+)
+@click.option(
     "-d",
     "--directories",
     type=click.Choice(VALID_DIRECTORIES),
@@ -235,6 +278,7 @@ def publish_outputs(
     settings_file_git_sha: str,
     directories: DataDirectoryLiteral,
     upload_to_big_query: bool,
+    upload_to_postgres: bool,
 ):
     """Publish outputs to Google Cloud Storage and Big Query."""
     bucket_name = "dgm-outputs"
@@ -258,14 +302,23 @@ def publish_outputs(
     blob.upload_from_string(metadata.to_yaml())
     logger.info(f"Uploaded metadata to gs://{bucket_name}/{destination_blob_name}")
 
-    if upload_to_big_query:
-        if target:
-            for directory in directories:
+    if target is not None:
+        for directory in directories:
+            if upload_to_big_query:
                 load_parquet_files_to_bigquery(
                     output_bucket, directory, metadata.version, target
                 )
-        else:
-            logger.warning("No target schema provided. Skipping BigQuery upload.")
+            # At this point postgres is only used for production data mart and private data mart tables
+            if (
+                upload_to_postgres
+                and ("data_mart" in str(directory))
+                and (target == "prod")
+            ):
+                load_parquet_files_to_postgres(
+                    output_bucket, directory, metadata.version
+                )
+    else:
+        logger.warning("No target schema provided. Skipping BigQuery/Postgres upload.")
 
 
 if __name__ == "__main__":

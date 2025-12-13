@@ -7,6 +7,9 @@ services:
       - API_KEY_GOOGLE_MAPS=${API_KEY_GOOGLE_MAPS} # get this value from our google account: https://console.cloud.google.com/google/maps-apis/credentials?project=dbcp-dev&supportedpurview=project
       - AIRTABLE_API_KEY=${AIRTABLE_API_KEY}
       - GEOCODIO_API_KEY=${GEOCODIO_API_KEY} # This api key is stored GCP project secret manager as geocodio-api-key
+      - PROD_POSTGRES_USER=${PROD_POSTGRES_USER}
+      - PROD_POSTGRES_PASSWORD=${PROD_POSTGRES_PASSWORD}
+      - PROD_POSTGRES_HOST=${PROD_POSTGRES_HOST}
     depends_on:
       postgres:
         condition: service_healthy
