@@ -1,7 +1,5 @@
 """Module to create a denormalized table for the Ballot Ready Election Data."""
 
-from typing import Optional
-
 import pandas as pd
 import sqlalchemy as sa
 
@@ -94,7 +92,9 @@ def _create_county_commission_elections_long(
     ).any(), "County comissioner election primary key is not unique."
     assert (
         comissioner_elections.total_n_seats >= comissioner_elections.total_n_races
-    ).all(), "Number of seats should always be greater or equal to number of races in a county."
+    ).all(), (
+        "Number of seats should always be greater or equal to number of races in a county."
+    )
     return comissioner_elections
 
 
@@ -104,19 +104,19 @@ def _create_county_commission_elections_wide(
     """Create a dataframe of county comissioner races where each row is a county with columns for regular, primary and special elections."""
     # Create election_type column to pivot on
     county_commission_elections_long["election_type"] = pd.Series()
-    county_commission_elections_long[
-        "election_type"
-    ] = county_commission_elections_long.election_type.mask(
-        county_commission_elections_long.is_primary, "primary"
+    county_commission_elections_long["election_type"] = (
+        county_commission_elections_long.election_type.mask(
+            county_commission_elections_long.is_primary, "primary"
+        )
     )
-    county_commission_elections_long[
-        "election_type"
-    ] = county_commission_elections_long.election_type.mask(
-        county_commission_elections_long.is_runoff, "run_off"
+    county_commission_elections_long["election_type"] = (
+        county_commission_elections_long.election_type.mask(
+            county_commission_elections_long.is_runoff, "run_off"
+        )
     )
-    county_commission_elections_long[
-        "election_type"
-    ] = county_commission_elections_long["election_type"].fillna("general")
+    county_commission_elections_long["election_type"] = (
+        county_commission_elections_long["election_type"].fillna("general")
+    )
     county_commission_elections_long = county_commission_elections_long.drop(
         columns=["is_primary", "is_runoff"]
     )
@@ -151,14 +151,14 @@ def _create_county_commission_elections_wide(
         next_county_commission_elections_wide.reset_index().convert_dtypes()
     )
 
-    assert (
-        next_county_commission_elections_wide.county_id_fips.is_unique
-    ), "county_id_fips is not unique!"
+    assert next_county_commission_elections_wide.county_id_fips.is_unique, (
+        "county_id_fips is not unique!"
+    )
     return next_county_commission_elections_wide
 
 
 def create_data_mart(
-    engine: Optional[sa.engine.Engine] = None,
+    engine: sa.engine.Engine | None = None,
 ) -> dict[str, pd.DataFrame]:
     """Create final output table.
 
@@ -167,6 +167,7 @@ def create_data_mart(
 
     Returns:
         pd.DataFrame: table for data mart
+
     """
     if engine is None:
         engine = get_sql_engine()

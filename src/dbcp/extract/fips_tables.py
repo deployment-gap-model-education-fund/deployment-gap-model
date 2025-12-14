@@ -5,7 +5,6 @@ import tempfile
 from functools import lru_cache
 from importlib.resources import files
 from pathlib import Path
-from typing import Dict
 
 import addfips
 import geopandas as gpd
@@ -19,8 +18,7 @@ TRIBAL_LANDS_URI = "gs://dgm-archive/census/tl_2021_us_aiannh.zip"
 
 
 def extract_zipped_shapefile(path: Path) -> gpd.GeoDataFrame:
-    """
-    Create a temporary file from a zipped shapefile and return a GeoDataFrame.
+    """Create a temporary file from a zipped shapefile and return a GeoDataFrame.
 
     vsizip doesn't like the '#' in the path so my workaround is to copy the file to a temporary file.
 
@@ -28,6 +26,7 @@ def extract_zipped_shapefile(path: Path) -> gpd.GeoDataFrame:
         path: path to zipped shapefile
     Returns:
         GeoDataFrame
+
     """
     with tempfile.NamedTemporaryFile(delete=True, suffix=".zip") as temp_file:
         shutil.copyfile(path, temp_file.name)
@@ -40,6 +39,7 @@ def _extract_census_counties(census_uri: str) -> pd.DataFrame:
 
     Args:
         census_uri: path to zipped shapefiles.
+
     """
     path = dbcp.extract.helpers.cache_gcs_archive_file_locally(census_uri)
     return extract_zipped_shapefile(path)
@@ -53,6 +53,7 @@ def extract_census_tribal_land(archive_uri: str) -> pd.DataFrame:
 
     Returns:
         output dataframes of county-level info.
+
     """
     path = dbcp.extract.helpers.cache_gcs_archive_file_locally(archive_uri)
     return extract_zipped_shapefile(path)
@@ -63,6 +64,7 @@ def _extract_state_fips() -> pd.DataFrame:
 
     Returns:
         Dict[str, pd.DataFrame]: output dictionary of dataframes
+
     """
     data_dir_path = files(addfips)
     state_csv_path = data_dir_path / addfips.addfips.STATES
@@ -70,11 +72,12 @@ def _extract_state_fips() -> pd.DataFrame:
     return states
 
 
-def extract_fips(census_uri: str) -> Dict[str, pd.DataFrame]:
+def extract_fips(census_uri: str) -> dict[str, pd.DataFrame]:
     """Extract canonical FIPS tables from census data and the addfips library.
 
     Returns:
         Dict[str, pd.DataFrame]: output dictionary of dataframes
+
     """
     fips_data = {}
     fips_data["counties"] = _extract_census_counties(census_uri=census_uri)

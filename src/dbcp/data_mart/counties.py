@@ -21,7 +21,6 @@ separately, such as non-commutative aggregations over nested groupings, eg
 """
 
 from io import StringIO
-from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -257,8 +256,8 @@ def _get_existing_fossil_plant_co2e_estimates() -> pd.Series:
 
 def _get_existing_plant_locations(
     postgres_engine: sa.engine.Engine,
-    state_fips_table: Optional[pd.DataFrame] = None,
-    county_fips_table: Optional[pd.DataFrame] = None,
+    state_fips_table: pd.DataFrame | None = None,
+    county_fips_table: pd.DataFrame | None = None,
 ):
     if state_fips_table is None:
         state_fips_table = _get_state_fips_df(postgres_engine)
@@ -273,8 +272,8 @@ def _get_existing_plant_locations(
 
 def _get_existing_plants(
     postgres_engine: sa.engine.Engine,
-    state_fips_table: Optional[pd.DataFrame] = None,
-    county_fips_table: Optional[pd.DataFrame] = None,
+    state_fips_table: pd.DataFrame | None = None,
+    county_fips_table: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     plants = _get_existing_plant_attributes(engine=postgres_engine)
     co2e = _get_existing_fossil_plant_co2e_estimates()
@@ -290,8 +289,8 @@ def _get_existing_plants(
 
 def _existing_plants_counties(
     postgres_engine: sa.engine.Engine,
-    state_fips_table: Optional[pd.DataFrame] = None,
-    county_fips_table: Optional[pd.DataFrame] = None,
+    state_fips_table: pd.DataFrame | None = None,
+    county_fips_table: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Create existing plant county-plant aggs for the long-format county table."""
     plants = _get_existing_plants(
@@ -688,12 +687,12 @@ def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
         "federal_fraction_unprotected_land",
     ]
     correlated_rounding_errors = areas["federal_fraction_unprotected_land"].gt(1)
-    assert (
-        correlated_rounding_errors.sum() == 1
-    ), f"Expected 1 bad rounding error, got {correlated_rounding_errors.sum()}"
-    areas.loc[
-        correlated_rounding_errors, "federal_fraction_unprotected_land"
-    ] = 1.0  # manually clip
+    assert correlated_rounding_errors.sum() == 1, (
+        f"Expected 1 bad rounding error, got {correlated_rounding_errors.sum()}"
+    )
+    areas.loc[correlated_rounding_errors, "federal_fraction_unprotected_land"] = (
+        1.0  # manually clip
+    )
 
     return areas.loc[:, out_cols].copy()
 
@@ -709,7 +708,7 @@ def _get_energy_community_qualification(postgres_engine: sa.engine.Engine):
 def _get_county_properties(
     postgres_engine: sa.engine.Engine,
     include_state_policies=False,
-    rename_dict: Optional[Dict[str, str]] = None,
+    rename_dict: dict[str, str] | None = None,
 ):
     if rename_dict is None:
         rename_dict = {
@@ -944,8 +943,8 @@ def _get_avoided_emissions_by_county_resource(engine: sa.engine.Engine) -> pd.Da
 
 
 def create_wide_format(
-    postgres_engine: Optional[sa.engine.Engine] = None,
-    long_format: Optional[pd.DataFrame] = None,
+    postgres_engine: sa.engine.Engine | None = None,
+    long_format: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Create wide format county aggregates."""
     if postgres_engine is None:
@@ -1027,8 +1026,8 @@ def _get_category_project_counts(engine: sa.engine.Engine) -> pd.DataFrame:
 
 
 def create_data_mart(
-    engine: Optional[sa.engine.Engine] = None,
-) -> Dict[str, pd.DataFrame]:
+    engine: sa.engine.Engine | None = None,
+) -> dict[str, pd.DataFrame]:
     """Create county data marts.
 
     Args:
@@ -1036,6 +1035,7 @@ def create_data_mart(
 
     Returns:
         Dict[str, pd.DataFrame]: county tables in both wide and long format
+
     """
     postgres_engine = engine
     if postgres_engine is None:

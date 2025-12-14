@@ -2,8 +2,8 @@
 
 import hashlib
 import re
+from collections.abc import Callable
 from functools import partial
-from typing import Callable
 
 import geopandas as gpd
 import numpy as np
@@ -49,9 +49,9 @@ def _col_transform_status(ser: pd.Series) -> pd.Series:
         pd.NA,
     }
     is_expected = out.isin(expected_values)
-    assert (
-        is_expected.all()
-    ), f"Unexpected status values: {out[~is_expected].value_counts()}"
+    assert is_expected.all(), (
+        f"Unexpected status values: {out[~is_expected].value_counts()}"
+    )
     return out
 
 
@@ -78,9 +78,9 @@ def _col_transform_phase_type(ser: pd.Series) -> pd.Series:
         pd.NA,
     }
     is_expected = out.isin(expected_values)
-    assert (
-        is_expected.all()
-    ), f"Unexpected status values: {out[~is_expected].value_counts()}"
+    assert is_expected.all(), (
+        f"Unexpected status values: {out[~is_expected].value_counts()}"
+    )
     return out
 
 
@@ -89,9 +89,9 @@ def _col_transform_iso_rtos(ser: pd.Series) -> pd.Series:
     # I think this is a reasonable simplification because only 0.37% are multivalued.
     # But first check that multi-valued items are still a small minority of records
     is_multi = ser.str.contains("|", regex=False).fillna(False)
-    assert (
-        is_multi.mean() < 0.01
-    ), f"Too many multi-valued ISO/RTOS: {ser[is_multi].value_counts()}"
+    assert is_multi.mean() < 0.01, (
+        f"Too many multi-valued ISO/RTOS: {ser[is_multi].value_counts()}"
+    )
     out = ser.str.split("|", regex=False).str[0].str.strip().astype(pd.StringDtype())
 
     # Standardize some variations
@@ -117,9 +117,9 @@ def _col_transform_iso_rtos(ser: pd.Series) -> pd.Series:
         pd.NA,
     }
     is_expected = out.isin(expected_values)
-    assert (
-        is_expected.all()
-    ), f"Unexpected ISO/RTOS values: {out[~is_expected].value_counts()}"
+    assert is_expected.all(), (
+        f"Unexpected ISO/RTOS values: {out[~is_expected].value_counts()}"
+    )
     return out
 
 
@@ -128,9 +128,9 @@ def _col_transform_owner_types(ser: pd.Series, full_df: pd.DataFrame) -> pd.Seri
     # Only 0.15% of proposed projects (1.4% overall) are multivalued.
     # But first check that multi-valued items are still a small minority of records
     is_multi = ser.str.contains("|", regex=False).fillna(False)
-    assert (
-        is_multi.mean() < 0.02
-    ), f"Too many multi-valued owner types: {ser[is_multi].value_counts()}"
+    assert is_multi.mean() < 0.02, (
+        f"Too many multi-valued owner types: {ser[is_multi].value_counts()}"
+    )
     out = (
         ser.str.split("|", regex=False, n=1)
         .str[0]
@@ -148,9 +148,7 @@ def _col_transform_owner_types(ser: pd.Series, full_df: pd.DataFrame) -> pd.Seri
         .max()
     )
     n_known_investor_owned = 1
-    assert (
-        n_max_investor_owned_owner_type_per_date == n_known_investor_owned
-    ), f"""
+    assert n_max_investor_owned_owner_type_per_date == n_known_investor_owned, f"""
         Found {n_max_investor_owned_owner_type_per_date} 'Investor Owned' owner types from one report date, expected {n_known_investor_owned}:
         {full_df[full_df["raw_owner_types"].str.contains("Investor Owned")][["raw_owner_types", "raw_owners", "report_date"]]}
         If these are all IPPs, then increase the number of expected.
@@ -179,9 +177,9 @@ def _col_transform_owner_types(ser: pd.Series, full_df: pd.DataFrame) -> pd.Seri
         pd.NA,
     }
     is_expected = out.isin(expected_values)
-    assert (
-        is_expected.all()
-    ), f"Unexpected owner type values: {out[~is_expected].value_counts()}"
+    assert is_expected.all(), (
+        f"Unexpected owner type values: {out[~is_expected].value_counts()}"
+    )
     return out
 
 
@@ -223,12 +221,12 @@ def _transform_location_cols(
     #    have multivalued entries.
 
     # first check dtypes
-    assert (
-        full_df["raw_avg_latitude"].dtype == pd.Float64Dtype()
-    ), "Latitude is not float64"
-    assert (
-        full_df["raw_avg_longitude"].dtype == pd.Float64Dtype()
-    ), "Longitude is not float64"
+    assert full_df["raw_avg_latitude"].dtype == pd.Float64Dtype(), (
+        "Latitude is not float64"
+    )
+    assert full_df["raw_avg_longitude"].dtype == pd.Float64Dtype(), (
+        "Longitude is not float64"
+    )
     county_shapes["GEOID"] = county_shapes["GEOID"].astype(pd.StringDtype())
     points = gpd.GeoSeries.from_xy(
         full_df["raw_avg_longitude"].astype(np.float64),
@@ -383,6 +381,7 @@ def _make_surrogate_key(raw_df: pd.DataFrame) -> pd.Series:
 
     Arguments:
         raw_df (pd.DataFrame): The raw dataframe to create a key for.
+
     """
     # The surrogate key is a hash of several columns that should uniquely identify a row
     # The main design decisions are whether to use raw data or transformed data as
@@ -410,9 +409,9 @@ def _make_surrogate_key(raw_df: pd.DataFrame) -> pd.Series:
     ]
     dupes = raw_df.duplicated(subset=pk, keep=False)
     assert not dupes.any(), f"Uniqueness violation: {dupes.sum()} duplicate PKs found."
-    assert (
-        raw_df["MW_Total_Capacity"].dtype == pd.Float64Dtype()
-    ), "Capacity is not float dtype"
+    assert raw_df["MW_Total_Capacity"].dtype == pd.Float64Dtype(), (
+        "Capacity is not float dtype"
+    )
 
     to_hash = raw_df.loc[:, pk].copy()
     str_cols = to_hash.select_dtypes(include="string").columns

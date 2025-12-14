@@ -1,7 +1,6 @@
 """Functions to transform LBNL ISO queue tables."""
 
 import logging
-from typing import Dict, List
 
 import numpy as np
 import pandas as pd
@@ -77,10 +76,10 @@ def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
 
     projects["project_id"] = np.arange(len(projects), dtype=np.int32)
     projects = projects.rename(columns=rename_dict)  # copy
-    projects.loc[
-        :, "interconnection_status_lbnl"
-    ] = _harmonize_interconnection_status_lbnl(
-        projects.loc[:, "interconnection_status_lbnl"]
+    projects.loc[:, "interconnection_status_lbnl"] = (
+        _harmonize_interconnection_status_lbnl(
+            projects.loc[:, "interconnection_status_lbnl"]
+        )
     )
     parse_date_columns(projects)
     # rename date_withdrawn to withdrawn_date and date_operational to actual_completion_date
@@ -135,7 +134,9 @@ def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
         .isna()
         .all()
         .all()
-    ), "Some operational or withdrawn projects have is_actionable or is_nearly_certain values."
+    ), (
+        "Some operational or withdrawn projects have is_actionable or is_nearly_certain values."
+    )
 
     # S-C utilities don't list the state which prevents them from being geocoded
     projects.loc[
@@ -147,15 +148,15 @@ def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     return projects
 
 
-def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
-    """
-    Transform LBNL ISO Queues dataframes.
+def transform(lbnl_raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+    """Transform LBNL ISO Queues dataframes.
 
     Args:
         lbnl_raw_dfs: Dictionary of the raw extracted data for each table.
 
     Returns:
         lbnl_transformed_dfs: Dictionary of the transformed tables.
+
     """
     transformed = _clean_all_iso_projects(
         lbnl_raw_dfs["lbnl_iso_queue"]
@@ -180,9 +181,9 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         .copy()
     )
     # Fix defunct county FIPS code
-    new_locs.loc[
-        new_locs.county_id_fips.eq("51515"), "county_id_fips"
-    ] = "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
+    new_locs.loc[new_locs.county_id_fips.eq("51515"), "county_id_fips"] = (
+        "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
+    )
     lbnl_normalized_dfs["iso_locations"] = new_locs
 
     # Clean up and categorize resources
@@ -197,9 +198,9 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
 
     # Most projects missing queue_status are from the early 2000s so I'm going to assume
     # they were withrawn.
-    assert (
-        lbnl_normalized_dfs["iso_projects"]["queue_status"].isna().sum() <= 42
-    ), "Unexpected number of projects missing queue status."
+    assert lbnl_normalized_dfs["iso_projects"]["queue_status"].isna().sum() <= 42, (
+        "Unexpected number of projects missing queue status."
+    )
     lbnl_normalized_dfs["iso_projects"]["queue_status"] = lbnl_normalized_dfs[
         "iso_projects"
     ]["queue_status"].fillna("withdrawn")
@@ -207,7 +208,7 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     return lbnl_normalized_dfs
 
 
-def _normalize_resource_capacity(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+def _normalize_resource_capacity(lbnl_df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Pull out the awkward one-to-many columns (type_1, capacity_1, type_2, capacity_2) to a separate dataframe.
 
     Args:
@@ -215,6 +216,7 @@ def _normalize_resource_capacity(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFram
 
     Returns:
         Dict[str, pd.DataFrame]: dict with the projects and multivalues split into two dataframes
+
     """
     n_multicolumns = 3
     attr_columns = {
@@ -229,13 +231,13 @@ def _normalize_resource_capacity(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFram
         preserve_original_names=False,
         dropna=True,
     )
-    combined_cols: List[str] = sum(attr_columns.values(), start=[])
+    combined_cols: list[str] = sum(attr_columns.values(), start=[])
     project_df = lbnl_df.drop(columns=combined_cols)
 
     return {"resource_capacity_df": resource_capacity_df, "project_df": project_df}
 
 
-def _normalize_location(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+def _normalize_location(lbnl_df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Pull out the awkward one-to-many columns (county_1, county_2, etc) to a separate dataframe.
 
     Args:
@@ -243,6 +245,7 @@ def _normalize_location(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
 
     Returns:
         Dict[str, pd.DataFrame]: dict with the projects and locations split into two dataframes
+
     """
     county_cols = ["county_" + str(n) for n in range(1, 4)]
     location_df = normalize_multicolumns_to_rows(
@@ -271,7 +274,7 @@ def _normalize_location(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     return {"location_df": location_df, "project_df": project_df}
 
 
-def normalize_lbnl_dfs(lbnl_transformed_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+def normalize_lbnl_dfs(lbnl_transformed_df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Normalize one-to-many columns and combine the three queues.
 
     Args:
@@ -279,6 +282,7 @@ def normalize_lbnl_dfs(lbnl_transformed_df: pd.DataFrame) -> Dict[str, pd.DataFr
 
     Returns:
         Dict[str, pd.DataFrame]: the combined queues, normalized into projects, locations, and resource_capacity
+
     """
     resource_capacity_dfs = _normalize_resource_capacity(lbnl_transformed_df)
     location_dfs = _normalize_location(resource_capacity_dfs["project_df"])
@@ -335,14 +339,13 @@ def _fix_independent_city_fips(location_df: pd.DataFrame) -> pd.DataFrame:
 
     Returns:
         pd.DataFrame: copy of location_df with fewer nan fips codes
+
     """
     if "county_id_fips" not in location_df.columns:
         raise ValueError("Use add_county_fips_with_backup_geocoding() first.")
     nan_fips = location_df.loc[
         location_df["county_id_fips"].isna(), ["raw_state_name", "raw_county_name"]
-    ].fillna(
-        ""
-    )  # copy
+    ].fillna("")  # copy
     nan_fips.loc[:, "raw_county_name"] = (
         nan_fips.loc[:, "raw_county_name"]
         .str.lower()

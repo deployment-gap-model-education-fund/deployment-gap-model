@@ -4,8 +4,6 @@ The table is at the county level and contains data from.
 
 """
 
-from typing import Optional
-
 import pandas as pd
 import sqlalchemy as sa
 
@@ -34,7 +32,7 @@ def _get_existing_plant_fuel_data() -> pd.DataFrame:
         df[col] = df[col].astype("string")
     df = df[
         (df["report_date"] >= f"{PUDL_LATEST_YEAR}-01-01")
-        & (df["report_date"] < f"{PUDL_LATEST_YEAR+1}-01-01")
+        & (df["report_date"] < f"{PUDL_LATEST_YEAR + 1}-01-01")
         & (df["fuel_type_code_pudl"].isin(["coal", "gas", "oil"]))
     ]
 
@@ -247,8 +245,7 @@ def _get_proposed_fossil_plants(engine: sa.engine.Engine) -> pd.DataFrame:
 def _estimate_proposed_power_co2e(
     df: pd.DataFrame,
 ) -> None:
-    """
-    Estimate CO2e tons per year from capacity and fuel type.
+    """Estimate CO2e tons per year from capacity and fuel type.
 
     This is essentially a manual decision tree. Capacity factors were simple mean
     values derived from recent gas plants. See notebooks/12-tpb-revisit_co2_estimates.ipynb
@@ -260,6 +257,7 @@ def _estimate_proposed_power_co2e(
 
     Returns:
         pd.DataFrame: copy of input dataframe with new column 'co2e_tonnes_per_year'
+
     """
     gas_turbine_mmbtu_per_mwh = 11.069
     combined_cycle_mmbtu_per_mwh = 7.604
@@ -328,7 +326,7 @@ def _get_proposed_fossil_infra(engine: sa.engine.Engine) -> pd.DataFrame:
 
 
 def create_data_mart(
-    engine: Optional[sa.engine.Engine] = None,
+    engine: sa.engine.Engine | None = None,
 ) -> pd.DataFrame:
     """Create final output table.
 
@@ -337,6 +335,7 @@ def create_data_mart(
 
     Returns:
         pd.DataFrame: table for data mart
+
     """
     postgres_engine = engine
     if postgres_engine is None:

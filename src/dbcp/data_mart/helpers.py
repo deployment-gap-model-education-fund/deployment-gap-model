@@ -1,7 +1,7 @@
 """Module of helper functions for creating data mart tables from the data warehouse."""
 
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Optional, Sequence
 
 import pandas as pd
 import sqlalchemy as sa
@@ -31,16 +31,16 @@ def _get_state_fips_df(engine: sa.engine.Engine) -> pd.DataFrame:
     return df
 
 
-class CountyOpposition(object):
+class CountyOpposition:
     """Combine ordinance information from NREL and Columbia at the county level."""
 
     # I think this is only a class because of some misguided attempt at caching. Future refactor.
 
     def __init__(  # noqa: D107
         self,
-        engine: Optional[sa.engine.Engine] = None,
-        county_fips_df: Optional[pd.DataFrame] = None,
-        state_fips_df: Optional[pd.DataFrame] = None,
+        engine: sa.engine.Engine | None = None,
+        county_fips_df: pd.DataFrame | None = None,
+        state_fips_df: pd.DataFrame | None = None,
     ) -> None:
         self._engine = engine if engine is not None else get_sql_engine()
         self._local_opp_df = self._get_local_opposition_df()
@@ -99,6 +99,7 @@ class CountyOpposition(object):
 
         Returns:
             pd.DataFrame: fanned out state policy dataframe
+
         """
         # fan out
         states_as_counties = self._state_opp_df.merge(
@@ -147,6 +148,7 @@ class CountyOpposition(object):
 
         Returns:
             pd.DataFrame: aggregated local ordinance dataframe
+
         """
         dupe_counties = ordinances.duplicated(subset="county_id_fips", keep=False)
         dupes = ordinances.loc[dupe_counties, :].copy()
@@ -214,6 +216,7 @@ class CountyOpposition(object):
 
         Returns:
             pd.DataFrame: county-level dataframe of policies
+
         """
         opposition = self._local_opp_df
         if include_state_policies:
@@ -249,8 +252,7 @@ def _add_emissions_factors(
 def _estimate_proposed_power_co2e(
     iso_projects: pd.DataFrame,
 ) -> None:
-    """
-    Estimate CO2e tons per year from capacity and fuel type. Currently for fossil plants only.
+    """Estimate CO2e tons per year from capacity and fuel type. Currently for fossil plants only.
 
     This is essentially a manual decision tree. Capacity factors were simple mean
     values derived from recent gas plants. See notebooks/12-tpb-revisit_co2_estimates.ipynb
@@ -262,6 +264,7 @@ def _estimate_proposed_power_co2e(
 
     Returns:
         pd.DataFrame: copy of input dataframe with new column 'co2e_tonnes_per_year'
+
     """
     gas_turbine_mmbtu_per_mwh = 11.069
     combined_cycle_mmbtu_per_mwh = 7.604
@@ -347,8 +350,7 @@ def _estimate_proposed_power_co2e(
 
 
 def get_query(filename: str) -> str:
-    """
-    Get the query from a file.
+    """Get the query from a file.
 
     To avoid having to write long queries in Python, we store them in separate files
     in the src/dbcp/sql_queries directory. To use them, call this function with the
@@ -365,6 +367,7 @@ def get_query(filename: str) -> str:
         >>> engine = get_sql_engine()
         >>> query = get_query("get_proposed_infra_projects.sql")
         >>> df = pd.read_sql(query, engine)
+
     """
     sql_query_dir = Path(__file__).parent / "sql_queries"
     full_path = sql_query_dir / filename
