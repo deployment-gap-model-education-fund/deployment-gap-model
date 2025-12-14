@@ -25,7 +25,9 @@ def extract(uri: str) -> dict[str, pd.DataFrame]:
         "ia_status_raw": "interconnection_status_raw",
         "ia_status_clean": "interconnection_status_fyi",
     }
-    all_projects.rename(columns=rename_dict, inplace=True)
+    all_projects = all_projects.rename(
+        columns=rename_dict,
+    )
     return {
         "fyi_queue": all_projects,
     }

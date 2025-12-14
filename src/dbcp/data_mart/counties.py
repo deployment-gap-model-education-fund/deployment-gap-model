@@ -306,7 +306,7 @@ def _existing_plants_counties(
             "plant_id_eia": "count",
         }
     )
-    aggs.loc[:, "co2e_tonnes_per_year"] = aggs.loc[:, "co2e_tonnes_per_year"].replace(
+    aggs = aggs.loc[:, "co2e_tonnes_per_year"].replace(
         0, np.nan
     )  # sums of 0 are simply unmodeled
     aggs["facility_type"] = "power plant"
@@ -340,7 +340,7 @@ def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     # from data_mart.fossil_infrastructure_projects
     # group by 1, 2
 
-    infra.loc[:, "industry_sector"] = infra.loc[:, "industry_sector"].replace(
+    infra = infra.loc[:, "industry_sector"].replace(
         "Liquefied Natural Gas (LNG)", "Liquefied Natural Gas"
     )  # Use shorthand code to shorten column names later on
 
@@ -353,19 +353,18 @@ def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
             "project_id": "count",
         }
     )
-    aggs.loc[:, "co2e_tonnes_per_year"] = aggs.loc[:, "co2e_tonnes_per_year"].replace(
+    aggs = aggs.loc[:, "co2e_tonnes_per_year"].replace(
         0, np.nan
     )  # sums of 0 are simply unmodeled
 
     aggs["facility_type"] = "fossil infrastructure"
     aggs["status"] = "proposed"
     aggs = aggs.reset_index()
-    aggs.rename(
+    aggs = aggs.rename(
         columns={
             "project_id": "facility_count",
             "industry_sector": "resource_or_sector",
         },
-        inplace=True,
     )
     return aggs
 
@@ -409,19 +408,17 @@ def _fyi_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
             "project_id": "count",
         }
     )
-    aggs.loc[:, "co2e_tonnes_per_year"] = aggs.loc[:, "co2e_tonnes_per_year"].replace(
-        0,
-        np.nan,
+    aggs = aggs.loc[:, "co2e_tonnes_per_year"].replace(
+        0, np.nan
     )  # sums of 0 are simply unmodeled
     aggs["facility_type"] = "power plant"
     aggs["status"] = "proposed"
-    aggs.reset_index(inplace=True)
-    aggs.rename(
+    aggs = aggs.reset_index()
+    aggs = aggs.rename(
         columns={
             "project_id": "facility_count",
             "resource_clean": "resource_or_sector",
         },
-        inplace=True,
     )
     return aggs
 
@@ -519,7 +516,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     # counties with power infrastructure in them
 
     wide = long.pivot(index=idx_cols, columns=col_cols, values=val_cols)
-    wide.reset_index(inplace=True)
+    wide = wide.reset_index()
 
     wide.columns = wide.columns.rename(
         {None: "measures"}
@@ -582,7 +579,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         infra_cols_to_sum = [f"infra_{sector}_{measure}" for sector in sectors]
         wide[f"infra_total_{measure}"] = wide.loc[:, infra_cols_to_sum].sum(axis=1)
 
-    wide.dropna(axis=1, how="all", inplace=True)
+    wide = wide.dropna(axis=1, how="all")
     cols_to_drop = [
         # A handful of hybrid facilities with co-located diesel generators.
         # They produce tiny amounts of CO2 but large amounts of confusion.
@@ -595,7 +592,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     ]
     # some columns pop in and out of existence based on minor fluctuations in the data
     cols_to_drop = [col for col in cols_to_drop if col in wide.columns]
-    wide.drop(columns=cols_to_drop, inplace=True)
+    wide = wide.drop(columns=cols_to_drop)
 
     return wide
 
@@ -634,7 +631,7 @@ def _get_offshore_wind_extra_cols(engine: sa.engine.Engine) -> pd.DataFrame:
     # to know how much total capacity is at stake in each port county.
     query = get_query("get_offshore_wind_extra_cols.sql")
     df = pd.read_sql(query, engine)
-    df.set_index("county_id_fips", inplace=True)
+    df = df.set_index("county_id_fips")
     return df
 
 
@@ -675,7 +672,7 @@ def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
     areas = pd.concat(
         [county_areas, federal_developable, un_developable], axis=1, join="outer"
     )
-    areas.loc[:, ["fed_dev", "protected"]].fillna(0, inplace=True)
+    areas = areas.loc[:, ["fed_dev", "protected"]].fillna(0)
     areas["unprotected_land_area_km2"] = (
         areas["county_area_coast_clipped_km2"] - areas["protected"]
     )
@@ -773,13 +770,12 @@ def _get_county_properties(
     )
     #  EC data currently only includes counties that have qualifying features.
     #  Fill in nulls for counties that do not qualify.
-    county_properties.fillna(
+    county_properties = county_properties.fillna(
         {
             "energy_community_coal_closures_area_fraction": 0.0,
             "energy_community_qualifies_via_employment": False,
             "energy_community_qualifies": False,
         },
-        inplace=True,
     )
 
     county_properties = county_properties.rename(columns=rename_dict)
@@ -846,7 +842,9 @@ def _get_actionable_aggs_for_wide_format(engine: sa.engine.Engine) -> pd.DataFra
                     }
                 )
             )
-            agg.rename(columns=rename_dict, inplace=True)
+            agg = agg.rename(
+                columns=rename_dict,
+            )
             aggs.append(agg)
         # and avoided co2 totals. This doesn't belong in this function but c'est la vie.
         agg = (
@@ -879,10 +877,9 @@ def _get_actionable_aggs_for_long_format(engine: sa.engine.Engine) -> pd.DataFra
     )
     frac_actionable["facility_type"] = "power plant"
     frac_actionable["status"] = "proposed"
-    frac_actionable.reset_index(inplace=True)
-    frac_actionable.rename(
+    frac_actionable = frac_actionable.reset_index()
+    frac_actionable = frac_actionable.rename(
         columns={0: "actionable_mw_fraction", "resource_clean": "resource_or_sector"},
-        inplace=True,
     )
 
     return frac_actionable
@@ -890,16 +887,15 @@ def _get_actionable_aggs_for_long_format(engine: sa.engine.Engine) -> pd.DataFra
 
 def _add_avoided_co2e(iso: pd.DataFrame, engine: sa.engine.Engine) -> pd.DataFrame:
     emiss_fac_by_county = _get_avoided_emissions_by_county_resource(engine)
-    emiss_fac_by_county["resource_type"].replace(
+    emiss_fac_by_county = emiss_fac_by_county["resource_type"].replace(
         {
             "onshore_wind": "Onshore Wind",
             "offshore_wind": "Offshore Wind",
             "utility_pv": "Solar",
         },
-        inplace=True,
     )
-    emiss_fac_by_county.rename(
-        columns={"resource_type": "resource_clean"}, inplace=True
+    emiss_fac_by_county = emiss_fac_by_county.rename(
+        columns={"resource_type": "resource_clean"},
     )
 
     iso = iso.merge(
@@ -935,10 +931,12 @@ def _get_avoided_emissions_by_county_resource(engine: sa.engine.Engine) -> pd.Da
     emiss_fac_by_county = emiss_fac_by_county.merge(
         national_avgs, on="resource_type", how="left"
     )
-    emiss_fac_by_county["co2e_tonnes_per_year_per_mw"].fillna(
-        emiss_fac_by_county["avg_co2"], inplace=True
+    emiss_fac_by_county = emiss_fac_by_county["co2e_tonnes_per_year_per_mw"].fillna(
+        emiss_fac_by_county["avg_co2"],
     )
-    emiss_fac_by_county.drop(columns=["avg_co2", "avert_region"], inplace=True)
+    emiss_fac_by_county = emiss_fac_by_county.drop(
+        columns=["avg_co2", "avert_region"],
+    )
     return emiss_fac_by_county
 
 
@@ -971,7 +969,7 @@ def create_wide_format(
         axis=1,
         join="outer",
     )
-    wide_format.reset_index(inplace=True)
+    wide_format = wide_format.reset_index()
     assert (
         wide_format["renewable_and_battery_proposed_facility_count"]
         .fillna(0)

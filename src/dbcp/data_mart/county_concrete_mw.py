@@ -51,9 +51,8 @@ def _get_concrete_aggs(engine: sa.engine.Engine) -> pd.DataFrame:
         .le(3)
         .map({True: "Advanced Development", False: "Under Construction"})
     )
-    eia860m.drop(
+    eia860m = eia860m.drop(
         columns=["prime_mover_code", "fuel_type_code_pudl", "operational_status_code"],
-        inplace=True,
     )
 
     acp = pd.read_sql_table(
@@ -85,12 +84,11 @@ def _get_concrete_aggs(engine: sa.engine.Engine) -> pd.DataFrame:
         .unstack("status")  # pivot the status totals into columns per client request
         .reset_index()
     )
-    out.rename(
+    out = out.rename(
         columns={
             "Advanced Development": "capacity_awaiting_permitting_mw",
             "Under Construction": "capacity_under_construction_mw",
         },
-        inplace=True,
     )
     out["capacity_total_proposed_mw"] = (
         out["capacity_awaiting_permitting_mw"]
@@ -113,7 +111,9 @@ def _get_concrete_aggs(engine: sa.engine.Engine) -> pd.DataFrame:
         how="left",
     )
     out = out.merge(cfips, on="county_id_fips", how="left")
-    out.sort_values(["state", "county", "iso_region", "resource_clean"], inplace=True)
+    out = out.sort_values(
+        ["state", "county", "iso_region", "resource_clean"],
+    )
     return out
 
 

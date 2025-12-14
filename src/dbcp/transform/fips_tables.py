@@ -54,7 +54,7 @@ def _add_tribal_land_frac(
         tribal_land_larger_than_county, 1.0
     )
     counties["tribal_land_frac"] = counties["tribal_land_frac"].round(2)
-    counties.drop(columns=["tribal_land_intersection", "geometry"], inplace=True)
+    counties = counties.drop(columns=["tribal_land_intersection", "geometry"])
 
     assert (counties.tribal_land_frac <= 1.0).all(), (
         "Found a county where tribal land is greater than 100%"
