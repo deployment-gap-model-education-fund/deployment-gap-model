@@ -45,13 +45,12 @@ def create_fyi_counties_proposed_clean_projects(
         }
     )
 
-    aggs.reset_index(inplace=True)
-    aggs.rename(
+    aggs = aggs.reset_index()
+    aggs = aggs.rename(
         columns={
             "project_id": "facility_count",
             "capacity_mw": "renewable_and_battery_proposed_capacity_mw",
         },
-        inplace=True,
     )
 
     return aggs

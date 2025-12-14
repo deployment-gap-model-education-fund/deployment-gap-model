@@ -147,7 +147,7 @@ def _co2_from_mwh(
         * df.loc[:, "tonnes_co2_per_mmbtu"]
     )
     intermediates = ["tonnes_co2_per_mmbtu", "mmbtu_per_mwh", "fuel_prime_mover"]
-    df.drop(columns=intermediates, inplace=True)
+    df = df.drop(columns=intermediates)
     return
 
 
@@ -191,7 +191,7 @@ def _transfrom_plant_location_data(
         how="left",
         copy=False,
     )
-    plant_locations.drop(
+    plant_locations = plant_locations.drop(
         columns=[
             "geocoded_locality_name",
             "geocoded_locality_type",
@@ -199,10 +199,9 @@ def _transfrom_plant_location_data(
             "state",
             "county",
         ],
-        inplace=True,
     )
-    plant_locations.rename(
-        columns={"state_name": "state", "county_name": "county"}, inplace=True
+    plant_locations = plant_locations.rename(
+        columns={"state_name": "state", "county_name": "county"},
     )
     return plant_locations
 
@@ -223,9 +222,8 @@ def _get_existing_fossil_plants(
         plant_co2e, on="plant_id_eia", how="right", copy=False
     )
     plant_data["facility_type"] = "existing_power"
-    plant_data.rename(
+    plant_data = plant_data.rename(
         columns={"plant_id_eia": "id"},
-        inplace=True,
     )
 
     return plant_data
@@ -236,9 +234,9 @@ def _get_proposed_fossil_plants(engine: sa.engine.Engine) -> pd.DataFrame:
     query = get_query("get_proposed_fossil_plants.sql")
     df = pd.read_sql(query, engine)
     _estimate_proposed_power_co2e(df)
-    df.rename(columns={"project_id": "id"}, inplace=True)
+    df = df.rename(columns={"project_id": "id"})
     df["facility_type"] = "proposed_power"
-    df.drop(columns=["capacity_mw", "resource"], inplace=True)
+    df = df.drop(columns=["capacity_mw", "resource"])
     return df
 
 
@@ -280,24 +278,26 @@ def _estimate_proposed_power_co2e(
     df["mmbtu_per_mwh"] = gas_turbine_mmbtu_per_mwh
     is_cc = df.loc[:, "capacity_mw"].gt(cc_gt_capacity_mw_split)
     is_coal = df.loc[:, "mod_resource"] == "coal"
-    df.loc[:, "mmbtu_per_mwh"].where(
-        ~is_cc, other=combined_cycle_mmbtu_per_mwh, inplace=True
+    df = df.loc[:, "mmbtu_per_mwh"].where(
+        ~is_cc,
+        other=combined_cycle_mmbtu_per_mwh,
     )
-    df.loc[:, "mmbtu_per_mwh"].where(
-        ~is_coal, other=coal_steam_turbine_mmbtu_per_mwh, inplace=True
+    df = df.loc[:, "mmbtu_per_mwh"].where(
+        ~is_coal, other=coal_steam_turbine_mmbtu_per_mwh
     )
 
     df["estimated_capacity_factor"] = gt_small_cap_factor
-    df.loc[:, "estimated_capacity_factor"].where(
+    df = df.loc[:, "estimated_capacity_factor"].where(
         ~is_cc & df.loc[:, "capacity_mw"].le(gt_sub_split),
         other=gt_large_cap_factor,
-        inplace=True,
     )
-    df.loc[:, "estimated_capacity_factor"].where(
-        ~is_cc, other=cc_cap_factor, inplace=True
+    df = df.loc[:, "estimated_capacity_factor"].where(
+        ~is_cc,
+        other=cc_cap_factor,
     )
-    df.loc[:, "estimated_capacity_factor"].where(
-        ~is_coal, other=coal_cap_factor, inplace=True
+    df = df.loc[:, "estimated_capacity_factor"].where(
+        ~is_coal,
+        other=coal_cap_factor,
     )
 
     # Put it all together
@@ -313,7 +313,9 @@ def _estimate_proposed_power_co2e(
         "mod_resource",
         "estimated_capacity_factor",
     ]
-    df.drop(columns=intermediates, inplace=True)
+    df = df.drop(
+        columns=intermediates,
+    )
     return
 
 
@@ -321,7 +323,9 @@ def _get_proposed_fossil_infra(engine: sa.engine.Engine) -> pd.DataFrame:
     query = get_query("get_proposed_fossil_infra.sql")
     df = pd.read_sql(query, engine)
     df["facility_type"] = "proposed_infrastructure"
-    df.rename(columns={"facility_id": "id"}, inplace=True)
+    df = df.rename(
+        columns={"facility_id": "id"},
+    )
     return df
 
 
