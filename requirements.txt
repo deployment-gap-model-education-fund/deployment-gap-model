@@ -26,6 +26,6 @@ google-cloud-storage~=3.6.0
 geopandas~=1.0.1
 gcsfs~=2025.10.0
 pydantic>=2.9,<2.13 # https://github.com/gtalarico/pyairtable/issues/411
-us~=3.2.0
 matplotlib~=3.10.0
 us~=3.2.0
+ruff>=0.14

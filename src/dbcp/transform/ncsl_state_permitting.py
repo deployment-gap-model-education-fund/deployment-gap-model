@@ -1,7 +1,5 @@
 """Tranform functions for NCSL state permitting."""
 
-from typing import Dict
-
 import numpy as np
 import pandas as pd
 
@@ -9,14 +7,15 @@ from dbcp.constants import US_STATES_TERRITORIES
 from dbcp.helpers import add_fips_ids
 
 
-def transform(raw_df: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
+def transform(raw_df: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """Standardize null values, state names, and dtypes. Add state FIPS codes.
 
     Args:
-        raw_df (Dict[str, pd.DataFrame]): dataframe from .docx parser
+        raw_df (dict[str, pd.DataFrame]): dataframe from .docx parser
 
     Returns:
-        Dict[str, pd.DataFrame]: cleaned and transformed state permitting dataset
+        dict[str, pd.DataFrame]: cleaned and transformed state permitting dataset
+
     """
     # only one df in dict
     transform_df = raw_df["ncsl_state_permitting"].copy()
@@ -56,6 +55,7 @@ def validate(ncsl_df: pd.DataFrame) -> None:
     Raises:
         AssertionError: if unexpected state name is found
         AssertionError: if unexpected permitting type is found
+
     """
     expected_states = US_STATES_TERRITORIES
     df_states = set(ncsl_df.loc[:, "raw_state_name"].unique())

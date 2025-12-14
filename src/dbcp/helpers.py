@@ -49,37 +49,38 @@ SA_TO_BQ_MODES = {True: "NULLABLE", False: "REQUIRED"}
 
 
 def get_schema_sql_alchemy_metadata(schema: str) -> sa.MetaData:
-    """
-    Get SQL Alchemy metadata object for a particular schema.
+    """Get SQL Alchemy metadata object for a particular schema.
 
     Args:
         schema: the name of the database schema.
+
     Returns:
         metadata: the SQL alchemy metadata associated with the db schema.
+
     """
     if schema == "data_mart":
         return dbcp.metadata.data_mart.metadata
-    elif schema == "data_warehouse":
+    if schema == "data_warehouse":
         return dbcp.metadata.data_warehouse.metadata
-    elif schema == "private_data_warehouse":
+    if schema == "private_data_warehouse":
         return dbcp.metadata.private_data_warehouse.metadata
-    elif schema == "private_data_mart":
+    if schema == "private_data_mart":
         return dbcp.metadata.private_data_mart.metadata
-    else:
-        raise ValueError(f"{schema} is not a valid schema.")
+    raise ValueError(f"{schema} is not a valid schema.")
 
 
 def get_bq_schema_from_metadata(
     table_name: str, schema: str, dev: bool = True
 ) -> list[dict[str, str]]:
-    """
-    Create a BigQuery schema from SQL Alchemy metadata.
+    """Create a BigQuery schema from SQL Alchemy metadata.
 
     Args:
         table_name: the name of the table.
         schema: the name of the database schema.
+
     Returns:
         bq_schema: a bigquery schema description.
+
     """
     table_name = f"{schema}.{table_name}"
     metadata = get_schema_sql_alchemy_metadata(schema)
@@ -94,14 +95,15 @@ def get_bq_schema_from_metadata(
 
 
 def get_pyarrow_schema_from_metadata(table_name: str, schema: str) -> pa.Schema:
-    """
-    Create a PyArrow schema from SQL Alchemy metadata.
+    """Create a PyArrow schema from SQL Alchemy metadata.
 
     Args:
         table_name: the name of the table.
         schema: the name of the database schema.
+
     Returns:
         pyarrow_schema: a PyArrow schema description.
+
     """
     table_name = f"{schema}.{table_name}"
     metadata = get_schema_sql_alchemy_metadata(schema)
@@ -166,6 +168,7 @@ def write_to_postgres(
         if_exists: What to do if table already exists in postgres. See Pandas ``to_sql`` for options.
         use_catalyst_schema: In the production postgres instance we only use the schema 'catalyst'
             but still need the actual schema name for ``enforce_dtypes``.
+
     """
     df = trim_columns_length(df)
     df = enforce_dtypes(df, table_name, schema_name)
@@ -192,8 +195,10 @@ def get_pudl_resource(
 
     Args:
         pudl_resource: The name of the PUDL resource to retrieve.
+
     Returns:
         pudl_resource_path: The path to the cached PUDL resource.
+
     """
     PUDL_VERSION = os.environ["PUDL_VERSION"]
 
@@ -211,7 +216,7 @@ def get_pudl_resource(
 
         # open the remote_pudl_resource_path and track progress with tqdm
         with fs.open(remote_pudl_resource_path) as fo:
-            with open(local_pudl_resource_path, "wb") as local_file:
+            with Path(local_pudl_resource_path).open("wb") as local_file:
                 with tqdm(
                     total=file_size, unit="B", unit_scale=True, unit_divisor=1024
                 ) as pbar:
@@ -227,20 +232,19 @@ def get_pudl_resource(
 
 def track_tar_progress(members):
     """Use tqdm to track progress of tar extraction."""
-    for member in tqdm(members):
-        # this will be the current file being extracted
-        yield member
+    yield from tqdm(members)
 
 
 def get_db_schema_tables(engine: sa.engine.Engine, schema: str) -> list[str]:
-    """
-    Get table names of database schema.
+    """Get table names of database schema.
 
     Args:
         engine: sqlalchemy connection engine.
         schema: the name of the database schema.
+
     Return:
         table_names: the table names in the db schema.
+
     """
     inspector = sa.inspect(engine)
     table_names = inspector.get_table_names(schema=schema)
@@ -309,6 +313,7 @@ def psql_insert_copy(table, conn, keys, data_iter):
     keys : list of str
         Column names
     data_iter : Iterable that iterates the values to be inserted
+
     """
     # gets a DBAPI connection that can provide a cursor
     dbapi_conn = conn.connection

@@ -1,7 +1,5 @@
 """Transform functions for local opposition data."""
 
-from typing import Dict
-
 import pandas as pd
 
 from dbcp.constants import FIPS_CODE_VINTAGE
@@ -21,6 +19,7 @@ def _extract_years(ser: pd.Series) -> pd.Series:
 
     Returns:
         pd.Series: summary dataframe ready to pd.concat() with input series
+
     """
     years = ser.str.extractall(r"(?P<year>199\d|20[012]\d)").squeeze()
     years = pd.to_numeric(years)  # convert string years to ints
@@ -51,6 +50,7 @@ def _transform_state_policy(state_policy_df: pd.DataFrame) -> pd.DataFrame:
 
     Returns:
         pd.DataFrame: dataframe of state policies with additional columns
+
     """
     state = add_fips_ids(
         state_policy_df, county_col="policy", vintage=FIPS_CODE_VINTAGE
@@ -69,6 +69,7 @@ def _transform_state_notes(state_notes_df: pd.DataFrame) -> pd.DataFrame:
 
     Returns:
         pd.DataFrame: dataframe of state notes with additional columns
+
     """
     # currently same transform as policy.
     # Just rename a column for compatibility, then rename it back.
@@ -86,6 +87,7 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
 
     Returns:
         pd.DataFrame: dataframe of local ordinances with additional columns
+
     """
     local = local_ord_df.copy()
     string_cols = [
@@ -152,6 +154,7 @@ def _transform_contested_projects(project_df: pd.DataFrame) -> pd.DataFrame:
 
     Returns:
         pd.DataFrame: dataframe of contested projects with additional columns
+
     """
     # this should really use geocoding, but we don't use this data so I didn't bother.
     proj = add_fips_ids(project_df, county_col="description").drop(
@@ -163,7 +166,7 @@ def _transform_contested_projects(project_df: pd.DataFrame) -> pd.DataFrame:
     return proj
 
 
-def transform(raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
+def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """Transform local opposition data."""
     transform_funcs = {
         "state_policy": _transform_state_policy,
@@ -171,21 +174,21 @@ def transform(raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         "local_ordinance": _transform_local_ordinances,
         "contested_project": _transform_contested_projects,
     }
-    transformed = {key: transform_funcs[key](raw_dfs[key]) for key in raw_dfs.keys()}
+    transformed = {key: transform_funcs[key](raw_dfs[key]) for key in raw_dfs}
     return transformed
 
 
 def _validate_ordinances(ordn: pd.DataFrame) -> None:
-    assert (
-        ordn.duplicated(subset=["raw_state_name", "raw_locality_name"]).sum() == 0
-    ), "Duplicate ordinance locations."
+    assert ordn.duplicated(subset=["raw_state_name", "raw_locality_name"]).sum() == 0, (
+        "Duplicate ordinance locations."
+    )
     assert ordn["county_id_fips"].isna().sum() == 0, "Missing FIPS codes."
     assert (
         ordn["geocoded_locality_name"].str.contains(r"[0-9]", regex=True).sum() == 0
     ), "Geocoded locality names contain numbers."
-    assert (
-        ordn["geocoded_locality_type"].isna().sum() == 0
-    ), "Missing geocoded locality types."
+    assert ordn["geocoded_locality_type"].isna().sum() == 0, (
+        "Missing geocoded locality types."
+    )
 
 
 if __name__ == "__main__":

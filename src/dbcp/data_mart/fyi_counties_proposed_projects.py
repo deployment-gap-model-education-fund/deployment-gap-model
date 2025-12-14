@@ -1,7 +1,5 @@
 """Create data mart tables of interconnection.fyi proposed project queue data aggregated up to the county level."""
 
-from typing import Dict, Optional
-
 import pandas as pd
 import sqlalchemy as sa
 
@@ -93,8 +91,8 @@ def create_fyi_counties_proposed_clean_projects_wide(
 
 
 def create_data_mart(
-    engine: Optional[sa.engine.Engine] = None,
-) -> Dict[str, pd.DataFrame]:
+    engine: sa.engine.Engine | None = None,
+) -> dict[str, pd.DataFrame]:
     """Create FYI proposed project data mart table aggregated to county level.
 
     Args:
@@ -102,6 +100,7 @@ def create_data_mart(
 
     Returns:
         Dict[str, pd.DataFrame]: proposed project data mart table at county level
+
     """
     postgres_engine = engine
     if postgres_engine is None:

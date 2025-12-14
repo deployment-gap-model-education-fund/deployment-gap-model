@@ -1,7 +1,5 @@
 """Create county-level aggregates of proposed projects from EIA860m and ACP data."""
 
-from typing import Optional
-
 import pandas as pd
 import sqlalchemy as sa
 
@@ -120,7 +118,7 @@ def _get_concrete_aggs(engine: sa.engine.Engine) -> pd.DataFrame:
 
 
 def create_data_mart(
-    engine: Optional[sa.engine.Engine] = None,
+    engine: sa.engine.Engine | None = None,
 ) -> pd.DataFrame:
     """API function to create the table of project aggregates.
 
@@ -129,6 +127,7 @@ def create_data_mart(
 
     Returns:
         Dataframe of EIA860m and ACP projects.
+
     """
     if engine is None:
         engine = get_sql_engine()
