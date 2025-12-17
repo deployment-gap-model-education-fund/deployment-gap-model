@@ -158,17 +158,19 @@ class CountyOpposition(object):
         grp = dupes.groupby("county_id_fips")
 
         years = grp["earliest_year_mentioned"].min()
+        descriptions = grp["ordinance_text"].sum().str.strip()
+        # combined and make county_id_fips a column
+        agg_dupes = pd.concat([years, descriptions], axis=1).reset_index()
 
         n_unique = grp[["geocoded_locality_name", "geocoded_locality_type"]].nunique()
         localities = (
             grp[["geocoded_locality_name", "geocoded_locality_type"]]
             .nth(0)
             .mask(n_unique > 1, other="multiple")
-        )
-
-        descriptions = grp["ordinance_text"].sum().str.strip()
-
-        agg_dupes = pd.concat([years, localities, descriptions], axis=1).reset_index()
+        ).reset_index(drop=True)
+        # separately concat the localities on, because it doesn't share
+        # county_id_fips as an index
+        agg_dupes = pd.concat([agg_dupes, localities], axis=1)
         recombined = pd.concat(
             [not_dupes, agg_dupes], axis=0, ignore_index=True
         ).sort_values("county_id_fips")

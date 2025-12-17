@@ -728,7 +728,6 @@ def _get_county_properties(
     env_justice = _get_env_justice_df(postgres_engine)
     fed_lands = _get_federal_land_fraction(postgres_engine)
     energy_community_counties = _get_energy_community_qualification(postgres_engine)
-
     # model local opposition
     aggregator = CountyOpposition(
         engine=postgres_engine, county_fips_df=all_counties, state_fips_df=all_states

@@ -190,7 +190,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     )
     # shouldn't be any with 3 generation types
     assert group.nth(2).shape[0] == 0
-    gen = pd.concat([gen_1, gen_2], axis=1, copy=False)
+    gen = gen_1.merge(gen_2, on=group_keys, how="left")
     # create storage column
     # Occassionally there are projects with multiple storage resources,
     # i.e. battery storage and pumped storage
@@ -227,7 +227,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     )
     # combine gen and storage cols, handling nans in county_id_fips
     SENTINEL = "<NA_FIPS>"
-    g = gen.reset_index().assign(
+    g = gen.assign(
         county_id_fips=lambda d: d["county_id_fips"].astype("string").fillna(SENTINEL)
     )
     s = storage.reset_index().assign(
@@ -236,7 +236,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     gen_stor = g.merge(s, how="outer", on=group_keys, suffixes=("_gen", "_stor"))
     # restore NaNs
     gen_stor["county_id_fips"] = gen_stor["county_id_fips"].replace(SENTINEL, np.nan)
-    gen_stor = gen_stor.set_index(group_keys)
+    # gen_stor = gen_stor.set_index(group_keys)
 
     assert (
         len(gen_stor) == long.groupby(group_keys, dropna=False).ngroups
@@ -254,8 +254,14 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         .groupby(group_keys, dropna=False)
         .nth(0)
     )
-    project_locations = pd.concat([gen_stor, other_cols, co2e], axis=1, copy=False)
-
+    # a left merge works here because the previous assert ensured that all
+    # project-locations are accounted for and 1:1
+    project_locations = gen_stor.merge(
+        other_cols, on=group_keys, how="left", validate="1:1"
+    )
+    project_locations = project_locations.merge(
+        co2e, on=group_keys, how="left", validate="1:1"
+    ).set_index(group_keys)
     # now create multiple location columns
     project_keys = ["source", "project_id"]
     projects = project_locations.reset_index("county_id_fips").groupby(
