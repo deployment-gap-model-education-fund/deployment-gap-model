@@ -283,7 +283,6 @@ def create_data_warehouse():
         "ncsl_state_permitting": etl_ncsl_state_permitting,
         "ballot_ready": etl_ballot_ready,
     }
-    logger.info(f"SQLALCHEMY VERSION: {sa.__version__}")
     run_etl(etl_funcs, "data_warehouse")
     # Run private ETL functions
     etl_funcs = {

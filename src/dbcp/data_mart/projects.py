@@ -167,19 +167,27 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     storage = long.loc[is_storage, :]
     group_keys = ["project_id", "source", "county_id_fips"]
     # create multiple generation columns
-    group = gen.groupby(group_keys, dropna=False)[["generation_type", "capacity_mw"]]
+    group = gen.groupby(group_keys, dropna=False)
     # first generation source
     rename_dict = {
         "generation_type": "generation_type_1",
         "capacity_mw": "generation_capacity_mw_1",
     }
-    gen_1 = group.nth(0).rename(columns=rename_dict)
+    gen_1 = (
+        group.nth(0)
+        .reset_index()
+        .rename(columns=rename_dict)[group_keys + list(rename_dict.values())]
+    )
     # second generation source (very few rows)
     rename_dict = {
         "generation_type": "generation_type_2",
         "capacity_mw": "generation_capacity_mw_2",
     }
-    gen_2 = group.nth(1).rename(columns=rename_dict)
+    gen_2 = (
+        group.nth(1)
+        .reset_index()
+        .rename(columns=rename_dict)[group_keys + list(rename_dict.values())]
+    )
     # shouldn't be any with 3 generation types
     assert group.nth(2).shape[0] == 0
     gen = pd.concat([gen_1, gen_2], axis=1, copy=False)
@@ -421,8 +429,9 @@ def create_long_format(
         "geocoded_locality_type": "ordinance_jurisdiction_type",
         "earliest_year_mentioned": "ordinance_earliest_year_mentioned",
     }
-    combined_opp.rename(columns=rename_dict, inplace=True)
-
+    combined_opp = combined_opp.rename(columns=rename_dict).dropna(
+        subset="county_id_fips"
+    )
     long_format = iso.merge(
         combined_opp, on="county_id_fips", how="left", validate="m:1"
     )
@@ -472,7 +481,9 @@ def create_fyi_long_format(
         "geocoded_locality_type": "ordinance_jurisdiction_type",
         "earliest_year_mentioned": "ordinance_earliest_year_mentioned",
     }
-    combined_opp.rename(columns=rename_dict, inplace=True)
+    combined_opp = combined_opp.rename(columns=rename_dict).dropna(
+        subset="county_id_fips"
+    )
 
     long_format = fyi.merge(
         combined_opp, on="county_id_fips", how="left", validate="m:1"
