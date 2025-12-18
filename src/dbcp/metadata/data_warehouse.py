@@ -655,6 +655,7 @@ pudl_eia860m_changelog = Table(
     Column("planned_generator_retirement_date", DateTime),
     Column("planned_net_summer_capacity_derate_mw", Float),
     Column("planned_net_summer_capacity_uprate_mw", Float),
+    Column("planned_repower_date", DateTime),
     Column("planned_uprate_date", DateTime),
     Column("prime_mover_code", String),
     Column("sector_id_eia", Integer),
