@@ -143,8 +143,10 @@ def get_sql_engine(production: bool = False) -> sa.engine.Engine:
     else:
         user = os.environ["PROD_POSTGRES_USER"]
         password = os.environ["PROD_POSTGRES_PASSWORD"]
-        db = os.environ["PROD_POSTGRES_DB"]
-        engine = sa.create_engine(f"postgresql://{user}:{password}@{db}:6543/postgres")
+        host = os.environ["PROD_POSTGRES_HOST"]
+        engine = sa.create_engine(
+            f"postgresql://{user}:{password}@{host}:6543/postgres"
+        )
     return engine
 
 
