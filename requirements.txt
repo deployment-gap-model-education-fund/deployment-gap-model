@@ -18,7 +18,7 @@ gridstatus~=0.20.0
 s3fs>=2022.11.0
 click>=8.1.7
 pyairtable>=2.3.3
-numpy<2
+numpy<3
 sqlalchemy<2.0
 coloredlogs~=15.0.1
 scipy~=1.14.1
