@@ -23,6 +23,8 @@ services:
     ports:
       - ${JUPYTER_PORT}:${JUPYTER_PORT}
     command: jupyter lab --port ${JUPYTER_PORT} --ip 0.0.0.0 --no-browser
+    networks:
+      - ip6net
 
   postgres:
     image: postgis/postgis:13-3.1-alpine
@@ -35,3 +37,12 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - ip6net
+
+networks:
+  ip6net:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 2001:db8::/64
