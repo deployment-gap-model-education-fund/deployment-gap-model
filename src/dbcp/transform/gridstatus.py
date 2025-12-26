@@ -13,6 +13,7 @@ from dbcp.transform.helpers import (
     normalize_multicolumns_to_rows,
     normalize_point_of_interconnection,
 )
+from dbcp.transform.interconnection_queue_helpers import parse_date_columns
 
 COLUMN_RENAME_DICT = {
     "Actual Completion Date": "actual_completion_date",
@@ -1131,10 +1132,11 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     )
 
     # parse dates
-    date_cols = [col for col in list(projects) if "date" in col]
-    for col in date_cols:
-        projects[col] = pd.to_datetime(projects[col], utc=True, errors="coerce")
-
+    # date_cols = [col for col in list(projects) if "date" in col]
+    projects = projects.reset_index(drop=True)
+    parse_date_columns(projects)
+    # for col in date_cols:
+    #     projects[col] = pd.to_datetime(projects[col], utc=True, errors="coerce")
     # create project_id
     projects["project_id"] = np.arange(len(projects), dtype=np.int32)
 
@@ -1187,3 +1189,12 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     dfs["gridstatus_resource_capacity"] = normalized_capacities
     dfs["gridstatus_locations"] = normalized_locations
     return dfs
+
+
+if __name__ == "__main__":
+    # debugging entry point
+    import dbcp
+
+    raw_dfs = dbcp.extract.gridstatus_isoqueues.extract()
+    transformed = dbcp.transform.gridstatus.transform(raw_dfs)
+    print("yeehaw")

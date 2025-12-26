@@ -521,7 +521,11 @@ def _transform_acp_snapshots_to_changelog(
 ) -> pd.DataFrame:
     """Create a changelog of the ACP data over time."""
     trans_df = raw_snapshots_df.reset_index(drop=True).convert_dtypes()
-    trans_df = trans_df.groupby("report_date").apply(_clean_col_names_and_create_id)
+    trans_df = (
+        trans_df.groupby("report_date")
+        .apply(_clean_col_names_and_create_id)
+        .reset_index(drop=True)
+    )
     trans_df = _clean_columns(trans_df)
     trans_df = trans_df.sort_values(by=["proj_id", "report_date"])
     compare_cols = [

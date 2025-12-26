@@ -1,4 +1,5 @@
 """Transform operations for the justice40 dataset."""
+
 import logging
 
 import pandas as pd
@@ -151,10 +152,11 @@ def transform(raw_j40: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         "Percent of the Census tract that is within Tribal areas": "tract_within_tribal_areas_percent",
     }
 
-    out_df = raw_j40["justice40"].convert_dtypes()  # copy
+    out_df = raw_j40["justice40"].copy()
+    out_df = out_df.convert_dtypes()
     out_df.rename(columns=rename_dict, inplace=True)
     out_df.drop(columns="", inplace=True)
-    out_df.loc[:, "tract_id_fips"] = _fips_int_to_string(out_df.loc[:, "tract_id_fips"])
+    out_df["tract_id_fips"] = _fips_int_to_string(out_df.loc[:, "tract_id_fips"])
 
     # Correct percentage errors and convert to fractions
     percent_cols = list(filter(lambda col: col.endswith("_percent"), list(out_df)))
@@ -176,7 +178,6 @@ def transform(raw_j40: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     # tract_within_tribal_areas_percent has a couple of values that are over 100%
     out_df["tract_within_tribal_areas_percent"].clip(upper=1, inplace=True)
-
     # Correct percentiles
     percentile_cols = list(
         filter(lambda col: col.endswith("_percentile"), list(out_df))
