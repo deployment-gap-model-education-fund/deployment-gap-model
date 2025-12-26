@@ -1,8 +1,9 @@
 """Common transform operations."""
 
 import logging
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any
 
 import pandas as pd
 from joblib import Memory
@@ -23,11 +24,11 @@ EXCEL_EPOCH_ORIGIN = pd.Timestamp("12/30/1899")
 
 @dataclass
 class MemoryCaches:
-    """
-    Container for multiple Memory caches.
+    """Container for multiple Memory caches.
 
     Attributes:
         caches: list of Memory caches
+
     """
 
     caches: list[Memory]
@@ -48,8 +49,8 @@ GEOCODER_CACHES = MemoryCaches([geocodio.GEOCODER_CACHE, google_maps.GEOCODER_CA
 
 def normalize_multicolumns_to_rows(
     df: pd.DataFrame,
-    attribute_columns_dict: Dict[str, Sequence[str]],
-    index_cols: Optional[List[str]] = None,
+    attribute_columns_dict: dict[str, Sequence[str]],
+    index_cols: list[str] | None = None,
     preserve_original_names=True,
     dropna=True,
 ) -> pd.DataFrame:
@@ -95,6 +96,7 @@ def normalize_multicolumns_to_rows(
     Note: the lists of fuel_N and capacity_of_fuel_N must be in the same order, or the associations
     will be wrong (fuel_2 with capacity_of_fuel_1, for example). Really it should be a tabular data
     structure rather than multiple independent lists.
+
     """
     if index_cols is not None:
         df = df.set_index(index_cols)
@@ -134,6 +136,7 @@ def multiformat_string_date_parser(
 
     Returns:
         pd.Series: dates converted to pd.Timestamp
+
     """
     if not pd.api.types.is_string_dtype(dates):
         raise ValueError(f"Column is not a string dtype. Given {dates.dtype}.")
@@ -176,8 +179,7 @@ def multiformat_string_date_parser(
                 if nans.sum() == 0:
                     break
             break
-        else:
-            remaining_nan = new_remaining_nan
+        remaining_nan = new_remaining_nan
 
     # handle numeric encodings
     numbers = pd.to_numeric(dates.loc[is_numeric_string], errors="coerce")
@@ -194,7 +196,7 @@ def numeric_offset_date_encoder(
     series: pd.Series,
     origin=EXCEL_EPOCH_ORIGIN,
     unit="d",
-    roundoff: Optional[str] = None,
+    roundoff: str | None = None,
 ) -> pd.Series:
     """Convert column of numeric date offsets (like 45059) to pd.Timestamp.
 
@@ -211,6 +213,7 @@ def numeric_offset_date_encoder(
 
     Returns:
         pd.Series: output timestamps
+
     """
     if len(series) == 0:  # accept empty series
         return series
@@ -242,6 +245,7 @@ def parse_dates(series: pd.Series, expected_mean_year=2020) -> pd.Series:
 
     Returns:
         pd.Series: new column of pd.Datetime
+
     """
     if pd.api.types.is_numeric_dtype(series):
         unix_dates = numeric_offset_date_encoder(series, origin=UNIX_EPOCH_ORIGIN)
@@ -250,11 +254,9 @@ def parse_dates(series: pd.Series, expected_mean_year=2020) -> pd.Series:
         excel_diff = expected_mean_year - excel_dates.dt.year.mean()
         if abs(unix_diff) < abs(excel_diff):
             return unix_dates
-        else:
-            return excel_dates
-    else:
-        # assumes excel epoch when mixed with strings
-        return multiformat_string_date_parser(series)
+        return excel_dates
+    # assumes excel epoch when mixed with strings
+    return multiformat_string_date_parser(series)
 
 
 def deduplicate_same_physical_entities(
@@ -282,6 +284,7 @@ def deduplicate_same_physical_entities(
 
     Returns:
         pd.DataFrame: dataframe with duplicates removed
+
     """
     df = df.copy()
     original_cols = df.columns
@@ -319,6 +322,7 @@ def _geocode_and_add_fips(
         api: name of the geocoding API to use
     Returns:
         dataframe with geocoded locality information
+
     """
     # Deduplicate on the state and locality columns to minimize API calls
     key_cols = [state_col, locality_col]
@@ -380,6 +384,7 @@ def add_county_fips_with_backup_geocoding(
 
     Returns:
         pd.DataFrame: copy of state_locality_df with new columns 'geocoded_locality_name', 'geocoded_locality_type', 'geocoded_containing_county'
+
     """
     # throw an error if the dataframe is empty
     if state_locality_df.empty:
@@ -481,6 +486,7 @@ def replace_value_with_count_validation(
 
     Raises:
         ValueError: if expected count of replacements does not match observed count
+
     """
     matches = df.loc[:, col] == val_to_replace
     observed_count = matches.sum()

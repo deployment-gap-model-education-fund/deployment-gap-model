@@ -1,5 +1,4 @@
 """Create table of existing plants (aggregated from pudl_generators generators)."""
-from typing import Optional
 
 import pandas as pd
 import sqlalchemy as sa
@@ -9,7 +8,7 @@ from dbcp.helpers import get_sql_engine
 
 
 def create_data_mart(
-    engine: Optional[sa.engine.Engine] = None,
+    engine: sa.engine.Engine | None = None,
 ) -> pd.DataFrame:
     """Create table of existing plants from pudl_generators generators.
 
@@ -18,6 +17,7 @@ def create_data_mart(
 
     Returns:
         pd.DataFrame: table of plants
+
     """
     postgres_engine = engine
     if postgres_engine is None:
