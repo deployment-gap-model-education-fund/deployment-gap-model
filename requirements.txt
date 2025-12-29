@@ -22,7 +22,7 @@ numpy<2
 sqlalchemy<2.0
 coloredlogs~=15.0.1
 scipy~=1.14.1
-google-cloud-storage~=3.6.0
+google-cloud-storage~=3.7.0
 geopandas~=1.0.1
 gcsfs~=2025.10.0
 pydantic>=2.9,<2.13 # https://github.com/gtalarico/pyairtable/issues/411
