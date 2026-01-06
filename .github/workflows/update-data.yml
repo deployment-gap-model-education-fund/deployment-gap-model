@@ -32,7 +32,7 @@ jobs:
       id-token: "write"
     steps:
       - name: Setup WARP to allow ipv6
-        uses: fscarmen/warp-on-actions@v1.0
+        uses: fscarmen/warp-on-actions@v1.4
       - name: Checkout code
         uses: actions/checkout@v6
         # This will checkout the main branch on "schedule" and the specified branch on "workflow_dispatch"
