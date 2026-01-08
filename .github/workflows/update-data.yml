@@ -261,6 +261,7 @@ jobs:
 
           # Run the publish-outputs command inside the Docker container
           # Pass:
+          # - upload-to-postgres to upload tables to production postgres, disabled temporarily
           # - build-ref (the git ref, e.g. a tag or branch) for versioning
           # - code-git-sha (commit hash of the code used for build)
           # - settings-file-git-sha (commit hash of the saved settings.yaml)
@@ -268,7 +269,6 @@ jobs:
           # - target (indicates if this is 'dev' or 'prod' environment target)
           docker compose run --rm app python dbcp/cli.py publish-outputs \
             -bq \
-            --upload-to-postgres \
             --build-ref ${{ matrix.ref }} \
             --code-git-sha ${{ steps.checkout.outputs.commit }} \
             --settings-file-git-sha $SETTINGS_FILE_SHA \
