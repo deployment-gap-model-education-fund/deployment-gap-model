@@ -5,14 +5,10 @@ This module provides a dedicated place for methods that are shared between these
 datasets without cluttering the general ``helpers`` module.
 """
 
-import logging
-
 import pandas as pd
 
 from dbcp.constants import QUEUE_RESOURCE_DICT
 from dbcp.transform.helpers import parse_dates
-
-logger = logging.getLogger(__name__)
 
 
 def add_actionable_and_nearly_certain_classification(
@@ -251,7 +247,6 @@ def parse_date_columns(queue: pd.DataFrame) -> None:
     for date_col, raw_col in rename_dict.items():
         if pd.api.types.is_object_dtype(queue.loc[:, raw_col]):
             queue[raw_col] = queue[raw_col].astype(str)
-        logger.info(f"Parsing date columns: {date_col}")
         new_dates = parse_dates(queue.loc[:, raw_col])
         # set obviously bad values to null
         # This is designed to catch NaN values improperly encoded by Excel to 1899 or 1900

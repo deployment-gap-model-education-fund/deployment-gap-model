@@ -149,11 +149,13 @@ def multiformat_string_date_parser(
     date_strings = dates.loc[~is_numeric_string]
 
     # parse strings
-    parsed_dates = pd.to_datetime(date_strings, errors="coerce")
+    parsed_dates = pd.to_datetime(date_strings, errors="coerce", utc=True)
     remaining_nan = parsed_dates.isna().sum()
     while remaining_nan > 0:
         nans = parsed_dates.isna()
-        nan_to_dates = pd.to_datetime(date_strings[nans], errors="coerce")
+        nan_to_dates = pd.to_datetime(
+            date_strings[nans], errors="coerce", format="mixed", dayfirst=False
+        )
         parsed_dates = parsed_dates.fillna(nan_to_dates)
         new_remaining_nan = nans.sum()
         if new_remaining_nan == remaining_nan:  # no improvement
@@ -178,9 +180,13 @@ def multiformat_string_date_parser(
     # handle numeric encodings
     numbers = pd.to_numeric(dates.loc[is_numeric_string], errors="coerce")
     encoded_dates = numeric_offset_date_encoder(numbers, origin=numeric_origin)
-
     # recombine
-    new_dates = pd.concat([parsed_dates, encoded_dates], copy=False).loc[dates.index]
+    if not encoded_dates.empty:
+        new_dates = pd.concat([parsed_dates, encoded_dates], copy=False).loc[
+            dates.index
+        ]
+    else:
+        new_dates = parsed_dates.loc[dates.index]
     pd.testing.assert_index_equal(new_dates.index, dates.index)
     new_dates = pd.to_datetime(new_dates, errors="coerce", utc=True, format="mixed")
 

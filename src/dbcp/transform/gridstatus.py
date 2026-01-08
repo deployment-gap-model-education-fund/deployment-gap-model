@@ -1132,11 +1132,8 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     )
 
     # parse dates
-    # date_cols = [col for col in list(projects) if "date" in col]
     projects = projects.reset_index(drop=True)
     parse_date_columns(projects)
-    # for col in date_cols:
-    #     projects[col] = pd.to_datetime(projects[col], utc=True, errors="coerce")
     # create project_id
     projects["project_id"] = np.arange(len(projects), dtype=np.int32)
 

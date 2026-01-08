@@ -307,18 +307,17 @@ def _existing_plants_counties(
             "plant_id_eia": "count",
         }
     )
-    aggs.loc[:, "co2e_tonnes_per_year"].replace(
-        0, np.nan, inplace=True
+    aggs.loc[:, "co2e_tonnes_per_year"] = aggs.loc[:, "co2e_tonnes_per_year"].replace(
+        0, np.nan
     )  # sums of 0 are simply unmodeled
     aggs["facility_type"] = "power plant"
     aggs["status"] = "existing"
-    aggs.reset_index(inplace=True)
-    aggs.rename(
+    aggs = aggs.reset_index()
+    aggs = aggs.rename(
         columns={
             "plant_id_eia": "facility_count",
             "resource": "resource_or_sector",
         },
-        inplace=True,
     )
     return aggs
 
@@ -342,8 +341,8 @@ def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     # from data_mart.fossil_infrastructure_projects
     # group by 1, 2
 
-    infra.loc[:, "industry_sector"].replace(
-        "Liquefied Natural Gas (LNG)", "Liquefied Natural Gas", inplace=True
+    infra.loc[:, "industry_sector"] = infra.loc[:, "industry_sector"].replace(
+        "Liquefied Natural Gas (LNG)", "Liquefied Natural Gas"
     )  # Use shorthand code to shorten column names later on
 
     grp = infra.groupby(["county_id_fips", "industry_sector"])
@@ -355,13 +354,13 @@ def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
             "project_id": "count",
         }
     )
-    aggs.loc[:, "co2e_tonnes_per_year"].replace(
-        0, np.nan, inplace=True
+    aggs.loc[:, "co2e_tonnes_per_year"] = aggs.loc[:, "co2e_tonnes_per_year"].replace(
+        0, np.nan
     )  # sums of 0 are simply unmodeled
 
     aggs["facility_type"] = "fossil infrastructure"
     aggs["status"] = "proposed"
-    aggs.reset_index(inplace=True)
+    aggs = aggs.reset_index()
     aggs.rename(
         columns={
             "project_id": "facility_count",
@@ -411,8 +410,9 @@ def _fyi_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
             "project_id": "count",
         }
     )
-    aggs.loc[:, "co2e_tonnes_per_year"].replace(
-        0, np.nan, inplace=True
+    aggs.loc[:, "co2e_tonnes_per_year"] = aggs.loc[:, "co2e_tonnes_per_year"].replace(
+        0,
+        np.nan,
     )  # sums of 0 are simply unmodeled
     aggs["facility_type"] = "power plant"
     aggs["status"] = "proposed"
