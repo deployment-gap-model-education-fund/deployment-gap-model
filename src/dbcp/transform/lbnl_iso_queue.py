@@ -84,14 +84,13 @@ def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     )
     parse_date_columns(projects)
     # rename date_withdrawn to withdrawn_date and date_operational to actual_completion_date
-    projects.rename(
+    projects = projects.rename(
         columns={
             "date_withdrawn_raw": "withdrawn_date_raw",
             "date_operational_raw": "actual_completion_date_raw",
             "date_withdrawn": "withdrawn_date",
             "date_operational": "actual_completion_date",
         },
-        inplace=True,
     )
     # deduplicate
     pre_dedupe = len(projects)
@@ -116,8 +115,8 @@ def _clean_all_iso_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     n_dupes = pre_dedupe - len(projects)
     logger.info(f"Deduplicated {n_dupes} ({n_dupes / pre_dedupe:.2%}) projects.")
 
-    projects.set_index("project_id", inplace=True)
-    projects.sort_index(inplace=True)
+    projects = projects.set_index("project_id")
+    projects = projects.sort_index()
     # clean up whitespace
     for col in projects.columns:
         if pd.api.types.is_object_dtype(projects.loc[:, col]):
@@ -192,7 +191,9 @@ def transform(lbnl_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     )
     if lbnl_normalized_dfs["iso_resource_capacity"].resource_clean.isna().any():
         raise AssertionError("Missing Resources!")
-    lbnl_normalized_dfs["iso_projects"].reset_index(inplace=True)
+    lbnl_normalized_dfs["iso_projects"] = lbnl_normalized_dfs[
+        "iso_projects"
+    ].reset_index()
 
     # Most projects missing queue_status are from the early 2000s so I'm going to assume
     # they were withrawn.
@@ -263,8 +264,9 @@ def _normalize_location(lbnl_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         columns=county_cols + ["raw_state_name", "county_state_pairs", "fips_codes"]
     )
 
-    location_df.dropna(
-        subset=["raw_state_name", "raw_county_name"], how="all", inplace=True
+    location_df = location_df.dropna(
+        subset=["raw_state_name", "raw_county_name"],
+        how="all",
     )
     return {"location_df": location_df, "project_df": project_df}
 
@@ -351,7 +353,9 @@ def _fix_independent_city_fips(location_df: pd.DataFrame) -> pd.DataFrame:
     )
 
     locs = location_df.copy()
-    locs.loc[:, "county_id_fips"].fillna(nan_fips["county_id_fips"], inplace=True)
+    locs.loc[:, "county_id_fips"] = locs.loc[:, "county_id_fips"].fillna(
+        nan_fips["county_id_fips"]
+    )
     return locs
 
 

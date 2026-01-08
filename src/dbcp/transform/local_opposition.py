@@ -39,7 +39,7 @@ def _extract_years(ser: pd.Series) -> pd.Series:
     only_one_year = summarized.loc[:, "n_years_mentioned"] == 1
     summarized.loc[only_one_year, "latest_year_mentioned"] = pd.NA
     summarized = summarized.reindex(index=ser.index, fill_value=pd.NA)
-    summarized.loc[:, "n_years_mentioned"].fillna(0, inplace=True)
+    summarized = summarized.loc[:, "n_years_mentioned"].fillna(0)
     return summarized
 
 

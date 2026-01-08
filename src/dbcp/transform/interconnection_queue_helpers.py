@@ -245,6 +245,8 @@ def parse_date_columns(queue: pd.DataFrame) -> None:
     queue.rename(columns=rename_dict, inplace=True)
 
     for date_col, raw_col in rename_dict.items():
+        if pd.api.types.is_object_dtype(queue.loc[:, raw_col]):
+            queue[raw_col] = queue[raw_col].astype(str)
         new_dates = parse_dates(queue.loc[:, raw_col])
         # set obviously bad values to null
         # This is designed to catch NaN values improperly encoded by Excel to 1899 or 1900

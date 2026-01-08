@@ -183,7 +183,7 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
     # TODO: There are 3 facilities with multiple states - pick first
     # logger.info(f"Assigning project to first listed state for {len(fac.loc[(fac.raw_state.str.contains(","))])} projects with multiple states.")
     fac["state"] = _fix_erroneous_array_items(fac["raw_state"])
-    fac["state"].replace(["TBD", "TDB", ""], pd.NA, inplace=True)
+    fac["state"] = fac["state"].replace(["TBD", "TDB", ""], pd.NA)
 
     # fix counties with multiple values
     # Simplify by only taking first county. Only 11 multivalued as of 7/18/2023
@@ -238,9 +238,7 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         min_lat > 0
     ), f"Min latitude found was {min_lat}, expected >0."  # USA latitudes
 
-    fac["date_modified"] = pd.to_datetime(
-        fac.loc[:, "raw_modified_on"], infer_datetime_format=True
-    )
+    fac["date_modified"] = pd.to_datetime(fac.loc[:, "raw_modified_on"], format="mixed")
 
     return fac
 
@@ -348,7 +346,7 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
     # proj.at[proj_idx[0], "raw_facility_id"] = 5806
 
     proj["date_modified"] = pd.to_datetime(
-        proj.loc[:, "raw_modified_on"], infer_datetime_format=True
+        proj.loc[:, "raw_modified_on"], format="mixed"
     )
     proj["operating_status"] = proj.loc[:, "raw_operating_status"].copy()
     replace_value_with_count_validation(  # in place
@@ -411,7 +409,7 @@ def air_construction_transform(raw_air_constr_df: pd.DataFrame) -> pd.DataFrame:
 
     # # transform columns
     air["date_modified"] = pd.to_datetime(  # ignore other date columns for now
-        air.loc[:, "raw_modified_on"], infer_datetime_format=True
+        air.loc[:, "raw_modified_on"], format="mixed"
     )
     air["permit_status"] = air.loc[:, "raw_permit_status"].copy()
     replace_value_with_count_validation(  # in place
@@ -502,11 +500,11 @@ def facilities_project_assn_transform(
     fac_proj.rename(columns=rename_dict, inplace=True)
 
     fac_proj["date_modified"] = pd.to_datetime(  # ignore other date columns for now
-        fac_proj.loc[:, "raw_updated_at"], infer_datetime_format=True
+        fac_proj.loc[:, "raw_updated_at"], format="mixed"
     )
 
     fac_proj["date_created"] = pd.to_datetime(  # ignore other date columns for now
-        fac_proj.loc[:, "raw_created_at"], infer_datetime_format=True
+        fac_proj.loc[:, "raw_created_at"], format="mixed"
     )
 
     return fac_proj
@@ -568,11 +566,11 @@ def project_permit_assn_transform(
     proj_perm.rename(columns=rename_dict, inplace=True)
 
     proj_perm["date_modified"] = pd.to_datetime(  # ignore other date columns for now
-        proj_perm.loc[:, "raw_updated_at"], infer_datetime_format=True
+        proj_perm.loc[:, "raw_updated_at"], format="mixed"
     )
 
     proj_perm["date_created"] = pd.to_datetime(  # ignore other date columns for now
-        proj_perm.loc[:, "raw_created_at"], infer_datetime_format=True
+        proj_perm.loc[:, "raw_created_at"], format="mixed"
     )
 
     return proj_perm
