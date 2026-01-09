@@ -1,7 +1,7 @@
 """Clean Grid Status Interconnection queue data."""
 
 import logging
-from typing import Sequence
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
@@ -510,7 +510,9 @@ def _clean_resource_type(
     expected_n_coastal_wind_projects = 93
     assert (
         len(nyiso_coastal_wind_project_project_ids) == expected_n_coastal_wind_projects
-    ), f"Expected {expected_n_coastal_wind_projects} NYISO coastal wind projects but found {len(nyiso_coastal_wind_project_project_ids)}"
+    ), (
+        f"Expected {expected_n_coastal_wind_projects} NYISO coastal wind projects but found {len(nyiso_coastal_wind_project_project_ids)}"
+    )
     # For all project ids in nyiso_coastal_wind_project_project_ids, set the resource_clean to "Offshore Wind" in resource_df
     resource_df.loc[
         resource_df.project_id.isin(nyiso_coastal_wind_project_project_ids),
@@ -634,14 +636,15 @@ def _transform_miso(post_2017: pd.DataFrame, pre_2017: pd.DataFrame) -> pd.DataF
     Args:
         post_2017: MISO data from 2017 to present. This contains the latest MISO data.
         pre_2017: The oldest snapshot of GS we have. Happens to include prior to 2017.
+
     """
     # grab projects that are only in pre_2017
     only_in_pre_2017 = pre_2017[~pre_2017["queue_id"].isin(post_2017["queue_id"])]
 
     # ensure there are no active projects in only_in_pre_2017
-    assert (
-        only_in_pre_2017["queue_status"].ne("Active").all()
-    ), "There are active projects in the pre-2017 MISO data that are not in the current MISO data."
+    assert only_in_pre_2017["queue_status"].ne("Active").all(), (
+        "There are active projects in the pre-2017 MISO data that are not in the current MISO data."
+    )
 
     # concat only_in_pre_2017 with iso_df
     iso_df = pd.concat([post_2017, only_in_pre_2017])
@@ -657,9 +660,9 @@ def _transform_miso(post_2017: pd.DataFrame, pre_2017: pd.DataFrame) -> pd.DataF
         in_service_projects["queue_status"].ne("Done")
     ]
     expected_n_done_in_service_projects = 3
-    assert (
-        len(done_in_service_projects) <= expected_n_done_in_service_projects
-    ), f"Expected {expected_n_done_in_service_projects} MISO projects that are In Service but not Done but found {len(done_in_service_projects)}."
+    assert len(done_in_service_projects) <= expected_n_done_in_service_projects, (
+        f"Expected {expected_n_done_in_service_projects} MISO projects that are In Service but not Done but found {len(done_in_service_projects)}."
+    )
 
     # Mark "Done" projects as "Active" because they are not necesarily operational yet.
     iso_df["queue_status"] = iso_df["queue_status"].map(
@@ -768,9 +771,9 @@ def _transform_pjm(iso_df: pd.DataFrame) -> pd.DataFrame:
         .str.contains(r"\d *kv")
         .agg(["mean", "sum"])
     )
-    assert (
-        stats["mean"] > 0.89
-    ), f"Only {stats['mean']:.2%} of Active project_name look like transmission lines."
+    assert stats["mean"] > 0.89, (
+        f"Only {stats['mean']:.2%} of Active project_name look like transmission lines."
+    )
 
     iso_df.drop(columns="point_of_interconnection", inplace=True)
     iso_df.rename(columns={"project_name": "point_of_interconnection"}, inplace=True)
@@ -829,16 +832,16 @@ def _transform_spp(iso_df: pd.DataFrame) -> pd.DataFrame:
         "TERMINATED": "Withdrawn",
         pd.NA: "Active",  # There are a few projects with missing status. All of them entered the queue in the last year so I will assume they are active
     }
-    assert (
-        iso_df["Status (Original)"].isna().sum() <= 27
-    ), f"{iso_df['Status (Original)'].isna().sum()} SPP projects are missing status"
+    assert iso_df["Status (Original)"].isna().sum() <= 27, (
+        f"{iso_df['Status (Original)'].isna().sum()} SPP projects are missing status"
+    )
     # assert all values in iso_df["Status (Original)"] exist in the keys of status_map
     projects_with_unmapped_status = iso_df[
         ~iso_df["Status (Original)"].isin(status_map.keys())
     ]
-    assert (
-        len(projects_with_unmapped_status) == 0
-    ), f"Some SPP projects have an unknown status {projects_with_unmapped_status['Status (Original)'].unique()}"
+    assert len(projects_with_unmapped_status) == 0, (
+        f"Some SPP projects have an unknown status {projects_with_unmapped_status['Status (Original)'].unique()}"
+    )
     iso_df["queue_status"] = iso_df["Status (Original)"].map(status_map)
 
     # Categorize certain and actionable projects
@@ -947,6 +950,7 @@ def _normalize_project_locations(iso_df: pd.DataFrame) -> pd.DataFrame:
 
     Args:
         iso_df: the complete denormalized iso dataframe.
+
     Returns:
         geocoded_locations: a dataframe of geocoded project locations.
 
@@ -967,7 +971,7 @@ def _normalize_project_locations(iso_df: pd.DataFrame) -> pd.DataFrame:
         county=iso_df["county"].str.split(",|/|-|&| and ")
     ).explode("county")
     # geocode the projects
-    locations["county_project_id"] = range(0, len(locations))
+    locations["county_project_id"] = range(len(locations))
     locations = locations.set_index("county_project_id")
 
     geocoded_locations = add_county_fips_with_backup_geocoding(
@@ -986,9 +990,9 @@ def _normalize_project_locations(iso_df: pd.DataFrame) -> pd.DataFrame:
         geocoded_locations[["county_id_fips", "project_id"]].duplicated(keep=False)
     ]
     n_expected_duplicates = 118
-    assert (
-        len(duplicate_locations) <= n_expected_duplicates
-    ), f"Found more duplicate locations in Grid Status location table than expected:\n {duplicate_locations}"
+    assert len(duplicate_locations) <= n_expected_duplicates, (
+        f"Found more duplicate locations in Grid Status location table than expected:\n {duplicate_locations}"
+    )
     return geocoded_locations
 
 
@@ -999,8 +1003,10 @@ def _normalize_project_capacity(iso_df: pd.DataFrame) -> pd.DataFrame:
 
     Args:
         iso_df: the complete denormalized iso dataframe.
+
     Returns:
         capacity_df: a dataframe of project capacities.
+
     """
     capacity_cols = ["project_id", "resource", "capacity_mw"]
 
@@ -1022,9 +1028,9 @@ def _normalize_project_capacity(iso_df: pd.DataFrame) -> pd.DataFrame:
     )
     original_capacity = caiso[caiso_capacity_cols].sum().sum().round()
     normalized_capacity = caiso_capacity_df["capacity_mw"].sum().round()
-    assert (
-        original_capacity == normalized_capacity
-    ), f"Total CAISO capacity not preserved after normaliztion\n\tOriginal: {original_capacity}\n\tNormalized: {normalized_capacity}."
+    assert original_capacity == normalized_capacity, (
+        f"Total CAISO capacity not preserved after normaliztion\n\tOriginal: {original_capacity}\n\tNormalized: {normalized_capacity}."
+    )
 
     capacity_df = pd.concat(
         [iso_df[~is_caiso][capacity_cols], caiso_capacity_df[capacity_cols]]
@@ -1035,8 +1041,7 @@ def _normalize_project_capacity(iso_df: pd.DataFrame) -> pd.DataFrame:
 def _normalize_projects(
     iso_df: pd.DataFrame,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """
-    Normalize Gridstatus projects into projects and capacities.
+    """Normalize Gridstatus projects into projects and capacities.
 
     CAISO is the only ISO that has multiple "capacities" per project.
 
@@ -1084,6 +1089,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     Returns:
         A dictionary of cleaned Grid Status data queus.
+
     """
     # create one dataframe
     iso_cleaning_functions = {
