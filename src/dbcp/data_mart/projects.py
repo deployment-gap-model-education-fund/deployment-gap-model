@@ -236,7 +236,6 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     gen_stor = g.merge(s, how="outer", on=group_keys, suffixes=("_gen", "_stor"))
     # restore NaNs
     gen_stor["county_id_fips"] = gen_stor["county_id_fips"].replace(SENTINEL, np.nan)
-    # gen_stor = gen_stor.set_index(group_keys)
 
     assert (
         len(gen_stor) == long.groupby(group_keys, dropna=False).ngroups
