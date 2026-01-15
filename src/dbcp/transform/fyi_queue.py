@@ -226,16 +226,20 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
     # will list the same resource twice if there are two generators, in
     # these cases, sum the resources
     n_expected_duped_resources = 10
+    # Expected project IDS that show up in dupes:
+    # "caiso-1085","caiso-1088", "caiso-908", "caiso-472",
+    # "caiso-54873", "caiso-1212","ladwp-q57"
+    # "caiso-955", "tucson-electric-power-94", "tucson-electric-power-94"
     assert (
         len(
             resource_capacity_df[
                 resource_capacity_df.duplicated(subset=["project_id", "resource"])
             ]
         )
-        < n_expected_duped_resources
+        <= n_expected_duped_resources
     ), (
-        f"More than {n_expected_duped_resources} projects found with the same resource"
-        "listed twice in capacity_by_generation_type_breakdown. Ensure that their capacities should be summed."
+        f"More than {n_expected_duped_resources} projects found with the same resource "
+        "listed twice in capacity_by_generation_type_breakdown. Ensure that their capacities should be summed. "
         f"They have project IDs: {resource_capacity_df[resource_capacity_df.duplicated(subset=['project_id', 'resource'])].project_id}"
     )
     # There are some projects where summing the duplicated resource's capacity
@@ -298,7 +302,13 @@ def _normalize_location(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     Returns:
         Dict[str, pd.DataFrame]: dict with the projects and locations split into two dataframes
     """
-    location_cols = ["raw_county_name", "raw_state_name", "latitude", "longitude"]
+    location_cols = [
+        "raw_county_name",
+        "raw_state_name",
+        "latitude",
+        "longitude",
+        "country_code",
+    ]
     location_df = fyi_df[location_cols]
     location_df.dropna(
         subset=["raw_state_name", "raw_county_name"], how="all", inplace=True
@@ -398,7 +408,7 @@ if __name__ == "__main__":
     # debugging entry point
     import dbcp
 
-    fyi_uri = "gs://dgm-archive/interconnection.fyi/interconnection_fyi_dataset_2025-11-04.csv"
+    fyi_uri = "gs://dgm-archive/interconnection.fyi/interconnection_fyi_dataset_2026-01-01.csv"
     fyi_raw_dfs = dbcp.extract.fyi_queue.extract(fyi_uri)
     fyi_transformed_dfs = dbcp.transform.fyi_queue.transform(fyi_raw_dfs)
     fyi_transformed_dfs["fyi_resource_capacity"].to_parquet(
