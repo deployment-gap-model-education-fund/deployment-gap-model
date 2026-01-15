@@ -158,21 +158,22 @@ class CountyOpposition(object):
         grp = dupes.groupby("county_id_fips")
 
         years = grp["earliest_year_mentioned"].min()
+        descriptions = grp["ordinance_text"].sum().str.strip()
+        # combined and make county_id_fips a column
+        agg_dupes = pd.concat([years, descriptions], axis=1).reset_index()
 
         n_unique = grp[["geocoded_locality_name", "geocoded_locality_type"]].nunique()
         localities = (
             grp[["geocoded_locality_name", "geocoded_locality_type"]]
-            .nth(0)
+            .first()
             .mask(n_unique > 1, other="multiple")
+        ).reset_index()
+        agg_dupes = agg_dupes.merge(
+            localities, on="county_id_fips", how="left", validate="1:1"
         )
-
-        descriptions = grp["ordinance_text"].sum().str.strip()
-
-        agg_dupes = pd.concat([years, localities, descriptions], axis=1).reset_index()
         recombined = pd.concat(
             [not_dupes, agg_dupes], axis=0, ignore_index=True
         ).sort_values("county_id_fips")
-
         return recombined
 
     def _get_nrel_bans(self) -> pd.DataFrame:
@@ -295,15 +296,15 @@ def _estimate_proposed_power_co2e(
     iso_projects["mmbtu_per_mwh"] = gas_turbine_mmbtu_per_mwh
     is_cc = iso_projects.loc[:, "capacity_mw"].gt(cc_gt_capacity_mw_split)
     is_coal = iso_projects.loc[:, "mod_resource"] == "coal"
-    iso_projects.loc[:, "mmbtu_per_mwh"].where(
-        ~is_cc, other=combined_cycle_mmbtu_per_mwh, inplace=True
+    iso_projects.loc[:, "mmbtu_per_mwh"] = iso_projects.loc[:, "mmbtu_per_mwh"].where(
+        ~is_cc, other=combined_cycle_mmbtu_per_mwh
     )
-    iso_projects.loc[:, "mmbtu_per_mwh"].where(
-        ~is_coal, other=coal_steam_turbine_mmbtu_per_mwh, inplace=True
+    iso_projects.loc[:, "mmbtu_per_mwh"] = iso_projects.loc[:, "mmbtu_per_mwh"].where(
+        ~is_coal, other=coal_steam_turbine_mmbtu_per_mwh
     )
     is_oil = iso_projects.loc[:, "mod_resource"] == "oil"
-    iso_projects.loc[:, "mmbtu_per_mwh"].where(
-        ~is_oil, other=oil_internal_combustion_mmbtu_per_mwh, inplace=True
+    iso_projects.loc[:, "mmbtu_per_mwh"] = iso_projects.loc[:, "mmbtu_per_mwh"].where(
+        ~is_oil, other=oil_internal_combustion_mmbtu_per_mwh
     )
 
     iso_projects["estimated_capacity_factor"] = gt_small_cap_factor
@@ -312,15 +313,15 @@ def _estimate_proposed_power_co2e(
         other=gt_large_cap_factor,
         inplace=True,
     )
-    iso_projects.loc[:, "estimated_capacity_factor"].where(
-        ~is_cc, other=cc_cap_factor, inplace=True
-    )
-    iso_projects.loc[:, "estimated_capacity_factor"].where(
-        ~is_coal, other=coal_cap_factor, inplace=True
-    )
-    iso_projects.loc[:, "estimated_capacity_factor"].where(
-        ~is_oil, other=oil_cap_factor, inplace=True
-    )
+    iso_projects.loc[:, "estimated_capacity_factor"] = iso_projects.loc[
+        :, "estimated_capacity_factor"
+    ].where(~is_cc, other=cc_cap_factor)
+    iso_projects.loc[:, "estimated_capacity_factor"] = iso_projects.loc[
+        :, "estimated_capacity_factor"
+    ].where(~is_coal, other=coal_cap_factor)
+    iso_projects.loc[:, "estimated_capacity_factor"] = iso_projects.loc[
+        :, "estimated_capacity_factor"
+    ].where(~is_oil, other=oil_cap_factor)
 
     # Put it all together
     hours_per_year = 8766  # extra 6 hours to average in leap years

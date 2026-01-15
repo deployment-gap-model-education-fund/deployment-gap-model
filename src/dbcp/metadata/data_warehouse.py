@@ -348,7 +348,7 @@ eip_air_constr_permits = Table(
     Column("created_by", String),
     Column("modified_by", String),
     Column("published", Boolean),
-    Column("unknown_id", Boolean),
+    Column("unknown_id", String),
     Column("nsr_per_id", String),
     Column("research_notes", String),
     Column("version", Integer),

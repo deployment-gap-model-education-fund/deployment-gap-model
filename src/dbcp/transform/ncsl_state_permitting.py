@@ -20,9 +20,11 @@ def transform(raw_df: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     """
     # only one df in dict
     transform_df = raw_df["ncsl_state_permitting"].copy()
-    transform_df.loc[:, "permitting_type"].replace("n/a", pd.NA, inplace=True)
-    transform_df.loc[:, "state"].replace(
-        "Washington D.C.", "District of Columbia", inplace=True
+    transform_df.loc[:, "permitting_type"] = transform_df.loc[
+        :, "permitting_type"
+    ].replace("n/a", pd.NA)
+    transform_df.loc[:, "state"] = transform_df.loc[:, "state"].replace(
+        "Washington D.C.", "District of Columbia"
     )
     # manual error correction
     idx_MS = transform_df.index[(transform_df.loc[:, "state"].eq("Mississippi"))][0]
@@ -42,7 +44,7 @@ def transform(raw_df: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     transform_df = add_fips_ids(transform_df, county_col="description").drop(
         columns="county_id_fips"
     )
-    transform_df.rename(columns={"state": "raw_state_name"}, inplace=True)
+    transform_df = transform_df.rename(columns={"state": "raw_state_name"})
     validate(transform_df)
     return {"ncsl_state_permitting": transform_df}
 
