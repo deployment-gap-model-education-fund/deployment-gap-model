@@ -165,16 +165,15 @@ class CountyOpposition(object):
         n_unique = grp[["geocoded_locality_name", "geocoded_locality_type"]].nunique()
         localities = (
             grp[["geocoded_locality_name", "geocoded_locality_type"]]
-            .nth(0)
+            .first()
             .mask(n_unique > 1, other="multiple")
-        ).reset_index(drop=True)
-        # separately concat the localities on, because it doesn't share
-        # county_id_fips as an index
-        agg_dupes = pd.concat([agg_dupes, localities], axis=1)
+        ).reset_index()
+        agg_dupes = agg_dupes.merge(
+            localities, on="county_id_fips", how="left", validate="1:1"
+        )
         recombined = pd.concat(
             [not_dupes, agg_dupes], axis=0, ignore_index=True
         ).sort_values("county_id_fips")
-
         return recombined
 
     def _get_nrel_bans(self) -> pd.DataFrame:
