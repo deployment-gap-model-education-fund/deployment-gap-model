@@ -3,7 +3,7 @@
 import ast
 import logging
 import re
-from typing import Dict, List, Sequence
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
@@ -16,15 +16,7 @@ from dbcp.transform.helpers import (
 logger = logging.getLogger(__name__)
 
 
-def _convert_string_to_boolean(ser: pd.Series) -> pd.Series:
-    if pd.api.types.is_bool_dtype(ser):
-        return ser
-    mapping = {"True": True, "False": False, "": pd.NA}
-    out = ser.map(mapping).astype(pd.BooleanDtype())
-    return out
-
-
-def _format_column_names(cols: Sequence[str]) -> List[str]:
+def _format_column_names(cols: Sequence[str]) -> list[str]:
     """Convert column names from human friendly to machine friendly.
 
     Args:
@@ -32,6 +24,7 @@ def _format_column_names(cols: Sequence[str]) -> List[str]:
 
     Returns:
         List[str]: list of converted column names
+
     """
     pattern = re.compile(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
     out = [pattern.sub("_", col).lower().replace("-", "") for col in cols]
@@ -50,6 +43,7 @@ def _split_json_column(
 
     Returns:
         DataFrame with JSON column split out into individual columns.
+
     """
     raw_df = df.copy()
     if col in raw_df.columns:
@@ -74,6 +68,7 @@ def _fix_erroneous_array_items(ser: pd.Series, split_on=",", regex=False) -> pd.
 
     Returns:
         pd.Series: fixed series
+
     """
     if pd.api.types.is_numeric_dtype(ser):
         return ser
@@ -89,6 +84,7 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
 
     Returns:
         pd.DataFrame: transformed copy of the raw facilities dataframe
+
     """
     fac = raw_fac_df.copy()
     fac = _split_json_column(fac, col="xata")
@@ -213,16 +209,16 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
     fac.loc[
         fac.county_id_fips != fac.county_fips_code, "geocoded_containing_county"
     ] = "DeSoto Parish"
-    fac.loc[
-        fac.county_id_fips != fac.county_fips_code, "geocoded_locality_name"
-    ] = "DeSoto Parish"
-    fac.loc[
-        fac.county_id_fips != fac.county_fips_code, "geocoded_locality_type"
-    ] = "county"
+    fac.loc[fac.county_id_fips != fac.county_fips_code, "geocoded_locality_name"] = (
+        "DeSoto Parish"
+    )
+    fac.loc[fac.county_id_fips != fac.county_fips_code, "geocoded_locality_type"] = (
+        "county"
+    )
     fac.loc[fac.county_id_fips != fac.county_fips_code, "county_id_fips"] = "22031"
-    assert (
-        len(fac.loc[fac.county_id_fips != fac.county_fips_code]) == 0
-    ), f"Found 1+ geocoded county FIPS IDs that did not match the EIP data:\n {fac.loc[fac.county_id_fips != fac.county_fips_code]}"
+    assert len(fac.loc[fac.county_id_fips != fac.county_fips_code]) == 0, (
+        f"Found 1+ geocoded county FIPS IDs that did not match the EIP data:\n {fac.loc[fac.county_id_fips != fac.county_fips_code]}"
+    )
 
     fac.drop(
         columns=["state", "county", "county_fips_code"], inplace=True
@@ -231,12 +227,12 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
     max_long = fac["longitude"].max()
     min_lat = fac["latitude"].min()
 
-    assert (
-        max_long < 0
-    ), f"Max longitude found was {max_long}, expected <0."  # USA longitudes
-    assert (
-        min_lat > 0
-    ), f"Min latitude found was {min_lat}, expected >0."  # USA latitudes
+    assert max_long < 0, (
+        f"Max longitude found was {max_long}, expected <0."
+    )  # USA longitudes
+    assert min_lat > 0, (
+        f"Min latitude found was {min_lat}, expected >0."
+    )  # USA latitudes
 
     fac["date_modified"] = pd.to_datetime(fac.loc[:, "raw_modified_on"], format="mixed")
 
@@ -251,6 +247,7 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
 
     Returns:
         pd.DataFrame: transformed copy of the raw projects dataframe
+
     """
     proj = raw_proj_df.copy()
     proj = _split_json_column(proj, col="xata")
@@ -366,9 +363,7 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
         ["operating_status_source_documents", "operating_status_source_documents_old"]
     ] = proj[
         ["operating_status_source_documents", "operating_status_source_documents_old"]
-    ].astype(
-        str
-    )
+    ].astype(str)
 
     return proj
 
@@ -381,6 +376,7 @@ def air_construction_transform(raw_air_constr_df: pd.DataFrame) -> pd.DataFrame:
 
     Returns:
         pd.DataFrame: transformed copy of the raw air_construction dataframe
+
     """
     air = raw_air_constr_df.copy()
     air = _split_json_column(air, col="xata")
@@ -440,6 +436,7 @@ def facilities_project_assn_transform(
 
     Returns:
         pd.DataFrame: table of associations between facilities and projects.
+
     """
     fac_proj = raw_facilities_project_assn.copy()
 
@@ -522,6 +519,7 @@ def project_permit_assn_transform(
 
     Returns:
         pd.DataFrame: table of associations between projects and air construction permits
+
     """
     proj_perm = raw_project_permits_assn.copy()
 
@@ -576,7 +574,7 @@ def project_permit_assn_transform(
     return proj_perm
 
 
-def transform(raw_eip_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
+def transform(raw_eip_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """Apply all transforms to raw EIP data.
 
     Args:
@@ -584,6 +582,7 @@ def transform(raw_eip_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
 
     Returns:
         Dict[str, pd.DataFrame]: transfomed EIP data for the warehouse
+
     """
     fac = facilities_transform(raw_eip_dfs["eip_facilities"])
     proj = projects_transform(raw_eip_dfs["eip_projects"])
