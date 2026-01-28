@@ -3,6 +3,7 @@
 import csv
 import logging
 import os
+from datetime import timezone
 from io import StringIO
 from pathlib import Path
 
@@ -33,7 +34,7 @@ SA_TO_PD_TYPES = {
     "VARCHAR": "string",
     "INTEGER": "Int64",
     "BIGINT": "Int64",
-    "FLOAT": "float64",
+    "FLOAT": "Float64",
     "BOOLEAN": "boolean",
     "DATETIME": "datetime64[ns]",
 }
@@ -125,7 +126,24 @@ def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str):
         # Add the column if it doesn't exist
         if col.name not in df.columns:
             df[col.name] = None
-        df[col.name] = df[col.name].astype(SA_TO_PD_TYPES[str(col.type)])
+        if str(col.type) == "DATETIME":
+            if not pd.api.types.is_datetime64_any_dtype(df[col.name]):
+                df[col.name] = pd.to_datetime(df[col.name], errors="coerce")
+            # drop the timezone in order to enable migration to Postgres.
+            if (df[col.name].dt.tz is not None) and (
+                df[col.name].dt.tz != timezone.utc
+            ):
+                logger.error(
+                    f"Non-UTC timezone encountered in column {col.name} "
+                    "while enforcing dtypes before postgres migration. "
+                    f"Datetime values in {col.name} will be localized (timezone removed) "
+                    "and UTC will be the assumed timezone. "
+                    "Either convert to UTC with df[col.name].dt.tz_convert('UTC') "
+                    "or add a timezone column to the table."
+                )
+            df[col.name] = df[col.name].dt.tz_localize(None)
+        else:
+            df[col.name] = df[col.name].astype(SA_TO_PD_TYPES[str(col.type)])
 
     # convert datetime[ns] columns to milliseconds
     for col in df.select_dtypes(include=["datetime64[ns]"]).columns:

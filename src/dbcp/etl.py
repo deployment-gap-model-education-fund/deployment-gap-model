@@ -209,9 +209,9 @@ def write_to_postgres_and_parquet(
     dfs: dict[str, pd.DataFrame], engine: sa.engine.Engine, schema_name: str
 ):
     """Write data mart tables from a schema to postgres and parquet."""
-    # Setup postgres
-    with engine.connect() as con:
-        con.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
+    # Ensure schema exists in a committed transaction
+    with engine.begin() as con:
+        con.execute(sa.text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
 
     # Delete any existing tables, and create them anew
     metadata = dbcp.helpers.get_schema_sql_alchemy_metadata(schema_name)

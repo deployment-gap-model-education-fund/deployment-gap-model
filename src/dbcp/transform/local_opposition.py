@@ -27,19 +27,20 @@ def _extract_years(ser: pd.Series) -> pd.Series:
 
     summarized = years.groupby(level=0).agg(["min", "max", "count"])
     summarized = summarized.astype(pd.Int16Dtype())
-    summarized.rename(
+    summarized = summarized.rename(
         columns={
             "min": "earliest_year_mentioned",
             "max": "latest_year_mentioned",
             "count": "n_years_mentioned",
         },
-        inplace=True,
     )
 
     only_one_year = summarized.loc[:, "n_years_mentioned"] == 1
     summarized.loc[only_one_year, "latest_year_mentioned"] = pd.NA
     summarized = summarized.reindex(index=ser.index, fill_value=pd.NA)
-    summarized.loc[:, "n_years_mentioned"].fillna(0, inplace=True)
+    summarized.loc[:, "n_years_mentioned"] = summarized.loc[
+        :, "n_years_mentioned"
+    ].fillna(0)
     return summarized
 
 
@@ -132,7 +133,6 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
 
     # undo locality corrections so we can view the raw data
     with_fips.loc[:, "locality"] = raw_locality
-
     year_summaries = _extract_years(local["ordinance_text"])
     local = pd.concat([with_fips, year_summaries], axis=1)
     local.rename(

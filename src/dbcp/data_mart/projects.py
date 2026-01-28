@@ -167,22 +167,24 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     storage = long.loc[is_storage, :]
     group_keys = ["project_id", "source", "county_id_fips"]
     # create multiple generation columns
-    group = gen.groupby(group_keys, dropna=False)[["generation_type", "capacity_mw"]]
+    group = gen.groupby(group_keys, dropna=False)[
+        group_keys + ["generation_type", "capacity_mw"]
+    ]
     # first generation source
     rename_dict = {
         "generation_type": "generation_type_1",
         "capacity_mw": "generation_capacity_mw_1",
     }
-    gen_1 = group.nth(0).rename(columns=rename_dict)
+    gen_1 = group.nth(0).reset_index(drop=True).rename(columns=rename_dict)
     # second generation source (very few rows)
     rename_dict = {
         "generation_type": "generation_type_2",
         "capacity_mw": "generation_capacity_mw_2",
     }
-    gen_2 = group.nth(1).rename(columns=rename_dict)
+    gen_2 = group.nth(1).reset_index(drop=True).rename(columns=rename_dict)
     # shouldn't be any with 3 generation types
     assert group.nth(2).shape[0] == 0
-    gen = pd.concat([gen_1, gen_2], axis=1, copy=False)
+    gen = gen_1.merge(gen_2, on=group_keys, how="left")
     # create storage column
     # Occassionally there are projects with multiple storage resources,
     # i.e. battery storage and pumped storage
@@ -219,7 +221,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     )
     # combine gen and storage cols, handling nans in county_id_fips
     SENTINEL = "<NA_FIPS>"
-    g = gen.reset_index().assign(
+    g = gen.assign(
         county_id_fips=lambda d: d["county_id_fips"].astype("string").fillna(SENTINEL)
     )
     s = storage.reset_index().assign(
@@ -228,7 +230,6 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     gen_stor = g.merge(s, how="outer", on=group_keys, suffixes=("_gen", "_stor"))
     # restore NaNs
     gen_stor["county_id_fips"] = gen_stor["county_id_fips"].replace(SENTINEL, np.nan)
-    gen_stor = gen_stor.set_index(group_keys)
 
     assert (
         len(gen_stor) == long.groupby(group_keys, dropna=False).ngroups
@@ -246,8 +247,14 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         .groupby(group_keys, dropna=False)
         .nth(0)
     )
-    project_locations = pd.concat([gen_stor, other_cols, co2e], axis=1, copy=False)
-
+    # a left merge works here because the previous assert ensured that all
+    # project-locations are accounted for and 1:1
+    project_locations = gen_stor.merge(
+        other_cols, on=group_keys, how="left", validate="1:1"
+    )
+    project_locations = project_locations.merge(
+        co2e, on=group_keys, how="left", validate="1:1"
+    ).set_index(group_keys)
     # now create multiple location columns
     project_keys = ["source", "project_id"]
     projects = project_locations.reset_index("county_id_fips").groupby(
@@ -421,8 +428,9 @@ def create_long_format(
         "geocoded_locality_type": "ordinance_jurisdiction_type",
         "earliest_year_mentioned": "ordinance_earliest_year_mentioned",
     }
-    combined_opp.rename(columns=rename_dict, inplace=True)
-
+    combined_opp = combined_opp.rename(columns=rename_dict).dropna(
+        subset="county_id_fips"
+    )
     long_format = iso.merge(
         combined_opp, on="county_id_fips", how="left", validate="m:1"
     )
@@ -472,7 +480,9 @@ def create_fyi_long_format(
         "geocoded_locality_type": "ordinance_jurisdiction_type",
         "earliest_year_mentioned": "ordinance_earliest_year_mentioned",
     }
-    combined_opp.rename(columns=rename_dict, inplace=True)
+    combined_opp = combined_opp.rename(columns=rename_dict).dropna(
+        subset="county_id_fips"
+    )
 
     long_format = fyi.merge(
         combined_opp, on="county_id_fips", how="left", validate="m:1"
