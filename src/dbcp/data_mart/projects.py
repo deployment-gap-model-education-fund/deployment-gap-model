@@ -168,27 +168,21 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     storage = long.loc[is_storage, :]
     group_keys = ["project_id", "source", "county_id_fips"]
     # create multiple generation columns
-    group = gen.groupby(group_keys, dropna=False)
+    group = gen.groupby(group_keys, dropna=False)[
+        group_keys + ["generation_type", "capacity_mw"]
+    ]
     # first generation source
     rename_dict = {
         "generation_type": "generation_type_1",
         "capacity_mw": "generation_capacity_mw_1",
     }
-    gen_1 = (
-        group.nth(0)
-        .reset_index()
-        .rename(columns=rename_dict)[group_keys + list(rename_dict.values())]
-    )
+    gen_1 = group.nth(0).reset_index(drop=True).rename(columns=rename_dict)
     # second generation source (very few rows)
     rename_dict = {
         "generation_type": "generation_type_2",
         "capacity_mw": "generation_capacity_mw_2",
     }
-    gen_2 = (
-        group.nth(1)
-        .reset_index()
-        .rename(columns=rename_dict)[group_keys + list(rename_dict.values())]
-    )
+    gen_2 = group.nth(1).reset_index(drop=True).rename(columns=rename_dict)
     # shouldn't be any with 3 generation types
     assert group.nth(2).shape[0] == 0
     gen = gen_1.merge(gen_2, on=group_keys, how="left")
