@@ -340,10 +340,9 @@ def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     # from data_mart.fossil_infrastructure_projects
     # group by 1, 2
 
-    infra = infra.loc[:, "industry_sector"].replace(
+    infra.loc[:, "industry_sector"] = infra.loc[:, "industry_sector"].replace(
         "Liquefied Natural Gas (LNG)", "Liquefied Natural Gas"
     )  # Use shorthand code to shorten column names later on
-
     grp = infra.groupby(["county_id_fips", "industry_sector"])
     aggs = grp.agg(
         {
@@ -353,7 +352,7 @@ def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
             "project_id": "count",
         }
     )
-    aggs = aggs.loc[:, "co2e_tonnes_per_year"].replace(
+    aggs.loc[:, "co2e_tonnes_per_year"] = aggs.loc[:, "co2e_tonnes_per_year"].replace(
         0, np.nan
     )  # sums of 0 are simply unmodeled
 
@@ -672,7 +671,9 @@ def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
     areas = pd.concat(
         [county_areas, federal_developable, un_developable], axis=1, join="outer"
     )
-    areas = areas.loc[:, ["fed_dev", "protected"]].fillna(0)
+    areas.loc[:, ["fed_dev", "protected"]] = areas.loc[
+        :, ["fed_dev", "protected"]
+    ].fillna(0)
     areas["unprotected_land_area_km2"] = (
         areas["county_area_coast_clipped_km2"] - areas["protected"]
     )
