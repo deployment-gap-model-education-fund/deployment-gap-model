@@ -306,7 +306,7 @@ def _existing_plants_counties(
             "plant_id_eia": "count",
         }
     )
-    aggs = aggs.loc[:, "co2e_tonnes_per_year"].replace(
+    aggs.loc[:, "co2e_tonnes_per_year"] = aggs.loc[:, "co2e_tonnes_per_year"].replace(
         0, np.nan
     )  # sums of 0 are simply unmodeled
     aggs["facility_type"] = "power plant"
@@ -343,6 +343,7 @@ def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     infra.loc[:, "industry_sector"] = infra.loc[:, "industry_sector"].replace(
         "Liquefied Natural Gas (LNG)", "Liquefied Natural Gas"
     )  # Use shorthand code to shorten column names later on
+
     grp = infra.groupby(["county_id_fips", "industry_sector"])
     aggs = grp.agg(
         {
@@ -402,13 +403,14 @@ def _fyi_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     grp = queue.groupby(["county_id_fips", "resource_clean"])
     aggs = grp.agg(
         {
-            "co2e_tonnes_per_year": "sum",  # type: ignore
+            "co2e_tonnes_per_year": "sum",
             "capacity_mw": "sum",
             "project_id": "count",
         }
     )
-    aggs = aggs.loc[:, "co2e_tonnes_per_year"].replace(
-        0, np.nan
+    aggs.loc[:, "co2e_tonnes_per_year"] = aggs.loc[:, "co2e_tonnes_per_year"].replace(
+        0,
+        np.nan,
     )  # sums of 0 are simply unmodeled
     aggs["facility_type"] = "power plant"
     aggs["status"] = "proposed"
@@ -843,9 +845,7 @@ def _get_actionable_aggs_for_wide_format(engine: sa.engine.Engine) -> pd.DataFra
                     }
                 )
             )
-            agg = agg.rename(
-                columns=rename_dict,
-            )
+            agg = agg.rename(columns=rename_dict)
             aggs.append(agg)
         # and avoided co2 totals. This doesn't belong in this function but c'est la vie.
         agg = (
@@ -888,7 +888,7 @@ def _get_actionable_aggs_for_long_format(engine: sa.engine.Engine) -> pd.DataFra
 
 def _add_avoided_co2e(iso: pd.DataFrame, engine: sa.engine.Engine) -> pd.DataFrame:
     emiss_fac_by_county = _get_avoided_emissions_by_county_resource(engine)
-    emiss_fac_by_county = emiss_fac_by_county["resource_type"].replace(
+    emiss_fac_by_county["resource_type"] = emiss_fac_by_county["resource_type"].replace(
         {
             "onshore_wind": "Onshore Wind",
             "offshore_wind": "Offshore Wind",
@@ -896,7 +896,7 @@ def _add_avoided_co2e(iso: pd.DataFrame, engine: sa.engine.Engine) -> pd.DataFra
         },
     )
     emiss_fac_by_county = emiss_fac_by_county.rename(
-        columns={"resource_type": "resource_clean"},
+        columns={"resource_type": "resource_clean"}
     )
 
     iso = iso.merge(
@@ -932,12 +932,10 @@ def _get_avoided_emissions_by_county_resource(engine: sa.engine.Engine) -> pd.Da
     emiss_fac_by_county = emiss_fac_by_county.merge(
         national_avgs, on="resource_type", how="left"
     )
-    emiss_fac_by_county = emiss_fac_by_county["co2e_tonnes_per_year_per_mw"].fillna(
-        emiss_fac_by_county["avg_co2"],
-    )
-    emiss_fac_by_county = emiss_fac_by_county.drop(
-        columns=["avg_co2", "avert_region"],
-    )
+    emiss_fac_by_county["co2e_tonnes_per_year_per_mw"] = emiss_fac_by_county[
+        "co2e_tonnes_per_year_per_mw"
+    ].fillna(emiss_fac_by_county["avg_co2"])
+    emiss_fac_by_county = emiss_fac_by_county.drop(columns=["avg_co2", "avert_region"])
     return emiss_fac_by_county
 
 
