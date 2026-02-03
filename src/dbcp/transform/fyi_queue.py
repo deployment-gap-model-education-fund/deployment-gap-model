@@ -1,7 +1,6 @@
 """Functions to transform interconnection.FYI interconnection queue tables."""
 
 import logging
-from typing import Dict
 
 import pandas as pd
 import yaml
@@ -88,9 +87,9 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
         "unique_id": "project_id",
         "raw_developer": "developer_raw",
     }
-    assert (
-        projects.unique_id.is_unique
-    ), "unique_id is not unique in the raw interconnection.FYI data!"
+    assert projects.unique_id.is_unique, (
+        "unique_id is not unique in the raw interconnection.FYI data!"
+    )
     projects = projects.rename(columns=rename_dict)
     # the interconnection_status_fyi column is already a cleaned
     # version of interconnection_status_raw, but validate to see
@@ -146,7 +145,9 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
         .isna()
         .all()
         .all()
-    ), "Some operational or withdrawn projects have is_actionable or is_nearly_certain values."
+    ), (
+        "Some operational or withdrawn projects have is_actionable or is_nearly_certain values."
+    )
 
     # Replace ISO-NE values in region with ISONE to match gridstatus
     projects["power_market"] = projects["power_market"].replace({"ISO-NE": "ISONE"})
@@ -168,9 +169,9 @@ def parse_capacity(row):
     # we want to save total energy storage capacity later
     allowed_keys = {"canonical_gen_type", "mw", "mwh"}
     keys = {key for item in data for key in item.keys()}
-    assert (
-        len(keys - allowed_keys) == 0
-    ), f"New key found in the capacity_by_generation_type_breakdown yaml string: {keys - allowed_keys}. For project_id: {row.name}"
+    assert len(keys - allowed_keys) == 0, (
+        f"New key found in the capacity_by_generation_type_breakdown yaml string: {keys - allowed_keys}. For project_id: {row.name}"
+    )
     # remove the mwh keys, we don't do anything with the total battery
     # storage capacity right now
     data = [item for item in data if "mwh" not in item.keys()]
@@ -191,7 +192,7 @@ def parse_capacity(row):
     }
 
 
-def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Pull out capacity and resource values into a separate dataframe.
 
     Args:
@@ -199,6 +200,7 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
 
     Returns:
         Dict[str, pd.DataFrame]: dict with the projects and multivalues split into two dataframes
+
     """
     # NYISO, CAISO, and West report capacity broken out by resource type
     # for some projects.
@@ -293,7 +295,7 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
     return {"resource_capacity_df": resource_capacity_df, "project_df": project_df}
 
 
-def _normalize_location(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+def _normalize_location(fyi_df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Pull out the county and state columns to a separate dataframe.
 
     Args:
@@ -301,6 +303,7 @@ def _normalize_location(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
 
     Returns:
         Dict[str, pd.DataFrame]: dict with the projects and locations split into two dataframes
+
     """
     location_cols = [
         "raw_county_name",
@@ -320,7 +323,7 @@ def _normalize_location(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     return {"location_df": location_df, "project_df": project_df}
 
 
-def normalize_fyi_dfs(fyi_transformed_dfs: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+def normalize_fyi_dfs(fyi_transformed_dfs: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Normalize one-to-many columns and combine the three queues.
 
     Args:
@@ -328,6 +331,7 @@ def normalize_fyi_dfs(fyi_transformed_dfs: pd.DataFrame) -> Dict[str, pd.DataFra
 
     Returns:
         Dict[str, pd.DataFrame]: the combined queues, normalized into projects, locations, and resource_capacity
+
     """
     resource_capacity_dfs = _normalize_resource_capacity(fyi_transformed_dfs)
     location_dfs = _normalize_location(resource_capacity_dfs["project_df"])
@@ -338,15 +342,15 @@ def normalize_fyi_dfs(fyi_transformed_dfs: pd.DataFrame) -> Dict[str, pd.DataFra
     }
 
 
-def transform(fyi_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
-    """
-    Transform LBNL ISO Queues dataframes.
+def transform(fyi_raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+    """Transform LBNL ISO Queues dataframes.
 
     Args:
         lbnl_raw_dfs: Dictionary of the raw extracted data for each table.
 
     Returns:
         lbnl_transformed_dfs: Dictionary of the transformed tables.
+
     """
     transformed = _clean_all_fyi_projects(
         fyi_raw_dfs["fyi_queue"]
@@ -395,9 +399,9 @@ def transform(fyi_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         raise AssertionError("Missing Resources!")
     # Most projects missing queue_status are from the early 2000s so I'm going to assume
     # they were withrawn.
-    assert (
-        fyi_normalized_dfs["fyi_projects"]["queue_status"].isna().sum() <= 42
-    ), "Unexpected number of projects missing queue status."
+    assert fyi_normalized_dfs["fyi_projects"]["queue_status"].isna().sum() <= 42, (
+        "Unexpected number of projects missing queue status."
+    )
     fyi_normalized_dfs["fyi_projects"]["queue_status"] = fyi_normalized_dfs[
         "fyi_projects"
     ]["queue_status"].fillna("Withdrawn")

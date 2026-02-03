@@ -29,12 +29,12 @@ repos:
       - id: isort
         args: ["--profile", "black"]
 
-  # Format the code
-  - repo: https://github.com/psf/black
-    rev: 22.3.0
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.8
     hooks:
-      - id: black
-        language_version: python3.10
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
 
   # Check for PEP8 non-compliance, code complexity, style, errors, etc:
   - repo: https://github.com/PyCQA/flake8

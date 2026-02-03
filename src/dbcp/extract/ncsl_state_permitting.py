@@ -1,6 +1,6 @@
 """Extract and logic for NCSL data."""
+
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import bs4
 import pandas as pd
@@ -8,14 +8,14 @@ import requests
 from requests.models import HTTPError
 
 
-class NCSLScraper(object):
+class NCSLScraper:
     """Scrape NCSL website for wind energy permitting regulations."""
 
     SOURCE_URL = "https://www.ncsl.org/research/energy/state-wind-energy-siting.aspx"
 
     def __init__(self) -> None:
         """Initialize NCSLScraper object."""
-        self.soup: Optional[bs4.BeautifulSoup] = None
+        self.soup: bs4.BeautifulSoup | None = None
         return
 
     def _get_page(self) -> None:
@@ -29,7 +29,7 @@ class NCSLScraper(object):
     def _parse_state_div(
         self,
         div: bs4.element.Tag,
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """Parse html <div>s corresponding to each state and extract relevant information.
 
         Args:
@@ -37,6 +37,7 @@ class NCSLScraper(object):
 
         Returns:
             Dict[str, str]: dict with keys state, permitting_type, description, and link
+
         """
         try:
             # State names have H2 headers
@@ -51,7 +52,7 @@ class NCSLScraper(object):
             if tag.contents[0].text == "":
                 continue
             # Statute link
-            elif tag.contents[0].text == "Statute":
+            if tag.contents[0].text == "Statute":
                 try:
                     statute_link = tag.select("a")[0].attrs["href"]
                 except IndexError:  # N/A values have no links
@@ -79,11 +80,12 @@ class NCSLScraper(object):
 
         Returns:
             pd.DataFrame: dataframe of raw scraped data.
+
         """
         if self.soup is None:
             self._get_page()
 
-        scraped: Dict[str, List[str]] = {
+        scraped: dict[str, list[str]] = {
             "state": [],
             "permitting_type": [],
             "description": [],
@@ -102,13 +104,14 @@ class NCSLScraper(object):
 
         Args:
             destination_path (Path): filepath to write csv to
+
         """
         scraped = self.parse_page()
         scraped.to_csv(destination_path, index=False)
         return
 
 
-def extract(csv) -> Dict[str, pd.DataFrame]:
+def extract(csv) -> dict[str, pd.DataFrame]:
     """Extract ncsl permitting data."""
     out = pd.read_csv(csv)
     # set categorical dtypes in transform stage, after cleaning up categories.
