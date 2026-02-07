@@ -293,7 +293,7 @@ RESOURCE_DICT = {
                 "Fuel Oil - Other",
                 "Fuel Oil - Combustion (gas) Turbine, but not part of a Combined-Cycle",
             ],
-            "spp": ["Thermal - Diesel/Gas"],
+            "spp": ["Thermal - Diesel/Gas", "Thermal - Diesel"],
             "nyiso": [],
             "isone": [
                 "KER BAT",
@@ -410,6 +410,7 @@ RESOURCE_DICT = {
                 "Hybrid - Solar/Battery/Wind",
                 "Hybrid - Photovoltaic / Battery",
                 "Hybrid - Solar/Storage/Wind",
+                "Hybrid - Battery/Solar",
             ],
             "nyiso": ["Solar"],
             "isone": ["SUN", "SUN BAT", "SUN WAT"],
@@ -671,6 +672,7 @@ def _transform_miso(post_2017: pd.DataFrame, pre_2017: pd.DataFrame) -> pd.DataF
             "Withdrawn": "Withdrawn",
             "LEGACY: Archived": "Withdrawn",
             "LEGACY: Done": "Operational",
+            "Pending Transfer": "Active",
         }
     )
     iso_df["queue_status"] = iso_df.queue_status.mask(
@@ -761,8 +763,9 @@ def _transform_pjm(iso_df: pd.DataFrame) -> pd.DataFrame:
     )
 
     # I think GridStatus wrongly assigned the raw "Name" column to "Project Name"
-    # instead of "Interconnection Location". 97% of the values for Active projects
-    # refer to transmission lines ("asdf XXX kV")
+    # instead of "Interconnection Location". 87% of the values for Active projects
+    # refer to transmission lines ("asdf XXX kV") and the remaining values seem like
+    # interchange points, i.e. AMIL-PJM
     stats = (
         iso_df.query('queue_status == "Active"')["project_name"]
         .str.lower()
@@ -770,7 +773,7 @@ def _transform_pjm(iso_df: pd.DataFrame) -> pd.DataFrame:
         .agg(["mean", "sum"])
     )
     assert (
-        stats["mean"] > 0.89
+        stats["mean"] > 0.86
     ), f"Only {stats['mean']:.2%} of Active project_name look like transmission lines."
 
     iso_df.drop(columns="point_of_interconnection", inplace=True)
