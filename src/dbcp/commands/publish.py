@@ -309,11 +309,7 @@ def publish_outputs(
                     output_bucket, directory, metadata.version, target
                 )
             # At this point postgres is only used for production data mart and private data mart tables
-            if (
-                upload_to_postgres
-                and ("data_mart" in str(directory))
-                and (target == "prod")
-            ):
+            if upload_to_postgres and ("data_mart" in str(directory)):
                 load_parquet_files_to_postgres(
                     output_bucket, directory, metadata.version
                 )
