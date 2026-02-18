@@ -293,7 +293,7 @@ RESOURCE_DICT = {
                 "Fuel Oil - Other",
                 "Fuel Oil - Combustion (gas) Turbine, but not part of a Combined-Cycle",
             ],
-            "spp": ["Thermal - Diesel/Gas"],
+            "spp": ["Thermal - Diesel/Gas", "Thermal - Diesel"],
             "nyiso": [],
             "isone": [
                 "KER BAT",
@@ -410,6 +410,7 @@ RESOURCE_DICT = {
                 "Hybrid - Solar/Battery/Wind",
                 "Hybrid - Photovoltaic / Battery",
                 "Hybrid - Solar/Storage/Wind",
+                "Hybrid - Battery/Solar",
             ],
             "nyiso": ["Solar"],
             "isone": ["SUN", "SUN BAT", "SUN WAT"],
@@ -599,7 +600,7 @@ def _create_project_status_classification_from_multiple_columns(
         .isin(set(completed_strings))
         .fillna(False)
     )
-    status_df.rename(columns=status_cols, inplace=True)
+    status_df = status_df.rename(columns=status_cols)
 
     iso_df["is_actionable"] = pd.NA
     iso_df["is_nearly_certain"] = pd.NA
@@ -674,6 +675,7 @@ def _transform_miso(post_2017: pd.DataFrame, pre_2017: pd.DataFrame) -> pd.DataF
             "Withdrawn": "Withdrawn",
             "LEGACY: Archived": "Withdrawn",
             "LEGACY: Done": "Operational",
+            "Pending Transfer": "Active",
         }
     )
     iso_df["queue_status"] = iso_df.queue_status.mask(
@@ -699,8 +701,8 @@ def _transform_miso(post_2017: pd.DataFrame, pre_2017: pd.DataFrame) -> pd.DataF
 
     # GridStatus wrongly sources "Proposed Completion Date" from "negInService".
     # It should come from "inService"
-    iso_df.rename(columns={"proposed_completion_date": "negInService"}, inplace=True)
-    iso_df.rename(columns={"inService": "proposed_completion_date"}, inplace=True)
+    iso_df = iso_df.rename(columns={"proposed_completion_date": "negInService"})
+    iso_df = iso_df.rename(columns={"inService": "proposed_completion_date"})
 
     # There are about 30 projects that are duplciated because there is an
     # addition record where studyPhase == "Network Upgrade". I don't fully
@@ -764,20 +766,21 @@ def _transform_pjm(iso_df: pd.DataFrame) -> pd.DataFrame:
     )
 
     # I think GridStatus wrongly assigned the raw "Name" column to "Project Name"
-    # instead of "Interconnection Location". 97% of the values for Active projects
-    # refer to transmission lines ("asdf XXX kV")
+    # instead of "Interconnection Location". 87% of the values for Active projects
+    # refer to transmission lines ("asdf XXX kV") and the remaining values seem like
+    # interchange points, i.e. AMIL-PJM
     stats = (
         iso_df.query('queue_status == "Active"')["project_name"]
         .str.lower()
         .str.contains(r"\d *kv")
         .agg(["mean", "sum"])
     )
-    assert stats["mean"] > 0.89, (
+    assert stats["mean"] > 0.86, (
         f"Only {stats['mean']:.2%} of Active project_name look like transmission lines."
     )
 
-    iso_df.drop(columns="point_of_interconnection", inplace=True)
-    iso_df.rename(columns={"project_name": "point_of_interconnection"}, inplace=True)
+    iso_df = iso_df.drop(columns="point_of_interconnection")
+    iso_df = iso_df.rename(columns={"project_name": "point_of_interconnection"})
 
     # winter_capacity_mw in pjm aligns with the LBNL data
     iso_df["capacity_mw"] = iso_df["winter_capacity_mw"]

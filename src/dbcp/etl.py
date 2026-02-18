@@ -44,7 +44,7 @@ def etl_lbnl_iso_queue() -> dict[str, pd.DataFrame]:
 
 def etl_fyi_queue() -> dict[str, pd.DataFrame]:
     """Interconnection.fyi ISO Queues ETL."""
-    fyi_uri = "gs://dgm-archive/interconnection.fyi/interconnection_fyi_dataset_2026-01-01.csv"
+    fyi_uri = "gs://dgm-archive/interconnection.fyi/interconnection_fyi_dataset_2026-02-01.csv"
     fyi_raw_dfs = dbcp.extract.fyi_queue.extract(fyi_uri)
     fyi_transformed_dfs = dbcp.transform.fyi_queue.transform(fyi_raw_dfs)
     return fyi_transformed_dfs
@@ -306,11 +306,11 @@ def create_data_mart(engine, private_only: bool = False):  # noqa: C901
             continue
         try:
             data = module.create_data_mart(engine=engine)
-        except AttributeError:
+        except AttributeError as error:
             raise AttributeError(
                 f"{module_info.name} has no attribute 'create_data_mart'."
                 "Make sure the data mart module implements create_data_mart function."
-            )
+            ) from error
         if isinstance(data, pd.DataFrame):
             name = module_info.name
             # If we're creating the private data mart only
@@ -330,7 +330,7 @@ def create_data_mart(engine, private_only: bool = False):  # noqa: C901
             # if no private tables are left from this module, skip
             if not data:
                 continue
-            assert len([key for key in data.keys() if key in data_mart_tables]) == 0, (
+            assert len([key for key in data if key in data_mart_tables]) == 0, (
                 f"Dict key from {module_info.name} already exists"
             )
             data_mart_tables.update(data)
