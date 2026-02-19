@@ -96,6 +96,35 @@ then set environment variables:
 echo 'export GOOGLE_GHA_CREDS_PATH="value"' > $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
 ```
 
+## Postgres Authentication
+Madrone is moving towards using a `postgres` instance for accessing data,
+and we have configured the ETL to auto-publish data to this instance when
+running the `update-data` job from github. We generally avoid accessing
+this instance during local runs of the ETL, so setting up credentials is
+not strictly necessary, but it can be useful for testing and validation
+purposes. To access this instance you must first set the following environment
+variables:
+
+- `PROD_POSTGRES_HOST`
+- `PROD_POSTGRES_USER`
+- `PROD_POSTGRES_PASSWORD`
+
+See the secret `DBCP Postgres Credentials` in Bitwarden to access the
+corresponding values for each of these variables.
+
+Once you have set these variables, there are various ways to access data
+from the postgres instance. For example, you could run `make jupyter_lab`
+then from a notebook:
+
+```py
+from dbcp.helpers import get_sql_engine
+
+engine = get_sql_engine(production=True)
+```
+
+To explore the data using SQL you can use the `make duckdb` target (see
+details below).
+
 ## Git Pre-commit Hooks
 
 Git hooks let you automatically run scripts at various points as you manage your source code. “Pre-commit” hook scripts are run when you try to make a new commit. These scripts can review your code and identify bugs, formatting errors, bad coding habits, and other issues before the code gets checked in. This gives you the opportunity to fix those issues before publishing them.
@@ -187,6 +216,17 @@ starts a jupyter lab instance at `http://127.0.0.1:8888/`. If you have another j
 ```
 export JUPYTER_PORT=8890
 ```
+
+```
+make duckdb
+```
+
+Will open a `duckdb` shell instance which can be used access data from
+BigQuery and the dev/prod postgres instances in one unified interface. Tables
+can then be referenced in queries like `{bq|pg_prod|pg_dev}.{schema_name}.{table_name}`.
+Note that we currently only have one schema in the production Postgres
+instance, so no schema name is required for this database.
+
 
 # Development Process
 
