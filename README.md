@@ -107,7 +107,7 @@ variables:
 
 - `PROD_POSTGRES_HOST`
 - `PROD_POSTGRES_USER`
-- `PROD_POSTGRES_USER`
+- `PROD_POSTGRES_PASSWORD`
 
 See the secret `DBCP Postgres Credentials` in Bitwarden to access the
 corresponding values for each of these variables.
