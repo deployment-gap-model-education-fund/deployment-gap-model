@@ -136,7 +136,7 @@ def _simplify_wind_ordinance_types(types: pd.Series) -> pd.Series:
     is_water = simple.str.contains("river|lake|creek|reservoir")
     simple.loc[is_water] = "water"
 
-    simple.replace(
+    simple = simple.replace(
         {
             "tower density": "density",
             "tower denisty": "density",
@@ -150,7 +150,6 @@ def _simplify_wind_ordinance_types(types: pd.Series) -> pd.Series:
             "noise": "sound",
             "property": "property line",
         },
-        inplace=True,
     )
     return simple
 
@@ -161,7 +160,7 @@ def _simplify_solar_ordinance_types(types: pd.Series) -> pd.Series:
     is_water = simple.str.contains("river|lake|wetland|waters")
     simple.loc[is_water] = "water"
 
-    simple.replace(
+    simple = simple.replace(
         {
             "highway": "highways",
             "lankford highway": "highways",
@@ -174,18 +173,16 @@ def _simplify_solar_ordinance_types(types: pd.Series) -> pd.Series:
             "mimimum lot size": "minimum lot size",
             "moratorium": "banned",
             "total installation": "total installation size",
-            "noise": "sound",
             "property": "property line",
             "coverage": "maximum lot coverage",
         },
-        inplace=True,
     )
     return simple
 
 
 def _simplify_wind_units(units: pd.Series) -> pd.Series:
     simple = units.str.lower().str.strip().str.replace("-", " ", regex=False)
-    simple.replace(
+    simple = simple.replace(
         {
             "meter": "meters",
             "turbine count": "turbines",
@@ -194,21 +191,19 @@ def _simplify_wind_units(units: pd.Series) -> pd.Series:
             "rotor diameter": "rotor diameter multiplier",
             "rotor radius": "rotor radius multiplier",
         },
-        inplace=True,
     )
     return simple
 
 
 def _simplify_solar_units(units: pd.Series) -> pd.Series:
     simple = units.str.lower().str.strip()
-    simple.replace(
+    simple = simple.replace(
         {
             "meter": "meters",
             "megawatt": "megawatts",
             "n/a": np.nan,
             "maximum structure height": "maximum structure height multiplier",
         },
-        inplace=True,
     )
     return simple
 
@@ -293,7 +288,7 @@ def local_wind_transform(raw_local_wind: pd.DataFrame) -> pd.DataFrame:
         "new_capture_date": "updated_year_recorded",
         "update_status": "update_status",
     }
-    wind.rename(columns=rename_dict, inplace=True)
+    wind = wind.rename(columns=rename_dict)
     for col in ["raw_state_name", "raw_town_name", "raw_county_name"]:
         wind.loc[:, col] = wind.loc[:, col].str.strip()
 
@@ -323,7 +318,7 @@ def local_wind_transform(raw_local_wind: pd.DataFrame) -> pd.DataFrame:
     wind = add_county_fips_with_backup_geocoding(
         wind, state_col="raw_state_name", locality_col="combined_locality"
     )
-    wind.drop(columns="combined_locality", inplace=True)
+    wind = wind.drop(columns="combined_locality")
 
     return wind
 
@@ -349,7 +344,7 @@ def local_solar_transform(raw_local_solar: pd.DataFrame) -> pd.DataFrame:
         "new_capture_date": "updated_year_recorded",
         "update_status": "update_status",
     }
-    solar.rename(columns=rename_dict, inplace=True)
+    solar = solar.rename(columns=rename_dict)
     for col in ["raw_state_name", "raw_town_name", "raw_county_name"]:
         solar.loc[:, col] = solar.loc[:, col].str.strip()
 
@@ -373,7 +368,7 @@ def local_solar_transform(raw_local_solar: pd.DataFrame) -> pd.DataFrame:
     solar = add_county_fips_with_backup_geocoding(
         solar, state_col="raw_state_name", locality_col="combined_locality"
     )
-    solar.drop(columns="combined_locality", inplace=True)
+    solar = solar.drop(columns="combined_locality")
     return solar
 
 

@@ -67,7 +67,9 @@ def _prep_for_deduplication(df: pd.DataFrame) -> None:
         "not started",
     ]
     # assign numerical values for sorting. Largest value is prioritized.
-    status_map = dict(zip(reversed(status_order), range(len(status_order))))
+    status_map = dict(
+        zip(reversed(status_order), range(len(status_order)), strict=True)
+    )
     df["status_rank"] = (
         df["interconnection_status_fyi"]
         .str.strip()
@@ -123,8 +125,8 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     )
     n_dupes = pre_dedupe - len(projects)
     logger.info(f"Deduplicated {n_dupes} ({n_dupes / pre_dedupe:.2%}) projects.")
-    projects.set_index("project_id", inplace=True)
-    projects.sort_index(inplace=True)
+    projects = projects.set_index("project_id")
+    projects = projects.sort_index()
     # clean up whitespace
     for col in projects.columns:
         if pd.api.types.is_object_dtype(projects.loc[:, col]):
@@ -168,13 +170,13 @@ def parse_capacity(row):
     # do anything with this but it could be useful if
     # we want to save total energy storage capacity later
     allowed_keys = {"canonical_gen_type", "mw", "mwh"}
-    keys = {key for item in data for key in item.keys()}
+    keys = {key for item in data for key in item}
     assert len(keys - allowed_keys) == 0, (
         f"New key found in the capacity_by_generation_type_breakdown yaml string: {keys - allowed_keys}. For project_id: {row.name}"
     )
     # remove the mwh keys, we don't do anything with the total battery
     # storage capacity right now
-    data = [item for item in data if "mwh" not in item.keys()]
+    data = [item for item in data if "mwh" not in item]
     # if a row is from NYISO we expect it to only have "mwh"
     if row["power_market"] == "NYISO":
         assert len(data) == 0, (
@@ -209,7 +211,7 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> dict[str, pd.DataFrame
         fyi_df[
             ~fyi_df["capacity_by_generation_type_breakdown"].isnull()
         ].power_market.unique()
-    ) == set(["CAISO", "West", "NYISO"]), (
+    ) == set({"CAISO", "West", "NYISO"}), (
         "There's a new power market with non-null values in capacity_by_generation_type_breakdown, check to see how this column interacts with capacity_mw in this power market."
         f"Power markets are: {set(fyi_df[~fyi_df['capacity_by_generation_type_breakdown'].isnull()].power_market.unique())}"
     )
@@ -313,8 +315,8 @@ def _normalize_location(fyi_df: pd.DataFrame) -> dict[str, pd.DataFrame]:
         "country_code",
     ]
     location_df = fyi_df[location_cols]
-    location_df.dropna(
-        subset=["raw_state_name", "raw_county_name"], how="all", inplace=True
+    location_df = location_df.dropna(
+        subset=["raw_state_name", "raw_county_name"], how="all"
     )
     # reset project_id index
     location_df = location_df.reset_index()
@@ -357,7 +359,9 @@ def transform(fyi_raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     )  # sets index to project_id
     # Combine and normalize iso queue tables
     fyi_normalized_dfs = normalize_fyi_dfs(transformed)
-    fyi_normalized_dfs["fyi_projects"].reset_index(inplace=True)
+    fyi_normalized_dfs["fyi_projects"] = fyi_normalized_dfs[
+        "fyi_projects"
+    ].reset_index()
     # data enrichment
     # Add Fips Codes
     # I write to a new variable because _manual_county_state_name_fixes overwrites

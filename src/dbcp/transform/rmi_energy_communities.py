@@ -18,7 +18,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         "num_coal_qualifying_tracts": "n_coal_qualifying_tracts",
         "percent_of_county_coal_qualified": "coal_qualifying_area_fraction",
     }
-    transformed.rename(columns=rename_dict, inplace=True)
+    transformed = transformed.rename(columns=rename_dict)
     # Some county entries have the state name appended to the county name which confuses the geocoder
     transformed["raw_county_name"] = transformed.apply(
         lambda row: row["raw_county_name"].replace(f", {row['raw_state_name']}", ""),
@@ -32,9 +32,9 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     # fix one null FIPS (Villalba Municipio, Puerto Rico)
     fips_is_nan = transformed["county_id_fips"].isna()
     expected_null_fips = 0
-    assert (
-        fips_is_nan.sum() == expected_null_fips
-    ), f"Assumption violation: expected {expected_null_fips} null FIPS, got {fips_is_nan.sum()}"
+    assert fips_is_nan.sum() == expected_null_fips, (
+        f"Assumption violation: expected {expected_null_fips} null FIPS, got {fips_is_nan.sum()}"
+    )
     transformed.loc[:, "county_id_fips"] = transformed.loc[:, "county_id_fips"].fillna(
         transformed.loc[:, "raw_county_id_fips"]
     )
@@ -44,6 +44,6 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         "geocoded_locality_type",  # all counties
         "geocoded_containing_county",  # all counties
     ]
-    transformed.drop(columns=cols_to_drop, inplace=True)
+    transformed = transformed.drop(columns=cols_to_drop)
     transformed_dfs = {"energy_communities_by_county": transformed}
     return transformed_dfs

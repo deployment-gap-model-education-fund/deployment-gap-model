@@ -221,16 +221,16 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         {"Pumped Storage + Battery Storage": "Battery Storage + Pumped Storage"}
     )
     # combine gen and storage cols, handling nans in county_id_fips
-    SENTINEL = "<NA_FIPS>"
+    sentinel = "<NA_FIPS>"
     g = gen.assign(
-        county_id_fips=lambda d: d["county_id_fips"].astype("string").fillna(SENTINEL)
+        county_id_fips=lambda d: d["county_id_fips"].astype("string").fillna(sentinel)
     )
     s = storage.reset_index().assign(
-        county_id_fips=lambda d: d["county_id_fips"].astype("string").fillna(SENTINEL)
+        county_id_fips=lambda d: d["county_id_fips"].astype("string").fillna(sentinel)
     )
     gen_stor = g.merge(s, how="outer", on=group_keys, suffixes=("_gen", "_stor"))
     # restore NaNs
-    gen_stor["county_id_fips"] = gen_stor["county_id_fips"].replace(SENTINEL, np.nan)
+    gen_stor["county_id_fips"] = gen_stor["county_id_fips"].replace(sentinel, np.nan)
 
     assert (
         len(gen_stor) == long.groupby(group_keys, dropna=False).ngroups
@@ -276,11 +276,9 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     assert projects.nth(2).shape[0] == 1, "More than 2 locations found for a project."
 
     wide = pd.concat([loc1, loc2], axis=1, copy=False)
-    wide.sort_index(inplace=True)
-    wide.reset_index(inplace=True)
-    wide.rename(
-        columns={"state": "state_1", "state_id_fips": "state_id_fips_1"}, inplace=True
-    )
+    wide = wide.sort_index()
+    wide = wide.reset_index()
+    wide = wide.rename(columns={"state": "state_1", "state_id_fips": "state_id_fips_1"})
     wide_col_order = [
         "project_id",
         "project_name",
@@ -506,7 +504,7 @@ def create_total_active_project_change_logs(
     metric: tuple[str],
     freq: str = "Q",
 ) -> pd.DataFrame:
-    """This function creates a data mart table where each row contains the total active capacity of projects for a given region and time interval.
+    """Creates a data mart table where each row contains the total active capacity of projects for a given region and time interval.
 
     This is different than create_geography_change_log where each row contains the number of projects that entered the queue in a given region and time interval.
     This function only calculates totals for active projects.
@@ -602,7 +600,7 @@ def create_total_active_project_change_logs(
 
     totals_chng_log.columns = [
         f"{resource_class}_{metric}"
-        for resource_class in totals_chng_log.columns.values
+        for resource_class in totals_chng_log.columns.to_numpy()
     ]
 
     return totals_chng_log.reset_index()
@@ -644,7 +642,7 @@ def create_geography_change_log(
     geography_change_log = geography_change_log.fillna(0)
     geography_change_log.columns = [
         f"{queue_status}_{resource_class}_{col}"
-        for col, queue_status, resource_class in geography_change_log.columns.values
+        for col, queue_status, resource_class in geography_change_log.columns.to_numpy()
     ]
     geography_change_log = geography_change_log.reset_index()
     # add county and state information to the change log
@@ -957,7 +955,7 @@ def get_eia860m_status_timeseries(
             "SELECT max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog",
             engine,
         )
-        .iat[0, 0]
+        .iloc[0, 0]
         .strftime("%Y-%m-%d")
     )
 
@@ -986,7 +984,7 @@ def get_eia860m_status_timeseries(
         status_history["end_date"],
         closed="both",
     )
-    status_history.set_index(date_intervals, inplace=True)
+    status_history = status_history.set_index(date_intervals)
 
     # Determine frequency and periods
     last_end_date = pd.Timestamp(last_report_date) + pd.offsets.MonthEnd()
@@ -1018,8 +1016,8 @@ def get_eia860m_status_timeseries(
     )
 
     idx_cols = gen_key + [f"{period_name}_end"]
-    time_series.sort_values(idx_cols, inplace=True)
-    time_series.reset_index(drop=True, inplace=True)
+    time_series = time_series.sort_values(idx_cols)
+    time_series = time_series.reset_index(drop=True)
 
     # Drop duplicates using latest start_date per generator-period
     # some duplicates are caused by NULL values in the valid_until_date coming from
@@ -1134,7 +1132,7 @@ def _get_plant_names(
                 "SELECT max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog",
                 engine,
             )
-            .iat[0, 0]
+            .iloc[0, 0]
             .strftime("%Y-%m-%d")
         )
     else:

@@ -135,12 +135,6 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         "cancer_prevalence": "raw_percent_cancer_prevalence",
         "cancer_prevalence_percentile": "raw_percentile_cancer_prevalence",
         "county_fips_code_text": "raw_county_fips_code",
-        "location": "raw_location",
-        "facility_footprint": "raw_facility_footprint",
-        "epafrsid1": "raw_epa_frs_id_1",
-        "epafrsid2": "raw_epa_frs_id_2",
-        "epafrsid3": "raw_epa_frs_id_3",
-        "id_qaqc": "unknown_id",
         # FIND THESE!
         # "congressional_representatives": "raw_congressional_representatives",
         # "ccs/ccus": "raw_is_ccs",
@@ -149,7 +143,7 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         # "o3_ppb": "raw_o3_ppb",
         # "wastewater_discharge_indicator": "raw_wastewater_discharge_indicator",
     }
-    fac.rename(columns=rename_dict, inplace=True)
+    fac = fac.rename(columns=rename_dict)
     should_be_numeric = [
         # "facility_id",
         "raw_estimated_population_within_3_miles",
@@ -188,8 +182,8 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         fac["raw_county_or_parish"], split_on=",| and | or ", regex=True
     )
     fac["county"] = fac["county"].astype("string")
-    fac["county"].replace(
-        ["TBD", "TDB", "TBD County", "TBD Parish", ""], pd.NA, inplace=True
+    fac["county"] = fac["county"].replace(
+        ["TBD", "TDB", "TBD County", "TBD Parish", ""], pd.NA
     )
     # Strip leading and trailing whitespace
     fac["county"] = fac["county"].str.strip()
@@ -220,8 +214,8 @@ def facilities_transform(raw_fac_df: pd.DataFrame) -> pd.DataFrame:
         f"Found 1+ geocoded county FIPS IDs that did not match the EIP data:\n {fac.loc[fac.county_id_fips != fac.county_fips_code]}"
     )
 
-    fac.drop(
-        columns=["state", "county", "county_fips_code"], inplace=True
+    fac = fac.drop(
+        columns=["state", "county", "county_fips_code"]
     )  # drop intermediates
 
     max_long = fac["longitude"].max()
@@ -286,7 +280,7 @@ def projects_transform(raw_proj_df: pd.DataFrame) -> pd.DataFrame:
         "total_wetlands_affected_permanentlyacres": "total_wetlands_affected_permanently_acres",  # NEW
         "total_wetlands_affected_temporarilyacres": "total_wetlands_affected_temporarily_acres",  # NEW
     }
-    proj.rename(columns=rename_dict, inplace=True)
+    proj = proj.rename(columns=rename_dict)
     should_be_numeric = [
         "greenhouse_gases_co2e_tpy",
         "particulate_matter_pm2_5_tpy",
@@ -383,9 +377,8 @@ def air_construction_transform(raw_air_constr_df: pd.DataFrame) -> pd.DataFrame:
     air.columns = _format_column_names(air.columns)
     # there are 7 columns with facility-wide criteria pollutant metrics, but they are
     # almost all null.
-    air.drop(
+    air = air.drop(
         columns=[col for col in air.columns if col.startswith("facilitywide_pte")],
-        inplace=True,
     )
     rename_dict = {  # add 'raw_' prefix to columns that need transformation
         "id": "air_construction_id",
@@ -401,7 +394,7 @@ def air_construction_transform(raw_air_constr_df: pd.DataFrame) -> pd.DataFrame:
         "final_permit_issuance_date": "raw_final_permit_issuance_date",
         "deadlineto_begin_construction": "raw_deadline_to_begin_construction",
     }
-    air.rename(columns=rename_dict, inplace=True)
+    air = air.rename(columns=rename_dict)
 
     # # transform columns
     air["date_modified"] = pd.to_datetime(  # ignore other date columns for now
@@ -494,7 +487,7 @@ def facilities_project_assn_transform(
         "updated_at": "raw_updated_at",
         "created_at": "raw_created_at",
     }
-    fac_proj.rename(columns=rename_dict, inplace=True)
+    fac_proj = fac_proj.rename(columns=rename_dict)
 
     fac_proj["date_modified"] = pd.to_datetime(  # ignore other date columns for now
         fac_proj.loc[:, "raw_updated_at"], format="mixed"
@@ -561,7 +554,7 @@ def project_permit_assn_transform(
         "updated_at": "raw_updated_at",
         "created_at": "raw_created_at",
     }
-    proj_perm.rename(columns=rename_dict, inplace=True)
+    proj_perm = proj_perm.rename(columns=rename_dict)
 
     proj_perm["date_modified"] = pd.to_datetime(  # ignore other date columns for now
         proj_perm.loc[:, "raw_updated_at"], format="mixed"

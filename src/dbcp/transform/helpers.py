@@ -104,8 +104,8 @@ def normalize_multicolumns_to_rows(
     new_names = attribute_columns_dict.keys()
     column_groups = attribute_columns_dict.values()
     chunks = []
-    for linked_columns in zip(*column_groups):  # Nth value of each list
-        rename_dict = dict(zip(linked_columns, new_names))
+    for linked_columns in zip(*column_groups, strict=True):  # Nth value of each list
+        rename_dict = dict(zip(linked_columns, new_names, strict=True))
         chunk = df.loc[:, list(linked_columns)].rename(columns=rename_dict)
         if preserve_original_names:
             # Assumes associated columns can be identified by a single member.
@@ -115,7 +115,7 @@ def normalize_multicolumns_to_rows(
 
     output: pd.DataFrame = pd.concat(chunks)
     if dropna:
-        output.dropna(subset=list(new_names), how="all", inplace=True)
+        output = output.dropna(subset=list(new_names), how="all")
 
     return output.sort_index().reset_index()
 
@@ -307,7 +307,7 @@ def deduplicate_same_physical_entities(
     )
 
     # remove whatever derived columns were created
-    dedupe.drop(columns=intermediate_cols, inplace=True)
+    dedupe = dedupe.drop(columns=intermediate_cols)
     return dedupe
 
 
@@ -533,5 +533,5 @@ def normalize_point_of_interconnection(ser: pd.Series) -> pd.Series:
         index=out.index,
         dtype="string",
     ).str.strip()
-    out.replace("", pd.NA, inplace=True)
+    out = out.replace("", pd.NA)
     return out

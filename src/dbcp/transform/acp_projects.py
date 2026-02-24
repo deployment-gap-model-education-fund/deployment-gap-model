@@ -315,7 +315,7 @@ def _transform_location_cols(
     joined.loc[
         failed_sjoin & has_point & ~is_offshore, ["avg_latitude", "avg_longitude"]
     ] = pd.NA
-    joined.rename(columns={"GEOID": "census_county_id_fips"}, inplace=True)
+    joined = joined.rename(columns={"GEOID": "census_county_id_fips"})
 
     # fill in any remaining missing and multi-valued entries with the first value
     is_missing_multi = joined["county_id_fips"].isna() & is_multivalued
@@ -488,8 +488,8 @@ def _clean_columns(df: pd.DataFrame) -> pd.DataFrame:
         "phase_type": "resource",  # match LBNL/gridstatus
         "mw_total_capacity": "capacity_mw",  # match PUDL/LBNL/gridstatus
     }
-    out.rename(columns=rename_dict, inplace=True)
-    out.drop(columns=cols_to_drop, inplace=True)
+    out = out.rename(columns=rename_dict)
+    out = out.drop(columns=cols_to_drop)
     return out
 
 
