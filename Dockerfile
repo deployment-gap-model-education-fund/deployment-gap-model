@@ -15,6 +15,7 @@ COPY pyproject.toml /app/pyproject.toml
 
 RUN python -m pip install --upgrade pip
 RUN python -m pip install -r /app/requirements.txt
+RUN curl https://install.duckdb.org | sh
 RUN rm requirements.txt
 
 # Add the python packages to PATH
