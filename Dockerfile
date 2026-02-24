@@ -1,5 +1,5 @@
 # set base image (host OS)
-FROM python:3.10
+FROM python:3.13
 
 RUN apt-get -y update && apt-get -y install sqlite3
 RUN apt-get -y install libgdal-dev
@@ -10,6 +10,8 @@ USER dbcp
 WORKDIR /app
 
 COPY requirements.txt /app/requirements.txt
+COPY pyproject.toml /app/pyproject.toml
+
 
 RUN python -m pip install --upgrade pip
 RUN python -m pip install -r /app/requirements.txt

@@ -18,7 +18,6 @@ The following datasets are available but not currently downloaded:
 # 'Data Sources',
 # 'Map Layers',
 """
-from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -52,11 +51,12 @@ def _downcast_ints(df: pd.DataFrame) -> None:
         df.loc[:, col] = ser.astype(pd.Int32Dtype())
 
 
-def extract() -> Dict[str, pd.DataFrame]:
+def extract() -> dict[str, pd.DataFrame]:
     """Read in EIP CSV files from a provided path to a folder.
 
     Returns:
         An output dictionary of dataframes.
+
     """
     raw_dfs = {}
 

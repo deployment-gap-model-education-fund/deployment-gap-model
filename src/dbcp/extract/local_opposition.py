@@ -4,7 +4,6 @@ This dataset is a .docx file with a hierarchical structure.  The hierarchy is de
 formatting details (paragraph level, font, etc), but is surprisingly consistent. It is
 infrequently updated by a research group at Columbia University.
 """
-from typing import Dict, List, Optional
 
 import docx
 import pandas as pd
@@ -12,7 +11,7 @@ import pandas as pd
 from dbcp.constants import DATA_DIR, US_STATES
 
 
-class ColumbiaDocxParser(object):
+class ColumbiaDocxParser:
     """Parser for the Columbia Local Opposition .docx file."""
 
     POSSIBLE_STATES = US_STATES
@@ -44,18 +43,18 @@ class ColumbiaDocxParser(object):
         """Create ColumbiaDocxParser object to parse docx data."""
         self.current_state = ""
         self.current_header = ""
-        self.doc: Optional[docx.Document] = None
+        self.doc: docx.Document | None = None
         self.previous_locality = ""
         self.previous_ordinance = ""
 
-        self.state_policy_dict: Dict[str, List[str]] = {"state": [], "policy": []}
-        self.state_notes_dict: Dict[str, List[str]] = {"state": [], "notes": []}
-        self.local_ordinance_dict: Dict[str, List[str]] = {
+        self.state_policy_dict: dict[str, list[str]] = {"state": [], "policy": []}
+        self.state_notes_dict: dict[str, list[str]] = {"state": [], "notes": []}
+        self.local_ordinance_dict: dict[str, list[str]] = {
             "state": [],
             "locality": [],
             "ordinance_text": [],
         }
-        self.contested_projects_dict: Dict[str, List[str]] = {
+        self.contested_projects_dict: dict[str, list[str]] = {
             "state": [],
             "project_name": [],
             "description": [],
@@ -68,12 +67,13 @@ class ColumbiaDocxParser(object):
 
         Args:
             source_path (Path, optional): path to .docx file. Defaults to Path('/app/data/raw/RELDI report updated 9.10.21 (1).docx').
+
         """
         self.doc = docx.Document(source_path)
 
     def _remove_intro(
-        self, paragraphs: List[docx.text.paragraph.Paragraph]
-    ) -> List[docx.text.paragraph.Paragraph]:
+        self, paragraphs: list[docx.text.paragraph.Paragraph]
+    ) -> list[docx.text.paragraph.Paragraph]:
         """Skip over The title page, table of contents, intro, etc that contain no data.
 
         Args:
@@ -84,6 +84,7 @@ class ColumbiaDocxParser(object):
 
         Returns:
             List[docx.text.paragraph.Paragraph]: subset of paragraphs, from the first data line to the end.
+
         """
         for idx, paragraph in enumerate(paragraphs):
             if paragraph.text.strip() == ColumbiaDocxParser.FIRST_STATE:
@@ -95,20 +96,21 @@ class ColumbiaDocxParser(object):
 
         Args:
             text (str): the paragraph text content
+
         """
         if self.current_header == "":  # state level notes
             # no null check required. This section is simply missing if null.
             self.state_notes_dict["state"].append(self.current_state)
             self.state_notes_dict["notes"].append(text)
             return
-        elif self.current_header == "State-Level Restrictions":
+        if self.current_header == "State-Level Restrictions":
             if text in ColumbiaDocxParser.NULL_STATE_POLICY:
                 return
             self.state_policy_dict["state"].append(self.current_state)
             self.state_policy_dict["policy"].append(text)
             return
 
-        elif self.current_header == "Local Restrictions":
+        if self.current_header == "Local Restrictions":
             if text in ColumbiaDocxParser.NULL_ORDINANCE:
                 return
             locality, ordinance = text.split(":", maxsplit=1)
@@ -125,7 +127,7 @@ class ColumbiaDocxParser(object):
             self.local_ordinance_dict["ordinance_text"].append(ordinance.strip())
             return
 
-        elif self.current_header == "Contested Projects":
+        if self.current_header == "Contested Projects":
             if text in ColumbiaDocxParser.NULL_PROJECT:
                 return
             try:
@@ -137,12 +139,11 @@ class ColumbiaDocxParser(object):
             self.contested_projects_dict["project_name"].append(name)
             self.contested_projects_dict["description"].append(description.strip())
             return
-        else:
-            raise ValueError(
-                f"Unexpected header in {self.current_state}: {self.current_header}"
-            )
+        raise ValueError(
+            f"Unexpected header in {self.current_state}: {self.current_header}"
+        )
 
-    def extract(self) -> Dict[str, pd.DataFrame]:
+    def extract(self) -> dict[str, pd.DataFrame]:
         """Parse the text of the Columbia Local Opposition docx file into tabular dataframes.
 
         The document is essentially a hierarchical data structure with two nested layers.
@@ -151,6 +152,7 @@ class ColumbiaDocxParser(object):
 
         Returns:
             Dict[str, pd.DataFrame]: return dataframes with keys 'state_policy', 'local_ordinance', and 'contested_project'
+
         """
         if self.doc is None:
             raise ValueError("Use the .load_docx() method to load the document.")
@@ -160,25 +162,27 @@ class ColumbiaDocxParser(object):
         for paragraph in paragraphs:
             if paragraph.text == "":  # skip blank lines
                 continue
-            elif paragraph.style.name == "Heading 1":  # states
+            if paragraph.style.name == "Heading 1":  # states
                 self.current_state = paragraph.text.strip()
-                assert (
-                    self.current_state in ColumbiaDocxParser.POSSIBLE_STATES
-                ), f"Unexepected state: {self.current_state}"
+                assert self.current_state in ColumbiaDocxParser.POSSIBLE_STATES, (
+                    f"Unexepected state: {self.current_state}"
+                )
                 self.current_header = (
                     ""  # a new state marks a new hierarchy, so reset cache
                 )
             elif paragraph.style.name == "Heading 2":  # value type
                 self.current_header = paragraph.text.strip()
-                assert (
-                    self.current_header in ColumbiaDocxParser.POSSIBLE_HEADERS
-                ), f"Unexpected header in {self.current_state}: {self.current_header}"
+                assert self.current_header in ColumbiaDocxParser.POSSIBLE_HEADERS, (
+                    f"Unexpected header in {self.current_state}: {self.current_header}"
+                )
             elif (
                 paragraph.style.name == "Heading 3"
             ):  # nearly meaningless subheading. skip.
                 assert (
                     paragraph.text.strip() in ColumbiaDocxParser.POSSIBLE_SUBHEADINGS
-                ), f"Unexpected subheading in {self.current_state}: {paragraph.text.strip()}"
+                ), (
+                    f"Unexpected subheading in {self.current_state}: {paragraph.text.strip()}"
+                )
                 continue
             elif paragraph.style.name in {
                 "Normal",
