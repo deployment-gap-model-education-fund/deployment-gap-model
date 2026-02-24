@@ -652,9 +652,7 @@ def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
     # downstream analysis.
     # I use the consistent value to calculate ratio, then pair that ratio
     #  with the accurate land area in the data mart
-    county_areas = pad.groupby("county_id_fips")[
-        "county_area_coast_clipped_km2"
-    ].first()
+    county_areas = pad.groupby("county_id_fips")["county_area_coast_clipped_km2"].max()
     is_developable = pad["gap_status"].str.match("^[34]")
     is_federally_managed = pad["manager_type"] == "Federal"
 
