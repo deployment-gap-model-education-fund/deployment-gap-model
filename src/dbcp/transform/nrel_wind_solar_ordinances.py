@@ -34,9 +34,9 @@ by same project developer if project is less than 40 acres in size". It is possi
 make sparse fields for all those conditions but is beyond the scope of this data model.
 """
 
+from collections.abc import Sequence
 from functools import partial, reduce
 from operator import or_
-from typing import Sequence, Union
 
 import numpy as np
 import pandas as pd
@@ -48,7 +48,7 @@ from dbcp.transform.helpers import add_county_fips_with_backup_geocoding
 FEET_TO_METERS = 12 * 2.54 / 100
 
 
-def _format_column_names(cols: Union[pd.Index, Sequence[str]]) -> list[str]:
+def _format_column_names(cols: pd.Index | Sequence[str]) -> list[str]:
     out = [(col.lower().replace(" ", "_").replace("/", "_or_")) for col in cols]
     return out
 
@@ -81,9 +81,9 @@ def _replace_multivalued_with_worst_case(
     replace_with_min = is_multivalued & lower_is_worse
     replace_with_max = is_multivalued & higher_is_worse
     err_msg = "Assumption violation: expected all multivalued types to be either dBA or meters."
-    assert (
-        replace_with_min.sum() + replace_with_max.sum() == is_multivalued.sum()
-    ), err_msg
+    assert replace_with_min.sum() + replace_with_max.sum() == is_multivalued.sum(), (
+        err_msg
+    )
     replacements = pd.concat(
         [
             _convert_multivalued_to_extreme_value(values.loc[replace_with_min]),
@@ -136,7 +136,7 @@ def _simplify_wind_ordinance_types(types: pd.Series) -> pd.Series:
     is_water = simple.str.contains("river|lake|creek|reservoir")
     simple.loc[is_water] = "water"
 
-    simple.replace(
+    simple = simple.replace(
         {
             "tower density": "density",
             "tower denisty": "density",
@@ -150,7 +150,6 @@ def _simplify_wind_ordinance_types(types: pd.Series) -> pd.Series:
             "noise": "sound",
             "property": "property line",
         },
-        inplace=True,
     )
     return simple
 
@@ -161,7 +160,7 @@ def _simplify_solar_ordinance_types(types: pd.Series) -> pd.Series:
     is_water = simple.str.contains("river|lake|wetland|waters")
     simple.loc[is_water] = "water"
 
-    simple.replace(
+    simple = simple.replace(
         {
             "highway": "highways",
             "lankford highway": "highways",
@@ -174,18 +173,16 @@ def _simplify_solar_ordinance_types(types: pd.Series) -> pd.Series:
             "mimimum lot size": "minimum lot size",
             "moratorium": "banned",
             "total installation": "total installation size",
-            "noise": "sound",
             "property": "property line",
             "coverage": "maximum lot coverage",
         },
-        inplace=True,
     )
     return simple
 
 
 def _simplify_wind_units(units: pd.Series) -> pd.Series:
     simple = units.str.lower().str.strip().str.replace("-", " ", regex=False)
-    simple.replace(
+    simple = simple.replace(
         {
             "meter": "meters",
             "turbine count": "turbines",
@@ -194,21 +191,19 @@ def _simplify_wind_units(units: pd.Series) -> pd.Series:
             "rotor diameter": "rotor diameter multiplier",
             "rotor radius": "rotor radius multiplier",
         },
-        inplace=True,
     )
     return simple
 
 
 def _simplify_solar_units(units: pd.Series) -> pd.Series:
     simple = units.str.lower().str.strip()
-    simple.replace(
+    simple = simple.replace(
         {
             "meter": "meters",
             "megawatt": "megawatts",
             "n/a": np.nan,
             "maximum structure height": "maximum structure height multiplier",
         },
-        inplace=True,
     )
     return simple
 
@@ -222,14 +217,10 @@ def _manual_local_wind_corrections(local_wind: pd.DataFrame) -> None:
         "raw_units"
     ].str.lower().str.strip().str.endswith("multiplier") & pd.to_numeric(
         local_wind["raw_value"], errors="coerce"
-    ).gt(
-        30
-    ).fillna(
-        False
+    ).gt(30).fillna(False)
+    assert erroneous_multipliers.sum() == 6, (
+        f"Assumption violation: expected 6 erroneous multipliers, got {erroneous_multipliers.sum()}"
     )
-    assert (
-        erroneous_multipliers.sum() == 6
-    ), f"Assumption violation: expected 6 erroneous multipliers, got {erroneous_multipliers.sum()}"
     local_wind.loc[erroneous_multipliers, "raw_units"] = "Meters"
 
     # Completeness
@@ -237,9 +228,9 @@ def _manual_local_wind_corrections(local_wind: pd.DataFrame) -> None:
     err_msg = "Assumption violation: expected one missing state."
     assert missing_state.sum() == 1, err_msg
     err_msg = "Assumption violation: expected missing state to belong to Brownsville."
-    assert (
-        local_wind.loc[missing_state, "raw_town_name"].squeeze() == "Brownsville"
-    ), err_msg
+    assert local_wind.loc[missing_state, "raw_town_name"].squeeze() == "Brownsville", (
+        err_msg
+    )
     # Raw data is partly sorted by state; adjacent entries are all Texas
     local_wind.loc[missing_state, "raw_state_name"] = "Texas"
 
@@ -297,7 +288,7 @@ def local_wind_transform(raw_local_wind: pd.DataFrame) -> pd.DataFrame:
         "new_capture_date": "updated_year_recorded",
         "update_status": "update_status",
     }
-    wind.rename(columns=rename_dict, inplace=True)
+    wind = wind.rename(columns=rename_dict)
     for col in ["raw_state_name", "raw_town_name", "raw_county_name"]:
         wind.loc[:, col] = wind.loc[:, col].str.strip()
 
@@ -327,7 +318,7 @@ def local_wind_transform(raw_local_wind: pd.DataFrame) -> pd.DataFrame:
     wind = add_county_fips_with_backup_geocoding(
         wind, state_col="raw_state_name", locality_col="combined_locality"
     )
-    wind.drop(columns="combined_locality", inplace=True)
+    wind = wind.drop(columns="combined_locality")
 
     return wind
 
@@ -353,7 +344,7 @@ def local_solar_transform(raw_local_solar: pd.DataFrame) -> pd.DataFrame:
         "new_capture_date": "updated_year_recorded",
         "update_status": "update_status",
     }
-    solar.rename(columns=rename_dict, inplace=True)
+    solar = solar.rename(columns=rename_dict)
     for col in ["raw_state_name", "raw_town_name", "raw_county_name"]:
         solar.loc[:, col] = solar.loc[:, col].str.strip()
 
@@ -377,7 +368,7 @@ def local_solar_transform(raw_local_solar: pd.DataFrame) -> pd.DataFrame:
     solar = add_county_fips_with_backup_geocoding(
         solar, state_col="raw_state_name", locality_col="combined_locality"
     )
-    solar.drop(columns="combined_locality", inplace=True)
+    solar = solar.drop(columns="combined_locality")
     return solar
 
 
@@ -431,7 +422,7 @@ def _standardize_units_to_distances(
         "rotor diameter multiplier": rotor_diameter_meters,
         "rotor radius multiplier": rotor_diameter_meters / 2,
     }
-    unit_map = {key: "meters" for key in reference_map.keys()}
+    unit_map = dict.fromkeys(reference_map.keys(), "meters")
     unit_map["dba"] = "meters"
 
     constants = nrel_df["units"].map(reference_map).fillna(1.0)
@@ -447,9 +438,7 @@ def _standardize_units_to_distances(
             "dba"
         )
         noise = nrel_df.loc[noise_filter, "value"].apply(sound_estimate)
-        assert noise.gt(
-            0
-        ).all(), (
+        assert noise.gt(0).all(), (
             f"Some converted {energy_type} sound -> distance values are not positive."
         )
         standardized_values.loc[noise_filter] = noise
@@ -507,9 +496,9 @@ def _define_bans(nrel_standardized: pd.DataFrame) -> pd.DataFrame:
 
     # fix a known false positive: the only height limit defined on hub height instead of total height
     idx = nrel_standardized["raw_comment"].eq("Max hub height 80 meters (263')")
-    assert (
-        idx.sum() == 1
-    ), f"False positive check is poorly defined. Should be one, got {idx.sum()}."
+    assert idx.sum() == 1, (
+        f"False positive check is poorly defined. Should be one, got {idx.sum()}."
+    )
     wind_height_ban.loc[idx] = False
 
     is_ban = reduce(
@@ -545,6 +534,7 @@ def transform(nrel_raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     Returns:
         Dict[str, pd.DataFrame]: transfomed NREL data for the warehouse
+
     """
     local_wind = local_wind_transform(nrel_raw_dfs["nrel_local_wind_ordinances"])
     local_solar = local_solar_transform(nrel_raw_dfs["nrel_local_solar_ordinances"])

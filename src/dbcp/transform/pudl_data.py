@@ -34,8 +34,10 @@ def _transform_pudl_generators(pudl_generators) -> pd.DataFrame:
 
     Args:
         pudl_generators: The raw pudl_generators table.
+
     Returns:
         The transformed pudl_generators table.
+
     """
     # add FIPS
     # workaround for addfips Bedford, VA problem
@@ -55,9 +57,9 @@ def _transform_pudl_generators(pudl_generators) -> pd.DataFrame:
 
     # Correct geocoding of some plants
     pudl_generators.loc[pudl_generators.plant_id_eia.eq(65756), "state"] = "MD"
-    pudl_generators.loc[
-        pudl_generators.plant_id_eia.eq(65756), "timezone"
-    ] = "America/New_York"
+    pudl_generators.loc[pudl_generators.plant_id_eia.eq(65756), "timezone"] = (
+        "America/New_York"
+    )
 
     return pudl_generators
 
@@ -73,13 +75,12 @@ def _transform_pudl_eia860m_changelog(
         if "date" in col:
             pudl_eia860m_changelog[col] = pd.to_datetime(pudl_eia860m_changelog[col])
 
-    pudl_eia860m_changelog.rename(
+    pudl_eia860m_changelog = pudl_eia860m_changelog.rename(
         columns={
             "state": "raw_state",
             "county": "raw_county",
             "operational_status": "operational_status_category",
         },
-        inplace=True,
     )
 
     # Fill FIPS codes
@@ -161,13 +162,14 @@ def _transform_pudl_eia860m_changelog(
 
 
 def _transform_pudl_eia860m_status_codes(pudl_eia860m_status_codes):
-    """
-    Create a table with operational status codes and descriptions.
+    """Create a table with operational status codes and descriptions.
 
     Args:
         pudl_eia860m_status_codes: the raw core_eia__codes_operational_status table.
+
     Returns:
         The DBCP operation status values mapped to PUDL codes and descriptions.
+
     """
     op_status_codes_scale = (
         pd.DataFrame.from_dict(OPERATIONAL_STATUS_CODES_SCALE, "index")
@@ -184,8 +186,10 @@ def transform(raw_pudl_tables: pd.DataFrame) -> dict[str, pd.DataFrame]:
 
     Args:
         raw_pudl_tables: The raw PUDL tables.
+
     Returns:
         The transformed PUDL tables.
+
     """
     table_transform_functions = {
         "pudl_generators": _transform_pudl_generators,
