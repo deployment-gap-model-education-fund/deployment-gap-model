@@ -83,7 +83,7 @@ def _get_fyi_projects(engine: sa.engine.Engine) -> pd.DataFrame:
 
 
 def _get_and_join_iso_tables(
-    engine: sa.engine.Engine, use_gridstatus=True, use_proprietary_offshore=True
+    engine: sa.engine.Engine, use_gridstatus=True, use_proprietary_offshore=False
 ) -> pd.DataFrame:
     """Get ISO projects.
 
@@ -388,7 +388,7 @@ def _add_derived_columns(mart: pd.DataFrame) -> None:
 def create_long_format(
     engine: sa.engine.Engine,
     active_projects_only: bool = True,
-    use_proprietary_offshore: bool = True,
+    use_proprietary_offshore: bool = False,
 ) -> pd.DataFrame:
     """Create table of ISO projects in long format.
 
@@ -451,7 +451,7 @@ def create_long_format(
 def create_fyi_long_format(
     engine: sa.engine.Engine,
     active_projects_only: bool = True,
-    use_proprietary_offshore: bool = True,
+    use_proprietary_offshore: bool = False,
 ):
     """Create long format FYI table."""
     fyi = _get_fyi_projects(engine)
@@ -950,29 +950,28 @@ def get_eia860m_status_timeseries(
             "frequency must be 'M' (monthly), 'Q' (quarterly), or 'A' / 'Y' (annually)"
         )
 
-    last_report_date = (
-        pd.read_sql(
-            "SELECT max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog",
-            engine,
-        )
-        .iloc[0, 0]
-        .strftime("%Y-%m-%d")
+    last_report_date = pd.read_sql(
+        "SELECT max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog",
+        engine,
+    ).iloc[0, 0]
+
+    query = """
+SELECT
+    plant_id_eia,
+    generator_id,
+    operational_status_code,
+    capacity_mw,
+    min(report_date) AS start_date,
+    max(COALESCE(valid_until_date, timestamp %(last_report_date)s)) AS end_date
+FROM data_warehouse.pudl_eia860m_changelog
+GROUP BY 1, 2, 3, 4
+ORDER BY 1, 2, 3, 4
+"""
+    status_history = pd.read_sql(
+        query,
+        engine,
+        params={"last_report_date": last_report_date},
     )
-
-    query = f"""
-    SELECT
-        plant_id_eia,
-        generator_id,
-        operational_status_code,
-        capacity_mw,
-        min(report_date) AS start_date,
-        max(COALESCE(valid_until_date, timestamp '{last_report_date}')) AS end_date
-    FROM data_warehouse.pudl_eia860m_changelog
-    GROUP BY 1, 2, 3, 4
-    ORDER BY 1, 2, 3, 4
-    """
-
-    status_history = pd.read_sql(query, engine)
     # The date fields are literally the first day of each month but in reality they
     # represent the whole month. I want to convert them to intervals, but first I need
     # to change end_date to the last day of the month.
