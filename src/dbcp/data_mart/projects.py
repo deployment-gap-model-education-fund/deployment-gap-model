@@ -272,8 +272,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         .nth(1)
         .rename(columns={"county_id_fips": "county_id_fips_2", "county": "county_2"})
     )
-    # Vineyard Wind 2 has 4 potential cable landing locations
-    assert projects.nth(2).shape[0] == 1, "More than 2 locations found for a project."
+    assert projects.nth(2).shape[0] == 0, "More than 2 locations found for a project."
 
     wide = pd.concat([loc1, loc2], axis=1, copy=False)
     wide = wide.sort_index()
