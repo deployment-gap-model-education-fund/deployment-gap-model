@@ -91,7 +91,7 @@ def test_fyi_fips_coverage(engine: Engine):
 def test_iso_projects_sources(engine: Engine):
     """Check that the right resources come from the right sources."""
     # all offshore wind projects from the proprietary source
-    proprietary_offshore = """
+    offshore = """
     SELECT
         source,
         count(*) as n_offshore
@@ -99,13 +99,13 @@ def test_iso_projects_sources(engine: Engine):
     where resource_clean ~* 'offshore'
     group by 1
     """
-    expected_source = {"proprietary"}
-    offshore_test = pd.read_sql(
-        proprietary_offshore, engine, index_col="source"
-    ).squeeze(axis=1)  # make series
+    expected_source = {"gridstatus", "lbnl"}
+    offshore_test = pd.read_sql(offshore, engine, index_col="source").squeeze(
+        axis=1
+    )  # make series
     actual_source = set(offshore_test.index)
     assert actual_source == expected_source, (
-        f"Found offshore wind projects from the wrong source. {offshore_test}"
+        f"Found offshore wind projects from the wrong (proprietary) source. {offshore_test}"
     )
 
     # all ISO projects from the gridstatus source
@@ -156,7 +156,6 @@ def test_iso_projects_capacity_aggs(engine: Engine):
         LEFT JOIN data_warehouse.iso_locations as loc
         ON proj.project_id = loc.project_id
         WHERE proj.region !~* 'ercot|miso|nyiso|pjm|spp|isone'
-            AND resource_clean != 'Offshore Wind'
             AND proj.queue_status = 'active'
         group by 1, 2
     ),
@@ -171,29 +170,14 @@ def test_iso_projects_capacity_aggs(engine: Engine):
         ON proj.project_id = res.project_id
         LEFT JOIN data_warehouse.gridstatus_locations as loc
         ON proj.project_id = loc.project_id
-        WHERE resource_clean not in ('Offshore Wind', 'Transmission')
+        WHERE resource_clean not in ('Transmission')
             AND proj.queue_status = 'active'
             AND proj.region ~* 'ercot|miso|nyiso|pjm|spp|isone'
-        group by 1, 2
-    ),
-    offshore as (
-        select
-            'proprietary' as source,
-            'Offshore Wind' as resource_clean,
-            count(*) as n_project_locations,
-            sum(proj.capacity_mw) as capacity_double_count_county
-        FROM data_warehouse.offshore_wind_projects as proj
-        LEFT JOIN data_warehouse.offshore_wind_cable_landing_association as loc
-        ON proj.project_id = loc.project_id
-        WHERE coalesce(proj.construction_status, 'TBD') IN
-            ('Not started', 'Construction underway', 'Site assessment underway', 'TBD')
         group by 1, 2
     )
     select * from lbnl
     UNION ALL
     select * from gridstatus
-    UNION ALL
-    select * from offshore
     order by 1, 2
     """
     data_mart = pd.read_sql(
@@ -318,10 +302,8 @@ def test_county_long_vs_wide(engine: Engine):
     def _condition(col: str) -> bool:
         is_count = col.endswith("_count")
         # want to remove category aggregates to avoid double counting with the individual categories
-        is_combined_aggregate = (
-            col.startswith("fossil_")
-            or col.startswith("renewable_")
-            or col.startswith("infra_total_")
+        is_combined_aggregate = col.startswith(
+            ("fossil_", "renewable_", "infra_total_")
         )
         return is_count and not is_combined_aggregate
 
