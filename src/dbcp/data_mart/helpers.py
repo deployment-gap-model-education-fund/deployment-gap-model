@@ -43,7 +43,7 @@ class CountyOpposition:
         state_fips_df: pd.DataFrame | None = None,
     ) -> None:
         self._engine = engine if engine is not None else get_sql_engine()
-        self._local_opp_df = self._get_local_opposition_df()
+        # self._local_opp_df = self._get_local_opposition_df()
         self._state_opp_df = self._get_state_opposition_df()
         self._county_fips_df = (
             county_fips_df

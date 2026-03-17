@@ -43,7 +43,7 @@ fyi_projects_long_format = Table(
     Column("ordinance_jurisdiction_name", String),
     Column("ordinance_jurisdiction_type", String),
     Column("ordinance_text", String),
-    Column("ordinance_via_reldi", Boolean, nullable=False),
+    # Column("ordinance_via_reldi", Boolean, nullable=False),
     Column("ordinance_via_solar_nrel", Boolean),
     Column("ordinance_via_wind_nrel", Boolean),
     Column("ordinance_via_nrel_is_de_facto", Boolean),

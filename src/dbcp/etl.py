@@ -272,7 +272,7 @@ def create_data_warehouse():
         "manual_ordinances": etl_manual_ordinances,
         "epa_avert": etl_epa_avert,
         "eip_infrastructure": etl_eip_infrastructure,
-        "columbia_local_opp": etl_columbia_local_opp,
+        # "columbia_local_opp": etl_columbia_local_opp,
         "energy_communities_by_county": etl_energy_communities_by_county,
         "fips_tables": etl_fips_tables,
         "protected_area_by_county": etl_protected_area_by_county,

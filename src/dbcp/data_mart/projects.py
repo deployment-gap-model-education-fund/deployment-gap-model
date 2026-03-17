@@ -10,7 +10,6 @@ import sqlalchemy as sa
 
 from dbcp.constants import OUTPUT_DIR
 from dbcp.data_mart.helpers import (
-    CountyOpposition,
     _estimate_proposed_power_co2e,
     _get_county_fips_df,
     _get_state_fips_df,
@@ -310,7 +309,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         "ordinance_jurisdiction_name",
         "ordinance_jurisdiction_type",
         "ordinance_earliest_year_mentioned",
-        "ordinance_text",
+        # "ordinance_text",
         "state_permitting_type",
         "is_actionable",
         "is_nearly_certain",
@@ -323,8 +322,8 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
 
 
 def _add_derived_columns(mart: pd.DataFrame) -> None:
-    mart["ordinance_via_reldi"] = mart["ordinance_text"].notna()
-    priority_ban = mart["ordinance_via_self_maintained"]
+    # mart["ordinance_via_reldi"] = mart["ordinance_text"].notna()
+    """priority_ban = mart["ordinance_via_self_maintained"]
     secondary_ban_cols = [
         "ordinance_via_reldi",
         "ordinance_via_solar_nrel",
@@ -333,6 +332,7 @@ def _add_derived_columns(mart: pd.DataFrame) -> None:
     mart["ordinance_is_restrictive"] = priority_ban.fillna(
         mart[secondary_ban_cols].fillna(False).any(axis=1)
     )
+    """
     # This categorizes any project with multiple generation or storage types as 'hybrid'
     mart["is_hybrid"] = (
         mart.groupby(["source", "project_id", "county_id_fips"])["resource_clean"]
@@ -415,6 +415,7 @@ def create_long_format(
     all_states = _get_state_fips_df(engine)
 
     # model local opposition
+    """
     aggregator = CountyOpposition(
         engine=engine, county_fips_df=all_counties, state_fips_df=all_states
     )
@@ -434,6 +435,8 @@ def create_long_format(
     long_format = iso.merge(
         combined_opp, on="county_id_fips", how="left", validate="m:1"
     )
+    """
+    long_format = iso.copy()
     _add_derived_columns(long_format)
     long_format["surrogate_id"] = range(len(long_format))
 
@@ -465,7 +468,7 @@ def create_fyi_long_format(
     _estimate_proposed_power_co2e(fyi)
     all_counties = _get_county_fips_df(engine)
     all_states = _get_state_fips_df(engine)
-
+    """
     # model local opposition
     aggregator = CountyOpposition(
         engine=engine, county_fips_df=all_counties, state_fips_df=all_states
@@ -487,6 +490,8 @@ def create_fyi_long_format(
     long_format = fyi.merge(
         combined_opp, on="county_id_fips", how="left", validate="m:1"
     )
+    """
+    long_format = fyi.copy()
     _add_derived_columns(long_format)
     if active_projects_only:
         active_long_format = long_format.query("queue_status == 'active'")
@@ -1248,8 +1253,8 @@ def create_data_mart(
         data_marts["iso_regions_all_projects_change_log"], all_projects_long_format
     )
 
-    active_long_format = create_long_format(engine, active_projects_only=True)
-    active_wide_format = _convert_long_to_wide(active_long_format)
+    # active_long_format = create_long_format(engine, active_projects_only=True)
+    # active_wide_format = _convert_long_to_wide(active_long_format)
     active_fyi_projects_long_format = create_fyi_long_format(
         engine, active_projects_only=True
     )
@@ -1261,8 +1266,8 @@ def create_data_mart(
 
     data_marts.update(
         {
-            "iso_projects_long_format": active_long_format,
-            "iso_projects_wide_format": active_wide_format,
+            # "iso_projects_long_format": active_long_format,
+            # "iso_projects_wide_format": active_wide_format,
             "iso_projects_change_log": iso_projects_change_log,
             "projects_current_eia860m": eia860m_current,
             "projects_status_yearly_eia860m": eia860m_status_yearly,
