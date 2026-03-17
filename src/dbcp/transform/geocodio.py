@@ -2,14 +2,23 @@
 
 import os
 from enum import Enum
+from typing import Any
 
 import pandas as pd
-from geocodio import Geocodio
-from geocodio.exceptions import AuthenticationError
 from joblib import Memory
 from pydantic import BaseModel, confloat
 
 from dbcp.constants import DATA_DIR
+
+try:
+    from geocodio import Geocodio
+    from geocodio.exceptions import AuthenticationError
+except ImportError:  # pragma: no cover - exercised via monkeypatch in tests
+    Geocodio = None
+
+    class AuthenticationError(RuntimeError):
+        """Fallback error used when geocodio-library-python is unavailable."""
+
 
 geocoder_local_cache = DATA_DIR / "geocodio_cache"
 # create geocoder_local_cache if it doesn't exist
@@ -43,8 +52,7 @@ class Location(BaseModel):
 
 
 class AccuracyType(str, Enum):
-    """
-    Accuracy types from Geocodio.
+    """Accuracy types from Geocodio.
 
     Valid values are documented at https://www.geocod.io/guides/accuracy-types-scores/
     """
@@ -75,11 +83,10 @@ class AddressData(BaseModel):
         """Create a locality name based on the accuracy type."""
         if self.accuracy_type == "place":
             return self.address_components.city
-        elif self.accuracy_type == "county":
+        if self.accuracy_type == "county":
             return self.address_components.county
-        else:
-            # We only care about cities and counties.
-            return None
+        # We only care about cities and counties.
+        return None
 
     @property
     def locality_type(self) -> str:
@@ -90,10 +97,31 @@ class AddressData(BaseModel):
         """
         if self.accuracy_type == "place":
             return "city"
-        elif self.accuracy_type == "county":
+        if self.accuracy_type == "county":
             return "county"
-        else:
-            return None
+        return None
+
+
+def _get_field(obj: Any, field: str) -> Any:
+    """Read a field from either an SDK response object or a legacy dict payload."""
+    if obj is None:
+        return None
+    if isinstance(obj, dict):
+        return obj.get(field)
+    return getattr(obj, field, None)
+
+
+def _get_best_result(response_item: Any) -> Any:
+    """Return the top geocoding result from a batch response item."""
+    nested_results = _get_field(response_item, "results")
+    if nested_results is not None:
+        return nested_results[0] if nested_results else None
+
+    # geocodio-library-python returns batch results as response objects directly.
+    if _get_field(response_item, "address_components") is not None:
+        return response_item
+
+    return None
 
 
 def _geocode_batch(
@@ -109,6 +137,7 @@ def _geocode_batch(
 
     Returns:
         dataframe with geocoded locality information
+
     """
     batch["address"] = batch[locality_col] + ", " + batch[state_col]
     try:
@@ -118,13 +147,17 @@ def _geocode_batch(
             "Geocodio API key is invalid or you hit the daily geocoding limit which you can change in the Geocodio billing tab."
         )
 
+    response_items = _get_field(responses, "results")
+    if response_items is None:
+        response_items = responses
+
     geocoded_localities = []
-    for r in responses:
-        results = r.get("results")
-        if results:
+    for response_item in response_items:
+        best_result = _get_best_result(response_item)
+        if best_result is not None:
             # The results are always ordered with the most accurate locations first.
             # It is therefore always safe to pick the first result in the list.
-            ad = AddressData.parse_obj(results[0])
+            ad = AddressData.model_validate(best_result, from_attributes=True)
             geocoded_localities.append(
                 [ad.locality_name, ad.locality_type, ad.address_components.county]
             )
@@ -159,10 +192,14 @@ def _geocode_locality(
         batch_size: number of rows to geocode at once
     Returns:
         dataframe with geocoded locality information
+
     """
+    if Geocodio is None:
+        raise ModuleNotFoundError(
+            "geocodio-library-python is required to geocode localities."
+        )
+
     GEOCODIO_API_KEY = os.environ["GEOCODIO_API_KEY"]
-    # turn off automatic loading of latest Geocodio API version
-    # to ensure backwards compatibility
     client = Geocodio(api_key=GEOCODIO_API_KEY)
 
     geocoded_results = []
