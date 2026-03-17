@@ -16,7 +16,7 @@ def _extract_pudl_generators() -> pd.DataFrame:
         pudl_resource="out_eia__yearly_generators.parquet"
     )
     pudl_generators = pd.read_parquet(
-        pudl_resource_path, engine="pyarrow", use_nullable_dtypes=True
+        pudl_resource_path, engine="pyarrow", dtype_backend="numpy_nullable"
     )
 
     # convert columns with 'date' in the name to datetime
@@ -39,7 +39,7 @@ def _extract_pudl_eia860m_changelog() -> pd.DataFrame:
         pudl_resource="core_eia860m__changelog_generators.parquet"
     )
     pudl_eia860m_changelog = pd.read_parquet(
-        pudl_resource_path, engine="pyarrow", use_nullable_dtypes=True
+        pudl_resource_path, engine="pyarrow", dtype_backend="numpy_nullable"
     )
     return pudl_eia860m_changelog
 
@@ -50,7 +50,7 @@ def _extract_pudl_eia860m_status_codes() -> pd.DataFrame:
         pudl_resource="core_eia__codes_operational_status.parquet"
     )
     pudl_eia860m_status_codes = pd.read_parquet(
-        pudl_resource_path, engine="pyarrow", use_nullable_dtypes=True
+        pudl_resource_path, engine="pyarrow", dtype_backend="numpy_nullable"
     )
     return pudl_eia860m_status_codes
 

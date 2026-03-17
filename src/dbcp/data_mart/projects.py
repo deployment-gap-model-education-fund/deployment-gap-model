@@ -3,7 +3,6 @@
 import logging
 from io import StringIO
 from re import IGNORECASE
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -43,6 +42,7 @@ def _merge_lbnl_with_gridstatus(lbnl: pd.DataFrame, gs: pd.DataFrame) -> pd.Data
     Args:
         lbnl: lbnl ISO queue projects
         engine: engine to connect to the local postgres data warehouse
+
     """
     is_non_iso = ~lbnl.iso_region.isin(GS_REGIONS)
     lbnl_non_isos = lbnl.loc[is_non_iso, :].copy()
@@ -58,12 +58,12 @@ def _merge_lbnl_with_gridstatus(lbnl: pd.DataFrame, gs: pd.DataFrame) -> pd.Data
 
     fields_in_gs_not_in_lbnl = gs.columns.difference(lbnl.columns)
     fields_in_lbnl_not_in_gs = lbnl.columns.difference(gs.columns)
-    assert (
-        fields_in_gs_not_in_lbnl.empty
-    ), f"These columns are in Grid Status but not LBNL: {fields_in_gs_not_in_lbnl}"
-    assert (
-        fields_in_lbnl_not_in_gs.empty
-    ), f"These columns are in LBNL but not Grid Status: {fields_in_lbnl_not_in_gs}"
+    assert fields_in_gs_not_in_lbnl.empty, (
+        f"These columns are in Grid Status but not LBNL: {fields_in_gs_not_in_lbnl}"
+    )
+    assert fields_in_lbnl_not_in_gs.empty, (
+        f"These columns are in LBNL but not Grid Status: {fields_in_lbnl_not_in_gs}"
+    )
 
     return pd.concat([gs, lbnl_non_isos], axis=0, ignore_index=True)
 
@@ -103,6 +103,7 @@ def _get_and_join_iso_tables(
 
     Returns:
         A dataframe of ISO projects with location, capacity, estimated co2 emissions and state permitting info.
+
     """
     if use_gridstatus:
         lbnl = _get_lbnl_projects(engine, non_iso_only=True)
@@ -167,22 +168,24 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     storage = long.loc[is_storage, :]
     group_keys = ["project_id", "source", "county_id_fips"]
     # create multiple generation columns
-    group = gen.groupby(group_keys, dropna=False)[["generation_type", "capacity_mw"]]
+    group = gen.groupby(group_keys, dropna=False)[
+        group_keys + ["generation_type", "capacity_mw"]
+    ]
     # first generation source
     rename_dict = {
         "generation_type": "generation_type_1",
         "capacity_mw": "generation_capacity_mw_1",
     }
-    gen_1 = group.nth(0).rename(columns=rename_dict)
+    gen_1 = group.nth(0).reset_index(drop=True).rename(columns=rename_dict)
     # second generation source (very few rows)
     rename_dict = {
         "generation_type": "generation_type_2",
         "capacity_mw": "generation_capacity_mw_2",
     }
-    gen_2 = group.nth(1).rename(columns=rename_dict)
+    gen_2 = group.nth(1).reset_index(drop=True).rename(columns=rename_dict)
     # shouldn't be any with 3 generation types
     assert group.nth(2).shape[0] == 0
-    gen = pd.concat([gen_1, gen_2], axis=1, copy=False)
+    gen = gen_1.merge(gen_2, on=group_keys, how="left")
     # create storage column
     # Occassionally there are projects with multiple storage resources,
     # i.e. battery storage and pumped storage
@@ -218,17 +221,16 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         {"Pumped Storage + Battery Storage": "Battery Storage + Pumped Storage"}
     )
     # combine gen and storage cols, handling nans in county_id_fips
-    SENTINEL = "<NA_FIPS>"
-    g = gen.reset_index().assign(
-        county_id_fips=lambda d: d["county_id_fips"].astype("string").fillna(SENTINEL)
+    sentinel = "<NA_FIPS>"
+    g = gen.assign(
+        county_id_fips=lambda d: d["county_id_fips"].astype("string").fillna(sentinel)
     )
     s = storage.reset_index().assign(
-        county_id_fips=lambda d: d["county_id_fips"].astype("string").fillna(SENTINEL)
+        county_id_fips=lambda d: d["county_id_fips"].astype("string").fillna(sentinel)
     )
     gen_stor = g.merge(s, how="outer", on=group_keys, suffixes=("_gen", "_stor"))
     # restore NaNs
-    gen_stor["county_id_fips"] = gen_stor["county_id_fips"].replace(SENTINEL, np.nan)
-    gen_stor = gen_stor.set_index(group_keys)
+    gen_stor["county_id_fips"] = gen_stor["county_id_fips"].replace(sentinel, np.nan)
 
     assert (
         len(gen_stor) == long.groupby(group_keys, dropna=False).ngroups
@@ -246,8 +248,14 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         .groupby(group_keys, dropna=False)
         .nth(0)
     )
-    project_locations = pd.concat([gen_stor, other_cols, co2e], axis=1, copy=False)
-
+    # a left merge works here because the previous assert ensured that all
+    # project-locations are accounted for and 1:1
+    project_locations = gen_stor.merge(
+        other_cols, on=group_keys, how="left", validate="1:1"
+    )
+    project_locations = project_locations.merge(
+        co2e, on=group_keys, how="left", validate="1:1"
+    ).set_index(group_keys)
     # now create multiple location columns
     project_keys = ["source", "project_id"]
     projects = project_locations.reset_index("county_id_fips").groupby(
@@ -256,9 +264,9 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     loc1 = projects.nth(0).rename(
         columns={"county_id_fips": "county_id_fips_1", "county": "county_1"}
     )
-    assert (
-        not loc1.index.to_frame().isna().any().any()
-    ), "Nulls found in project_id or source."
+    assert not loc1.index.to_frame().isna().any().any(), (
+        "Nulls found in project_id or source."
+    )
     loc2 = (
         projects[["county_id_fips", "county"]]
         .nth(1)
@@ -268,11 +276,9 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     assert projects.nth(2).shape[0] == 1, "More than 2 locations found for a project."
 
     wide = pd.concat([loc1, loc2], axis=1, copy=False)
-    wide.sort_index(inplace=True)
-    wide.reset_index(inplace=True)
-    wide.rename(
-        columns={"state": "state_1", "state_id_fips": "state_id_fips_1"}, inplace=True
-    )
+    wide = wide.sort_index()
+    wide = wide.reset_index()
+    wide = wide.rename(columns={"state": "state_1", "state_id_fips": "state_id_fips_1"})
     wide_col_order = [
         "project_id",
         "project_name",
@@ -400,6 +406,7 @@ def create_long_format(
 
     Returns:
         long format table of ISO projects
+
     """
     iso = _get_and_join_iso_tables(
         engine, use_gridstatus=True, use_proprietary_offshore=use_proprietary_offshore
@@ -421,8 +428,9 @@ def create_long_format(
         "geocoded_locality_type": "ordinance_jurisdiction_type",
         "earliest_year_mentioned": "ordinance_earliest_year_mentioned",
     }
-    combined_opp.rename(columns=rename_dict, inplace=True)
-
+    combined_opp = combined_opp.rename(columns=rename_dict).dropna(
+        subset="county_id_fips"
+    )
     long_format = iso.merge(
         combined_opp, on="county_id_fips", how="left", validate="m:1"
     )
@@ -472,7 +480,9 @@ def create_fyi_long_format(
         "geocoded_locality_type": "ordinance_jurisdiction_type",
         "earliest_year_mentioned": "ordinance_earliest_year_mentioned",
     }
-    combined_opp.rename(columns=rename_dict, inplace=True)
+    combined_opp = combined_opp.rename(columns=rename_dict).dropna(
+        subset="county_id_fips"
+    )
 
     long_format = fyi.merge(
         combined_opp, on="county_id_fips", how="left", validate="m:1"
@@ -494,8 +504,7 @@ def create_total_active_project_change_logs(
     metric: tuple[str],
     freq: str = "Q",
 ) -> pd.DataFrame:
-    """
-    This function creates a data mart table where each row contains the total active capacity of projects for a given region and time interval.
+    """Creates a data mart table where each row contains the total active capacity of projects for a given region and time interval.
 
     This is different than create_geography_change_log where each row contains the number of projects that entered the queue in a given region and time interval.
     This function only calculates totals for active projects.
@@ -509,18 +518,18 @@ def create_total_active_project_change_logs(
         freq: the frequency to aggregate by
     Returns:
         totals_chng_log: dataframe where each row contains the total active capacity or number of projects for a given region and time interval.
+
     """
-    assert active_iso_projects_change_log.queue_status.eq(
-        "new"
-    ).all(), "Found rows with unexpected queue status."
+    assert active_iso_projects_change_log.queue_status.eq("new").all(), (
+        "Found rows with unexpected queue status."
+    )
 
     chng_log = active_iso_projects_change_log.copy()
     min_date = chng_log.effective_date.min() - pd.offsets.QuarterBegin(startingMonth=1)
     max_date = chng_log.effective_date.max() + pd.offsets.QuarterEnd(0)
 
     def generate_frequencies(start, end, min_date, max_date, freq="Q"):
-        """
-        Generate a list of dates between start and end at a given frequency.
+        """Generate a list of dates between start and end at a given frequency.
 
         If end is missing, it is set to max_date. End is null when the project is still active.
         If start is missing, it is set to min_date. There are only 5 projects with missing start dates.
@@ -533,6 +542,7 @@ def create_total_active_project_change_logs(
             freq: the frequency to generate dates at
         Returns:
             periods: a list of dates between start and end at a given frequency
+
         """
         if pd.isna(start):
             start = min_date
@@ -590,7 +600,7 @@ def create_total_active_project_change_logs(
 
     totals_chng_log.columns = [
         f"{resource_class}_{metric}"
-        for resource_class in totals_chng_log.columns.values
+        for resource_class in totals_chng_log.columns.to_numpy()
     ]
 
     return totals_chng_log.reset_index()
@@ -632,7 +642,7 @@ def create_geography_change_log(
     geography_change_log = geography_change_log.fillna(0)
     geography_change_log.columns = [
         f"{queue_status}_{resource_class}_{col}"
-        for col, queue_status, resource_class in geography_change_log.columns.values
+        for col, queue_status, resource_class in geography_change_log.columns.to_numpy()
     ]
     geography_change_log = geography_change_log.reset_index()
     # add county and state information to the change log
@@ -660,6 +670,7 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
         long_format: long format of ISO projects
     Returns:
         chng: change log of ISO projects
+
     """
     original_long_format = long_format.copy()
     # for projcts where resource_clean == "Unknown", set resource_class to "other" instead of nan
@@ -703,9 +714,9 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
     )
     # make sure pct_after_current_year is less than 0.001 of operational projects
     expected_missing = 0.002
-    assert (
-        pct_after_current_year < expected_missing
-    ), f"More than {expected_missing}% of operational projects have actual_completion_date after the current year."
+    assert pct_after_current_year < expected_missing, (
+        f"More than {expected_missing}% of operational projects have actual_completion_date after the current year."
+    )
 
     # map active projects to "new"
     long_format["queue_status"] = long_format["queue_status"].map(
@@ -761,9 +772,9 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
         )
 
         # set effective_date column to date_col for projects that == status
-        long_format.loc[
-            long_format["queue_status"].eq(status), "effective_date"
-        ] = long_format[date_col]
+        long_format.loc[long_format["queue_status"].eq(status), "effective_date"] = (
+            long_format[date_col]
+        )
 
     # Set end date to to null all projects.
     long_format["end_date"] = pd.NA
@@ -818,9 +829,9 @@ def validate_project_change_log(
     result_n_projects_change = abs(
         len(iso_projects_change_log) - len(iso_projects_long_format)
     ) / len(iso_projects_change_log)
-    assert (
-        result_n_projects_change < expected_n_projects_change
-    ), f"Found unexpected change in total projects count: {result_n_projects_change}"
+    assert result_n_projects_change < expected_n_projects_change, (
+        f"Found unexpected change in total projects count: {result_n_projects_change}"
+    )
 
     # Create a dictionary of expected pct change for each iso_region
     expected_pct_change = pd.Series(
@@ -844,9 +855,9 @@ def validate_project_change_log(
     pct_change = (
         long_format_region_capacity - iso_projects_change_log_region_capacity
     ) / iso_projects_change_log_region_capacity
-    assert pct_change.lt(
-        expected_pct_change
-    ).all(), f"Found unexpected pct change in iso_projects_long_format: {pct_change}"
+    assert pct_change.lt(expected_pct_change).all(), (
+        f"Found unexpected pct change in iso_projects_long_format: {pct_change}"
+    )
 
 
 def validate_iso_regions_change_log(
@@ -872,9 +883,9 @@ def validate_iso_regions_change_log(
     result_n_projects_change = abs(
         n_projects_iso_regions_change_log - len(iso_projects_long_format)
     ) / len(iso_projects_long_format)
-    assert (
-        result_n_projects_change < expected_n_projects_change
-    ), f"Found unexpected change in total projects count: {result_n_projects_change}"
+    assert result_n_projects_change < expected_n_projects_change, (
+        f"Found unexpected change in total projects count: {result_n_projects_change}"
+    )
 
     # Create a dictionary of expected pct change for each iso_region
     expected_pct_change = pd.Series(
@@ -904,9 +915,9 @@ def validate_iso_regions_change_log(
     pct_change = (
         long_format_region_capacity - iso_projects_change_log_region_capacity
     ) / iso_projects_change_log_region_capacity
-    assert pct_change.lt(
-        expected_pct_change
-    ).all(), f"Found unexpected pct change in iso_projects_long_format: {pct_change}"
+    assert pct_change.lt(expected_pct_change).all(), (
+        f"Found unexpected pct change in iso_projects_long_format: {pct_change}"
+    )
 
 
 def get_eia860m_current(engine: sa.engine.Engine) -> pd.DataFrame:
@@ -914,6 +925,7 @@ def get_eia860m_current(engine: sa.engine.Engine) -> pd.DataFrame:
 
     Args:
         engine (sa.engine.Engine): connection to the data warehouse database
+
     """
     query = get_query("get_eia860m_current.sql")
     current_projects = pd.read_sql(query, engine)
@@ -931,6 +943,7 @@ def get_eia860m_status_timeseries(
         engine (sa.engine.Engine): connection to the data warehouse database
         frequency (str): 'M' for monthly, 'Q' for quarterly, 'A' for yearly.
         lookback_years (int): Number of years of data to generate
+
     """
     if frequency not in ("M", "Q", "A", "Y"):
         raise ValueError(
@@ -942,7 +955,7 @@ def get_eia860m_status_timeseries(
             "SELECT max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog",
             engine,
         )
-        .iat[0, 0]
+        .iloc[0, 0]
         .strftime("%Y-%m-%d")
     )
 
@@ -971,7 +984,7 @@ def get_eia860m_status_timeseries(
         status_history["end_date"],
         closed="both",
     )
-    status_history.set_index(date_intervals, inplace=True)
+    status_history = status_history.set_index(date_intervals)
 
     # Determine frequency and periods
     last_end_date = pd.Timestamp(last_report_date) + pd.offsets.MonthEnd()
@@ -1003,8 +1016,8 @@ def get_eia860m_status_timeseries(
     )
 
     idx_cols = gen_key + [f"{period_name}_end"]
-    time_series.sort_values(idx_cols, inplace=True)
-    time_series.reset_index(drop=True, inplace=True)
+    time_series = time_series.sort_values(idx_cols)
+    time_series = time_series.reset_index(drop=True)
 
     # Drop duplicates using latest start_date per generator-period
     # some duplicates are caused by NULL values in the valid_until_date coming from
@@ -1052,6 +1065,7 @@ def _get_eia860m_transition_dates(engine: sa.engine.Engine) -> pd.DataFrame:
 
     Args:
         engine (sa.engine.Engine): connection to the data warehouse database
+
     """
     query = """
     WITH with_latest AS (
@@ -1109,7 +1123,7 @@ def _get_eia860m_transition_dates(engine: sa.engine.Engine) -> pd.DataFrame:
 
 
 def _get_plant_names(
-    engine: sa.engine.Engine, date_as_of: Optional[str] = None
+    engine: sa.engine.Engine, date_as_of: str | None = None
 ) -> pd.DataFrame:
     """Get the most recent EIA860M data."""
     if not date_as_of:  # get most recent data
@@ -1118,7 +1132,7 @@ def _get_plant_names(
                 "SELECT max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog",
                 engine,
             )
-            .iat[0, 0]
+            .iloc[0, 0]
             .strftime("%Y-%m-%d")
         )
     else:
@@ -1144,8 +1158,7 @@ def create_wide_geography_change_log(
     metric: str,
     date_range: tuple[str, str],
 ) -> pd.DataFrame:
-    """
-    Create a wide table of ISO Queue changes for a given status, resource_class and metric.
+    """Create a wide table of ISO Queue changes for a given status, resource_class and metric.
 
     Args:
         geography_change_log: project change log where each row is a snap shot of a geography
@@ -1156,6 +1169,7 @@ def create_wide_geography_change_log(
         date_range: tuple of start and end date to filter on
     Return:
         wide: wide table of ISO Queue changes
+
     """
     value_column = f"{status}_{resource_class}_{metric}"
 
@@ -1197,7 +1211,7 @@ def _create_status_codes() -> pd.DataFrame:
 
 
 def create_data_mart(
-    engine: Optional[sa.engine.Engine] = None,
+    engine: sa.engine.Engine | None = None,
 ) -> dict[str, pd.DataFrame]:
     """Create projects datamart dataframe."""
     if engine is None:
@@ -1221,13 +1235,13 @@ def create_data_mart(
             "queue_status == 'new'"
         )
         for metric in metrics:
-            data_marts[
-                f"{geography}_active_projects_{metric}_change_log"
-            ] = create_total_active_project_change_logs(
-                new_iso_projects_change_log,
-                geography=geography_columns,
-                metric=metric,
-                freq="Q",
+            data_marts[f"{geography}_active_projects_{metric}_change_log"] = (
+                create_total_active_project_change_logs(
+                    new_iso_projects_change_log,
+                    geography=geography_columns,
+                    metric=metric,
+                    freq="Q",
+                )
             )
 
     validate_iso_regions_change_log(

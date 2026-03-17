@@ -259,6 +259,7 @@ fyi_locations = Table(
     Column("geocoded_containing_county", String),
     Column("latitude", Float),
     Column("longitude", Float),
+    Column("country_code", String),
     schema=schema,
 )
 

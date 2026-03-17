@@ -1,7 +1,5 @@
 """Module to create a table of EIP fossil infrastructure projects for use in spreadsheet tools."""
 
-from typing import Optional
-
 import pandas as pd
 import sqlalchemy as sa
 
@@ -16,7 +14,7 @@ def _get_proposed_infra_projects(engine: sa.engine.Engine) -> pd.DataFrame:
 
 
 def create_data_mart(
-    engine: Optional[sa.engine.Engine] = None,
+    engine: sa.engine.Engine | None = None,
 ) -> pd.DataFrame:
     """API function to create the table of proposed fossil infrastructure projects.
 
@@ -25,6 +23,7 @@ def create_data_mart(
 
     Returns:
         pd.DataFrame: Dataframe of proposed fossil infrastructure projects.
+
     """
     if engine is None:
         engine = get_sql_engine()

@@ -1,7 +1,7 @@
 """The ETL module create the data warehouse tables."""
 
 import logging
-from typing import Callable, Dict
+from collections.abc import Callable
 
 import pandas as pd
 import pyarrow as pa
@@ -14,7 +14,7 @@ from dbcp.constants import DATA_DIR, OUTPUT_DIR
 from dbcp.extract.ballot_ready import BR_URI
 from dbcp.extract.fips_tables import CENSUS_URI, TRIBAL_LANDS_URI
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
-from dbcp.helpers import enforce_dtypes, psql_insert_copy
+from dbcp.helpers import write_to_postgres
 from dbcp.transform.fips_tables import SPATIAL_CACHE
 from dbcp.transform.helpers import GEOCODER_CACHES
 from dbcp.validation.tests import validate_data_mart, validate_warehouse
@@ -22,7 +22,7 @@ from dbcp.validation.tests import validate_data_mart, validate_warehouse
 logger = logging.getLogger(__name__)
 
 
-def etl_eip_infrastructure() -> Dict[str, pd.DataFrame]:
+def etl_eip_infrastructure() -> dict[str, pd.DataFrame]:
     """EIP Infrastructure ETL."""
     # Extract
     eip_raw_dfs = dbcp.extract.eip_infrastructure.extract()
@@ -33,7 +33,7 @@ def etl_eip_infrastructure() -> Dict[str, pd.DataFrame]:
     return eip_transformed_dfs
 
 
-def etl_lbnl_iso_queue() -> Dict[str, pd.DataFrame]:
+def etl_lbnl_iso_queue() -> dict[str, pd.DataFrame]:
     """LBNL ISO Queues ETL."""
     lbnl_uri = "gs://dgm-archive/lbnl_iso_queue/queues_2024_clean_data.xlsx"
     lbnl_raw_dfs = dbcp.extract.lbnl_iso_queue.extract(lbnl_uri)
@@ -42,15 +42,15 @@ def etl_lbnl_iso_queue() -> Dict[str, pd.DataFrame]:
     return lbnl_transformed_dfs
 
 
-def etl_fyi_queue() -> Dict[str, pd.DataFrame]:
+def etl_fyi_queue() -> dict[str, pd.DataFrame]:
     """Interconnection.fyi ISO Queues ETL."""
-    fyi_uri = "gs://dgm-archive/interconnection.fyi/interconnection_fyi_dataset_2025-12-01.csv"
+    fyi_uri = "gs://dgm-archive/interconnection.fyi/interconnection_fyi_dataset_2026-03-01.csv"
     fyi_raw_dfs = dbcp.extract.fyi_queue.extract(fyi_uri)
     fyi_transformed_dfs = dbcp.transform.fyi_queue.transform(fyi_raw_dfs)
     return fyi_transformed_dfs
 
 
-def etl_columbia_local_opp() -> Dict[str, pd.DataFrame]:
+def etl_columbia_local_opp() -> dict[str, pd.DataFrame]:
     """Columbia Local Opposition ETL."""
     # Extract
     source_path = (
@@ -68,13 +68,13 @@ def etl_columbia_local_opp() -> Dict[str, pd.DataFrame]:
     return transformed_dfs
 
 
-def etl_pudl_tables() -> Dict[str, pd.DataFrame]:
+def etl_pudl_tables() -> dict[str, pd.DataFrame]:
     """Pull tables from pudl sqlite database."""
     raw_pudl_tables = dbcp.extract.pudl_data.extract()
     return dbcp.transform.pudl_data.transform(raw_pudl_tables)
 
 
-def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
+def etl_ncsl_state_permitting() -> dict[str, pd.DataFrame]:
     """NCSL State Permitting for Wind ETL."""
     source_path = DATA_DIR / "raw/ncsl_state_permitting_wind.csv"
     if not source_path.exists():
@@ -86,7 +86,7 @@ def etl_ncsl_state_permitting() -> Dict[str, pd.DataFrame]:
     return out
 
 
-def etl_fips_tables() -> Dict[str, pd.DataFrame]:
+def etl_fips_tables() -> dict[str, pd.DataFrame]:
     """Master state and county FIPS table ETL."""
     fips = dbcp.extract.fips_tables.extract_fips(CENSUS_URI)
 
@@ -209,9 +209,9 @@ def write_to_postgres_and_parquet(
     dfs: dict[str, pd.DataFrame], engine: sa.engine.Engine, schema_name: str
 ):
     """Write data mart tables from a schema to postgres and parquet."""
-    # Setup postgres
-    with engine.connect() as con:
-        con.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
+    # Ensure schema exists in a committed transaction
+    with engine.begin() as con:
+        con.execute(sa.text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
 
     # Delete any existing tables, and create them anew
     metadata = dbcp.helpers.get_schema_sql_alchemy_metadata(schema_name)
@@ -231,26 +231,21 @@ def write_to_postgres_and_parquet(
     parquet_dir.mkdir(exist_ok=True)
 
     # Load table into postgres and parquet
-    with engine.connect() as con:
-        for table in metadata.sorted_tables:
-            if table in tables:
-                logger.info(f"Load {table.name} to postgres.")
-                df = dbcp.helpers.trim_columns_length(dfs[table.name])
-                df = enforce_dtypes(df, table.name, schema_name)
-                df.to_sql(
-                    name=table.name,
-                    con=con,
-                    if_exists="append",
-                    index=False,
-                    schema=schema_name,
-                    method=psql_insert_copy,
-                    chunksize=5000,  # adjust based on memory capacity
-                )
-                schema = dbcp.helpers.get_pyarrow_schema_from_metadata(
-                    table.name, schema_name
-                )
-                pa_table = pa.Table.from_pandas(df, schema=schema)
-                pq.write_table(pa_table, parquet_dir / f"{table.name}.parquet")
+    for table in metadata.sorted_tables:
+        if table in tables:
+            logger.info(f"Load {table.name} to postgres.")
+            df = write_to_postgres(
+                df=dfs[table.name],
+                table_name=table.name,
+                engine=engine,
+                schema_name=schema_name,
+                if_exists="append",
+            )
+            schema = dbcp.helpers.get_pyarrow_schema_from_metadata(
+                table.name, schema_name
+            )
+            pa_table = pa.Table.from_pandas(df, schema=schema)
+            pq.write_table(pa_table, parquet_dir / f"{table.name}.parquet")
 
 
 def run_etl(funcs: dict[str, Callable], schema_name: str):
@@ -311,20 +306,20 @@ def create_data_mart(engine, private_only: bool = False):  # noqa: C901
             continue
         try:
             data = module.create_data_mart(engine=engine)
-        except AttributeError:
+        except AttributeError as error:
             raise AttributeError(
                 f"{module_info.name} has no attribute 'create_data_mart'."
                 "Make sure the data mart module implements create_data_mart function."
-            )
+            ) from error
         if isinstance(data, pd.DataFrame):
             name = module_info.name
             # If we're creating the private data mart only
             # and this specific table is not private, skip it.
             if private_only and name not in module_private:
                 continue
-            assert (
-                name not in data_mart_tables.keys()
-            ), f"Key {name} already exists in data mart"
+            assert name not in data_mart_tables, (
+                f"Key {name} already exists in data mart"
+            )
             data_mart_tables[name] = data
             if name in module_private:
                 private_table_names.add(name)
@@ -335,9 +330,9 @@ def create_data_mart(engine, private_only: bool = False):  # noqa: C901
             # if no private tables are left from this module, skip
             if not data:
                 continue
-            assert (
-                len([key for key in data.keys() if key in data_mart_tables.keys()]) == 0
-            ), f"Dict key from {module_info.name} already exists"
+            assert len([key for key in data if key in data_mart_tables]) == 0, (
+                f"Dict key from {module_info.name} already exists"
+            )
             data_mart_tables.update(data)
             private_table_names.update(module_private.intersection(data.keys()))
         else:
