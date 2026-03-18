@@ -20,7 +20,7 @@ except ImportError:  # pragma: no cover - exercised via monkeypatch in tests
         """Fallback error used when geocodio-library-python is unavailable."""
 
 
-geocoder_local_cache = DATA_DIR / "geocodio_cache"
+geocoder_local_cache = DATA_DIR / "geocodio_cache_official_client"
 # create geocoder_local_cache if it doesn't exist
 geocoder_local_cache.mkdir(parents=True, exist_ok=True)
 assert geocoder_local_cache.exists()
@@ -85,6 +85,10 @@ class AddressData(BaseModel):
             return self.address_components.city
         if self.accuracy_type == "county":
             return self.address_components.county
+        if self.address_components.city:
+            return self.address_components.city
+        if self.address_components.county:
+            return self.address_components.county
         # We only care about cities and counties.
         return None
 
@@ -98,6 +102,10 @@ class AddressData(BaseModel):
         if self.accuracy_type == "place":
             return "city"
         if self.accuracy_type == "county":
+            return "county"
+        if self.address_components.city:
+            return "city"
+        if self.address_components.county:
             return "county"
         return None
 
@@ -117,11 +125,31 @@ def _get_best_result(response_item: Any) -> Any:
     if nested_results is not None:
         return nested_results[0] if nested_results else None
 
+    nested_response = _get_field(response_item, "response")
+    if nested_response is not None:
+        nested_results = _get_field(nested_response, "results")
+        return nested_results[0] if nested_results else None
+
     # geocodio-library-python returns batch results as response objects directly.
     if _get_field(response_item, "address_components") is not None:
         return response_item
 
     return None
+
+
+def _get_batch_responses(client: Geocodio, addresses: list[str]) -> Any:
+    """Fetch geocoding batch responses without relying on the client's buggy parser."""
+    if hasattr(client, "_request") and hasattr(client, "BASE_PATH"):
+        raw_response = client._request(
+            "POST",
+            f"{client.BASE_PATH}/geocode",
+            params={},
+            json=addresses,
+            timeout=getattr(client, "batch_timeout", None),
+        )
+        return raw_response.json().get("results", [])
+
+    return client.geocode(addresses)
 
 
 def _geocode_batch(
@@ -139,9 +167,10 @@ def _geocode_batch(
         dataframe with geocoded locality information
 
     """
+    batch = batch.copy()
     batch["address"] = batch[locality_col] + ", " + batch[state_col]
     try:
-        responses = client.geocode(batch["address"].tolist())
+        responses = _get_batch_responses(client, batch["address"].tolist())
     except AuthenticationError:
         raise AuthenticationError(
             "Geocodio API key is invalid or you hit the daily geocoding limit which you can change in the Geocodio billing tab."
@@ -200,7 +229,7 @@ def _geocode_locality(
         )
 
     GEOCODIO_API_KEY = os.environ["GEOCODIO_API_KEY"]
-    client = Geocodio(api_key=GEOCODIO_API_KEY)
+    client = Geocodio(GEOCODIO_API_KEY)
 
     geocoded_results = []
 
