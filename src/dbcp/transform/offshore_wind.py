@@ -101,8 +101,7 @@ LOCS_SCHEMA = {
 def _create_association_table(
     df: pd.DataFrame, pk: str, array_col: str, array_col_rename: str
 ) -> pd.DataFrame:
-    """
-    Create an association table between a primary key and a CSV array column.
+    """Create an association table between a primary key and a CSV array column.
 
     This function drops rows with empty arrays.
 
@@ -114,9 +113,10 @@ def _create_association_table(
 
     Returns:
         the association table
+
     """
     # drop rows with empty arrays
-    df = df[df[array_col].notnull()]
+    df = df.loc[df[array_col].notnull()].copy()
 
     df[array_col] = df[array_col].str.split(",")
     exploded = df.explode(array_col)
@@ -142,6 +142,7 @@ def _add_geocoded_locations(transformed_locs: pd.DataFrame) -> None:
 
     Args:
         transformed_locs (pd.DataFrame): locations df after other cleaning has been performed
+
     """
     # this code is ugly and procedural for the sake of making inplace operations.
     # And all to save copy operations on a dataframe that is... 50 rows lol. Dumb!
@@ -153,7 +154,7 @@ def _add_geocoded_locations(transformed_locs: pd.DataFrame) -> None:
         state_col="raw_state_abbrev",
         locality_col="city_county",
     )
-    transformed_locs.drop(columns=["city_county"], inplace=True)
+    transformed_locs = transformed_locs.drop(columns=["city_county"])
 
     nan_fips_idx = first_pass["county_id_fips"].isna()
     cols_to_fill = [
@@ -188,16 +189,16 @@ def _add_actionable_and_nearly_certain_classification(projects: pd.DataFrame) ->
     projects.loc[:, "is_nearly_certain"] = projects["construction_status"].isin(
         nearly_certain_statuses
     )
-    return None
+    return
 
 
 def _validate_raw_data(projs: pd.DataFrame, locs: pd.DataFrame) -> None:
-    """
-    Validate the raw data.
+    """Validate the raw data.
 
     Args:
         projs (pd.DataFrame): raw projects data
         locs (pd.DataFrame): raw locations data
+
     """
 
     def assert_primary_key(df: pd.DataFrame, key: list[str] | str) -> None:
@@ -217,21 +218,21 @@ def _validate_raw_data(projs: pd.DataFrame, locs: pd.DataFrame) -> None:
 
     small_projects = projs[projs["capacity_mw"].lt(100)]
     n_small_projects = 4
-    assert (
-        len(small_projects) == n_small_projects
-    ), f"Found {len(small_projects)} small projects, expected {n_small_projects}: {small_projects['name']}"
+    assert len(small_projects) == n_small_projects, (
+        f"Found {len(small_projects)} small projects, expected {n_small_projects}: {small_projects['name']}"
+    )
     assert projs["capacity_mw"].max() < 10_000, "Found unusually large project."
 
     early_projects = projs[projs["proposed_completion_year"].lt(2022)]
     n_early_projects = 2
-    assert (
-        len(early_projects) == n_early_projects
-    ), f"Found {len(early_projects)} early projects, expected {n_early_projects}: {early_projects['name']}"
+    assert len(early_projects) == n_early_projects, (
+        f"Found {len(early_projects)} early projects, expected {n_early_projects}: {early_projects['name']}"
+    )
     late_projects = projs[projs["proposed_completion_year"].ge(2040)]
     n_late_projects = 0
-    assert (
-        len(late_projects) == n_late_projects
-    ), f"Found {len(late_projects)} early projects, expected {n_late_projects}: {late_projects['name']}"
+    assert len(late_projects) == n_late_projects, (
+        f"Found {len(late_projects)} early projects, expected {n_late_projects}: {late_projects['name']}"
+    )
 
     # Locations
     # assert location_id is unique, print out duplicates if not
@@ -242,8 +243,7 @@ def _validate_raw_data(projs: pd.DataFrame, locs: pd.DataFrame) -> None:
 def _normalize_tables(
     proj: pd.DataFrame, locs: pd.DataFrame
 ) -> dict[str, pd.DataFrame]:
-    """
-    Normalize the project and location tables.
+    """Normalize the project and location tables.
 
     Create the following tables:
     - offshore_wind_projects: pk is project_id
@@ -257,6 +257,7 @@ def _normalize_tables(
 
     Returns:
         dictionary of normalized tables
+
     """
     tables = {}
     # locations
@@ -356,8 +357,8 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         .fillna("TBD")
         .map(queue_mapping)
     )
-    assert (
-        transformed_dfs["offshore_wind_projects"]["queue_status"].notnull().all()
-    ), "Unmapped construction status."
+    assert transformed_dfs["offshore_wind_projects"]["queue_status"].notnull().all(), (
+        "Unmapped construction status."
+    )
 
     return transformed_dfs

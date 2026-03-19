@@ -20,7 +20,7 @@ def _get_existing_plant_fuel_data() -> pd.DataFrame:
     df = pd.read_parquet(
         get_pudl_resource("core_eia923__monthly_generation_fuel.parquet"),
         engine="pyarrow",
-        use_nullable_dtypes=True,
+        dtype_backend="numpy_nullable",
     )
     # convert all columns with the word date to datetime
     date_columns = [col for col in df.columns if "date" in col]
