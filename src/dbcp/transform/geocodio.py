@@ -9,17 +9,11 @@ from pydantic import BaseModel, confloat
 
 from dbcp.constants import DATA_DIR
 
-try:
-    from geocodio import Geocodio
-    from geocodio.exceptions import AuthenticationError
-except ImportError:  # pragma: no cover - exercised via monkeypatch in tests
-    Geocodio = None
-
-    class AuthenticationError(RuntimeError):
-        """Fallback error used when geocodio-library-python is unavailable."""
+from geocodio import Geocodio
+from geocodio.exceptions import AuthenticationError
 
 
-geocoder_local_cache = DATA_DIR / "geocodio_cache_official_client"
+geocoder_local_cache = DATA_DIR / "geocodio_cache"
 # create geocoder_local_cache if it doesn't exist
 geocoder_local_cache.mkdir(parents=True, exist_ok=True)
 assert geocoder_local_cache.exists()
