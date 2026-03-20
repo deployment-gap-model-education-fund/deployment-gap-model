@@ -2,7 +2,6 @@
 
 import os
 from enum import Enum
-from typing import Any
 
 import pandas as pd
 from joblib import Memory
@@ -110,46 +109,22 @@ class AddressData(BaseModel):
         return None
 
 
-def _get_field(obj: Any, field: str) -> Any:
-    """Read a field from either an SDK response object or a legacy dict payload."""
-    if obj is None:
-        return None
-    if isinstance(obj, dict):
-        return obj.get(field)
-    return getattr(obj, field, None)
-
-
-def _get_best_result(response_item: Any) -> Any:
+def _get_best_result(response_item: dict) -> dict | None:
     """Return the top geocoding result from a batch response item."""
-    nested_results = _get_field(response_item, "results")
-    if nested_results is not None:
-        return nested_results[0] if nested_results else None
-
-    nested_response = _get_field(response_item, "response")
-    if nested_response is not None:
-        nested_results = _get_field(nested_response, "results")
-        return nested_results[0] if nested_results else None
-
-    # geocodio-library-python returns batch results as response objects directly.
-    if _get_field(response_item, "address_components") is not None:
-        return response_item
-
-    return None
+    nested_results = response_item.get("response", {}).get("results", [])
+    return nested_results[0] if nested_results else None
 
 
-def _get_batch_responses(client: Geocodio, addresses: list[str]) -> Any:
+def _get_batch_responses(client: Geocodio, addresses: list[str]) -> list[dict]:
     """Fetch geocoding batch responses without relying on the client's buggy parser."""
-    if hasattr(client, "_request") and hasattr(client, "BASE_PATH"):
-        raw_response = client._request(
-            "POST",
-            f"{client.BASE_PATH}/geocode",
-            params={},
-            json=addresses,
-            timeout=getattr(client, "batch_timeout", None),
-        )
-        return raw_response.json().get("results", [])
-
-    return client.geocode(addresses)
+    raw_response = client._request(
+        "POST",
+        f"{client.BASE_PATH}/geocode",
+        params={},
+        json=addresses,
+        timeout=client.batch_timeout,
+    )
+    return raw_response.json().get("results", [])
 
 
 def _geocode_batch(
@@ -176,17 +151,13 @@ def _geocode_batch(
             "Geocodio API key is invalid or you hit the daily geocoding limit which you can change in the Geocodio billing tab."
         )
 
-    response_items = _get_field(responses, "results")
-    if response_items is None:
-        response_items = responses
-
     geocoded_localities = []
-    for response_item in response_items:
+    for response_item in responses:
         best_result = _get_best_result(response_item)
         if best_result is not None:
             # The results are always ordered with the most accurate locations first.
             # It is therefore always safe to pick the first result in the list.
-            ad = AddressData.model_validate(best_result, from_attributes=True)
+            ad = AddressData.model_validate(best_result)
             geocoded_localities.append(
                 [ad.locality_name, ad.locality_type, ad.address_components.county]
             )

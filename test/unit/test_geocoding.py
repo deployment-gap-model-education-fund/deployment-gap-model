@@ -1,7 +1,5 @@
 """Test suite for dbcp.transform.google_maps module."""
 
-from dataclasses import dataclass
-
 import pandas as pd
 import pytest
 
@@ -10,118 +8,120 @@ from dbcp.transform.google_maps import GoogleGeocoder
 from dbcp.transform.helpers import add_county_fips_with_backup_geocoding
 
 
-@dataclass
-class MockGeocodioAddressComponents:
-    """Mock Geocodio address components payload."""
+class MockRawResponse:
+    """Mock raw HTTP response returned by the official Geocodio client."""
 
-    city: str | None = None
-    county: str | None = None
-    state: str | None = None
+    def __init__(self, payload: dict[str, object]):
+        self._payload = payload
 
-
-@dataclass
-class MockGeocodioLocation:
-    """Mock Geocodio location payload."""
-
-    lat: float = 0.0
-    lng: float = 0.0
-
-
-@dataclass
-class MockGeocodioResult:
-    """Mock Geocodio geocoding result."""
-
-    address_components: MockGeocodioAddressComponents
-    formatted_address: str
-    location: MockGeocodioLocation
-    accuracy: float
-    accuracy_type: str
-    source: str = "geocodio"
-
-
-@dataclass
-class MockGeocodioBatchResponse:
-    """Mock batch response returned by the official Geocodio client."""
-
-    results: list[MockGeocodioResult | None]
+    def json(self) -> dict[str, object]:
+        """Return the mocked JSON payload."""
+        return self._payload
 
 
 class MockGeocodioClient:
     """Mock official Geocodio client."""
 
+    BASE_PATH = "v1.7"
+    batch_timeout = 30
     responses = {
-        "richmond-nj, ny": MockGeocodioResult(
-            address_components=MockGeocodioAddressComponents(
-                county="Richmond County", state="NY"
-            ),
-            formatted_address="Richmond County, NY",
-            location=MockGeocodioLocation(),
-            accuracy=1.0,
-            accuracy_type="county",
-        ),
-        "renssalear, ny": MockGeocodioResult(
-            address_components=MockGeocodioAddressComponents(
-                city="Rensselaer", county="Rensselaer County", state="NY"
-            ),
-            formatted_address="Rensselaer, NY",
-            location=MockGeocodioLocation(),
-            accuracy=1.0,
-            accuracy_type="place",
-        ),
-        "fairfield, me": MockGeocodioResult(
-            address_components=MockGeocodioAddressComponents(
-                city="Fairfield", county="Somerset County", state="ME"
-            ),
-            formatted_address="Fairfield, ME",
-            location=MockGeocodioLocation(),
-            accuracy=1.0,
-            accuracy_type="place",
-        ),
-        "northhampton, nc": MockGeocodioResult(
-            address_components=MockGeocodioAddressComponents(
-                county="Northampton County", state="NC"
-            ),
-            formatted_address="Northampton County, NC",
-            location=MockGeocodioLocation(),
-            accuracy=1.0,
-            accuracy_type="county",
-        ),
-        "rio arriba, co": MockGeocodioResult(
-            address_components=MockGeocodioAddressComponents(
-                county="Rio Arriba County", state="NM"
-            ),
-            formatted_address="Rio Arriba County, NM",
-            location=MockGeocodioLocation(),
-            accuracy=1.0,
-            accuracy_type="county",
-        ),
-        "sonoma, ca": MockGeocodioResult(
-            address_components=MockGeocodioAddressComponents(
-                city="Sonoma", county="Sonoma County", state="CA"
-            ),
-            formatted_address="Sonoma, CA",
-            location=MockGeocodioLocation(),
-            accuracy=1.0,
-            accuracy_type="place",
-        ),
+        "richmond-nj, ny": {
+            "address_components": {"county": "Richmond County", "state": "NY"},
+            "formatted_address": "Richmond County, NY",
+            "location": {"lat": 0.0, "lng": 0.0},
+            "accuracy": 1.0,
+            "accuracy_type": "county",
+            "source": "geocodio",
+        },
+        "renssalear, ny": {
+            "address_components": {
+                "city": "Rensselaer",
+                "county": "Rensselaer County",
+                "state": "NY",
+            },
+            "formatted_address": "Rensselaer, NY",
+            "location": {"lat": 0.0, "lng": 0.0},
+            "accuracy": 1.0,
+            "accuracy_type": "place",
+            "source": "geocodio",
+        },
+        "fairfield, me": {
+            "address_components": {
+                "city": "Fairfield",
+                "county": "Somerset County",
+                "state": "ME",
+            },
+            "formatted_address": "Fairfield, ME",
+            "location": {"lat": 0.0, "lng": 0.0},
+            "accuracy": 1.0,
+            "accuracy_type": "place",
+            "source": "geocodio",
+        },
+        "northhampton, nc": {
+            "address_components": {"county": "Northampton County", "state": "NC"},
+            "formatted_address": "Northampton County, NC",
+            "location": {"lat": 0.0, "lng": 0.0},
+            "accuracy": 1.0,
+            "accuracy_type": "county",
+            "source": "geocodio",
+        },
+        "rio arriba, co": {
+            "address_components": {"county": "Rio Arriba County", "state": "NM"},
+            "formatted_address": "Rio Arriba County, NM",
+            "location": {"lat": 0.0, "lng": 0.0},
+            "accuracy": 1.0,
+            "accuracy_type": "county",
+            "source": "geocodio",
+        },
+        "sonoma, ca": {
+            "address_components": {
+                "city": "Sonoma",
+                "county": "Sonoma County",
+                "state": "CA",
+            },
+            "formatted_address": "Sonoma, CA",
+            "location": {"lat": 0.0, "lng": 0.0},
+            "accuracy": 1.0,
+            "accuracy_type": "place",
+            "source": "geocodio",
+        },
         "random locality name, xx": None,
-        "rchmond, ny": MockGeocodioResult(
-            address_components=MockGeocodioAddressComponents(
-                county="Richmond County", state="NY"
-            ),
-            formatted_address="Richmond County, NY",
-            location=MockGeocodioLocation(),
-            accuracy=1.0,
-            accuracy_type="county",
-        ),
+        "rchmond, ny": {
+            "address_components": {"county": "Richmond County", "state": "NY"},
+            "formatted_address": "Richmond County, NY",
+            "location": {"lat": 0.0, "lng": 0.0},
+            "accuracy": 1.0,
+            "accuracy_type": "county",
+            "source": "geocodio",
+        },
     }
 
     def __init__(self, api_key: str):
         self.api_key = api_key
 
-    def geocode(self, addresses: list[str]) -> MockGeocodioBatchResponse:
-        return MockGeocodioBatchResponse(
-            results=[self.responses[address.lower()] for address in addresses]
+    def _request(
+        self,
+        method: str,
+        endpoint: str,
+        params: dict[str, object],
+        json: list[str],
+        timeout: int | None = None,
+    ) -> MockRawResponse:
+        del method, endpoint, params, timeout
+        return MockRawResponse(
+            {
+                "results": [
+                    {
+                        "query": address,
+                        "response": {
+                            "results": [self.responses[address.lower()]]
+                            if self.responses[address.lower()] is not None
+                            else []
+                        },
+                    }
+                    for address in json
+                ]
+            }
         )
 
 
@@ -415,20 +415,6 @@ def test_geocode_locality(geocoder, expected):
     assert geocoder.locality_name == expected["locality_name"]
     assert geocoder.containing_county == expected["containing_county"]
     assert geocoder.admin_type == expected["admin_type"]
-
-
-@pytest.mark.skip(
-    reason="We're not reliant on the Google Geocoder right now. Keep as a backup option."
-)
-def test_GoogleGeocoder_init_and_properties():
-    """Test the init and @property decorators."""
-    empty = GoogleGeocoder()
-    with pytest.raises(AttributeError) as e:
-        empty.locality_name
-        assert str(e).endswith("Call geocode_request() first.")
-    full = GoogleGeocoder()
-    full._response = mock_geocoder_town_and_county()._response
-    assert full.locality_name == "Westport"
 
 
 def test_add_county_fips_with_backup_geocoding_empty_df():
