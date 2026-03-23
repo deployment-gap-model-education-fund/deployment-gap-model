@@ -4,12 +4,14 @@ import os
 from enum import Enum
 
 import pandas as pd
-from geocodio import GeocodioClient
-from geocodio.exceptions import GeocodioAuthError
 from joblib import Memory
 from pydantic import BaseModel, confloat
 
 from dbcp.constants import DATA_DIR
+
+from geocodio import Geocodio
+from geocodio.exceptions import AuthenticationError
+
 
 geocoder_local_cache = DATA_DIR / "geocodio_cache"
 # create geocoder_local_cache if it doesn't exist
@@ -43,8 +45,7 @@ class Location(BaseModel):
 
 
 class AccuracyType(str, Enum):
-    """
-    Accuracy types from Geocodio.
+    """Accuracy types from Geocodio.
 
     Valid values are documented at https://www.geocod.io/guides/accuracy-types-scores/
     """
@@ -75,11 +76,14 @@ class AddressData(BaseModel):
         """Create a locality name based on the accuracy type."""
         if self.accuracy_type == "place":
             return self.address_components.city
-        elif self.accuracy_type == "county":
+        if self.accuracy_type == "county":
             return self.address_components.county
-        else:
-            # We only care about cities and counties.
-            return None
+        if self.address_components.city:
+            return self.address_components.city
+        if self.address_components.county:
+            return self.address_components.county
+        # We only care about cities and counties.
+        return None
 
     @property
     def locality_type(self) -> str:
@@ -90,14 +94,35 @@ class AddressData(BaseModel):
         """
         if self.accuracy_type == "place":
             return "city"
-        elif self.accuracy_type == "county":
+        if self.accuracy_type == "county":
             return "county"
-        else:
-            return None
+        if self.address_components.city:
+            return "city"
+        if self.address_components.county:
+            return "county"
+        return None
+
+
+def _get_best_result(response_item: dict) -> dict | None:
+    """Return the top geocoding result from a batch response item."""
+    nested_results = response_item.get("response", {}).get("results", [])
+    return nested_results[0] if nested_results else None
+
+
+def _get_batch_responses(client: Geocodio, addresses: list[str]) -> list[dict]:
+    """Fetch geocoding batch responses without relying on the client's buggy parser."""
+    raw_response = client._request(
+        "POST",
+        f"{client.BASE_PATH}/geocode",
+        params={},
+        json=addresses,
+        timeout=client.batch_timeout,
+    )
+    return raw_response.json().get("results", [])
 
 
 def _geocode_batch(
-    batch: pd.DataFrame, client: GeocodioClient, state_col: str, locality_col: str
+    batch: pd.DataFrame, client: Geocodio, state_col: str, locality_col: str
 ) -> pd.DataFrame:
     """Geocode a batch of addresses.
 
@@ -109,22 +134,24 @@ def _geocode_batch(
 
     Returns:
         dataframe with geocoded locality information
+
     """
+    batch = batch.copy()
     batch["address"] = batch[locality_col] + ", " + batch[state_col]
     try:
-        responses = client.geocode(batch["address"].tolist())
-    except GeocodioAuthError:
-        raise GeocodioAuthError(
+        responses = _get_batch_responses(client, batch["address"].tolist())
+    except AuthenticationError:
+        raise AuthenticationError(
             "Geocodio API key is invalid or you hit the daily geocoding limit which you can change in the Geocodio billing tab."
         )
 
     geocoded_localities = []
-    for r in responses:
-        results = r.get("results")
-        if results:
+    for response_item in responses:
+        best_result = _get_best_result(response_item)
+        if best_result is not None:
             # The results are always ordered with the most accurate locations first.
             # It is therefore always safe to pick the first result in the list.
-            ad = AddressData.parse_obj(results[0])
+            ad = AddressData.model_validate(best_result)
             geocoded_localities.append(
                 [ad.locality_name, ad.locality_type, ad.address_components.county]
             )
@@ -159,13 +186,15 @@ def _geocode_locality(
         batch_size: number of rows to geocode at once
     Returns:
         dataframe with geocoded locality information
+
     """
+    if Geocodio is None:
+        raise ModuleNotFoundError(
+            "geocodio-library-python is required to geocode localities."
+        )
+
     GEOCODIO_API_KEY = os.environ["GEOCODIO_API_KEY"]
-    # turn off automatic loading of latest Geocodio API version
-    # to ensure backwards compatibility
-    client = GeocodioClient(
-        GEOCODIO_API_KEY, version="1.9", auto_load_api_version=False
-    )
+    client = Geocodio(GEOCODIO_API_KEY)
 
     geocoded_results = []
 
