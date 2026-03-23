@@ -231,7 +231,7 @@ jobs:
         run: sudo chown -R runner:docker $GITHUB_WORKSPACE
 
       # commit the settings file to main only on branch pushes
-      - uses: EndBug/add-and-commit@v9
+      - uses: EndBug/add-and-commit@v10
         id: commit_settings_file
         if: ${{ steps.write_settings.outcome == 'success'
                 && github.event_name == 'push'
