@@ -83,7 +83,7 @@ def _get_fyi_projects(engine: sa.engine.Engine) -> pd.DataFrame:
 
 
 def _get_and_join_iso_tables(
-    engine: sa.engine.Engine, use_gridstatus=True, use_proprietary_offshore=True
+    engine: sa.engine.Engine, use_gridstatus=True, use_proprietary_offshore=False
 ) -> pd.DataFrame:
     """Get ISO projects.
 
@@ -272,8 +272,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         .nth(1)
         .rename(columns={"county_id_fips": "county_id_fips_2", "county": "county_2"})
     )
-    # Vineyard Wind 2 has 4 potential cable landing locations
-    assert projects.nth(2).shape[0] == 1, "More than 2 locations found for a project."
+    assert projects.nth(2).shape[0] == 0, "More than 2 locations found for a project."
 
     wide = pd.concat([loc1, loc2], axis=1, copy=False)
     wide = wide.sort_index()
@@ -333,6 +332,7 @@ def _add_derived_columns(mart: pd.DataFrame) -> None:
     mart["ordinance_is_restrictive"] = priority_ban.fillna(
         mart[secondary_ban_cols].fillna(False).any(axis=1)
     )
+
     # This categorizes any project with multiple generation or storage types as 'hybrid'
     mart["is_hybrid"] = (
         mart.groupby(["source", "project_id", "county_id_fips"])["resource_clean"]
@@ -388,7 +388,7 @@ def _add_derived_columns(mart: pd.DataFrame) -> None:
 def create_long_format(
     engine: sa.engine.Engine,
     active_projects_only: bool = True,
-    use_proprietary_offshore: bool = True,
+    use_proprietary_offshore: bool = False,
 ) -> pd.DataFrame:
     """Create table of ISO projects in long format.
 
@@ -451,7 +451,7 @@ def create_long_format(
 def create_fyi_long_format(
     engine: sa.engine.Engine,
     active_projects_only: bool = True,
-    use_proprietary_offshore: bool = True,
+    use_proprietary_offshore: bool = False,
 ):
     """Create long format FYI table."""
     fyi = _get_fyi_projects(engine)
@@ -465,7 +465,6 @@ def create_fyi_long_format(
     _estimate_proposed_power_co2e(fyi)
     all_counties = _get_county_fips_df(engine)
     all_states = _get_state_fips_df(engine)
-
     # model local opposition
     aggregator = CountyOpposition(
         engine=engine, county_fips_df=all_counties, state_fips_df=all_states
@@ -950,29 +949,28 @@ def get_eia860m_status_timeseries(
             "frequency must be 'M' (monthly), 'Q' (quarterly), or 'A' / 'Y' (annually)"
         )
 
-    last_report_date = (
-        pd.read_sql(
-            "SELECT max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog",
-            engine,
-        )
-        .iloc[0, 0]
-        .strftime("%Y-%m-%d")
+    last_report_date = pd.read_sql(
+        "SELECT max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog",
+        engine,
+    ).iloc[0, 0]
+
+    query = """
+SELECT
+    plant_id_eia,
+    generator_id,
+    operational_status_code,
+    capacity_mw,
+    min(report_date) AS start_date,
+    max(COALESCE(valid_until_date, timestamp %(last_report_date)s)) AS end_date
+FROM data_warehouse.pudl_eia860m_changelog
+GROUP BY 1, 2, 3, 4
+ORDER BY 1, 2, 3, 4
+"""
+    status_history = pd.read_sql(
+        query,
+        engine,
+        params={"last_report_date": last_report_date},
     )
-
-    query = f"""
-    SELECT
-        plant_id_eia,
-        generator_id,
-        operational_status_code,
-        capacity_mw,
-        min(report_date) AS start_date,
-        max(COALESCE(valid_until_date, timestamp '{last_report_date}')) AS end_date
-    FROM data_warehouse.pudl_eia860m_changelog
-    GROUP BY 1, 2, 3, 4
-    ORDER BY 1, 2, 3, 4
-    """
-
-    status_history = pd.read_sql(query, engine)
     # The date fields are literally the first day of each month but in reality they
     # represent the whole month. I want to convert them to intervals, but first I need
     # to change end_date to the last day of the month.
