@@ -8,7 +8,132 @@ from dbcp.transform.google_maps import GoogleGeocoder
 from dbcp.transform.helpers import add_county_fips_with_backup_geocoding
 
 
-class mock_geocoder(GoogleGeocoder):
+class MockRawResponse:
+    """Mock raw HTTP response returned by the official Geocodio client."""
+
+    def __init__(self, payload: dict[str, object]):
+        self._payload = payload
+
+    def json(self) -> dict[str, object]:
+        """Return the mocked JSON payload."""
+        return self._payload
+
+
+class MockGeocodioClient:
+    """Mock official Geocodio client."""
+
+    BASE_PATH = "v1.7"
+    batch_timeout = 30
+    responses = {
+        "richmond-nj, ny": {
+            "address_components": {"county": "Richmond County", "state": "NY"},
+            "formatted_address": "Richmond County, NY",
+            "location": {"lat": 0.0, "lng": 0.0},
+            "accuracy": 1.0,
+            "accuracy_type": "county",
+            "source": "geocodio",
+        },
+        "renssalear, ny": {
+            "address_components": {
+                "city": "Rensselaer",
+                "county": "Rensselaer County",
+                "state": "NY",
+            },
+            "formatted_address": "Rensselaer, NY",
+            "location": {"lat": 0.0, "lng": 0.0},
+            "accuracy": 1.0,
+            "accuracy_type": "place",
+            "source": "geocodio",
+        },
+        "fairfield, me": {
+            "address_components": {
+                "city": "Fairfield",
+                "county": "Somerset County",
+                "state": "ME",
+            },
+            "formatted_address": "Fairfield, ME",
+            "location": {"lat": 0.0, "lng": 0.0},
+            "accuracy": 1.0,
+            "accuracy_type": "place",
+            "source": "geocodio",
+        },
+        "northhampton, nc": {
+            "address_components": {"county": "Northampton County", "state": "NC"},
+            "formatted_address": "Northampton County, NC",
+            "location": {"lat": 0.0, "lng": 0.0},
+            "accuracy": 1.0,
+            "accuracy_type": "county",
+            "source": "geocodio",
+        },
+        "rio arriba, co": {
+            "address_components": {"county": "Rio Arriba County", "state": "NM"},
+            "formatted_address": "Rio Arriba County, NM",
+            "location": {"lat": 0.0, "lng": 0.0},
+            "accuracy": 1.0,
+            "accuracy_type": "county",
+            "source": "geocodio",
+        },
+        "sonoma, ca": {
+            "address_components": {
+                "city": "Sonoma",
+                "county": "Sonoma County",
+                "state": "CA",
+            },
+            "formatted_address": "Sonoma, CA",
+            "location": {"lat": 0.0, "lng": 0.0},
+            "accuracy": 1.0,
+            "accuracy_type": "place",
+            "source": "geocodio",
+        },
+        "random locality name, xx": None,
+        "rchmond, ny": {
+            "address_components": {"county": "Richmond County", "state": "NY"},
+            "formatted_address": "Richmond County, NY",
+            "location": {"lat": 0.0, "lng": 0.0},
+            "accuracy": 1.0,
+            "accuracy_type": "county",
+            "source": "geocodio",
+        },
+    }
+
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+
+    def _request(
+        self,
+        method: str,
+        endpoint: str,
+        params: dict[str, object],
+        json: list[str],
+        timeout: int | None = None,
+    ) -> MockRawResponse:
+        del method, endpoint, params, timeout
+        return MockRawResponse(
+            {
+                "results": [
+                    {
+                        "query": address,
+                        "response": {
+                            "results": [self.responses[address.lower()]]
+                            if self.responses[address.lower()] is not None
+                            else []
+                        },
+                    }
+                    for address in json
+                ]
+            }
+        )
+
+
+@pytest.fixture(autouse=True)
+def mock_official_geocodio_client(monkeypatch):
+    """Patch Geocodio lookups to use the official client's object response shape."""
+    geocodio.GEOCODER_CACHE.clear(warn=False)
+    monkeypatch.setenv("GEOCODIO_API_KEY", "test-key")
+    monkeypatch.setattr(geocodio, "Geocodio", MockGeocodioClient)
+
+
+class MockGeocoder(GoogleGeocoder):
     """Mock GoogleGeocoder class for testing."""
 
     def __init__(
@@ -19,7 +144,7 @@ class mock_geocoder(GoogleGeocoder):
         self._clear_cache()  # initialize attributes
 
         # mock gc.geocode_request(**request_kwargs)
-        if request_kwargs.get("country", None) is None:
+        if request_kwargs.get("country") is None:
             request_kwargs["country"] = "US"
         self._name = request_kwargs["name"]
         self._state = request_kwargs["state"]
@@ -74,7 +199,7 @@ def mock_geocoder_street_address() -> GoogleGeocoder:
         "partial_match": True,
         "types": ["establishment", "local_government_office", "point_of_interest"],
     }
-    return mock_geocoder(request_kwargs, resp)
+    return MockGeocoder(request_kwargs, resp)
 
 
 def mock_geocoder_town_and_county() -> GoogleGeocoder:
@@ -121,7 +246,7 @@ def mock_geocoder_town_and_county() -> GoogleGeocoder:
         "place_id": "ChIJRZO585GqB4gRZ-Wtajrhvo4",
         "types": ["locality", "political"],
     }
-    return mock_geocoder(request_kwargs, resp)
+    return MockGeocoder(request_kwargs, resp)
 
 
 def mock_geocoder_county() -> GoogleGeocoder:
@@ -164,7 +289,7 @@ def mock_geocoder_county() -> GoogleGeocoder:
         "place_id": "ChIJ_64qVYr3eIgRLLQnMg1825Y",
         "types": ["locality", "political"],
     }
-    return mock_geocoder(request_kwargs, resp)
+    return MockGeocoder(request_kwargs, resp)
 
 
 def mock_geocoder_county_explicit() -> GoogleGeocoder:
@@ -195,7 +320,7 @@ def mock_geocoder_county_explicit() -> GoogleGeocoder:
         # truncated ...
         "types": ["administrative_area_level_2", "political"],
     }
-    return mock_geocoder(request_kwargs, resp)
+    return MockGeocoder(request_kwargs, resp)
 
 
 def mock_geocoder_independent_city() -> GoogleGeocoder:
@@ -224,7 +349,7 @@ def mock_geocoder_independent_city() -> GoogleGeocoder:
         "place_id": "ChIJ7ZVLmwGFuokRXXOEtSJCVkw",
         "types": ["locality", "political"],
     }
-    return mock_geocoder(request_kwargs, resp)
+    return MockGeocoder(request_kwargs, resp)
 
 
 @pytest.mark.skip(
@@ -292,20 +417,6 @@ def test_geocode_locality(geocoder, expected):
     assert geocoder.admin_type == expected["admin_type"]
 
 
-@pytest.mark.skip(
-    reason="We're not reliant on the Google Geocoder right now. Keep as a backup option."
-)
-def test_GoogleGeocoder_init_and_properties():
-    """Test the init and @property decorators."""
-    empty = GoogleGeocoder()
-    with pytest.raises(AttributeError) as e:
-        empty.locality_name
-        assert str(e).endswith("Call geocode_request() first.")
-    full = GoogleGeocoder()
-    full._response = mock_geocoder_town_and_county()._response
-    assert full.locality_name == "Westport"
-
-
 def test_add_county_fips_with_backup_geocoding_empty_df():
     """Test add_county_fips_with_backup_geocoding with an empty DataFrame."""
     empty_df = pd.DataFrame(columns=["state", "county"])
@@ -369,14 +480,12 @@ def test_add_county_fips_with_backup_geocoding_empty_df():
                 "geocoded_containing_county": "Sonoma County",
             },
         ),
-        # TODO: fix this / catch unknown location when official
-        # python client library is integrated
         pytest.param(
             {"state": "XX", "county": "Random locality name"},
             {
-                "geocoded_locality_name": "Nome",
-                "geocoded_locality_type": "city",
-                "geocoded_containing_county": "Nome Census Area",
+                "geocoded_locality_name": None,
+                "geocoded_locality_type": None,
+                "geocoded_containing_county": None,
             },
         ),
     ],
