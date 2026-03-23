@@ -4,14 +4,12 @@ import os
 from enum import Enum
 
 import pandas as pd
+from geocodio import Geocodio
+from geocodio.exceptions import AuthenticationError
 from joblib import Memory
 from pydantic import BaseModel, confloat
 
 from dbcp.constants import DATA_DIR
-
-from geocodio import Geocodio
-from geocodio.exceptions import AuthenticationError
-
 
 geocoder_local_cache = DATA_DIR / "geocodio_cache"
 # create geocoder_local_cache if it doesn't exist
