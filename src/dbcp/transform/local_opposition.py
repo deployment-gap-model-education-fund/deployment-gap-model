@@ -97,9 +97,6 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
     for col in string_cols:
         local.loc[:, col] = local.loc[:, col].str.strip()
 
-    # TODO: check if Saratoga County still needs a correction
-    # after the Geocodio official client migration.
-    # manual corrections
     location_corrections = {
         "Batavia Township (Clermont County)": "Branch County",
         "Town of Albion (Kennebec County)": "Albion (Kennebec County)",

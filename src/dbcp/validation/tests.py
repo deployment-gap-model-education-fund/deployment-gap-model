@@ -73,9 +73,9 @@ def test_gridstatus_fips_coverage(engine: Engine):
     location_coverage = gridstatus_locations.county_id_fips.isna().sum() / len(
         gridstatus_locations
     )
-    assert (
-        location_coverage < 0.04
-    ), "More than 4 percent of Grid Status locations could not be geocoded."
+    assert location_coverage < 0.04, (
+        "More than 4 percent of Grid Status locations could not be geocoded."
+    )
 
 
 def test_fyi_fips_coverage(engine: Engine):
@@ -83,15 +83,15 @@ def test_fyi_fips_coverage(engine: Engine):
     with engine.connect() as con:
         fyi_locations = pd.read_sql_table("fyi_locations", con, schema="data_warehouse")
     location_coverage = fyi_locations.county_id_fips.isna().sum() / len(fyi_locations)
-    assert (
-        location_coverage < 0.02
-    ), "More than 2 percent of FYI locations could not be geocoded."
+    assert location_coverage < 0.02, (
+        "More than 2 percent of FYI locations could not be geocoded."
+    )
 
 
 def test_iso_projects_sources(engine: Engine):
     """Check that the right resources come from the right sources."""
     # all offshore wind projects from the proprietary source
-    proprietary_offshore = """
+    offshore = """
     SELECT
         source,
         count(*) as n_offshore
@@ -99,16 +99,14 @@ def test_iso_projects_sources(engine: Engine):
     where resource_clean ~* 'offshore'
     group by 1
     """
-    expected_source = {"proprietary"}
-    offshore_test = pd.read_sql(
-        proprietary_offshore, engine, index_col="source"
-    ).squeeze(
+    expected_source = {"gridstatus", "lbnl"}
+    offshore_test = pd.read_sql(offshore, engine, index_col="source").squeeze(
         axis=1
     )  # make series
     actual_source = set(offshore_test.index)
-    assert (
-        actual_source == expected_source
-    ), f"Found offshore wind projects from the wrong source. {offshore_test}"
+    assert actual_source == expected_source, (
+        f"Found offshore wind projects from the wrong (proprietary) source. {offshore_test}"
+    )
 
     # all ISO projects from the gridstatus source
     iso_projects = """
@@ -122,9 +120,9 @@ def test_iso_projects_sources(engine: Engine):
     expected_source = {"gridstatus"}  # region is currently NULL for offshore wind
     iso_test = pd.read_sql(iso_projects, engine, index_col="source").squeeze(axis=1)
     actual_source = set(iso_test.index)
-    assert (
-        actual_source == expected_source
-    ), f"Found ISO projects from the wrong source. {iso_test}"
+    assert actual_source == expected_source, (
+        f"Found ISO projects from the wrong source. {iso_test}"
+    )
     # remaining projects from LBNL (non-ISO, non-offshore)
     return
 
@@ -158,7 +156,6 @@ def test_iso_projects_capacity_aggs(engine: Engine):
         LEFT JOIN data_warehouse.iso_locations as loc
         ON proj.project_id = loc.project_id
         WHERE proj.region !~* 'ercot|miso|nyiso|pjm|spp|isone'
-            AND resource_clean != 'Offshore Wind'
             AND proj.queue_status = 'active'
         group by 1, 2
     ),
@@ -173,29 +170,14 @@ def test_iso_projects_capacity_aggs(engine: Engine):
         ON proj.project_id = res.project_id
         LEFT JOIN data_warehouse.gridstatus_locations as loc
         ON proj.project_id = loc.project_id
-        WHERE resource_clean not in ('Offshore Wind', 'Transmission')
+        WHERE resource_clean not in ('Transmission')
             AND proj.queue_status = 'active'
             AND proj.region ~* 'ercot|miso|nyiso|pjm|spp|isone'
-        group by 1, 2
-    ),
-    offshore as (
-        select
-            'proprietary' as source,
-            'Offshore Wind' as resource_clean,
-            count(*) as n_project_locations,
-            sum(proj.capacity_mw) as capacity_double_count_county
-        FROM data_warehouse.offshore_wind_projects as proj
-        LEFT JOIN data_warehouse.offshore_wind_cable_landing_association as loc
-        ON proj.project_id = loc.project_id
-        WHERE coalesce(proj.construction_status, 'TBD') IN
-            ('Not started', 'Construction underway', 'Site assessment underway', 'TBD')
         group by 1, 2
     )
     select * from lbnl
     UNION ALL
     select * from gridstatus
-    UNION ALL
-    select * from offshore
     order by 1, 2
     """
     data_mart = pd.read_sql(
@@ -207,9 +189,9 @@ def test_iso_projects_capacity_aggs(engine: Engine):
     absolute_diff = data_mart - source
     relative_diff = absolute_diff / source
 
-    assert (
-        relative_diff.lt(1e-5).all().all()
-    ), f"Aggregate resource metrics have a large relative difference: {relative_diff}"
+    assert relative_diff.lt(1e-5).all().all(), (
+        f"Aggregate resource metrics have a large relative difference: {relative_diff}"
+    )
     return
 
 
@@ -230,15 +212,15 @@ def test_county_commission_election_info(engine: Engine):
         df = pd.read_sql_table(
             "county_commission_election_info", con, schema="data_mart"
         ).convert_dtypes()
-    assert (
-        df.next_primary_total_n_seats >= df.next_primary_total_n_races
-    ).all(), "Found more races than seats in county_commission_election_info!"
-    assert (
-        df.next_general_total_n_seats >= df.next_general_total_n_races
-    ).all(), "Found more races than seats in county_commission_election_info!"
-    assert (
-        df.next_run_off_total_n_seats >= df.next_run_off_total_n_races
-    ).all(), "Found more races than seats in county_commission_election_info!"
+    assert (df.next_primary_total_n_seats >= df.next_primary_total_n_races).all(), (
+        "Found more races than seats in county_commission_election_info!"
+    )
+    assert (df.next_general_total_n_seats >= df.next_general_total_n_races).all(), (
+        "Found more races than seats in county_commission_election_info!"
+    )
+    assert (df.next_run_off_total_n_seats >= df.next_run_off_total_n_races).all(), (
+        "Found more races than seats in county_commission_election_info!"
+    )
 
 
 def test_county_wide_coverage(engine: Engine):
@@ -249,9 +231,9 @@ def test_county_wide_coverage(engine: Engine):
     n_counties = pd.read_sql(
         "SELECT count(*) FROM data_warehouse.county_fips", engine
     ).squeeze()
-    assert (
-        df.shape[0] == n_counties
-    ), "counties_wide_format does not contain all counties"
+    assert df.shape[0] == n_counties, (
+        "counties_wide_format does not contain all counties"
+    )
     notnull = df.notnull()
     n_expected_counties = 2458
     n_notnull_counties = notnull.any(axis=1).sum()
@@ -312,27 +294,25 @@ def test_county_long_vs_wide(engine: Engine):
         wide_format_technical.notnull().any(axis=1)
     ].nunique()
     n_counties_long = shorter_long_format["county_id_fips"].nunique()
-    assert (
-        n_counties_wide == n_counties_long
-    ), "counties_wide_format and counties_long_format have different county coverage"
+    assert n_counties_wide == n_counties_long, (
+        "counties_wide_format and counties_long_format have different county coverage"
+    )
 
     # check project counts
     def _condition(col: str) -> bool:
         is_count = col.endswith("_count")
         # want to remove category aggregates to avoid double counting with the individual categories
-        is_combined_aggregate = (
-            col.startswith("fossil_")
-            or col.startswith("renewable_")
-            or col.startswith("infra_total_")
+        is_combined_aggregate = col.startswith(
+            ("fossil_", "renewable_", "infra_total_")
         )
         return is_count and not is_combined_aggregate
 
     count_cols = [col for col in wide_format_technical.columns if _condition(col)]
     wide_project_counts = wide_format_technical.loc[:, count_cols].sum().sum()
     long_project_counts = shorter_long_format["facility_count"].sum()
-    assert (
-        long_project_counts == wide_project_counts
-    ), "counties_long_format has fewer projects than counties_wide_format"
+    assert long_project_counts == wide_project_counts, (
+        "counties_long_format has fewer projects than counties_wide_format"
+    )
 
 
 def test_manual_ordinance_fips_coverage(engine: Engine):
