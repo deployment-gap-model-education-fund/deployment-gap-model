@@ -434,7 +434,6 @@ def create_long_format(
     long_format = iso.merge(
         combined_opp, on="county_id_fips", how="left", validate="m:1"
     )
-    long_format = iso.copy()
     _add_derived_columns(long_format)
     long_format["surrogate_id"] = range(len(long_format))
 
@@ -487,7 +486,6 @@ def create_fyi_long_format(
     long_format = fyi.merge(
         combined_opp, on="county_id_fips", how="left", validate="m:1"
     )
-    long_format = fyi.copy()
     _add_derived_columns(long_format)
     if active_projects_only:
         active_long_format = long_format.query("queue_status == 'active'")
