@@ -616,7 +616,7 @@ def create_long_format(
     # join it all
     out = pd.concat([projects, existing, infra], axis=0, ignore_index=True)
     out = out.merge(county_properties, on="county_id_fips", how="left")
-    # out = _add_derived_columns(out)
+    out = _add_derived_columns(out)
     return out
 
 
@@ -789,7 +789,7 @@ def _join_all_counties_to_wide_format(
     # this exists to create a row for every county, even if it is all nulls.
     # The long format data does not include rows for all counties, so
     # _convert_long_to_wide does not produce a row for each county.
-    # county_properties = _add_derived_columns(county_properties)
+    county_properties = _add_derived_columns(county_properties)
 
     county_properties = county_properties.merge(
         wide_format,
@@ -1032,7 +1032,6 @@ def create_data_mart(
         Dict[str, pd.DataFrame]: county tables in both wide and long format
 
     """
-    return {}
     postgres_engine = engine
     if postgres_engine is None:
         postgres_engine = get_sql_engine()

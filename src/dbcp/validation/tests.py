@@ -349,9 +349,9 @@ def validate_warehouse(engine: Engine):
 def validate_data_mart(engine: Engine):
     """Run data mart validation tests."""
     logger.info("Validating data mart")
-    # test_county_long_vs_wide(engine)
-    # test_county_wide_coverage(engine)
-    # test_iso_projects_data_mart(engine)
+    test_county_long_vs_wide(engine)
+    test_county_wide_coverage(engine)
+    test_iso_projects_data_mart(engine)
     test_county_commission_election_info(engine)
 
 
