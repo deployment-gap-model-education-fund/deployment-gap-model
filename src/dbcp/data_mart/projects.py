@@ -332,7 +332,6 @@ def _add_derived_columns(mart: pd.DataFrame) -> None:
     mart["ordinance_is_restrictive"] = priority_ban.fillna(
         mart[secondary_ban_cols].fillna(False).any(axis=1)
     )
-
     # This categorizes any project with multiple generation or storage types as 'hybrid'
     mart["is_hybrid"] = (
         mart.groupby(["source", "project_id", "county_id_fips"])["resource_clean"]

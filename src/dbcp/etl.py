@@ -17,7 +17,7 @@ from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.helpers import write_to_postgres
 from dbcp.transform.fips_tables import SPATIAL_CACHE
 from dbcp.transform.helpers import GEOCODER_CACHES
-from dbcp.validation.tests import validate_data_mart, validate_warehouse
+from dbcp.validation.tests import validate_warehouse
 
 logger = logging.getLogger(__name__)
 
@@ -267,26 +267,26 @@ def run_etl(funcs: dict[str, Callable], schema_name: str):
 def create_data_warehouse():
     """Create data warehouse tables by ETL-ing each data source."""
     etl_funcs = {
-        "offshore_wind": etl_offshore_wind,
-        "gridstatus": etl_gridstatus_isoqueues,
-        "manual_ordinances": etl_manual_ordinances,
-        "epa_avert": etl_epa_avert,
-        "eip_infrastructure": etl_eip_infrastructure,
-        "columbia_local_opp": etl_columbia_local_opp,
-        "energy_communities_by_county": etl_energy_communities_by_county,
+        # "offshore_wind": etl_offshore_wind,
+        # "gridstatus": etl_gridstatus_isoqueues,
+        # "manual_ordinances": etl_manual_ordinances,
+        # "epa_avert": etl_epa_avert,
+        # "eip_infrastructure": etl_eip_infrastructure,
+        # "columbia_local_opp": etl_columbia_local_opp,
+        # "energy_communities_by_county": etl_energy_communities_by_county,
         "fips_tables": etl_fips_tables,
-        "protected_area_by_county": etl_protected_area_by_county,
-        "justice40_tracts": etl_justice40,
-        "nrel_wind_solar_ordinances": etl_nrel_ordinances,
-        "lbnl_iso_queue": etl_lbnl_iso_queue,
+        # "protected_area_by_county": etl_protected_area_by_county,
+        # "justice40_tracts": etl_justice40,
+        # "nrel_wind_solar_ordinances": etl_nrel_ordinances,
+        # "lbnl_iso_queue": etl_lbnl_iso_queue,
         "pudl": etl_pudl_tables,
-        "ncsl_state_permitting": etl_ncsl_state_permitting,
+        # "ncsl_state_permitting": etl_ncsl_state_permitting,
         "ballot_ready": etl_ballot_ready,
     }
     run_etl(etl_funcs, "data_warehouse")
     # Run private ETL functions
     etl_funcs = {
-        "acp_projects": etl_acp_projects,
+        # "acp_projects": etl_acp_projects,
         "fyi_queue": etl_fyi_queue,
     }
     run_etl(etl_funcs, "private_data_warehouse")
@@ -377,11 +377,11 @@ def etl(schema="all"):
     if (schema == "data_warehouse") or (schema == "all"):
         create_data_warehouse()
         validate_warehouse(engine=engine)
-    if (schema == "data_mart") or (schema == "all"):
-        create_data_mart(engine=engine)
-        validate_data_mart(engine=engine)
-    if schema == "private_data_mart":
-        create_data_mart(engine=engine, private_only=True)
+    # if (schema == "data_mart") or (schema == "all"):
+    #     create_data_mart(engine=engine)
+    #     validate_data_mart(engine=engine)
+    # if schema == "private_data_mart":
+    #     create_data_mart(engine=engine, private_only=True)
 
     logger.info("Sucessfully finished ETL.")
 
