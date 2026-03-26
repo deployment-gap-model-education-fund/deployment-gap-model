@@ -41,6 +41,7 @@ def add_actionable_and_nearly_certain_classification(
         "IA Executed",
         "Operational",
     }
+    queue = queue.copy()
     queue["is_actionable"] = (
         queue[status_col].isin(actionable_ia_statuses).fillna(False)
     )
@@ -216,7 +217,7 @@ def normalize_point_of_interconnection(ser: pd.Series) -> pd.Series:
         index=out.index,
         dtype="string",
     ).str.strip()
-    out.replace("", pd.NA, inplace=True)
+    out = out.replace("", pd.NA)
     return out
 
 
@@ -227,6 +228,7 @@ def parse_date_columns(queue: pd.DataFrame) -> None:
 
     Args:
         queue (pd.DataFrame): an LBNL ISO queue dataframe
+
     """
     date_cols = [
         col
@@ -242,7 +244,7 @@ def parse_date_columns(queue: pd.DataFrame) -> None:
     rename_dict: dict[str, str] = dict(
         zip(date_cols, [col + "_raw" for col in date_cols])
     )
-    queue.rename(columns=rename_dict, inplace=True)
+    queue.columns = [rename_dict.get(col, col) for col in queue.columns]
 
     for date_col, raw_col in rename_dict.items():
         if pd.api.types.is_object_dtype(queue.loc[:, raw_col]):

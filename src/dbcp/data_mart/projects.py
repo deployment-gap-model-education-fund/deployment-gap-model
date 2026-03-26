@@ -203,7 +203,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
 
     # combine the storage_type column for these dupe storage projects
     storage_concat = long.groupby(group_keys, dropna=False)["storage_type"].transform(
-        lambda s: " + ".join(pd.unique([x for x in s.dropna() if x != ""]))
+        lambda s: " + ".join(dict.fromkeys(x for x in s.dropna() if x != ""))
     )
     # Count how many storage rows per group
     storage_count = (
@@ -329,10 +329,11 @@ def _add_derived_columns(mart: pd.DataFrame) -> None:
         "ordinance_via_solar_nrel",
         "ordinance_via_wind_nrel",
     ]
-    mart["ordinance_is_restrictive"] = priority_ban.fillna(
-        mart[secondary_ban_cols].fillna(False).any(axis=1)
+    priority_ban = priority_ban.astype("boolean")
+    secondary_bans = (
+        mart[secondary_ban_cols].astype("boolean").fillna(False).any(axis=1)
     )
-
+    mart["ordinance_is_restrictive"] = priority_ban.fillna(secondary_bans)
     # This categorizes any project with multiple generation or storage types as 'hybrid'
     mart["is_hybrid"] = (
         mart.groupby(["source", "project_id", "county_id_fips"])["resource_clean"]
@@ -548,6 +549,7 @@ def create_total_active_project_change_logs(
         if pd.isna(end):
             end = max_date
 
+        freq = {"Q": "QE", "M": "ME", "Y": "YE", "A": "YE"}.get(freq, freq)
         periods = pd.date_range(start=start, end=end, freq=freq, normalize=True)
         return periods
 
@@ -617,7 +619,10 @@ def create_geography_change_log(
     """
     group_keys = [
         geography,
-        pd.Grouper(key="effective_date", freq=freq),
+        pd.Grouper(
+            key="effective_date",
+            freq={"Q": "QE", "M": "ME", "Y": "YE", "A": "YE"}.get(freq, freq),
+        ),
         "queue_status",
         "resource_class",
     ]
@@ -678,7 +683,9 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
     )
 
     # Not all ISO regions have operational and withdrawn dates which are required to make a full change log.
-    long_format = long_format[long_format["iso_region"].isin(CHANGE_LOG_REGIONS)]
+    long_format = long_format.loc[
+        long_format["iso_region"].isin(CHANGE_LOG_REGIONS)
+    ].copy()
 
     # make sure we are missing less than 11% of withdrawn_date
     withdrawn = long_format.query("queue_status == 'withdrawn'")
@@ -688,16 +695,13 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
     ), f"More than {expected_missing} of withdrawn_date is missing."
 
     # For operational projects, fill in missing actual_completion_date with date_proposed_online
-    operational = long_format.query("queue_status == 'operational'")
-    operational["actual_completion_date"] = operational[
-        "actual_completion_date"
-    ].fillna(operational["date_proposed_online"])
-    long_format.loc[operational.index, "actual_completion_date"] = operational[
-        "actual_completion_date"
-    ]
+    operational = long_format["queue_status"].eq("operational")
+    long_format.loc[operational, "actual_completion_date"] = long_format.loc[
+        operational, "actual_completion_date"
+    ].fillna(long_format.loc[operational, "date_proposed_online"])
 
     # make sure we are missing less than 10% of actual_completion_date
-    operational = long_format.query("queue_status == 'operational'")
+    operational = long_format.loc[long_format["queue_status"].eq("operational")]
     expected_missing = 0.1
     assert (
         operational["actual_completion_date"].isna().sum() / len(operational)
@@ -791,7 +795,23 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
     operational_active["end_date"] = operational_active["actual_completion_date"]
 
     # combine the withdrawn_active dataframe with the long_format dataframe
-    long_format = pd.concat([long_format, withdrawn_active, operational_active])
+    all_long_format_columns = pd.Index(
+        sorted(
+            {
+                col
+                for df in (long_format, withdrawn_active, operational_active)
+                for col in df.columns
+            }
+        )
+    )
+    concat_ready = [
+        df.dropna(axis="columns", how="all")
+        for df in (long_format, withdrawn_active, operational_active)
+        if not df.empty
+    ]
+    long_format = pd.concat(concat_ready, ignore_index=True).reindex(
+        columns=all_long_format_columns
+    )
 
     # drop withdrawn_date, actual_completion_date and date_entered_queue columns
     long_format = long_format.drop(
@@ -988,15 +1008,15 @@ ORDER BY 1, 2, 3, 4
     last_end_date = pd.Timestamp(last_report_date) + pd.offsets.MonthEnd()
 
     if frequency in ("A", "Y"):
-        freq_end, period_freq = "Y", "A"
+        freq_end, period_freq = "YE", "Y"
         period_name = "year"
         period_ct = lookback_years
     elif frequency == "Q":
-        freq_end, period_freq = "Q", "Q"
+        freq_end, period_freq = "QE", "Q"
         period_name = "quarter"
         period_ct = lookback_years * 4
     elif frequency == "M":
-        freq_end, period_freq = "M", "M"
+        freq_end, period_freq = "ME", "M"
         period_name = "month"
         period_ct = lookback_years * 12
 

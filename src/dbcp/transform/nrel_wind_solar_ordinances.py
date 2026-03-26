@@ -71,12 +71,12 @@ def _replace_multivalued_with_worst_case(
 ) -> None:
     # currently assumes all multivalued entries are marked with either "/" or "-"
     # Will raise error if any other values fail to convert to numeric.
-    is_multivalued = values.str.contains("/|-").fillna(False)
-    lower_is_worse = (
-        value_types.str.lower().str.contains("dba").fillna(False)
+    is_multivalued = values.str.contains("/|-", regex=True, na=False)
+    lower_is_worse = value_types.str.lower().str.contains(
+        "dba", regex=False, na=False
     )  # sound restrictions
-    higher_is_worse = (
-        value_types.str.lower().str.contains("meters").fillna(False)
+    higher_is_worse = value_types.str.lower().str.contains(
+        "meters", regex=False, na=False
     )  # setbacks
     replace_with_min = is_multivalued & lower_is_worse
     replace_with_max = is_multivalued & higher_is_worse
@@ -84,14 +84,14 @@ def _replace_multivalued_with_worst_case(
     assert replace_with_min.sum() + replace_with_max.sum() == is_multivalued.sum(), (
         err_msg
     )
+    replacement_parts = [
+        _convert_multivalued_to_extreme_value(values.loc[replace_with_min]),
+        _convert_multivalued_to_extreme_value(
+            values.loc[replace_with_max], use_minimum=False
+        ),
+    ]
     replacements = pd.concat(
-        [
-            _convert_multivalued_to_extreme_value(values.loc[replace_with_min]),
-            _convert_multivalued_to_extreme_value(
-                values.loc[replace_with_max], use_minimum=False
-            ),
-        ],
-        axis=0,
+        [part for part in replacement_parts if not part.empty], axis=0
     )
     values.update(replacements.astype(values.dtype))
     return
@@ -106,9 +106,10 @@ def _convert_linear_expr_to_constant(values: pd.Series, x_meters=151.0) -> pd.Se
     built just shorter than this (at least as of 2019 when I was in the industry).
     """
     pattern = r"(?P<multiplier>\d\.?\d*) ?\+ ?(?P<offset>\d+\.?\d*)\s?(?P<unit>\w*)"  # capture A, b and the unit from "1.5 + 22.86 meters"
-    expr_df = values.str.extract(pattern, expand=True)
-    for col in ["multiplier", "offset"]:
-        expr_df.loc[:, col] = pd.to_numeric(expr_df.loc[:, col])
+    expr_df = values.str.extract(pattern, expand=True).assign(
+        multiplier=lambda df: pd.to_numeric(df["multiplier"]),
+        offset=lambda df: pd.to_numeric(df["offset"]),
+    )
     # unit conversion: feet to meters
     expr_df.loc[:, "offset"] = expr_df.loc[:, "offset"].where(
         expr_df.loc[:, "unit"].str.lower().eq("meters"),
@@ -121,12 +122,12 @@ def _convert_linear_expr_to_constant(values: pd.Series, x_meters=151.0) -> pd.Se
 def _replace_linear_definitions_with_constants(
     values: pd.Series, value_types: pd.Series, new_type="meters"
 ) -> None:
-    is_linear = values.str.contains(r"\+", regex=True).fillna(False)
+    is_linear = values.str.contains(r"\+", regex=True, na=False)
     err_msg = "Assumption violation: expected all linear setbacks to be defined in terms of max tip height."
     assert value_types.loc[is_linear].eq("max tip height multiplier").all(), err_msg
     replacements = _convert_linear_expr_to_constant(values.loc[is_linear])
     values.update(replacements.astype(values.dtype))
-    value_types.loc[is_linear] = new_type
+    value_types.update(pd.Series(new_type, index=value_types.index[is_linear]))
     return
 
 
@@ -307,10 +308,18 @@ def local_wind_transform(raw_local_wind: pd.DataFrame) -> pd.DataFrame:
     )
     wind["energy_type"] = "wind"
 
-    year_cols = ["year_enacted", "year_recorded", "updated_year_recorded"]
-    for col in ["value"] + year_cols:
-        wind.loc[:, col] = pd.to_numeric(wind.loc[:, col], downcast="float")
-    wind.loc[:, year_cols] = wind.loc[:, year_cols].astype(pd.Int16Dtype())
+    wind = wind.assign(
+        value=pd.to_numeric(wind["value"], downcast="float"),
+        year_enacted=pd.to_numeric(wind["year_enacted"], downcast="float").astype(
+            pd.Int16Dtype()
+        ),
+        year_recorded=pd.to_numeric(wind["year_recorded"], downcast="float").astype(
+            pd.Int16Dtype()
+        ),
+        updated_year_recorded=pd.to_numeric(
+            wind["updated_year_recorded"], downcast="float"
+        ).astype(pd.Int16Dtype()),
+    )
 
     wind["combined_locality"] = (
         wind["raw_county_name"].add(" County").fillna(wind["raw_town_name"])
@@ -357,10 +366,18 @@ def local_solar_transform(raw_local_solar: pd.DataFrame) -> pd.DataFrame:
     _replace_multivalued_with_worst_case(solar.loc[:, "value"], solar.loc[:, "units"])
     solar["energy_type"] = "solar"
 
-    year_cols = ["year_enacted", "year_recorded", "updated_year_recorded"]
-    for col in ["value"] + year_cols:
-        solar.loc[:, col] = pd.to_numeric(solar.loc[:, col], downcast="float")
-    solar.loc[:, year_cols] = solar.loc[:, year_cols].astype(pd.Int16Dtype())
+    solar = solar.assign(
+        value=pd.to_numeric(solar["value"], downcast="float"),
+        year_enacted=pd.to_numeric(solar["year_enacted"], downcast="float").astype(
+            pd.Int16Dtype()
+        ),
+        year_recorded=pd.to_numeric(solar["year_recorded"], downcast="float").astype(
+            pd.Int16Dtype()
+        ),
+        updated_year_recorded=pd.to_numeric(
+            solar["updated_year_recorded"], downcast="float"
+        ).astype(pd.Int16Dtype()),
+    )
 
     solar["combined_locality"] = (
         solar["raw_county_name"].add(" County").fillna(solar["raw_town_name"])

@@ -148,18 +148,20 @@ def multiformat_string_date_parser(
         r"^(199\d|20[0123]\d)$", lambda x: f"07/01/{x.group(1)}", regex=True
     )
     # separate numeric encodings from string encodings
-    is_numeric_string = dates.str.isnumeric().fillna(False)
+    is_numeric_string = dates.str.isnumeric().astype("boolean").fillna(False)
     date_strings = dates.loc[~is_numeric_string]
 
     # parse strings
-    parsed_dates = pd.to_datetime(date_strings, errors="coerce", utc=True)
+    parsed_dates = pd.to_datetime(
+        date_strings, errors="coerce", utc=True, format="mixed"
+    )
     remaining_nan = parsed_dates.isna().sum()
     while remaining_nan > 0:
         nans = parsed_dates.isna()
         nan_to_dates = pd.to_datetime(
             date_strings[nans], errors="coerce", format="mixed", dayfirst=False
         )
-        parsed_dates = parsed_dates.fillna(nan_to_dates)
+        parsed_dates = parsed_dates.combine_first(nan_to_dates)
         new_remaining_nan = nans.sum()
         if new_remaining_nan == remaining_nan:  # no improvement
             # try specific weird formats
@@ -172,7 +174,7 @@ def multiformat_string_date_parser(
                 nan_to_dates = pd.to_datetime(
                     date_strings[nans], format=fmt, errors="coerce"
                 )
-                parsed_dates = parsed_dates.fillna(nan_to_dates)
+                parsed_dates = parsed_dates.combine_first(nan_to_dates)
                 nans = parsed_dates.isna()
                 if nans.sum() == 0:
                     break

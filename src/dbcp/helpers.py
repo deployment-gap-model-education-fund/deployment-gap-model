@@ -3,7 +3,7 @@
 import csv
 import logging
 import os
-from datetime import timezone
+from datetime import UTC
 from io import StringIO
 from pathlib import Path
 
@@ -117,6 +117,7 @@ def get_pyarrow_schema_from_metadata(table_name: str, schema: str) -> pa.Schema:
 
 def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str):
     """Apply dtypes to a dataframe using the sqlalchemy metadata."""
+    df = df.copy()
     table_name = f"{schema}.{table_name}"
     metadata = get_schema_sql_alchemy_metadata(schema)
     try:
@@ -132,9 +133,7 @@ def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str):
             if not pd.api.types.is_datetime64_any_dtype(df[col.name]):
                 df[col.name] = pd.to_datetime(df[col.name], errors="coerce")
             # drop the timezone in order to enable migration to Postgres.
-            if (df[col.name].dt.tz is not None) and (
-                df[col.name].dt.tz != timezone.utc
-            ):
+            if (df[col.name].dt.tz is not None) and (df[col.name].dt.tz != UTC):
                 logger.error(
                     f"Non-UTC timezone encountered in column {col.name} "
                     "while enforcing dtypes before postgres migration. "

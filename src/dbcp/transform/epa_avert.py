@@ -1,4 +1,5 @@
 """Transform EPA AVERT avoided emissions database."""
+
 import logging
 
 import numpy as np
@@ -10,7 +11,7 @@ logger = logging.getLogger(__name__)
 def _capacity_factor_transform(cap_factors: pd.DataFrame) -> pd.DataFrame:
     """Transform capacity factors table."""
     cap_factors = (
-        cap_factors.replace("-", np.nan)
+        cap_factors.mask(cap_factors.eq("-"), np.nan)
         .melt(
             id_vars=["avert_region"],
             var_name="resource_type",
@@ -33,7 +34,7 @@ def _emissions_transform(emissions: pd.DataFrame) -> pd.DataFrame:
     """Transform emissions table."""
     lbs_to_tonnes = 1 / 2204.62
     emissions = (
-        emissions.replace("-", np.nan)
+        emissions.mask(emissions.eq("-"), np.nan)
         # remove energy efficiency columns
         .drop(columns=[col for col in emissions.columns if col.endswith("_ee")])
         .melt(
@@ -67,6 +68,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     Returns:
         Dict[str, pd.DataFrame]: output dictionary of dataframes
+
     """
     cap_factors = _capacity_factor_transform(raw_dfs["avert_capacity_factors"])
     emissions = _emissions_transform(raw_dfs["avert_emissions_factors"])

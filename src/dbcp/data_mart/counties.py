@@ -446,9 +446,11 @@ def _add_derived_columns(mart: pd.DataFrame) -> pd.DataFrame:
         "ordinance_via_solar_nrel",
         "ordinance_via_wind_nrel",
     ]
-    out["ordinance_is_restrictive"] = priority_ban.fillna(
-        mart[secondary_ban_cols].fillna(False).any(axis=1)
+    priority_ban = priority_ban.astype("boolean")
+    secondary_bans = (
+        mart[secondary_ban_cols].astype("boolean").fillna(False).any(axis=1)
     )
+    out["ordinance_is_restrictive"] = priority_ban.fillna(secondary_bans)
 
     return out
 
@@ -771,12 +773,18 @@ def _get_county_properties(
     )
     #  EC data currently only includes counties that have qualifying features.
     #  Fill in nulls for counties that do not qualify.
-    county_properties = county_properties.fillna(
-        {
-            "energy_community_coal_closures_area_fraction": 0.0,
-            "energy_community_qualifies_via_employment": False,
-            "energy_community_qualifies": False,
-        },
+    county_properties = county_properties.assign(
+        energy_community_coal_closures_area_fraction=county_properties[
+            "energy_community_coal_closures_area_fraction"
+        ].fillna(0.0),
+        energy_community_qualifies_via_employment=county_properties[
+            "energy_community_qualifies_via_employment"
+        ]
+        .astype("boolean")
+        .fillna(False),
+        energy_community_qualifies=county_properties["energy_community_qualifies"]
+        .astype("boolean")
+        .fillna(False),
     )
 
     county_properties = county_properties.rename(columns=rename_dict)

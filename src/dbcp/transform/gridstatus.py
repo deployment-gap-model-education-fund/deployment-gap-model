@@ -552,7 +552,7 @@ def _create_project_status_classification_from_single_column(
     iso_df["is_nearly_certain"] = pd.NA
 
     is_active = iso_df["queue_status"].eq("Active")
-    active_projects = iso_df[is_active]
+    active_projects = iso_df.loc[is_active].copy()
 
     active_projects["is_actionable"] = (
         active_projects[status_col].isin(actionable_vals).fillna(False)
@@ -606,7 +606,7 @@ def _create_project_status_classification_from_multiple_columns(
     iso_df["is_nearly_certain"] = pd.NA
 
     is_active = iso_df["queue_status"].eq("Active")
-    active_projects = iso_df[is_active]
+    active_projects = iso_df.loc[is_active].copy()
 
     active_projects["is_nearly_certain"] = status_df.loc[:, "executed_ia"]
     active_projects["is_actionable"] = (
@@ -1128,7 +1128,15 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         renamed_df["entity"] = iso.upper()
         projects.append(renamed_df)
 
-    projects = pd.concat(projects)
+    all_project_columns = pd.Index(
+        sorted({col for df in projects for col in df.columns})
+    )
+    concat_ready = [
+        df.dropna(axis="columns", how="all") for df in projects if not df.empty
+    ]
+    projects = pd.concat(concat_ready, ignore_index=True).reindex(
+        columns=all_project_columns
+    )
     projects["queue_status"] = projects.queue_status.str.lower()
     projects["queue_status"] = projects["queue_status"].map(
         {

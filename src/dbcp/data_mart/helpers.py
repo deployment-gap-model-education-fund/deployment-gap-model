@@ -310,11 +310,11 @@ def _estimate_proposed_power_co2e(
         ~is_oil, other=oil_internal_combustion_mmbtu_per_mwh
     )
 
-    iso_projects["estimated_capacity_factor"] = gt_small_cap_factor
-    iso_projects.loc[:, "estimated_capacity_factor"].where(
+    iso_projects["estimated_capacity_factor"] = pd.Series(
+        gt_small_cap_factor, index=iso_projects.index
+    ).where(
         ~is_cc & iso_projects.loc[:, "capacity_mw"].le(gt_sub_split),
         other=gt_large_cap_factor,
-        inplace=True,
     )
     iso_projects.loc[:, "estimated_capacity_factor"] = iso_projects.loc[
         :, "estimated_capacity_factor"
@@ -345,7 +345,8 @@ def _estimate_proposed_power_co2e(
         "mod_resource",
         "estimated_capacity_factor",
     ]
-    iso_projects.drop(columns=intermediates, inplace=True)
+    for intermediate in intermediates:
+        del iso_projects[intermediate]
     return
 
 
