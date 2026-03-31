@@ -426,22 +426,24 @@ columbia_reldi_local_opposition__local_ordinance = Table(
     schema=schema,
 )
 
-# state_policy = Table(
-#     "state_policy",
-#     metadata,
-#     Column("raw_state_name", String, nullable=False),
-#     Column("policy", String, nullable=False),
-#     Column("year_enacted", Integer),
-#     Column("energy_type", String),
-#     Column("source", String),
-#     Column(
-#         "state_id_fips", String, ForeignKey("data_warehouse.census__state_fips.state_id_fips")
-#     ),
-#     Column("earliest_year_mentioned", Integer),
-#     Column("latest_year_mentioned", Integer),
-#     Column("n_years_mentioned", Integer),
-#     schema=schema,
-# )
+columbia_reldi_local_opposition__state_policy = Table(
+    "columbia_reldi_local_opposition__state_policy",
+    metadata,
+    Column("raw_state_name", String, nullable=False),
+    Column("policy", String, nullable=False),
+    Column("year_enacted", Integer),
+    Column("energy_type", String),
+    Column("source", String),
+    Column(
+        "state_id_fips",
+        String,
+        ForeignKey("data_warehouse.census__state_fips.state_id_fips"),
+    ),
+    Column("earliest_year_mentioned", Integer),
+    Column("latest_year_mentioned", Integer),
+    Column("n_years_mentioned", Integer),
+    schema=schema,
+)
 
 
 # state_notes = Table(

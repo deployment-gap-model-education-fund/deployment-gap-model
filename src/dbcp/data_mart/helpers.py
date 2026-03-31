@@ -44,6 +44,7 @@ class CountyOpposition:
     ) -> None:
         self._engine = engine if engine is not None else get_sql_engine()
         self._local_opp_df = self._get_local_opposition_df()
+        self._state_opp_df = self._get_state_opposition_df()
         self._county_fips_df = (
             county_fips_df
             if county_fips_df is not None
@@ -73,40 +74,30 @@ class CountyOpposition:
         df = _subset_db_columns(cols, db, self._engine)
         return df
 
+    def _get_state_opposition_df(self) -> pd.DataFrame:
+        cols = [
+            "earliest_year_mentioned",
+            "policy",
+            "state_id_fips",
+        ]
+        table = "data_warehouse.columbia_reldi_local_opposition__state_policy"
+        states_to_exclude = (
+            "23",  # Maine (repealed)
+            "36",  # New York (pro-renewables policy)
+        )
+        query = f"SELECT {', '.join(cols)} FROM {table} WHERE state_id_fips NOT IN {states_to_exclude}"
+        df = pd.read_sql(query, self._engine)
+        return df
+
     def _represent_state_policy_as_local_ordinances(self) -> pd.DataFrame:
         """Downscale state policies to look like county-level ordinances at each county in the respective state.
 
-        To make concatenation easier, the output dataframe imitates the columns of the local ordinance table.
-
         Returns:
             pd.DataFrame: fanned out state policy dataframe
 
         """
-        raise NotImplementedError(
-            "state_policy has been removed from the local opposition ETL. "
-            "Re-enable a replacement state-level source before including state policies."
-        )
-
-    def _get_state_opposition_df(self) -> pd.DataFrame:
-        """Deprecated placeholder for the removed state_policy table."""
-        raise NotImplementedError(
-            "state_policy has been removed from the local opposition ETL."
-        )
-
-    def _represent_removed_state_policy_as_local_ordinances(self) -> pd.DataFrame:
-        """Downscale state policies to look like county-level ordinances at each county in the respective state.
-
-        This implementation is retained for reference while the upstream state_policy
-        table is disabled.
-
-        Returns:
-            pd.DataFrame: fanned out state policy dataframe
-
-        """
-        state_opp_df = self._get_state_opposition_df()
-
         # fan out
-        states_as_counties = state_opp_df.merge(
+        states_as_counties = self._state_opp_df.merge(
             self._county_fips_df.loc[:, ["county_id_fips", "state_id_fips"]],
             on="state_id_fips",
             how="left",

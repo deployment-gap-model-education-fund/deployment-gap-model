@@ -197,7 +197,9 @@ class ColumbiaDocxParser:
                 )
 
         output = {
-            # "state_policy": pd.DataFrame(self.state_policy_dict),
+            "columbia_reldi_local_opposition__state_policy": pd.DataFrame(
+                self.state_policy_dict
+            ),
             # "state_notes": pd.DataFrame(self.state_notes_dict),
             "columbia_reldi_local_opposition__local_ordinance": pd.DataFrame(
                 self.local_ordinance_dict

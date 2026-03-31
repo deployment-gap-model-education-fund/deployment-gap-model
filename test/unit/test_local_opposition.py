@@ -77,9 +77,9 @@ def test_extract():  # integration test
     )
     parser = mock_parser_factory(data)
     expected = {
-        # "state_policy": pd.DataFrame(
-        #     {"state": ["Alabama"], "policy": ["Very Important Policy"]}
-        # ),
+        "columbia_reldi_local_opposition__state_policy": pd.DataFrame(
+            {"state": ["Alabama"], "policy": ["Very Important Policy"]}
+        ),
         # "state_notes": pd.DataFrame({"state": [], "notes": []}),
         "columbia_reldi_local_opposition__local_ordinance": pd.DataFrame(
             {
