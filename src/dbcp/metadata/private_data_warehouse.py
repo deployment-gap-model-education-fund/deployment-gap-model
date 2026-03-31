@@ -21,8 +21,8 @@ schema = "private_data_warehouse"
 ##############
 # ACP Tables #
 ##############
-acp__changelog__projects = Table(
-    "acp__changelog__projects",
+acp__private__changelog__projects = Table(
+    "acp__private__changelog__projects",
     metadata,
     Column("proj_id", BigInteger, primary_key=True),
     Column("report_date", DateTime, primary_key=True),
@@ -101,8 +101,8 @@ acp__changelog__projects = Table(
     schema=schema,
 )
 
-acp__projects = Table(
-    "acp__projects",
+acp__private__projects = Table(
+    "acp__private__projects",
     metadata,
     Column("proj_id", BigInteger, primary_key=True),
     Column("report_date", DateTime),

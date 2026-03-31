@@ -55,7 +55,9 @@ def _get_concrete_aggs(engine: sa.engine.Engine) -> pd.DataFrame:
         columns=["prime_mover_code", "fuel_type_code_pudl", "operational_status_code"],
     )
 
-    acp = pd.read_sql_table("acp__projects", engine, schema="private_data_warehouse")
+    acp = pd.read_sql_table(
+        "acp__private__projects", engine, schema="private_data_warehouse"
+    )
     acp = acp[
         [
             "plant_id_eia",

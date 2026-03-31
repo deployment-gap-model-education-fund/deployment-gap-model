@@ -3,7 +3,7 @@
 import csv
 import logging
 import os
-from datetime import timezone
+from datetime import UTC
 from io import StringIO
 from pathlib import Path
 
@@ -132,9 +132,7 @@ def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str):
             if not pd.api.types.is_datetime64_any_dtype(df[col.name]):
                 df[col.name] = pd.to_datetime(df[col.name], errors="coerce")
             # drop the timezone in order to enable migration to Postgres.
-            if (df[col.name].dt.tz is not None) and (
-                df[col.name].dt.tz != timezone.utc
-            ):
+            if (df[col.name].dt.tz is not None) and (df[col.name].dt.tz != UTC):
                 logger.error(
                     f"Non-UTC timezone encountered in column {col.name} "
                     "while enforcing dtypes before postgres migration. "
@@ -300,8 +298,12 @@ def upload_schema_to_bigquery(schema: str, dev: bool = True) -> None:
     credentials, project_id = google.auth.default()
     client = bigquery.Client(credentials=credentials, project=project_id)
 
-    for table_name, df in loaded_tables.items():
+    if schema in {"data_warehouse", "private_data_warehouse"}:
+        schema_environment = f"data_warehouse_staging{'_dev' if dev else ''}"
+    else:
         schema_environment = f"{schema}{'_dev' if dev else ''}"
+
+    for table_name, df in loaded_tables.items():
         full_table_name = f"{schema_environment}.{table_name}"
         table_schema = get_bq_schema_from_metadata(table_name, schema, dev)
         logger.info(f"Loading: {table_name}")
