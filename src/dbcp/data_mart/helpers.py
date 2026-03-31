@@ -19,14 +19,14 @@ def _subset_db_columns(
 
 def _get_county_fips_df(engine: sa.engine.Engine) -> pd.DataFrame:
     cols = ["*"]
-    db = "data_warehouse.county_fips"
+    db = "data_warehouse.census__county_fips"
     df = _subset_db_columns(cols, db, engine)
     return df
 
 
 def _get_state_fips_df(engine: sa.engine.Engine) -> pd.DataFrame:
     cols = ["*"]
-    db = "data_warehouse.state_fips"
+    db = "data_warehouse.census__state_fips"
     df = _subset_db_columns(cols, db, engine)
     return df
 
@@ -44,7 +44,6 @@ class CountyOpposition:
     ) -> None:
         self._engine = engine if engine is not None else get_sql_engine()
         self._local_opp_df = self._get_local_opposition_df()
-        self._state_opp_df = self._get_state_opposition_df()
         self._county_fips_df = (
             county_fips_df
             if county_fips_df is not None
@@ -70,26 +69,8 @@ class CountyOpposition:
             # 'raw_state_name',  # drop raw name in favor of canonical one
             # 'state_id_fips',  # will join on 5-digit county FIPS, which includes state
         ]
-        db = "data_warehouse.local_ordinance"
+        db = "data_warehouse.columbia_reldi_local_opposition__local_ordinance"
         df = _subset_db_columns(cols, db, self._engine)
-        return df
-
-    def _get_state_opposition_df(self) -> pd.DataFrame:
-        cols = [
-            "earliest_year_mentioned",
-            # 'latest_year_mentioned',  # for simplicity, only include one year metric (earliest_year_mentioned)
-            # 'n_years_mentioned',  # for simplicity, only include one year metric (earliest_year_mentioned)
-            "policy",
-            # 'raw_state_name',  # drop raw name in favor of canonical one
-            "state_id_fips",
-        ]
-        table = "data_warehouse.state_policy"
-        states_to_exclude = (
-            "23",  # Maine (repealed)
-            "36",  # New York (pro-renewables policy)
-        )
-        query = f"SELECT {', '.join(cols)} FROM {table} WHERE state_id_fips NOT IN {states_to_exclude}"
-        df = pd.read_sql(query, self._engine)
         return df
 
     def _represent_state_policy_as_local_ordinances(self) -> pd.DataFrame:
@@ -101,8 +82,31 @@ class CountyOpposition:
             pd.DataFrame: fanned out state policy dataframe
 
         """
+        raise NotImplementedError(
+            "state_policy has been removed from the local opposition ETL. "
+            "Re-enable a replacement state-level source before including state policies."
+        )
+
+    def _get_state_opposition_df(self) -> pd.DataFrame:
+        """Deprecated placeholder for the removed state_policy table."""
+        raise NotImplementedError(
+            "state_policy has been removed from the local opposition ETL."
+        )
+
+    def _represent_removed_state_policy_as_local_ordinances(self) -> pd.DataFrame:
+        """Downscale state policies to look like county-level ordinances at each county in the respective state.
+
+        This implementation is retained for reference while the upstream state_policy
+        table is disabled.
+
+        Returns:
+            pd.DataFrame: fanned out state policy dataframe
+
+        """
+        state_opp_df = self._get_state_opposition_df()
+
         # fan out
-        states_as_counties = self._state_opp_df.merge(
+        states_as_counties = state_opp_df.merge(
             self._county_fips_df.loc[:, ["county_id_fips", "state_id_fips"]],
             on="state_id_fips",
             how="left",
@@ -199,7 +203,7 @@ class CountyOpposition:
 
     def _get_manual_ordinances(self) -> pd.DataFrame:
         df = pd.read_sql_table(
-            "manual_ordinances", self._engine, schema="data_warehouse"
+            "airtable__manual_ordinances", self._engine, schema="data_warehouse"
         )
         return df
 
@@ -361,12 +365,8 @@ def get_query(filename: str) -> str:
     Returns:
         the query as a string
     Example:
-        >>> import pandas as pd
-        >>> from dbcp.data_mart.helpers import get_query
-        >>> from dbcp.helpers import get_sql_engine
-        >>> engine = get_sql_engine()
-        >>> query = get_query("get_proposed_infra_projects.sql")
-        >>> df = pd.read_sql(query, engine)
+        Use `query = get_query("get_proposed_infra_projects.sql")` and pass the
+        returned SQL string to `pd.read_sql(...)`.
 
     """
     sql_query_dir = Path(__file__).parent / "sql_queries"

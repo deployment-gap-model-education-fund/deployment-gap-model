@@ -1,4 +1,5 @@
 """Test DBCP helper functions."""
+
 import pytest
 import sqlalchemy as sa
 
@@ -19,7 +20,7 @@ class TestBQSchemaHelpers:
         """Ensure we get the expected metadata object."""
         metadata = dbcp.helpers.get_schema_sql_alchemy_metadata("data_warehouse")
         assert isinstance(metadata, sa.MetaData)
-        assert "data_warehouse.pudl_generators" in metadata.tables.keys()
+        assert "data_warehouse.eia860m__annual__generators" in metadata.tables.keys()
 
     def test_get_schema_sql_alchemy_metadata_exception(self):
         """Make sure an exception is raised when an invalid schema is requested."""
@@ -43,6 +44,6 @@ class TestBQSchemaHelpers:
         ]
 
         bq_schema = dbcp.helpers.get_bq_schema_from_metadata(
-            "county_fips", "data_warehouse"
+            "census__county_fips", "data_warehouse"
         )
         assert bq_schema == expected_bq_schema

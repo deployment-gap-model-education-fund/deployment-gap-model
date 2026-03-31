@@ -165,12 +165,16 @@ def _transform_contested_projects(project_df: pd.DataFrame) -> pd.DataFrame:
 def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """Transform local opposition data."""
     transform_funcs = {
-        "state_policy": _transform_state_policy,
-        "state_notes": _transform_state_notes,
-        "local_ordinance": _transform_local_ordinances,
-        "contested_project": _transform_contested_projects,
+        # "state_policy": _transform_state_policy,
+        # "state_notes": _transform_state_notes,
+        "columbia_reldi_local_opposition__local_ordinance": _transform_local_ordinances,
+        # "contested_project": _transform_contested_projects,
     }
-    transformed = {key: transform_funcs[key](raw_dfs[key]) for key in raw_dfs}
+    transformed = {
+        key: transform_funcs[key](raw_dfs[key])
+        for key in transform_funcs
+        if key in raw_dfs
+    }
     return transformed
 
 

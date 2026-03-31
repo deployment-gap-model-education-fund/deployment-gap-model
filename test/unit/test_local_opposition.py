@@ -1,4 +1,5 @@
 """Test Local opposition ETL code."""
+
 from collections import namedtuple
 
 import pandas as pd
@@ -76,25 +77,26 @@ def test_extract():  # integration test
     )
     parser = mock_parser_factory(data)
     expected = {
-        "state_policy": pd.DataFrame(
-            {"state": ["Alabama"], "policy": ["Very Important Policy"]}
-        ),
-        "state_notes": pd.DataFrame({"state": [], "notes": []}),
-        "local_ordinance": pd.DataFrame(
+        # "state_policy": pd.DataFrame(
+        #     {"state": ["Alabama"], "policy": ["Very Important Policy"]}
+        # ),
+        # "state_notes": pd.DataFrame({"state": [], "notes": []}),
+        "columbia_reldi_local_opposition__local_ordinance": pd.DataFrame(
             {
                 "state": ["Alabama"],
                 "locality": ["Lovely County"],
                 "ordinance_text": ["Important Ordinance"],
             }
         ),
-        "contested_project": pd.DataFrame(
-            {
-                "state": ["Alabama"],
-                "project_name": ["Amazing Project"],
-                "description": ["Sad Story"],
-            }
-        ),
+        # "contested_project": pd.DataFrame(
+        #     {
+        #         "state": ["Alabama"],
+        #         "project_name": ["Amazing Project"],
+        #         "description": ["Sad Story"],
+        #     }
+        # ),
     }
     actual = parser.extract()
+    assert actual.keys() == expected.keys()
     for key, df in actual.items():
         pd.testing.assert_frame_equal(df, expected[key])

@@ -267,12 +267,12 @@ def run_etl(funcs: dict[str, Callable], schema_name: str):
 def create_data_warehouse():
     """Create data warehouse tables by ETL-ing each data source."""
     etl_funcs = {
-        # "offshore_wind": etl_offshore_wind,
+        "offshore_wind": etl_offshore_wind,
         # "gridstatus": etl_gridstatus_isoqueues,
-        # "manual_ordinances": etl_manual_ordinances,
+        "manual_ordinances": etl_manual_ordinances,
         # "epa_avert": etl_epa_avert,
         # "eip_infrastructure": etl_eip_infrastructure,
-        # "columbia_local_opp": etl_columbia_local_opp,
+        "columbia_local_opp": etl_columbia_local_opp,
         # "energy_communities_by_county": etl_energy_communities_by_county,
         "fips_tables": etl_fips_tables,
         # "protected_area_by_county": etl_protected_area_by_county,
@@ -280,13 +280,13 @@ def create_data_warehouse():
         # "nrel_wind_solar_ordinances": etl_nrel_ordinances,
         # "lbnl_iso_queue": etl_lbnl_iso_queue,
         "pudl": etl_pudl_tables,
-        # "ncsl_state_permitting": etl_ncsl_state_permitting,
-        "ballot_ready": etl_ballot_ready,
+        "ncsl_state_permitting": etl_ncsl_state_permitting,
+        # "ballot_ready": etl_ballot_ready,
     }
     run_etl(etl_funcs, "data_warehouse")
     # Run private ETL functions
     etl_funcs = {
-        # "acp_projects": etl_acp_projects,
+        "acp_projects": etl_acp_projects,
         "fyi_queue": etl_fyi_queue,
     }
     run_etl(etl_funcs, "private_data_warehouse")
@@ -367,7 +367,7 @@ def create_data_mart(engine, private_only: bool = False):  # noqa: C901
 
 
 def etl(schema="all"):
-    """Run dbc ETL."""
+    """Run ETL."""
     # Reduce size of caches if necessary
     GEOCODER_CACHES.reduce_cache_sizes()
     SPATIAL_CACHE.reduce_size()

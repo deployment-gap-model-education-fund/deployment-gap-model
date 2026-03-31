@@ -55,9 +55,7 @@ def _get_concrete_aggs(engine: sa.engine.Engine) -> pd.DataFrame:
         columns=["prime_mover_code", "fuel_type_code_pudl", "operational_status_code"],
     )
 
-    acp = pd.read_sql_table(
-        "acp_projects_current", engine, schema="private_data_warehouse"
-    )
+    acp = pd.read_sql_table("acp__projects", engine, schema="private_data_warehouse")
     acp = acp[
         [
             "plant_id_eia",
@@ -97,11 +95,11 @@ def _get_concrete_aggs(engine: sa.engine.Engine) -> pd.DataFrame:
     )
     # bring in standardized state and county names
     sfips = pd.read_sql(
-        "SELECT state_id_fips, state_name as state FROM data_warehouse.state_fips",
+        "SELECT state_id_fips, state_name as state FROM data_warehouse.census__state_fips",
         engine,
     )
     cfips = pd.read_sql(
-        "SELECT county_id_fips, county_name as county FROM data_warehouse.county_fips",
+        "SELECT county_id_fips, county_name as county FROM data_warehouse.census__county_fips",
         engine,
     )
     out = out.merge(

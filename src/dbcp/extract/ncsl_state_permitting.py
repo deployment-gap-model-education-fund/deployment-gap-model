@@ -115,4 +115,4 @@ def extract(csv) -> dict[str, pd.DataFrame]:
     """Extract ncsl permitting data."""
     out = pd.read_csv(csv)
     # set categorical dtypes in transform stage, after cleaning up categories.
-    return {"ncsl_state_permitting": out}
+    return {"ncsl__state_permitting": out}

@@ -151,7 +151,7 @@ class ColumbiaDocxParser:
         and then extracting values into a dictionary (later converted to pd.DataFrame)
 
         Returns:
-            Dict[str, pd.DataFrame]: return dataframes with keys 'state_policy', 'local_ordinance', and 'contested_project'
+            Dict[str, pd.DataFrame]: return dataframes with the active Columbia RELDI output tables.
 
         """
         if self.doc is None:
@@ -197,10 +197,12 @@ class ColumbiaDocxParser:
                 )
 
         output = {
-            "state_policy": pd.DataFrame(self.state_policy_dict),
-            "state_notes": pd.DataFrame(self.state_notes_dict),
-            "local_ordinance": pd.DataFrame(self.local_ordinance_dict),
-            "contested_project": pd.DataFrame(self.contested_projects_dict),
+            # "state_policy": pd.DataFrame(self.state_policy_dict),
+            # "state_notes": pd.DataFrame(self.state_notes_dict),
+            "columbia_reldi_local_opposition__local_ordinance": pd.DataFrame(
+                self.local_ordinance_dict
+            ),
+            # "contested_project": pd.DataFrame(self.contested_projects_dict),
         }
 
         return output

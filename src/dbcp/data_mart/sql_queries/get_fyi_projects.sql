@@ -19,8 +19,8 @@ WITH
             proj.withdrawn_date,
             res.capacity_mw,
             res.resource_clean
-        FROM private_data_warehouse.fyi_projects as proj
-        INNER JOIN private_data_warehouse.fyi_resource_capacity as res
+        FROM private_data_warehouse.fyi__private__projects as proj
+        INNER JOIN private_data_warehouse.fyi__private__resource_capacity as res
         ON proj.project_id = res.project_id
     ),
     loc as (
@@ -35,7 +35,7 @@ WITH
             county_id_fips,
             raw_county_name, -- for validation only
             (1.0 / count(*) over (partition by project_id))::real as frac_locations_in_county
-        FROM private_data_warehouse.fyi_locations
+        FROM private_data_warehouse.fyi__private__locations
     ),
     iso as (
         SELECT
@@ -56,10 +56,10 @@ WITH
         'fyi' as source,
         ncsl.permitting_type as state_permitting_type
     from iso
-    left join data_warehouse.state_fips as sfip
+    left join data_warehouse.census__state_fips as sfip
         on iso.state_id_fips = sfip.state_id_fips
-    left join data_warehouse.county_fips as cfip
+    left join data_warehouse.census__county_fips as cfip
         on iso.county_id_fips = cfip.county_id_fips
-    left join data_warehouse.ncsl_state_permitting as ncsl
+    left join data_warehouse.ncsl__state_permitting as ncsl
         on iso.state_id_fips = ncsl.state_id_fips
     ;

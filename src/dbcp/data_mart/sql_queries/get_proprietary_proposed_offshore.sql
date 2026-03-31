@@ -9,8 +9,8 @@ WITH
             -- because some projects list multiple towns in the same parent county
             -- in the raw "county" field.
             (1.0 / count(*) over (partition by project_id))::real as frac_locations_in_county
-        FROM data_warehouse.offshore_wind_cable_landing_association as cable
-        INNER JOIN data_warehouse.offshore_wind_locations as locs
+        FROM data_warehouse.offshore_wind_airtable__cable_landing_association as cable
+        INNER JOIN data_warehouse.offshore_wind_airtable__locations as locs
         USING(location_id)
     )
     -- join the project, state, and county stuff
@@ -39,13 +39,13 @@ WITH
         cfip.county_name as county,
         ncsl.permitting_type as state_permitting_type
 
-    FROM data_warehouse.offshore_wind_projects as proj
+    FROM data_warehouse.offshore_wind_airtable__projects as proj
     LEFT JOIN proj_county_assoc as assoc
     USING(project_id)
-    LEFT JOIN data_warehouse.state_fips as sfip
+    LEFT JOIN data_warehouse.census__state_fips as sfip
     ON substr(assoc.county_id_fips, 1, 2) = sfip.state_id_fips
-    LEFT JOIN data_warehouse.county_fips as cfip
+    LEFT JOIN data_warehouse.census__county_fips as cfip
     USING(county_id_fips)
-    LEFT JOIN data_warehouse.ncsl_state_permitting as ncsl
+    LEFT JOIN data_warehouse.ncsl__state_permitting as ncsl
     ON substr(assoc.county_id_fips, 1, 2) = ncsl.state_id_fips
     ;
