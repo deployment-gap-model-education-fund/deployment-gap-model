@@ -1,4 +1,4 @@
-"""Logic for extracing PUDL data."""
+"""Logic for extracting PUDL data."""
 
 import pandas as pd
 

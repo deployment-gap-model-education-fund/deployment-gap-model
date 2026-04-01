@@ -64,7 +64,7 @@ def _prepare_eia860m_yearly_generators(generators_raw: pd.DataFrame) -> pd.DataF
     return generators
 
 
-def _build_eia860m_annual_generators(generators_raw: pd.DataFrame) -> pd.DataFrame:
+def _transform_eia860m_annual_generators(generators_raw: pd.DataFrame) -> pd.DataFrame:
     """Create eia860m__annual__generators from yearly generator history."""
     generators = _prepare_eia860m_yearly_generators(generators_raw)
 
@@ -171,7 +171,7 @@ def _transform_eia860m_changelog_generators(
     return changelog_generators
 
 
-def _build_eia860m_changelog_generators_operational_status(
+def _transform_eia860m_changelog_generators_operational_status(
     generators_raw: pd.DataFrame,
 ) -> pd.DataFrame:
     """Create the operational-status-only generator changelog table."""
@@ -239,14 +239,14 @@ def transform(raw_pudl_tables: pd.DataFrame) -> dict[str, pd.DataFrame]:
 
     """
     transformed_dfs = {
-        "eia860m__annual__generators": _build_eia860m_annual_generators(
+        "eia860m__annual__generators": _transform_eia860m_annual_generators(
             raw_pudl_tables["eia860m__yearly_generators"]
         ),
         "eia860m__changelog__generators": _transform_eia860m_changelog_generators(
             raw_pudl_tables["eia860m__changelog__generators"]
         ),
         "eia860m__changelog__generators_operational_status": (
-            _build_eia860m_changelog_generators_operational_status(
+            _transform_eia860m_changelog_generators_operational_status(
                 raw_pudl_tables["eia860m__yearly_generators"]
             )
         ),
