@@ -251,7 +251,7 @@ def transform(raw_pudl_tables: pd.DataFrame) -> dict[str, pd.DataFrame]:
             )
         ),
         "eia860m__operational_status_codes": _transform_eia860m_operational_status_codes(
-            raw_pudl_tables["eia860m__status_codes_definitions"]
+            raw_pudl_tables["eia860m__operational_status_codes"]
         ),
     }
     return transformed_dfs
