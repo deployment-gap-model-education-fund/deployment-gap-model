@@ -26,15 +26,15 @@ def _extract_eia860m_changelog_generators() -> pd.DataFrame:
     return changelog_generators
 
 
-def _extract_eia860m_status_codes_definitions() -> pd.DataFrame:
+def _extract_eia860m_operational_status_codes() -> pd.DataFrame:
     """Extract the core_eia__codes_operational_status parquet file from the PUDL resources."""
     pudl_resource_path = dbcp.helpers.get_pudl_resource(
         pudl_resource="core_eia__codes_operational_status.parquet"
     )
-    status_codes_definitions = pd.read_parquet(
+    operational_status_codes = pd.read_parquet(
         pudl_resource_path, engine="pyarrow", dtype_backend="numpy_nullable"
     )
-    return status_codes_definitions
+    return operational_status_codes
 
 
 def extract() -> dict[str, pd.DataFrame]:
@@ -49,7 +49,7 @@ def extract() -> dict[str, pd.DataFrame]:
     tables = {
         "eia860m__yearly_generators": _extract_eia860m_yearly_generators,
         "eia860m__changelog__generators": _extract_eia860m_changelog_generators,
-        "eia860m__status_codes_definitions": _extract_eia860m_status_codes_definitions,
+        "eia860m__operational_status_codes": _extract_eia860m_operational_status_codes,
     }
     for dgm_table_name, extract_func in tables.items():
         raw_pudl_tables[dgm_table_name] = extract_func()

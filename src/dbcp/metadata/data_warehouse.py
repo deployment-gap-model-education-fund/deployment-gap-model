@@ -652,7 +652,7 @@ eia860m__changelog__generators = Table(
     Column(
         "raw_operational_status_code",
         String,
-        ForeignKey("data_warehouse.eia860m__status_codes_definitions.code"),
+        ForeignKey("data_warehouse.eia860m__operational_status_codes.code"),
     ),
     Column("operational_status_code", Integer, nullable=True),
     Column("planned_derate_date", DateTime),
@@ -701,8 +701,9 @@ eia860m__changelog__generators_operational_status = Table(
     schema=schema,
 )
 
-eia860m__status_codes_definitions = Table(
-    "eia860m__status_codes_definitions",
+
+eia860m__operational_status_codes = Table(
+    "eia860m__operational_status_codes",
     metadata,
     Column("code", String, primary_key=True),
     Column("status", Integer),
