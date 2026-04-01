@@ -157,13 +157,13 @@ def _transform_eia860m_changelog_generators(
     return changelog_generators
 
 
-def _transform_eia860m_status_codes_definitions(
-    status_codes_definitions: pd.DataFrame,
+def _transform_eia860m_operational_status_codes(
+    operational_status_codes: pd.DataFrame,
 ):
     """Create a table with operational status codes and descriptions.
 
     Args:
-        status_codes_definitions: the raw core_eia__codes_operational_status table.
+        operational_status_codes: the raw core_eia__codes_operational_status table.
 
     Returns:
         The DBCP operation status values mapped to PUDL codes and descriptions.
@@ -175,7 +175,7 @@ def _transform_eia860m_status_codes_definitions(
         .rename(columns={"index": "code", 0: "status"})
     )
     return op_status_codes_scale.merge(
-        status_codes_definitions, how="inner", on="code"
+        operational_status_codes, how="inner", on="code"
     )[["code", "status", "description"]]
 
 
@@ -192,7 +192,7 @@ def transform(raw_pudl_tables: pd.DataFrame) -> dict[str, pd.DataFrame]:
     table_transform_functions = {
         "eia860m__annual__generators": _transform_eia860m_annual_generators,
         "eia860m__changelog__generators": _transform_eia860m_changelog_generators,
-        "eia860m__status_codes_definitions": _transform_eia860m_status_codes_definitions,
+        "eia860m__operational_status_codes": _transform_eia860m_operational_status_codes,
     }
 
     transformed_dfs = {}
