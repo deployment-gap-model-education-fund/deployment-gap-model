@@ -84,7 +84,7 @@ def _transform_eia860m_changelog_generators(
     # Fill FIPS codes
     filled_location = changelog_generators.loc[:, ["raw_state", "raw_county"]].fillna(
         ""
-    )  # copy; don't want to fill actual table
+    )
 
     fips = add_fips_ids(
         filled_location,
@@ -110,23 +110,15 @@ def _transform_eia860m_changelog_generators(
         "raw_operational_status_code"
     ].map(OPERATIONAL_STATUS_CODES_SCALE)
 
-    # 3307 / 33943 current projects are missing a balancing authority code (mostly
-    # retired projects). But a simple county lookup can fill in half (1642 / 3307) of them:
-    # 1932 / 2400 counties with a project missing a BA code have a single unique
-    # BA code among the other projects in that county. These are a pretty safe bet
-    # to impute. Counties with multiple or zero BAs are not imputed.
-
-    # Identify the latest snapshot
+    # Fill missing BA / ISO values when a county has exactly one unique code.
     latest_date = changelog_generators["valid_until_date"].max()
     latest = changelog_generators[changelog_generators.valid_until_date == latest_date]
 
-    # Find counties with exactly one unique non-null BA code in latest snapshot
     ba_counts = latest.groupby("county_id_fips")[
         "balancing_authority_code_eia"
     ].nunique()
     single_ba_counties = ba_counts[ba_counts == 1].index
 
-    # Extract the unique BA for those counties
     unique_ba = (
         latest[latest.county_id_fips.isin(single_ba_counties)]
         .dropna(subset=["balancing_authority_code_eia"])
@@ -134,20 +126,17 @@ def _transform_eia860m_changelog_generators(
         .first()
     )
 
-    # Impute missing BA codes
     def _fill_ba(row):
         if pd.isna(row.balancing_authority_code_eia):
             return unique_ba.get(row.county_id_fips, pd.NA)
         return row.balancing_authority_code_eia
 
-    # Map to standardized ISO names
     iso_map = {
         "CISO": "CAISO",
         "ERCO": "ERCOT",
         "ISNE": "ISONE",
         "NYIS": "NYISO",
         "SWPP ": "SPP",
-        # MISO and PJM unchanged
     }
 
     changelog_generators["iso_region"] = changelog_generators.apply(
@@ -155,6 +144,64 @@ def _transform_eia860m_changelog_generators(
     ).replace(iso_map)
 
     return changelog_generators
+
+
+def _transform_eia860m_changelog_generators_operational_status(
+    generators_raw: pd.DataFrame,
+) -> pd.DataFrame:
+    """Transform the operational-status-only generator changelog table."""
+    changelog_generators = generators_raw.convert_dtypes().copy()
+
+    # Convert every column with date in it to a datetime column
+    for col in changelog_generators.columns:
+        if "date" in col:
+            changelog_generators[col] = pd.to_datetime(changelog_generators[col])
+
+    # Fill FIPS codes
+    bedford_addfips_fix(changelog_generators)
+    filled_location = changelog_generators.loc[:, ["state", "county"]].fillna("")
+
+    fips = add_fips_ids(
+        filled_location,
+        vintage=FIPS_CODE_VINTAGE,
+    )
+    changelog_generators = pd.concat(
+        [changelog_generators, fips[["state_id_fips", "county_id_fips"]]],
+        axis=1,
+        copy=False,
+    )
+
+    changelog_generators.loc[
+        changelog_generators.county_id_fips.eq("51515"), "county_id_fips"
+    ] = "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
+
+    changelog_generators = changelog_generators.sort_values(
+        ["plant_id_eia", "generator_id", "report_date"]
+    ).reset_index(drop=True)
+
+    generator_group = changelog_generators.groupby(
+        ["plant_id_eia", "generator_id"], sort=False
+    )
+    status_changed = generator_group["operational_status"].transform(
+        lambda series: series.ne(series.shift())
+    )
+    changelog_generators = changelog_generators.loc[status_changed].copy()
+
+    changelog_generators["valid_until_date"] = changelog_generators.groupby(
+        ["plant_id_eia", "generator_id"], sort=False
+    )["report_date"].shift(-1)
+
+    return changelog_generators[
+        [
+            "generator_id",
+            "plant_id_eia",
+            "report_date",
+            "valid_until_date",
+            "operational_status",
+            "county_id_fips",
+            "capacity_mw",
+        ]
+    ]
 
 
 def _transform_eia860m_status_codes_definitions(
@@ -192,6 +239,9 @@ def transform(raw_pudl_tables: pd.DataFrame) -> dict[str, pd.DataFrame]:
     table_transform_functions = {
         "eia860m__annual__generators": _transform_eia860m_annual_generators,
         "eia860m__changelog__generators": _transform_eia860m_changelog_generators,
+        "eia860m__changelog__generators_operational_status": (
+            _transform_eia860m_changelog_generators_operational_status
+        ),
         "eia860m__status_codes_definitions": _transform_eia860m_status_codes_definitions,
     }
 

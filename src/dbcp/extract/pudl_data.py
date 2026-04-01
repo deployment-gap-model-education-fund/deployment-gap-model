@@ -6,13 +6,8 @@ import dbcp
 from dbcp.constants import PUDL_LATEST_YEAR
 
 
-def _extract_eia860m_annual_generators() -> pd.DataFrame:
-    """Extract eia860m__annual__generators table from PUDL resources.
-
-    Returns:
-        The eia860m__annual__generators table.
-
-    """
+def _read_eia_yearly_generators() -> pd.DataFrame:
+    """Read the out_eia__yearly_generators PUDL parquet."""
     pudl_resource_path = dbcp.helpers.get_pudl_resource(
         pudl_resource="out_eia__yearly_generators.parquet"
     )
@@ -25,6 +20,17 @@ def _extract_eia860m_annual_generators() -> pd.DataFrame:
     date_columns = [col for col in generators.columns if "date" in col]
     for col in date_columns:
         generators[col] = pd.to_datetime(generators[col])
+    return generators
+
+
+def _extract_eia860m_annual_generators() -> pd.DataFrame:
+    """Extract eia860m__annual__generators table from PUDL resources.
+
+    Returns:
+        The eia860m__annual__generators table.
+
+    """
+    generators = _read_eia_yearly_generators()
 
     # filter generators where report_year >= PUDL_LATEST_YEAR and < PUDL_LATEST_YEAR+1
     generators = generators[
@@ -43,6 +49,11 @@ def _extract_eia860m_changelog_generators() -> pd.DataFrame:
         pudl_resource_path, engine="pyarrow", dtype_backend="numpy_nullable"
     )
     return changelog_generators
+
+
+def _extract_eia860m_changelog_generators_operational_status() -> pd.DataFrame:
+    """Extract generator history used to build the operational-status changelog."""
+    return _read_eia_yearly_generators()
 
 
 def _extract_eia860m_status_codes_definitions() -> pd.DataFrame:
@@ -68,6 +79,9 @@ def extract() -> dict[str, pd.DataFrame]:
     tables = {
         "eia860m__annual__generators": _extract_eia860m_annual_generators,
         "eia860m__changelog__generators": _extract_eia860m_changelog_generators,
+        "eia860m__changelog__generators_operational_status": (
+            _extract_eia860m_changelog_generators_operational_status
+        ),
         "eia860m__status_codes_definitions": _extract_eia860m_status_codes_definitions,
     }
     for dgm_table_name, extract_func in tables.items():
