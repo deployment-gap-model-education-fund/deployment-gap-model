@@ -121,8 +121,8 @@ def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str):
     metadata = get_schema_sql_alchemy_metadata(schema)
     try:
         table = metadata.tables[table_name]
-    except KeyError:
-        raise KeyError(f"{table_name} does not exist in metadata.")
+    except KeyError as e:
+        raise KeyError(f"{table_name} does not exist in metadata.") from e
 
     for col in table.columns:
         # Add the column if it doesn't exist
@@ -174,7 +174,6 @@ def write_to_postgres(
     engine: sa.engine.Engine,
     schema_name: str,
     if_exists: str = "append",
-    use_catalyst_schema: bool = False,
 ):
     """Create data from a DataFrame to a postgres table.
 
@@ -184,8 +183,6 @@ def write_to_postgres(
         engine: sqlalchemy engine.
         schema_name: Name of schema like ``data_mart`` or ``data_warehouse``.
         if_exists: What to do if table already exists in postgres. See Pandas ``to_sql`` for options.
-        use_catalyst_schema: In the production postgres instance we only use the schema 'catalyst'
-            but still need the actual schema name for ``enforce_dtypes``.
 
     """
     df = trim_columns_length(df)
@@ -195,7 +192,7 @@ def write_to_postgres(
         con=engine,
         if_exists=if_exists,
         index=False,
-        schema="catalyst" if use_catalyst_schema else schema_name,
+        schema="data_mart" if "data_mart" in schema_name else "data_warehouse",
         method=psql_insert_copy,
         chunksize=5000,  # adjust based on memory capacity
     )
@@ -218,14 +215,14 @@ def get_pudl_resource(
         pudl_resource_path: The path to the cached PUDL resource.
 
     """
-    PUDL_VERSION = os.environ["PUDL_VERSION"]
+    pudl_version = os.environ["PUDL_VERSION"]
 
     pudl_cache = DATA_DIR / "data_cache/pudl/"
     pudl_cache.mkdir(exist_ok=True)
-    pudl_version_cache = pudl_cache / PUDL_VERSION
+    pudl_version_cache = pudl_cache / pudl_version
     pudl_version_cache.mkdir(exist_ok=True)
 
-    remote_pudl_resource_path = f"{bucket}/{PUDL_VERSION}/{pudl_resource}"
+    remote_pudl_resource_path = f"{bucket}/{pudl_version}/{pudl_resource}"
     local_pudl_resource_path = pudl_version_cache / pudl_resource
 
     if not local_pudl_resource_path.exists():
@@ -233,17 +230,17 @@ def get_pudl_resource(
         file_size = fs.size(remote_pudl_resource_path)
 
         # open the remote_pudl_resource_path and track progress with tqdm
-        with fs.open(remote_pudl_resource_path) as fo:
-            with Path(local_pudl_resource_path).open("wb") as local_file:
-                with tqdm(
-                    total=file_size, unit="B", unit_scale=True, unit_divisor=1024
-                ) as pbar:
-                    while True:
-                        buf = fo.read(8192)
-                        if not buf:
-                            break
-                        local_file.write(buf)
-                        pbar.update(len(buf))
+        with (
+            fs.open(remote_pudl_resource_path) as fo,
+            Path(local_pudl_resource_path).open("wb") as local_file,
+            tqdm(total=file_size, unit="B", unit_scale=True, unit_divisor=1024) as pbar,
+        ):
+            while True:
+                buf = fo.read(8192)
+                if not buf:
+                    break
+                local_file.write(buf)
+                pbar.update(len(buf))
 
     return local_pudl_resource_path
 
@@ -346,10 +343,9 @@ def psql_insert_copy(table, conn, keys, data_iter):
         s_buf.seek(0)
 
         columns = ", ".join([f'"{k}"' for k in keys])
-        if table.schema:
-            table_name = f"{table.schema}.{table.name}"
-        else:
-            table_name = table.name
+        table_name = (
+            f"{table.schema}.{table.name}" if table.schema is not None else table.name
+        )
 
         sql = f"COPY {table_name} ({columns}) FROM STDIN WITH CSV"
         cur.copy_expert(sql=sql, file=s_buf)

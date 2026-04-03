@@ -34,7 +34,7 @@ def _get_bigquery_dataset_id(
 
     # Publish both public and private warehouse tables into one staging dataset.
     if destination_blob_prefix in {"data_warehouse", "private_data_warehouse"}:
-        return f"data_warehouse_staging{destination_suffix}"
+        return f"data_warehouse_{destination_suffix}"
 
     return f"{destination_blob_prefix}{destination_suffix}"
 
@@ -77,6 +77,7 @@ def load_parquet_files_to_postgres(
     output_bucket: storage.Bucket,
     destination_blob_prefix: DataDirectoryLiteral,
     version: str,
+    target: str,
 ):
     """Load Parquet files from GCS to production postgres db.
 
@@ -103,7 +104,6 @@ def load_parquet_files_to_postgres(
             engine=engine,
             schema_name=destination_blob_prefix,
             if_exists="replace",
-            use_catalyst_schema=True,
         )
         logger.info(f"Successfully wrote table {table_name} to production postgres DB.")
 
@@ -189,7 +189,7 @@ class OutputMetadata(BaseModel):
     date_created: datetime = datetime.now()
 
     @validator("git_ref")
-    def git_ref_must_be_branch_or_tag(cls, git_ref: str | None) -> str | None:
+    def git_ref_must_be_branch_or_tag(cls, git_ref: str | None) -> str | None:  # noqa: N805
         """Validate that the git ref is 'main', a tag like vX.Y.Z, or a valid branch name."""
         if not git_ref:
             return git_ref
@@ -207,7 +207,7 @@ class OutputMetadata(BaseModel):
         )
 
     @validator("target")
-    def target_must_be_dev_or_prod(cls, target: str | None) -> str | None:
+    def target_must_be_dev_or_prod(cls, target: str | None) -> str | None:  # noqa: N805
         """Validate that the target is either "dev" or "prod"."""
         if target:
             if target in ("dev", "prod"):
@@ -320,9 +320,9 @@ def publish_outputs(
                     output_bucket, directory, metadata.version, target
                 )
             # At this point postgres is only used for production data mart and private data mart tables
-            if upload_to_postgres and ("data_mart" in str(directory)):
+            if upload_to_postgres:
                 load_parquet_files_to_postgres(
-                    output_bucket, directory, metadata.version
+                    output_bucket, directory, metadata.version, target
                 )
     else:
         logger.warning("No target schema provided. Skipping BigQuery/Postgres upload.")

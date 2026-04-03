@@ -28,7 +28,7 @@ sql_shell:
 duckdb:
 	docker compose run --publish 4213:4213 --rm app  duckdb -ui \
 		-cmd 'INSTALL bigquery FROM community; LOAD bigquery;' \
-		-cmd "ATTACH 'dbname=postgres user=catalyst host=$$PROD_POSTGRES_HOST password=$$PROD_POSTGRES_PASSWORD port=6543 connect_timeout=0' AS pg_prod (TYPE postgres, SCHEMA catalyst, READ_ONLY);" \
+		-cmd "ATTACH 'dbname=postgres user=$$PROD_POSTGRES_USER host=$$PROD_POSTGRES_HOST password=$$PROD_POSTGRES_PASSWORD port=6543 connect_timeout=0' AS pg_prod (TYPE postgres, READ_ONLY);" \
 		-cmd "ATTACH 'dbname=postgres user=$(POSTGRES_USER) host=$(POSTGRES_HOST) password=$(POSTGRES_PASSWORD) port=5432 connect_timeout=0' AS pg_dev (TYPE postgres);" \
 		-cmd "ATTACH 'project=dbcp-dev-350818' AS bq (TYPE bigquery, READ_ONLY);"
 
