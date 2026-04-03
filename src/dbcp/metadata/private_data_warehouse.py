@@ -21,8 +21,8 @@ schema = "private_data_warehouse"
 ##############
 # ACP Tables #
 ##############
-acp_changelog = Table(
-    "acp_changelog",
+acp__private__changelog__projects = Table(
+    "acp__private__changelog__projects",
     metadata,
     Column("proj_id", BigInteger, primary_key=True),
     Column("report_date", DateTime, primary_key=True),
@@ -101,8 +101,8 @@ acp_changelog = Table(
     schema=schema,
 )
 
-acp_projects_current = Table(
-    "acp_projects_current",
+acp__private__projects = Table(
+    "acp__private__projects",
     metadata,
     Column("proj_id", BigInteger, primary_key=True),
     Column("report_date", DateTime),
@@ -183,8 +183,8 @@ acp_projects_current = Table(
 ######################################
 # Interconnection.fyi Project Queues #
 ######################################
-fyi_projects = Table(
-    "fyi_projects",
+fyi__private__projects = Table(
+    "fyi__private__projects",
     metadata,
     Column("project_id", String, primary_key=True, autoincrement=False),
     Column("project_type", String),
@@ -232,26 +232,26 @@ fyi_projects = Table(
     schema=schema,
 )
 
-fyi_locations = Table(
-    "fyi_locations",
+fyi__private__locations = Table(
+    "fyi__private__locations",
     metadata,
     Column(
         "project_id",
         String,
-        ForeignKey("private_data_warehouse.fyi_projects.project_id"),
+        ForeignKey("private_data_warehouse.fyi__private__projects.project_id"),
     ),
     Column("raw_county_name", String),
     Column("raw_state_name", String),
     Column(
         "state_id_fips",
         String,
-        ForeignKey("data_warehouse.state_fips.state_id_fips"),
+        ForeignKey("data_warehouse.census__state_fips.state_id_fips"),
         nullable=True,
     ),
     Column(
         "county_id_fips",
         String,
-        ForeignKey("data_warehouse.county_fips.county_id_fips"),
+        ForeignKey("data_warehouse.census__county_fips.county_id_fips"),
         nullable=True,
     ),
     Column("geocoded_locality_name", String),
@@ -264,13 +264,13 @@ fyi_locations = Table(
 )
 
 
-fyi_resource_capacity = Table(
-    "fyi_resource_capacity",
+fyi__private__resource_capacity = Table(
+    "fyi__private__resource_capacity",
     metadata,
     Column(
         "project_id",
         String,
-        ForeignKey("private_data_warehouse.fyi_projects.project_id"),
+        ForeignKey("private_data_warehouse.fyi__private__projects.project_id"),
     ),
     Column("resource", String),
     Column("resource_clean", String),

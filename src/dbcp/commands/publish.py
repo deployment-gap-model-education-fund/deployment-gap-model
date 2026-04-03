@@ -26,20 +26,33 @@ DataDirectoryLiteral = Literal[
 VALID_DIRECTORIES = typing.get_args(DataDirectoryLiteral)
 
 
+def _get_bigquery_dataset_id(
+    destination_blob_prefix: DataDirectoryLiteral, target: str
+) -> str:
+    """Map an output directory to the BigQuery dataset it should publish into."""
+    destination_suffix = "" if target == "prod" else f"_{target}"
+
+    # Publish both public and private warehouse tables into one staging dataset.
+    if destination_blob_prefix in {"data_warehouse", "private_data_warehouse"}:
+        return f"data_warehouse_{destination_suffix}"
+
+    return f"{destination_blob_prefix}{destination_suffix}"
+
+
 def upload_parquet_directory_to_gcs(
     directory_path: str,
     output_bucket: storage.Bucket,
     destination_blob_prefix: DataDirectoryLiteral,
     version: str,
 ):
-    """
-    Uploads a directory of Parquet files to Google Cloud Storage.
+    """Uploads a directory of Parquet files to Google Cloud Storage.
 
     Args:
         directory_path: Path to the directory containing Parquet files.
         output_bucket: The GCS output bucket
         destination_blob_prefix: Prefix to prepend to destination blob names.
         version: The version of the data to upload.
+
     """
     # List all Parquet files in the directory
     parquet_files = list(Path(directory_path).glob("*.parquet"))
@@ -64,14 +77,15 @@ def load_parquet_files_to_postgres(
     output_bucket: storage.Bucket,
     destination_blob_prefix: DataDirectoryLiteral,
     version: str,
+    target: str,
 ):
-    """
-    Load Parquet files from GCS to production postgres db.
+    """Load Parquet files from GCS to production postgres db.
 
     Args:
         output_bucket: the GCS bucket containing the output Parquet files.
         destination_blob_prefix: the prefix of the GCS blobs to load.
         version: the version of the data to load.
+
     """
     engine = get_sql_engine(production=True)
     for blob in output_bucket.list_blobs(prefix=f"{version}/{destination_blob_prefix}"):
@@ -90,7 +104,6 @@ def load_parquet_files_to_postgres(
             engine=engine,
             schema_name=destination_blob_prefix,
             if_exists="replace",
-            use_catalyst_schema=True,
         )
         logger.info(f"Successfully wrote table {table_name} to production postgres DB.")
 
@@ -101,23 +114,21 @@ def load_parquet_files_to_bigquery(
     version: str,
     target: str,
 ):
-    """
-    Load Parquet files from GCS to BigQuery.
+    """Load Parquet files from GCS to BigQuery.
 
     Args:
         output_bucket: the GCS bucket containing the output Parquet files.
         destination_blob_prefix: the prefix of the GCS blobs to load.
         version: the version of the data to load.
         target: the target schema, one of "prod" or "dev".
+
     """
     # Create a BigQuery client
     credentials, project_id = google.auth.default()
     client = bigquery.Client(credentials=credentials, project=project_id)
 
     # Get the BigQuery dataset
-    # the "production" bigquery datasets do not have a suffix
-    destination_suffix = "" if target == "prod" else f"_{target}"
-    dataset_id = f"{destination_blob_prefix}{destination_suffix}"
+    dataset_id = _get_bigquery_dataset_id(destination_blob_prefix, target)
     dataset_ref = client.dataset(dataset_id)
 
     # get all parquet files in the bucket/{version} directory
@@ -157,8 +168,7 @@ def load_parquet_files_to_bigquery(
 
 
 class OutputMetadata(BaseModel):
-    """
-    Metadata for the outputs of the ETL process.
+    """Metadata for the outputs of the ETL process.
 
     Attributes:
         version: The uuid version of the outputs.
@@ -167,6 +177,7 @@ class OutputMetadata(BaseModel):
         code_git_sha: The git sha of the code used to build the outputs.
         settings_file_git_sha: The git sha of the settings file used to build the outputs.
         github_action_run_id: The run id of the github action that built the outputs.
+
     """
 
     version: str = str(uuid.uuid4())
@@ -178,7 +189,7 @@ class OutputMetadata(BaseModel):
     date_created: datetime = datetime.now()
 
     @validator("git_ref")
-    def git_ref_must_be_branch_or_tag(cls, git_ref: str | None) -> str | None:
+    def git_ref_must_be_branch_or_tag(cls, git_ref: str | None) -> str | None:  # noqa: N805
         """Validate that the git ref is 'main', a tag like vX.Y.Z, or a valid branch name."""
         if not git_ref:
             return git_ref
@@ -196,7 +207,7 @@ class OutputMetadata(BaseModel):
         )
 
     @validator("target")
-    def target_must_be_dev_or_prod(cls, target: str | None) -> str | None:
+    def target_must_be_dev_or_prod(cls, target: str | None) -> str | None:  # noqa: N805
         """Validate that the target is either "dev" or "prod"."""
         if target:
             if target in ("dev", "prod"):
@@ -211,12 +222,12 @@ class OutputMetadata(BaseModel):
         settings_dict = self.dict()
         repo_base_url = "https://github.com/deployment-gap-model-education-fund/deployment-gap-model"
         settings_dict["code_git_sha_url"] = f"{repo_base_url}/tree/{self.git_ref}"
-        settings_dict[
-            "settings_file_git_sha_url"
-        ] = f"{repo_base_url}/blob/{self.settings_file_git_sha}/src/dbcp/settings.yaml"
-        settings_dict[
-            "github_action_run_url"
-        ] = f"{repo_base_url}/actions/runs/{self.github_action_run_id}"
+        settings_dict["settings_file_git_sha_url"] = (
+            f"{repo_base_url}/blob/{self.settings_file_git_sha}/src/dbcp/settings.yaml"
+        )
+        settings_dict["github_action_run_url"] = (
+            f"{repo_base_url}/actions/runs/{self.github_action_run_id}"
+        )
 
         return yaml.dump(settings_dict)
 
@@ -309,9 +320,9 @@ def publish_outputs(
                     output_bucket, directory, metadata.version, target
                 )
             # At this point postgres is only used for production data mart and private data mart tables
-            if upload_to_postgres and ("data_mart" in str(directory)):
+            if upload_to_postgres:
                 load_parquet_files_to_postgres(
-                    output_bucket, directory, metadata.version
+                    output_bucket, directory, metadata.version, target
                 )
     else:
         logger.warning("No target schema provided. Skipping BigQuery/Postgres upload.")

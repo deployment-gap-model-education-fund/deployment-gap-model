@@ -271,7 +271,7 @@ FYI_RESOURCE_DICT = {
 
 FIPS_CODE_VINTAGE = 2020
 
-PUDL_LATEST_YEAR = 2024
+PUDL_LATEST_YEAR = 2025
 """The latest year of PUDL data available for data that is reported annually.
 
 Note some datasets we use here are reported quarterly like EIA 860m.

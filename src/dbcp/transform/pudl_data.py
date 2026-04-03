@@ -27,55 +27,53 @@ OPERATIONAL_STATUS_CODES_SCALE = {
 }
 
 
-def _transform_pudl_generators(pudl_generators) -> pd.DataFrame:
-    """Transform pudl_generators table.
+def _transform_eia860m_annual_generators(generators: pd.DataFrame) -> pd.DataFrame:
+    """Transform eia860m__annual__generators table.
 
     Add FIPS codes to the table and correct Bedford, VA FIPS code.
 
     Args:
-        pudl_generators: The raw pudl_generators table.
+        generators: The raw eia860m__annual__generators table.
 
     Returns:
-        The transformed pudl_generators table.
+        The transformed eia860m__annual__generators table.
 
     """
     # add FIPS
     # workaround for addfips Bedford, VA problem
-    bedford_addfips_fix(pudl_generators)
-    filled_location = pudl_generators.loc[:, ["state", "county"]].fillna(
+    bedford_addfips_fix(generators)
+    filled_location = generators.loc[:, ["state", "county"]].fillna(
         ""
     )  # copy; don't want to fill actual table
     fips = add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
-    pudl_generators = pd.concat(
-        [pudl_generators, fips[["state_id_fips", "county_id_fips"]]], axis=1, copy=False
+    generators = pd.concat(
+        [generators, fips[["state_id_fips", "county_id_fips"]]], axis=1, copy=False
     )
-    pudl_generators = pudl_generators.convert_dtypes()
+    generators = generators.convert_dtypes()
     # Convert every column with date in it to a datetime column
-    for col in pudl_generators.columns:
+    for col in generators.columns:
         if "date" in col:
-            pudl_generators[col] = pd.to_datetime(pudl_generators[col])
+            generators[col] = pd.to_datetime(generators[col])
 
     # Correct geocoding of some plants
-    pudl_generators.loc[pudl_generators.plant_id_eia.eq(65756), "state"] = "MD"
-    pudl_generators.loc[pudl_generators.plant_id_eia.eq(65756), "timezone"] = (
-        "America/New_York"
-    )
+    generators.loc[generators.plant_id_eia.eq(65756), "state"] = "MD"
+    generators.loc[generators.plant_id_eia.eq(65756), "timezone"] = "America/New_York"
 
-    return pudl_generators
+    return generators
 
 
-def _transform_pudl_eia860m_changelog(
-    pudl_eia860m_changelog_raw: pd.DataFrame,
+def _transform_eia860m_changelog_generators(
+    changelog_generators_raw: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Transform pudl_eia860m_changelog table."""
-    pudl_eia860m_changelog = pudl_eia860m_changelog_raw.convert_dtypes().copy()
+    """Transform eia860m__changelog__generators table."""
+    changelog_generators = changelog_generators_raw.convert_dtypes().copy()
 
     # Convert every column with date in it to a datetime column
-    for col in pudl_eia860m_changelog.columns:
+    for col in changelog_generators.columns:
         if "date" in col:
-            pudl_eia860m_changelog[col] = pd.to_datetime(pudl_eia860m_changelog[col])
+            changelog_generators[col] = pd.to_datetime(changelog_generators[col])
 
-    pudl_eia860m_changelog = pudl_eia860m_changelog.rename(
+    changelog_generators = changelog_generators.rename(
         columns={
             "state": "raw_state",
             "county": "raw_county",
@@ -84,7 +82,7 @@ def _transform_pudl_eia860m_changelog(
     )
 
     # Fill FIPS codes
-    filled_location = pudl_eia860m_changelog.loc[:, ["raw_state", "raw_county"]].fillna(
+    filled_location = changelog_generators.loc[:, ["raw_state", "raw_county"]].fillna(
         ""
     )  # copy; don't want to fill actual table
 
@@ -94,21 +92,21 @@ def _transform_pudl_eia860m_changelog(
         state_col="raw_state",
         county_col="raw_county",
     )
-    pudl_eia860m_changelog = pd.concat(
-        [pudl_eia860m_changelog, fips[["state_id_fips", "county_id_fips"]]],
+    changelog_generators = pd.concat(
+        [changelog_generators, fips[["state_id_fips", "county_id_fips"]]],
         axis=1,
         copy=False,
     )
 
-    pudl_eia860m_changelog.loc[
-        pudl_eia860m_changelog.county_id_fips.eq("51515"), "county_id_fips"
+    changelog_generators.loc[
+        changelog_generators.county_id_fips.eq("51515"), "county_id_fips"
     ] = "51019"  # https://www.ddorn.net/data/FIPS_County_Code_Changes.pdf
 
     # Map operational status codes
-    pudl_eia860m_changelog["raw_operational_status_code"] = pudl_eia860m_changelog[
+    changelog_generators["raw_operational_status_code"] = changelog_generators[
         "operational_status_code"
     ].copy()
-    pudl_eia860m_changelog["operational_status_code"] = pudl_eia860m_changelog[
+    changelog_generators["operational_status_code"] = changelog_generators[
         "raw_operational_status_code"
     ].map(OPERATIONAL_STATUS_CODES_SCALE)
 
@@ -119,10 +117,8 @@ def _transform_pudl_eia860m_changelog(
     # to impute. Counties with multiple or zero BAs are not imputed.
 
     # Identify the latest snapshot
-    latest_date = pudl_eia860m_changelog["valid_until_date"].max()
-    latest = pudl_eia860m_changelog[
-        pudl_eia860m_changelog.valid_until_date == latest_date
-    ]
+    latest_date = changelog_generators["valid_until_date"].max()
+    latest = changelog_generators[changelog_generators.valid_until_date == latest_date]
 
     # Find counties with exactly one unique non-null BA code in latest snapshot
     ba_counts = latest.groupby("county_id_fips")[
@@ -154,18 +150,20 @@ def _transform_pudl_eia860m_changelog(
         # MISO and PJM unchanged
     }
 
-    pudl_eia860m_changelog["iso_region"] = pudl_eia860m_changelog.apply(
+    changelog_generators["iso_region"] = changelog_generators.apply(
         _fill_ba, axis=1
     ).replace(iso_map)
 
-    return pudl_eia860m_changelog
+    return changelog_generators
 
 
-def _transform_pudl_eia860m_status_codes(pudl_eia860m_status_codes):
+def _transform_eia860m_operational_status_codes(
+    operational_status_codes: pd.DataFrame,
+):
     """Create a table with operational status codes and descriptions.
 
     Args:
-        pudl_eia860m_status_codes: the raw core_eia__codes_operational_status table.
+        operational_status_codes: the raw core_eia__codes_operational_status table.
 
     Returns:
         The DBCP operation status values mapped to PUDL codes and descriptions.
@@ -177,7 +175,7 @@ def _transform_pudl_eia860m_status_codes(pudl_eia860m_status_codes):
         .rename(columns={"index": "code", 0: "status"})
     )
     return op_status_codes_scale.merge(
-        pudl_eia860m_status_codes, how="inner", on="code"
+        operational_status_codes, how="inner", on="code"
     )[["code", "status", "description"]]
 
 
@@ -192,9 +190,9 @@ def transform(raw_pudl_tables: pd.DataFrame) -> dict[str, pd.DataFrame]:
 
     """
     table_transform_functions = {
-        "pudl_generators": _transform_pudl_generators,
-        "pudl_eia860m_changelog": _transform_pudl_eia860m_changelog,
-        "pudl_eia860m_status_codes": _transform_pudl_eia860m_status_codes,
+        "eia860m__annual__generators": _transform_eia860m_annual_generators,
+        "eia860m__changelog__generators": _transform_eia860m_changelog_generators,
+        "eia860m__operational_status_codes": _transform_eia860m_operational_status_codes,
     }
 
     transformed_dfs = {}

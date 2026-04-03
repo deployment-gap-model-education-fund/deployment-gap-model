@@ -19,14 +19,14 @@ def _subset_db_columns(
 
 def _get_county_fips_df(engine: sa.engine.Engine) -> pd.DataFrame:
     cols = ["*"]
-    db = "data_warehouse.county_fips"
+    db = "data_warehouse.census__county_fips"
     df = _subset_db_columns(cols, db, engine)
     return df
 
 
 def _get_state_fips_df(engine: sa.engine.Engine) -> pd.DataFrame:
     cols = ["*"]
-    db = "data_warehouse.state_fips"
+    db = "data_warehouse.census__state_fips"
     df = _subset_db_columns(cols, db, engine)
     return df
 
@@ -70,20 +70,17 @@ class CountyOpposition:
             # 'raw_state_name',  # drop raw name in favor of canonical one
             # 'state_id_fips',  # will join on 5-digit county FIPS, which includes state
         ]
-        db = "data_warehouse.local_ordinance"
+        db = "data_warehouse.columbia_reldi_local_opposition__local_ordinance"
         df = _subset_db_columns(cols, db, self._engine)
         return df
 
     def _get_state_opposition_df(self) -> pd.DataFrame:
         cols = [
             "earliest_year_mentioned",
-            # 'latest_year_mentioned',  # for simplicity, only include one year metric (earliest_year_mentioned)
-            # 'n_years_mentioned',  # for simplicity, only include one year metric (earliest_year_mentioned)
             "policy",
-            # 'raw_state_name',  # drop raw name in favor of canonical one
             "state_id_fips",
         ]
-        table = "data_warehouse.state_policy"
+        table = "data_warehouse.columbia_reldi_local_opposition__state_policy"
         states_to_exclude = (
             "23",  # Maine (repealed)
             "36",  # New York (pro-renewables policy)
@@ -94,8 +91,6 @@ class CountyOpposition:
 
     def _represent_state_policy_as_local_ordinances(self) -> pd.DataFrame:
         """Downscale state policies to look like county-level ordinances at each county in the respective state.
-
-        To make concatenation easier, the output dataframe imitates the columns of the local ordinance table.
 
         Returns:
             pd.DataFrame: fanned out state policy dataframe
@@ -199,7 +194,7 @@ class CountyOpposition:
 
     def _get_manual_ordinances(self) -> pd.DataFrame:
         df = pd.read_sql_table(
-            "manual_ordinances", self._engine, schema="data_warehouse"
+            "airtable__manual_ordinances", self._engine, schema="data_warehouse"
         )
         return df
 
@@ -361,12 +356,8 @@ def get_query(filename: str) -> str:
     Returns:
         the query as a string
     Example:
-        >>> import pandas as pd
-        >>> from dbcp.data_mart.helpers import get_query
-        >>> from dbcp.helpers import get_sql_engine
-        >>> engine = get_sql_engine()
-        >>> query = get_query("get_proposed_infra_projects.sql")
-        >>> df = pd.read_sql(query, engine)
+        Use `query = get_query("get_proposed_infra_projects.sql")` and pass the
+        returned SQL string to `pd.read_sql(...)`.
 
     """
     sql_query_dir = Path(__file__).parent / "sql_queries"

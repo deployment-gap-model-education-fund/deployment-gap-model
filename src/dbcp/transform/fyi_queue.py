@@ -338,9 +338,11 @@ def normalize_fyi_dfs(fyi_transformed_dfs: pd.DataFrame) -> dict[str, pd.DataFra
     resource_capacity_dfs = _normalize_resource_capacity(fyi_transformed_dfs)
     location_dfs = _normalize_location(resource_capacity_dfs["project_df"])
     return {
-        "fyi_projects": location_dfs["project_df"],
-        "fyi_locations": location_dfs["location_df"],
-        "fyi_resource_capacity": resource_capacity_dfs["resource_capacity_df"],
+        "fyi__private__projects": location_dfs["project_df"],
+        "fyi__private__locations": location_dfs["location_df"],
+        "fyi__private__resource_capacity": resource_capacity_dfs[
+            "resource_capacity_df"
+        ],
     }
 
 
@@ -359,8 +361,8 @@ def transform(fyi_raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     )  # sets index to project_id
     # Combine and normalize iso queue tables
     fyi_normalized_dfs = normalize_fyi_dfs(transformed)
-    fyi_normalized_dfs["fyi_projects"] = fyi_normalized_dfs[
-        "fyi_projects"
+    fyi_normalized_dfs["fyi__private__projects"] = fyi_normalized_dfs[
+        "fyi__private__projects"
     ].reset_index()
     # data enrichment
     # Add Fips Codes
@@ -368,46 +370,54 @@ def transform(fyi_raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     # raw names with lowercase + manual corrections. I want to preserve raw names in the final
     # output but didn't want to refactor these functions to do it.
     new_locs = fyi_manual_county_state_name_fill_ins(
-        fyi_normalized_dfs["fyi_locations"]
+        fyi_normalized_dfs["fyi__private__locations"]
     )
     # we may have manually filled in locations for projects that are no
     # longer in the projects table. If so, they should be removed
     # from the manual fill ins.
     in_locations_not_in_projects = new_locs[
-        ~new_locs["project_id"].isin(fyi_normalized_dfs["fyi_projects"]["project_id"])
+        ~new_locs["project_id"].isin(
+            fyi_normalized_dfs["fyi__private__projects"]["project_id"]
+        )
     ]
     if len(in_locations_not_in_projects) > 0:
         logger.warning(
-            "Found projects in the locations table that aren't in the fyi_projects table. "
+            "Found projects in the locations table that aren't in the fyi__private__projects table. "
             "Remove these projects from the FYI manual county-state locations fill ins:\n"
             f"{in_locations_not_in_projects}"
         )
     new_locs = new_locs[
-        new_locs["project_id"].isin(fyi_normalized_dfs["fyi_projects"]["project_id"])
+        new_locs["project_id"].isin(
+            fyi_normalized_dfs["fyi__private__projects"]["project_id"]
+        )
     ]
     # add state_id_fips, county_id_fips, geocoded_locality_name, geocoded_locality_type, geocoded_containing_county
     new_locs = add_county_fips_with_backup_geocoding(
         new_locs, state_col="raw_state_name", locality_col="raw_county_name"
     )
     new_locs.loc[:, ["raw_state_name", "raw_county_name"]] = (
-        fyi_normalized_dfs["fyi_locations"]
+        fyi_normalized_dfs["fyi__private__locations"]
         .loc[:, ["raw_state_name", "raw_county_name"]]
         .copy()
     )
-    fyi_normalized_dfs["fyi_locations"] = new_locs
+    fyi_normalized_dfs["fyi__private__locations"] = new_locs
     # Clean up and categorize resources
-    fyi_normalized_dfs["fyi_resource_capacity"] = clean_resource_type(
-        fyi_normalized_dfs["fyi_resource_capacity"], FYI_RESOURCE_DICT
+    fyi_normalized_dfs["fyi__private__resource_capacity"] = clean_resource_type(
+        fyi_normalized_dfs["fyi__private__resource_capacity"], FYI_RESOURCE_DICT
     )
-    if fyi_normalized_dfs["fyi_resource_capacity"].resource_clean.isna().any():
+    if (
+        fyi_normalized_dfs["fyi__private__resource_capacity"]
+        .resource_clean.isna()
+        .any()
+    ):
         raise AssertionError("Missing Resources!")
     # Most projects missing queue_status are from the early 2000s so I'm going to assume
     # they were withrawn.
-    assert fyi_normalized_dfs["fyi_projects"]["queue_status"].isna().sum() <= 42, (
-        "Unexpected number of projects missing queue status."
-    )
-    fyi_normalized_dfs["fyi_projects"]["queue_status"] = fyi_normalized_dfs[
-        "fyi_projects"
+    assert (
+        fyi_normalized_dfs["fyi__private__projects"]["queue_status"].isna().sum() <= 42
+    ), "Unexpected number of projects missing queue status."
+    fyi_normalized_dfs["fyi__private__projects"]["queue_status"] = fyi_normalized_dfs[
+        "fyi__private__projects"
     ]["queue_status"].fillna("Withdrawn")
     return fyi_normalized_dfs
 
@@ -419,8 +429,8 @@ if __name__ == "__main__":
     fyi_uri = "gs://dgm-archive/interconnection.fyi/interconnection_fyi_dataset_2026-01-01.csv"
     fyi_raw_dfs = dbcp.extract.fyi_queue.extract(fyi_uri)
     fyi_transformed_dfs = dbcp.transform.fyi_queue.transform(fyi_raw_dfs)
-    fyi_transformed_dfs["fyi_resource_capacity"].to_parquet(
-        OUTPUT_DIR / "private_data_warehouse/fyi_resource_capacity.parquet"
+    fyi_transformed_dfs["fyi__private__resource_capacity"].to_parquet(
+        OUTPUT_DIR / "private_data_warehouse/fyi__private__resource_capacity.parquet"
     )
 
     assert fyi_transformed_dfs

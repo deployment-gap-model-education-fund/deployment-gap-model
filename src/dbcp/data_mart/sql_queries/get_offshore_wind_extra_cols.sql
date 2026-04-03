@@ -5,10 +5,10 @@
             port.location_id,
             locs.county_id_fips,
             proj."capacity_mw"
-        FROM "data_warehouse"."offshore_wind_projects" as proj
-        INNER JOIN data_warehouse.offshore_wind_port_association as port
+        FROM "data_warehouse"."offshore_wind_airtable__projects" as proj
+        INNER JOIN data_warehouse.offshore_wind_airtable__port_association as port
         USING(project_id)
-        INNER JOIN data_warehouse.offshore_wind_locations as locs
+        INNER JOIN data_warehouse.offshore_wind_airtable__locations as locs
         USING(location_id)
     ),
     -- select * from proj_ports
@@ -28,7 +28,7 @@
         SELECT
             county_id_fips,
             string_agg(distinct(why_of_interest), ',' order by why_of_interest) as offshore_wind_interest_type
-        FROM data_warehouse.offshore_wind_locations as locs
+        FROM data_warehouse.offshore_wind_airtable__locations as locs
         GROUP BY 1
         ORDER BY 1
     )

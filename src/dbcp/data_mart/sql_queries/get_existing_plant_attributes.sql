@@ -12,7 +12,7 @@ WITH
             sum(net_generation_mwh) as net_gen_by_fuel,
             sum(capacity_mw) as capacity_by_fuel,
             max(generator_operating_date) as max_operating_date
-        from data_warehouse.pudl_generators
+        from data_warehouse.eia860m__annual__generators
         where operational_status = 'existing'
         group by 1, 2
     ),
