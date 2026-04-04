@@ -1,37 +1,18 @@
-"""Logic for extracing PUDL data."""
+"""Logic for extracting PUDL data."""
 
 import pandas as pd
 
 import dbcp
-from dbcp.constants import PUDL_LATEST_YEAR
 
 
-def _extract_eia860m_annual_generators() -> pd.DataFrame:
-    """Extract eia860m__annual__generators table from PUDL resources.
-
-    Returns:
-        The eia860m__annual__generators table.
-
-    """
+def _extract_eia860m_yearly_generators() -> pd.DataFrame:
+    """Extract yearly generator history from PUDL resources."""
     pudl_resource_path = dbcp.helpers.get_pudl_resource(
         pudl_resource="out_eia__yearly_generators.parquet"
     )
-    generators = pd.read_parquet(
+    return pd.read_parquet(
         pudl_resource_path, engine="pyarrow", dtype_backend="numpy_nullable"
     )
-
-    # convert columns with 'date' in the name to datetime
-    # TODO: Use dtype_backend="pyarrow" when we update to pandas >= 2.0
-    date_columns = [col for col in generators.columns if "date" in col]
-    for col in date_columns:
-        generators[col] = pd.to_datetime(generators[col])
-
-    # filter generators where report_year >= PUDL_LATEST_YEAR and < PUDL_LATEST_YEAR+1
-    generators = generators[
-        (generators.report_date.dt.year >= PUDL_LATEST_YEAR)
-        & (generators.report_date.dt.year < PUDL_LATEST_YEAR + 1)
-    ]
-    return generators
 
 
 def _extract_eia860m_changelog_generators() -> pd.DataFrame:
@@ -66,7 +47,7 @@ def extract() -> dict[str, pd.DataFrame]:
     raw_pudl_tables = {}
     # dictionary of PUDL table names to names used in DGM data warehouse
     tables = {
-        "eia860m__annual__generators": _extract_eia860m_annual_generators,
+        "eia860m__yearly_generators": _extract_eia860m_yearly_generators,
         "eia860m__changelog__generators": _extract_eia860m_changelog_generators,
         "eia860m__operational_status_codes": _extract_eia860m_operational_status_codes,
     }

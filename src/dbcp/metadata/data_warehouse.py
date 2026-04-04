@@ -678,10 +678,29 @@ eia860m__changelog__generators = Table(
         String,
         ForeignKey("data_warehouse.census__county_fips.county_id_fips"),
         nullable=True,
-    ),  # Should not be nullable in future updates
+    ),
     Column("iso_region", String),
     schema=schema,
 )
+
+eia860m__changelog__generators_operational_status = Table(
+    "eia860m__changelog__generators_operational_status",
+    metadata,
+    Column("generator_id", String, primary_key=True),
+    Column("plant_id_eia", Integer, primary_key=True),
+    Column("report_date", DateTime, primary_key=True),
+    Column("valid_until_date", DateTime),
+    Column("operational_status", String),
+    Column("capacity_mw", Float),
+    Column(
+        "county_id_fips",
+        String,
+        ForeignKey("data_warehouse.census__county_fips.county_id_fips"),
+        nullable=True,
+    ),
+    schema=schema,
+)
+
 
 eia860m__operational_status_codes = Table(
     "eia860m__operational_status_codes",
