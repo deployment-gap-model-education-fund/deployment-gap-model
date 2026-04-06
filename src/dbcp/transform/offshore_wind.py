@@ -246,7 +246,7 @@ def _normalize_tables(
     """Normalize the project and location tables.
 
     Create the following tables:
-    - offshore_wind_airtable__projects: pk is project_id
+    - airtable__offshore_wind_projects: pk is project_id
     - offshore_wind_airtable__locations: pk is location_id
     - offshore_wind_airtable__cable_landing_association: association table between projects and locations for cable landings
     - offshore_wind_airtable__port_association: association table between projects and locations for port locations
@@ -292,7 +292,7 @@ def _normalize_tables(
 
     # projects
     _add_actionable_and_nearly_certain_classification(proj)
-    tables["offshore_wind_airtable__projects"] = proj
+    tables["airtable__offshore_wind_projects"] = proj
 
     # locations
     _add_geocoded_locations(locs)
@@ -352,13 +352,13 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         "Site assessment underway": "active",
         "TBD": "active",  # assume active
     }
-    transformed_dfs["offshore_wind_airtable__projects"]["queue_status"] = (
-        transformed_dfs["offshore_wind_airtable__projects"]["construction_status"]
+    transformed_dfs["airtable__offshore_wind_projects"]["queue_status"] = (
+        transformed_dfs["airtable__offshore_wind_projects"]["construction_status"]
         .fillna("TBD")
         .map(queue_mapping)
     )
     assert (
-        transformed_dfs["offshore_wind_airtable__projects"]["queue_status"]
+        transformed_dfs["airtable__offshore_wind_projects"]["queue_status"]
         .notnull()
         .all()
     ), "Unmapped construction status."

@@ -39,7 +39,7 @@ WITH
         cfip.county_name as county,
         ncsl.permitting_type as state_permitting_type
 
-    FROM data_warehouse.offshore_wind_airtable__projects as proj
+    FROM data_warehouse.airtable__offshore_wind_projects as proj
     LEFT JOIN proj_county_assoc as assoc
     USING(project_id)
     LEFT JOIN data_warehouse.census__state_fips as sfip
