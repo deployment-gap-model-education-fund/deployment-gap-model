@@ -32,9 +32,9 @@ def _get_bigquery_dataset_id(
     """Map an output directory to the BigQuery dataset it should publish into."""
     destination_suffix = "" if target == "prod" else f"_{target}"
 
-    # Publish both public and private warehouse tables into one staging dataset.
+    # Publish both public and private warehouse tables into one dataset.
     if destination_blob_prefix in {"data_warehouse", "private_data_warehouse"}:
-        return f"data_warehouse_staging{destination_suffix}"
+        return f"data_warehouse_{destination_suffix}"
 
     return f"{destination_blob_prefix}{destination_suffix}"
 

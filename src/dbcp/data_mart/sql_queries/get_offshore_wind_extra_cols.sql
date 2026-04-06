@@ -5,7 +5,7 @@
             port.location_id,
             locs.county_id_fips,
             proj."capacity_mw"
-        FROM "data_warehouse"."offshore_wind_airtable__projects" as proj
+        FROM "data_warehouse"."airtable__offshore_wind_projects" as proj
         INNER JOIN data_warehouse.offshore_wind_airtable__port_association as port
         USING(project_id)
         INNER JOIN data_warehouse.offshore_wind_airtable__locations as locs
