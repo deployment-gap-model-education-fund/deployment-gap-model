@@ -187,12 +187,20 @@ def write_to_postgres(
     """
     df = trim_columns_length(df)
     df = enforce_dtypes(df, table_name, schema_name)
+    if schema_name not in {
+        "data_mart",
+        "private_data_mart",
+        "data_warehouse",
+        "private_data_warehouse",
+    }:
+        raise ValueError(f"{schema_name} is not a valid schema.")
+
     df.to_sql(
         name=table_name,
         con=engine,
         if_exists=if_exists,
         index=False,
-        schema="data_mart" if "data_mart" in schema_name else "data_warehouse",
+        schema=schema_name,
         method=psql_insert_copy,
         chunksize=5000,  # adjust based on memory capacity
     )

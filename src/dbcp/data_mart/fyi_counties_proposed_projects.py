@@ -1,4 +1,4 @@
-"""Create data mart tables of interconnection.fyi proposed project queue data aggregated up to the county level."""
+"""Create county-level data mart tables from interconnection.fyi queue data."""
 
 import pandas as pd
 import sqlalchemy as sa
@@ -7,19 +7,12 @@ from dbcp.constants import FYI_RESOURCE_DICT
 from dbcp.data_mart.projects import create_fyi_long_format
 from dbcp.helpers import get_sql_engine
 
-# Specify which tables should be part of the private
-# data mart schema
-PRIVATE_DATA_MART_TABLES = {
-    "fyi_counties_proposed_clean_projects",
-    "fyi_counties_proposed_clean_projects_wide",
-}
 
-
-def create_fyi_counties_proposed_clean_projects(
+def create_fyi_counties_active_clean_projects(
     postgres_engine: sa.engine.Engine,
 ) -> pd.DataFrame:
-    """Create data mart table of projects in FYI queue data aggregated by county and resource."""
-    fyi = create_fyi_long_format(postgres_engine)
+    """Aggregate active FYI clean-energy projects to county/resource totals."""
+    fyi = create_fyi_long_format(postgres_engine, active_projects_only=True)
 
     # Distribute project-level quantities across locations, when there are multiple.
     # A handful of ISO projects are in multiple counties and the proprietary offshore
@@ -49,42 +42,40 @@ def create_fyi_counties_proposed_clean_projects(
     aggs = aggs.rename(
         columns={
             "project_id": "facility_count",
-            "capacity_mw": "renewable_and_battery_proposed_capacity_mw",
+            "capacity_mw": "active_clean_projects_capacity_mw",
         },
     )
 
     return aggs
 
 
-def create_fyi_counties_proposed_clean_projects_wide(
-    fyi_counties_proposed_clean_projects: pd.DataFrame,
+def create_fyi_private_counties_active_clean_projects_capacity(
+    fyi_counties_active_clean_projects: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Create wide version of FYI counties proposed table."""
+    """Create a light-weight county-level mart of active clean-project capacity."""
     # Filter to only desired resources and map to column names
     resource_name_map = {
-        "Solar": "solar_mw",
-        "Onshore Wind": "onshore_wind_mw",
-        "Battery Storage": "battery_storage_mw",
+        "Solar": "solar_active_capacity_mw",
+        "Onshore Wind": "onshore_wind_active_capacity_mw",
+        "Battery Storage": "battery_storage_active_capacity_mw",
     }
-    tidy_df = fyi_counties_proposed_clean_projects[
-        fyi_counties_proposed_clean_projects["resource_clean"].isin(
-            resource_name_map.keys()
-        )
+    tidy_df = fyi_counties_active_clean_projects[
+        fyi_counties_active_clean_projects["resource_clean"].isin(resource_name_map)
     ]
 
     # Pivot tidy table
     wide_df = tidy_df.pivot(
         index="county_id_fips",
         columns="resource_clean",
-        values="renewable_and_battery_proposed_capacity_mw",
+        values="active_clean_projects_capacity_mw",
     ).rename(columns=resource_name_map)
 
     # Create column with sum of all resources
-    wide_df["total_proposed_capacity_mw"] = wide_df.sum(axis="columns")
+    wide_df["total_active_clean_projects_capacity_mw"] = wide_df.sum(axis="columns")
 
     # Reindex so all counties are included
     wide_df = wide_df.reindex(
-        fyi_counties_proposed_clean_projects["county_id_fips"].unique()
+        fyi_counties_active_clean_projects["county_id_fips"].unique()
     )
     return wide_df
 
@@ -92,31 +83,32 @@ def create_fyi_counties_proposed_clean_projects_wide(
 def create_data_mart(
     engine: sa.engine.Engine | None = None,
 ) -> dict[str, pd.DataFrame]:
-    """Create FYI proposed project data mart table aggregated to county level.
+    """Create FYI active clean-project capacity table aggregated to county level.
 
     Args:
         engine (Optional[sa.engine.Engine], optional): postgres engine. Defaults to None.
 
     Returns:
-        Dict[str, pd.DataFrame]: proposed project data mart table at county level
+        Dict[str, pd.DataFrame]: county-level FYI active clean-project capacity table
 
     """
     postgres_engine = engine
     if postgres_engine is None:
         postgres_engine = get_sql_engine()
 
-    counties_proposed_clean_projects = create_fyi_counties_proposed_clean_projects(
+    counties_active_clean_projects = create_fyi_counties_active_clean_projects(
         postgres_engine=postgres_engine
     )
 
-    counties_proposed_clean_projects_wide = (
-        create_fyi_counties_proposed_clean_projects_wide(
-            counties_proposed_clean_projects
+    counties_active_clean_projects_capacity = (
+        create_fyi_private_counties_active_clean_projects_capacity(
+            counties_active_clean_projects
         )
     ).reset_index()
     out = {
-        "fyi_counties_proposed_clean_projects": counties_proposed_clean_projects,
-        "fyi_counties_proposed_clean_projects_wide": counties_proposed_clean_projects_wide,
+        "fyi__private__counties__active_clean_projects_capacity": (
+            counties_active_clean_projects_capacity
+        ),
     }
     return out
 
