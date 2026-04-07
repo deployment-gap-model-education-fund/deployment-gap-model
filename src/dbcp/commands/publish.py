@@ -20,9 +20,13 @@ from dbcp.metadata import SchemaName
 logger = logging.getLogger(__name__)
 
 
-def _get_schema_id(schema_name: SchemaName, target: str) -> str:
-    """Map an output directory to the BigQuery dataset it should publish into."""
-    destination_suffix = "" if target == "_prod" else target
+def _get_published_schema_id(schema_name: SchemaName, target: str) -> str:
+    """Combine schema name with target to get to get schema ID for published data.
+
+    Our published data (on BigQuery and Postgres) maintains a dev / prod split, which
+    is why we don't use the schema_name in isolation.
+    """
+    destination_suffix = "" if target == "prod" else f"_{target}"
 
     return f"{schema_name.value}{destination_suffix}"
 
@@ -92,6 +96,7 @@ def load_parquet_files_to_postgres(
             engine=engine,
             schema_name=schema,
             if_exists="replace",
+            remote_schema_id=_get_published_schema_id(schema, target),
         )
         logger.info(f"Successfully wrote table {table_name} to production postgres DB.")
 
@@ -116,7 +121,7 @@ def load_parquet_files_to_bigquery(
     client = bigquery.Client(credentials=credentials, project=project_id)
 
     # Get the BigQuery dataset
-    dataset_id = _get_schema_id(schema, target)
+    dataset_id = _get_published_schema_id(schema, target)
     dataset_ref = client.dataset(dataset_id)
 
     # get all parquet files in the bucket/{version} directory
