@@ -11,7 +11,7 @@ from dbcp.helpers import get_sql_engine
 def create_fyi_counties_active_clean_projects(
     postgres_engine: sa.engine.Engine,
 ) -> pd.DataFrame:
-    """Aggregate active FYI clean-energy projects to county/resource totals."""
+    """Aggregate active FYI clean projects by county and resource."""
     fyi = create_fyi_long_format(postgres_engine, active_projects_only=True)
 
     # Distribute project-level quantities across locations, when there are multiple.
@@ -42,7 +42,7 @@ def create_fyi_counties_active_clean_projects(
     aggs = aggs.rename(
         columns={
             "project_id": "facility_count",
-            "capacity_mw": "active_clean_projects_capacity_mw",
+            "capacity_mw": "renewable_and_battery_proposed_capacity_mw",
         },
     )
 
@@ -52,7 +52,7 @@ def create_fyi_counties_active_clean_projects(
 def create_fyi_private_counties_active_clean_projects_capacity(
     fyi_counties_active_clean_projects: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Create a light-weight county-level mart of active clean-project capacity."""
+    """Create a county-level mart of active clean queue project capacity."""
     # Filter to only desired resources and map to column names
     resource_name_map = {
         "Solar": "solar_active_capacity_mw",
@@ -67,7 +67,7 @@ def create_fyi_private_counties_active_clean_projects_capacity(
     wide_df = tidy_df.pivot(
         index="county_id_fips",
         columns="resource_clean",
-        values="active_clean_projects_capacity_mw",
+        values="renewable_and_battery_proposed_capacity_mw",
     ).rename(columns=resource_name_map)
 
     # Create column with sum of all resources
@@ -83,13 +83,13 @@ def create_fyi_private_counties_active_clean_projects_capacity(
 def create_data_mart(
     engine: sa.engine.Engine | None = None,
 ) -> dict[str, pd.DataFrame]:
-    """Create FYI active clean-project capacity table aggregated to county level.
+    """Create FYI active clean project capacity table aggregated to county level.
 
     Args:
         engine (Optional[sa.engine.Engine], optional): postgres engine. Defaults to None.
 
     Returns:
-        Dict[str, pd.DataFrame]: county-level FYI active clean-project capacity table
+        Dict[str, pd.DataFrame]: county-level FYI active clean project capacity table
 
     """
     postgres_engine = engine

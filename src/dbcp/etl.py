@@ -22,10 +22,6 @@ from dbcp.validation.tests import validate_warehouse
 
 logger = logging.getLogger(__name__)
 
-LIGHTWEIGHT_DATA_MART_MODULES = {
-    "fyi_counties_proposed_projects",
-}
-
 
 def etl_eip_infrastructure() -> dict[str, pd.DataFrame]:
     """EIP Infrastructure ETL."""
@@ -292,7 +288,6 @@ def create_data_mart(engine):  # noqa: C901
     modules = [
         (module, module_info)
         for module, module_info in dbcp.data_mart.get_data_mart_modules()
-        if module_info.name in LIGHTWEIGHT_DATA_MART_MODULES
     ]
     data_mart_tables: dict[str, pd.DataFrame] = {}
     for module, module_info in modules:
@@ -326,7 +321,7 @@ def etl(schema: SchemaName | None = None):
     if (schema == SchemaName.DATA_WAREHOUSE) or (schema is None):
         create_data_warehouse()
         validate_warehouse(engine=engine)
-    if (schema == "data_mart") or (schema == "all") or (schema == "private_data_mart"):
+    if (schema == "data_mart") or (schema == "all"):
         create_data_mart(engine=engine)
 
     logger.info("Successfully finished ETL.")

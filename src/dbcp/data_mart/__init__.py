@@ -12,6 +12,12 @@ def get_data_mart_modules():
     modules_to_skip = {
         "helpers",  # helper code; no tables
         "co2_dashboard",  # obsolete but code imported elsewhere
+        "br_election_data",
+        "counties",
+        "county_concrete_mw",
+        "existing_plants",
+        "fossil_infrastructure_projects",
+        "projects",
     }
     modules = []
     for module_info in pkgutil.iter_modules(__path__):
