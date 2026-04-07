@@ -625,8 +625,8 @@ eia860m__annual__generators = Table(
     schema=schema,
 )
 
-eia860m__changelog__generators = Table(
-    "eia860m__changelog__generators",
+_eia860m__changelog__generators = Table(
+    "_eia860m__changelog__generators",
     metadata,
     Column("report_date", DateTime, primary_key=True),
     Column("generator_id", String, primary_key=True),

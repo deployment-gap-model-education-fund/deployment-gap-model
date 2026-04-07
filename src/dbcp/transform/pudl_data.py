@@ -65,7 +65,7 @@ def _transform_eia860m_annual_generators(generators: pd.DataFrame) -> pd.DataFra
 def _transform_eia860m_changelog_generators(
     changelog_generators_raw: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Transform eia860m__changelog__generators table."""
+    """Transform _eia860m__changelog__generators table."""
     changelog_generators = changelog_generators_raw.convert_dtypes().copy()
 
     # Convert every column with date in it to a datetime column
@@ -191,7 +191,7 @@ def transform(raw_pudl_tables: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """
     table_transform_functions = {
         "eia860m__annual__generators": _transform_eia860m_annual_generators,
-        "eia860m__changelog__generators": _transform_eia860m_changelog_generators,
+        "_eia860m__changelog__generators": _transform_eia860m_changelog_generators,
         "eia860m__operational_status_codes": _transform_eia860m_operational_status_codes,
     }
 
