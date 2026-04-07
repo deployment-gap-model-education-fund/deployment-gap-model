@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import sqlalchemy as sa
 
-from dbcp.constants import OUTPUT_DIR
+from dbcp.constants import OUTPUT_DIR, PUDL_LATEST_YEAR
 from dbcp.data_mart.co2_dashboard import (
     _get_plant_location_data,
     _transfrom_plant_location_data,
@@ -21,7 +21,9 @@ from dbcp.data_mart.helpers import (
     _replace_iso_offshore_with_proprietary,
     get_query,
 )
+from dbcp.extract.pudl_data import _extract_eia860m_yearly_generators
 from dbcp.helpers import get_sql_engine
+from dbcp.transform.pudl_data import _prepare_eia860m_yearly_generators
 
 logger = logging.getLogger(__name__)
 
@@ -851,9 +853,56 @@ def get_eia860m_current(engine: sa.engine.Engine) -> pd.DataFrame:
 
 
 def _get_latest_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
-    """Get plant-level fuel and capacity attributes from the annual EIA860M table."""
-    query = get_query("get_existing_plant_attributes.sql")
-    df = pd.read_sql(query, engine)
+    """Get plant-level fuel and capacity attributes from the latest annual PUDL data."""
+    current_year = pd.Timestamp.now().year
+    if current_year - PUDL_LATEST_YEAR > 1:
+        logger.warning(
+            "PUDL_LATEST_YEAR=%s is more than one year behind the current year %s.",
+            PUDL_LATEST_YEAR,
+            current_year,
+        )
+
+    generators = _prepare_eia860m_yearly_generators(
+        _extract_eia860m_yearly_generators()
+    )
+    generators = generators[
+        (generators["report_date"].dt.year >= PUDL_LATEST_YEAR)
+        & (generators["report_date"].dt.year < PUDL_LATEST_YEAR + 1)
+        & (generators["operational_status"] == "existing")
+    ].copy()
+
+    generators["resource"] = generators["fuel_type_code_pudl"].astype("string")
+    generators.loc[generators["technology_description"] == "Batteries", "resource"] = (
+        "Battery Storage"
+    )
+    generators.loc[
+        generators["technology_description"] == "Offshore Wind Turbine", "resource"
+    ] = "Offshore Wind"
+    generators.loc[generators["fuel_type_code_pudl"] == "waste", "resource"] = "other"
+
+    plant_fuel_aggs = generators.groupby(
+        ["plant_id_eia", "resource"], dropna=False, as_index=False
+    ).agg(
+        net_gen_by_fuel=("net_generation_mwh", "sum"),
+        capacity_by_fuel=("capacity_mw", "sum"),
+        max_operating_date=("generator_operating_date", "max"),
+    )
+    plant_capacity = (
+        plant_fuel_aggs.groupby("plant_id_eia", as_index=False)["capacity_by_fuel"]
+        .sum()
+        .rename(columns={"capacity_by_fuel": "capacity_mw"})
+    )
+    df = (
+        plant_fuel_aggs.merge(plant_capacity, on="plant_id_eia", how="left")
+        .sort_values(
+            ["plant_id_eia", "net_gen_by_fuel", "capacity_by_fuel"],
+            ascending=[True, False, False],
+            na_position="last",
+        )
+        .drop_duplicates(subset=["plant_id_eia"], keep="first")
+        .loc[:, ["plant_id_eia", "resource", "max_operating_date", "capacity_mw"]]
+    )
+
     resource_map = {
         "gas": "Natural Gas",
         "wind": "Onshore Wind",

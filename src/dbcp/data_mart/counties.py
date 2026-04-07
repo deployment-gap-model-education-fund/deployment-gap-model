@@ -29,8 +29,10 @@ import sqlalchemy as sa
 from dbcp.data_mart.co2_dashboard import (
     _estimate_existing_co2e,
     _get_existing_plant_fuel_data,
-    _get_plant_location_data,
-    _transfrom_plant_location_data,
+)
+from dbcp.data_mart.eia860m import (
+    _get_latest_plant_attributes,
+    _get_latest_plant_locations,
 )
 from dbcp.data_mart.fossil_infrastructure_projects import (
     create_data_mart as create_fossil_infra_data_mart,
@@ -213,47 +215,10 @@ def _get_env_justice_df(engine: sa.engine.Engine) -> pd.DataFrame:
     return df
 
 
-def _get_existing_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
-    # get plant_id, fuel_type, capacity_mw
-
-    query = get_query("get_existing_plant_attributes.sql")
-    df = pd.read_sql(query, engine)
-    resource_map = {
-        "gas": "Natural Gas",
-        "wind": "Onshore Wind",
-        "hydro": "Hydro",
-        "oil": "Oil",
-        "nuclear": "Nuclear",
-        "coal": "Coal",
-        "other": "Other",
-        "solar": "Solar",
-        "Battery Storage": "Battery Storage",
-        "Offshore Wind": "Offshore Wind",
-    }
-    df.loc[:, "resource"] = df.loc[:, "resource"].map(resource_map)
-    return df
-
-
 def _get_existing_fossil_plant_co2e_estimates() -> pd.Series:
     gen_fuel_923 = _get_existing_plant_fuel_data()
     plant_co2e = _estimate_existing_co2e(gen_fuel_923)
     return plant_co2e
-
-
-def _get_existing_plant_locations(
-    postgres_engine: sa.engine.Engine,
-    state_fips_table: pd.DataFrame | None = None,
-    county_fips_table: pd.DataFrame | None = None,
-):
-    if state_fips_table is None:
-        state_fips_table = _get_state_fips_df(postgres_engine)
-    if county_fips_table is None:
-        county_fips_table = _get_county_fips_df(postgres_engine)
-    plant_locations = _get_plant_location_data()
-    plant_locations = _transfrom_plant_location_data(
-        plant_locations, state_table=state_fips_table, county_table=county_fips_table
-    )
-    return plant_locations
 
 
 def _get_existing_plants(
@@ -261,9 +226,9 @@ def _get_existing_plants(
     state_fips_table: pd.DataFrame | None = None,
     county_fips_table: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    plants = _get_existing_plant_attributes(engine=postgres_engine)
+    plants = _get_latest_plant_attributes(engine=postgres_engine)
     co2e = _get_existing_fossil_plant_co2e_estimates()
-    locations = _get_existing_plant_locations(
+    locations = _get_latest_plant_locations(
         postgres_engine=postgres_engine,
         state_fips_table=state_fips_table,
         county_fips_table=county_fips_table,
