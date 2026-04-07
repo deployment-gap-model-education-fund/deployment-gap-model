@@ -1217,8 +1217,8 @@ nrel_local_ordinances = Table(
 ##########################
 
 
-offshore_wind_airtable__projects = Table(
-    "offshore_wind_airtable__projects",
+airtable__offshore_wind_projects = Table(
+    "airtable__offshore_wind_projects",
     metadata,
     Column("project_id", Integer, primary_key=True),
     Column("name", String),
@@ -1284,7 +1284,7 @@ offshore_wind_airtable__cable_landing_association = Table(
     Column(
         "project_id",
         Integer,
-        ForeignKey("data_warehouse.offshore_wind_airtable__projects.project_id"),
+        ForeignKey("data_warehouse.airtable__offshore_wind_projects.project_id"),
         primary_key=True,
     ),
     schema=schema,
@@ -1301,7 +1301,7 @@ offshore_wind_airtable__port_association = Table(
     Column(
         "project_id",
         Integer,
-        ForeignKey("data_warehouse.offshore_wind_airtable__projects.project_id"),
+        ForeignKey("data_warehouse.airtable__offshore_wind_projects.project_id"),
         primary_key=True,
     ),
     schema=schema,
@@ -1318,7 +1318,7 @@ offshore_wind_airtable__staging_association = Table(
     Column(
         "project_id",
         Integer,
-        ForeignKey("data_warehouse.offshore_wind_airtable__projects.project_id"),
+        ForeignKey("data_warehouse.airtable__offshore_wind_projects.project_id"),
         primary_key=True,
     ),
     schema=schema,
