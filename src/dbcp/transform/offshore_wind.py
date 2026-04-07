@@ -170,7 +170,7 @@ def _add_geocoded_locations(transformed_locs: pd.DataFrame) -> None:
         first_pass.update(second_pass.loc[:, cols_to_fill])
 
     transformed_locs.loc[:, cols_to_fill] = first_pass[cols_to_fill]
-    return
+    return transformed_locs
 
 
 def _add_actionable_and_nearly_certain_classification(projects: pd.DataFrame) -> None:
@@ -293,8 +293,7 @@ def _normalize_tables(
     tables["airtable__offshore_wind_projects"] = proj
 
     # locations
-    _add_geocoded_locations(locs)
-    tables["airtable__offshore_wind_locations"] = locs
+    tables["airtable__offshore_wind_locations"] = _add_geocoded_locations(locs)
 
     return tables
 
