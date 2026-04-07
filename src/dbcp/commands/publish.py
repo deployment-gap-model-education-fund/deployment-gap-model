@@ -304,12 +304,12 @@ def publish_outputs(
         for schema in schemas:
             if upload_to_big_query:
                 load_parquet_files_to_bigquery(
-                    output_bucket, schema, metadata.version, target
+                    output_bucket, SchemaName(schema), metadata.version, target
                 )
             # At this point postgres is only used for production data mart and private data mart tables
             if upload_to_postgres:
                 load_parquet_files_to_postgres(
-                    output_bucket, schema, metadata.version, target
+                    output_bucket, SchemaName(schema), metadata.version, target
                 )
     else:
         logger.warning("No target schema provided. Skipping BigQuery/Postgres upload.")
