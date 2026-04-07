@@ -201,14 +201,13 @@ counties_wide_format = Table(
     schema=schema,
 )
 
-existing_plants = Table(
-    "existing_plants",
+eia860m__latest__plants = Table(
+    "eia860m__latest__plants",
     metadata,
     Column("plant_id_eia", Integer, primary_key=True),
     Column("resource", String, nullable=False),
     Column("max_operating_date", DateTime),
     Column("capacity_mw", Float, nullable=False),
-    Column("co2e_tonnes_per_year", Float),
     Column("state_id_fips", String),
     Column("county_id_fips", String),
     Column("state", String),
@@ -652,8 +651,8 @@ county_commission_election_info = Table(
     schema=schema,
 )
 
-projects_current_eia860m = Table(
-    "projects_current_eia860m",
+eia860m__latest__generators = Table(
+    "eia860m__latest__generators",
     metadata,
     Column("report_date", DateTime),  # not primary key. Only one row per generator here
     Column("plant_name_eia", String),
@@ -699,8 +698,8 @@ projects_current_eia860m = Table(
 )
 
 
-projects_status_monthly_eia860m = Table(
-    "projects_status_monthly_eia860m",
+eia860m__monthly__generators = Table(
+    "eia860m__monthly__generators",
     metadata,
     Column("plant_name_eia", String),
     Column("plant_id_eia", Integer, primary_key=True),
@@ -739,8 +738,8 @@ projects_status_yearly_eia860m = Table(
 )
 
 
-projects_status_transition_dates_eia860m = Table(
-    "projects_status_transition_dates_eia860m",
+eia860m__generators_operational_status_transition_dates = Table(
+    "eia860m__generators_operational_status_transition_dates",
     metadata,
     Column("plant_name_eia", String),
     Column("plant_id_eia", Integer, primary_key=True),
@@ -756,15 +755,6 @@ projects_status_transition_dates_eia860m = Table(
     Column("date_entered_99", DateTime),
     Column("latest_report_date", DateTime),
     Column("data_freshness_date", DateTime),
-    schema=schema,
-)
-
-projects_status_codes_eia860m = Table(
-    "projects_status_codes_eia860m",
-    metadata,
-    Column("operational_status_code", Integer, primary_key=True),
-    Column("raw_operational_status_code", String),
-    Column("description", String),
     schema=schema,
 )
 

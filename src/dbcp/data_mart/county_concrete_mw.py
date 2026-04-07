@@ -3,7 +3,7 @@
 import pandas as pd
 import sqlalchemy as sa
 
-from dbcp.data_mart.projects import get_eia860m_current
+from dbcp.data_mart.eia860m import get_eia860m_current
 from dbcp.helpers import get_sql_engine
 
 

@@ -17,7 +17,6 @@ def get_data_mart_modules():
         "county_concrete_mw",
         "existing_plants",
         "fossil_infrastructure_projects",
-        "projects",
     }
     modules = []
     for module_info in pkgutil.iter_modules(__path__):

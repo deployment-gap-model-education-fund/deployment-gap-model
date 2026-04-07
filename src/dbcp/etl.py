@@ -321,7 +321,7 @@ def etl(schema: SchemaName | None = None):
     if (schema == SchemaName.DATA_WAREHOUSE) or (schema is None):
         create_data_warehouse()
         validate_warehouse(engine=engine)
-    if (schema == "data_mart") or (schema == "all"):
+    if (schema == SchemaName.DATA_MART) or (schema is None):
         create_data_mart(engine=engine)
 
     logger.info("Successfully finished ETL.")

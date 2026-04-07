@@ -1,6 +1,6 @@
-# projects_status_monthly_eia860m
+# eia860m__monthly__generators
 
-This table contains three years of operational status history for each generator in EIA 860m. The data are monthly timeseries of the operational status code. Each row is a generator-month pair.
+This table contains three years of monthly status history for each generator in EIA 860M. Each row is a generator-month pair.
 
 ## Column Descriptions
 

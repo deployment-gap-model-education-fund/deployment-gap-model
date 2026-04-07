@@ -35,6 +35,7 @@ from dbcp.data_mart.co2_dashboard import (
 from dbcp.data_mart.fossil_infrastructure_projects import (
     create_data_mart as create_fossil_infra_data_mart,
 )
+from dbcp.data_mart.fyi import create_fyi_long_format as create_fyi_data_mart
 from dbcp.data_mart.helpers import (
     CountyOpposition,
     _get_county_fips_df,
@@ -42,7 +43,6 @@ from dbcp.data_mart.helpers import (
     _subset_db_columns,
     get_query,
 )
-from dbcp.data_mart.projects import create_fyi_long_format as create_fyi_data_mart
 from dbcp.helpers import get_sql_engine
 
 JUSTICE40_AGGREGATES = pd.read_csv(
@@ -215,20 +215,6 @@ def _get_env_justice_df(engine: sa.engine.Engine) -> pd.DataFrame:
 
 def _get_existing_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
     # get plant_id, fuel_type, capacity_mw
-
-    # The query here relies on the fact that each generator has only one fuel_type_pudl.
-    # I confirmed that this is true because the following query returns 1:
-    # WITH
-    # gen_fuels as (
-    #     SELECT
-    #         plant_id_eia,
-    #         generator_id,
-    #         count(fuel_type_code_pudl) as fuel_type_count
-    #     FROM "data_warehouse"."eia860m__annual__generators"
-    #     GROUP BY 1, 2
-    # )
-    # SELECT max(fuel_type_count) as max_fuel_type_count
-    # FROM gen_fuels
 
     query = get_query("get_existing_plant_attributes.sql")
     df = pd.read_sql(query, engine)

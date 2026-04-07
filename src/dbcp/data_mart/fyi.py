@@ -4,8 +4,73 @@ import pandas as pd
 import sqlalchemy as sa
 
 from dbcp.constants import FYI_RESOURCE_DICT
-from dbcp.data_mart.projects import create_fyi_long_format
+from dbcp.data_mart.helpers import (
+    CountyOpposition,
+    _get_county_fips_df,
+    _get_proprietary_proposed_offshore,
+    _get_state_fips_df,
+    _replace_iso_offshore_with_proprietary,
+    get_query,
+)
+
+# from dbcp.data_mart.eia860m import create_fyi_long_format
 from dbcp.helpers import get_sql_engine
+
+
+def _get_fyi_projects(engine: sa.engine.Engine) -> pd.DataFrame:
+    query = get_query("get_fyi_projects.sql")
+    df = pd.read_sql(query, engine)
+    return df.drop(columns=["raw_county_name"])
+
+
+def create_fyi_long_format(
+    engine: sa.engine.Engine,
+    active_projects_only: bool = True,
+    use_proprietary_offshore: bool = False,
+):
+    """Create long format FYI table."""
+    fyi = _get_fyi_projects(engine)
+    if use_proprietary_offshore:
+        offshore = _get_proprietary_proposed_offshore(engine)
+        offshore["project_id"] = offshore["project_id"].astype("string")
+        offshore["date_proposed_online"] = pd.to_datetime(
+            offshore["date_proposed_online"]
+        )
+        fyi = _replace_iso_offshore_with_proprietary(fyi, offshore)
+    # _estimate_proposed_power_co2e(fyi)
+    all_counties = _get_county_fips_df(engine)
+    all_states = _get_state_fips_df(engine)
+
+    # model local opposition
+    aggregator = CountyOpposition(
+        engine=engine, county_fips_df=all_counties, state_fips_df=all_states
+    )
+    combined_opp = aggregator.agg_to_counties(
+        include_state_policies=False,
+        include_manual_ordinances=True,
+    )
+    rename_dict = {
+        "geocoded_locality_name": "ordinance_jurisdiction_name",
+        "geocoded_locality_type": "ordinance_jurisdiction_type",
+        "earliest_year_mentioned": "ordinance_earliest_year_mentioned",
+    }
+    combined_opp = combined_opp.rename(columns=rename_dict).dropna(
+        subset="county_id_fips"
+    )
+
+    long_format = fyi.merge(
+        combined_opp, on="county_id_fips", how="left", validate="m:1"
+    )
+
+    # _add_derived_columns(long_format)
+    if active_projects_only:
+        active_long_format = long_format.query("queue_status == 'active'")
+        # drop actual_completion_date and withdrawn_date columns
+        active_long_format = active_long_format.drop(
+            columns=["actual_completion_date", "withdrawn_date"]
+        )
+        return active_long_format
+    return long_format
 
 
 def create_fyi_counties_active_clean_projects(
@@ -26,7 +91,7 @@ def create_fyi_counties_active_clean_projects(
         if codes_dict["type"] == "Renewable"
     ]
     fyi = fyi[fyi["resource_clean"].isin(clean_resources)]
-    fyi = fyi.drop(columns=["co2e_tonnes_per_year"])
+    # fyi = fyi.drop(columns=["co2e_tonnes_per_year"])
     fyi.loc[:, ["capacity_mw"]] = fyi.loc[:, ["capacity_mw"]].mul(
         fyi["frac_locations_in_county"], axis=0
     )

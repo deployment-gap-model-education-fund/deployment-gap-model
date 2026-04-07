@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from dbcp.constants import FIPS_CODE_VINTAGE, PUDL_LATEST_YEAR
+from dbcp.constants import FIPS_CODE_VINTAGE
 from dbcp.helpers import add_fips_ids
 from dbcp.transform.helpers import bedford_addfips_fix
 
@@ -25,6 +25,71 @@ OPERATIONAL_STATUS_CODES_SCALE = {
     # retired
     "RE": 8,
 }
+
+SUMMARIZED_STATUS_DESCRIPTIONS = pd.DataFrame(
+    [
+        {
+            "status": 1,
+            "summarized_status_description": (
+                "Planned for installation but regulatory approvals "
+                "not initiated; Not under construction"
+            ),
+        },
+        {
+            "status": 2,
+            "summarized_status_description": (
+                "Regulatory approvals pending. Not under construction "
+                "but site preparation could be underway"
+            ),
+        },
+        {
+            "status": 3,
+            "summarized_status_description": (
+                "Regulatory approvals received. Not under construction "
+                "but site preparation could be underway"
+            ),
+        },
+        {
+            "status": 4,
+            "summarized_status_description": (
+                "Under construction, less than or equal to 50 percent "
+                "complete (based on construction time to date of operation)"
+            ),
+        },
+        {
+            "status": 5,
+            "summarized_status_description": (
+                "Under construction, more than 50 percent complete "
+                "(based on construction time to date of operation)"
+            ),
+        },
+        {
+            "status": 6,
+            "summarized_status_description": (
+                "Construction complete, but not yet in commercial operation"
+            ),
+        },
+        {
+            "status": 7,
+            "summarized_status_description": "Various operational categories",
+        },
+        {
+            "status": 8,
+            "summarized_status_description": "Retired",
+        },
+        {
+            "status": 98,
+            "summarized_status_description": (
+                "Planned new generator canceled, indefinitely postponed, "
+                "or no longer in resource plan"
+            ),
+        },
+        {
+            "status": 99,
+            "summarized_status_description": "Other",
+        },
+    ]
+)
 
 
 def _convert_date_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -61,18 +126,6 @@ def _prepare_eia860m_yearly_generators(generators_raw: pd.DataFrame) -> pd.DataF
     """Apply shared preprocessing to yearly generator history."""
     generators = _convert_date_columns(generators_raw)
     generators = _add_eia860m_generator_fips(generators)
-    return generators
-
-
-def _transform_eia860m_annual_generators(generators_raw: pd.DataFrame) -> pd.DataFrame:
-    """Create eia860m__annual__generators from yearly generator history."""
-    generators = _prepare_eia860m_yearly_generators(generators_raw)
-
-    # filter generators where report_year >= PUDL_LATEST_YEAR and < PUDL_LATEST_YEAR+1
-    generators = generators[
-        (generators.report_date.dt.year >= PUDL_LATEST_YEAR)
-        & (generators.report_date.dt.year < PUDL_LATEST_YEAR + 1)
-    ]
     return generators
 
 
@@ -225,7 +278,9 @@ def _transform_eia860m_operational_status_codes(
     )
     return op_status_codes_scale.merge(
         operational_status_codes, how="inner", on="code"
-    )[["code", "status", "description"]]
+    ).merge(SUMMARIZED_STATUS_DESCRIPTIONS, how="left", on="status")[
+        ["code", "status", "description", "summarized_status_description"]
+    ]
 
 
 def transform(raw_pudl_tables: pd.DataFrame) -> dict[str, pd.DataFrame]:
@@ -239,16 +294,8 @@ def transform(raw_pudl_tables: pd.DataFrame) -> dict[str, pd.DataFrame]:
 
     """
     transformed_dfs = {
-        "eia860m__annual__generators": _transform_eia860m_annual_generators(
-            raw_pudl_tables["eia860m__yearly_generators"]
-        ),
-        "eia860m__changelog__generators": _transform_eia860m_changelog_generators(
+        "_eia860m__changelog__generators": _transform_eia860m_changelog_generators(
             raw_pudl_tables["eia860m__changelog__generators"]
-        ),
-        "eia860m__changelog__generators_operational_status": (
-            _transform_eia860m_changelog_generators_operational_status(
-                raw_pudl_tables["eia860m__yearly_generators"]
-            )
         ),
         "eia860m__operational_status_codes": _transform_eia860m_operational_status_codes(
             raw_pudl_tables["eia860m__operational_status_codes"]

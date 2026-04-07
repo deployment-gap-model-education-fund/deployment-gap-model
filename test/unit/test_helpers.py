@@ -15,7 +15,7 @@ class TestBQSchemaHelpers:
             SchemaName.DATA_WAREHOUSE
         )
         assert isinstance(metadata, sa.MetaData)
-        assert "data_warehouse.eia860m__annual__generators" in metadata.tables
+        assert "data_warehouse._eia860m__changelog__generators" in metadata.tables
 
     def test_get_bq_schema_from_metadata(self):
         """Ensure we get the expected Bigquery schema."""
