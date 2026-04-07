@@ -144,8 +144,6 @@ def _add_geocoded_locations(transformed_locs: pd.DataFrame) -> None:
         transformed_locs (pd.DataFrame): locations df after other cleaning has been performed
 
     """
-    # this code is ugly and procedural for the sake of making inplace operations.
-    # And all to save copy operations on a dataframe that is... 50 rows lol. Dumb!
     transformed_locs["city_county"] = (
         transformed_locs["raw_city"] + ", " + transformed_locs["raw_county"]
     )
@@ -154,7 +152,7 @@ def _add_geocoded_locations(transformed_locs: pd.DataFrame) -> None:
         state_col="raw_state_abbrev",
         locality_col="city_county",
     )
-    transformed_locs.drop(columns=["city_county"], inplace=True)
+    transformed_locs = transformed_locs.drop(columns=["city_county"])
 
     nan_fips_idx = first_pass["county_id_fips"].isna()
     cols_to_fill = [
@@ -247,9 +245,9 @@ def _normalize_tables(
 
     Create the following tables:
     - airtable__offshore_wind_projects: pk is project_id
-    - offshore_wind_airtable__locations: pk is location_id
-    - offshore_wind_airtable__cable_landing_association: association table between projects and locations for cable landings
-    - offshore_wind_airtable__port_association: association table between projects and locations for port locations
+    - airtable__offshore_wind_locations: pk is location_id
+    - airtable__offshore_wind_cable_landing_association: association table between projects and locations for cable landings
+    - airtable__offshore_wind_port_association: association table between projects and locations for port locations
 
     Args:
         proj (pd.DataFrame): raw projects data
@@ -266,19 +264,19 @@ def _normalize_tables(
     # Create association tables
     association_table_metadata = [
         {
-            "table_name": "offshore_wind_airtable__cable_landing_association",
+            "table_name": "airtable__offshore_wind_cable_landing_association",
             "pk": "project_id",
             "array_col": "cable_location_ids",
             "array_col_rename": "location_id",
         },
         {
-            "table_name": "offshore_wind_airtable__port_association",
+            "table_name": "airtable__offshore_wind_port_association",
             "pk": "project_id",
             "array_col": "port_location_ids",
             "array_col_rename": "location_id",
         },
         {
-            "table_name": "offshore_wind_airtable__staging_association",
+            "table_name": "airtable__offshore_wind_staging_association",
             "pk": "project_id",
             "array_col": "staging_location_ids",
             "array_col_rename": "location_id",
@@ -296,7 +294,7 @@ def _normalize_tables(
 
     # locations
     _add_geocoded_locations(locs)
-    tables["offshore_wind_airtable__locations"] = locs
+    tables["airtable__offshore_wind_locations"] = locs
 
     return tables
 

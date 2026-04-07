@@ -1248,8 +1248,8 @@ airtable__offshore_wind_projects = Table(
     Column("is_nearly_certain", Boolean, nullable=True),
     schema=schema,
 )
-offshore_wind_airtable__locations = Table(
-    "offshore_wind_airtable__locations",
+airtable__offshore_wind_locations = Table(
+    "airtable__offshore_wind_locations",
     metadata,
     Column("location_id", Integer, primary_key=True),
     Column("raw_city", String),
@@ -1272,13 +1272,13 @@ offshore_wind_airtable__locations = Table(
     Column("geocoded_containing_county", String),
     schema=schema,
 )
-offshore_wind_airtable__cable_landing_association = Table(
-    "offshore_wind_airtable__cable_landing_association",
+airtable__offshore_wind_cable_landing_association = Table(
+    "airtable__offshore_wind_cable_landing_association",
     metadata,
     Column(
         "location_id",
         Integer,
-        ForeignKey("data_warehouse.offshore_wind_airtable__locations.location_id"),
+        ForeignKey("data_warehouse.airtable__offshore_wind_locations.location_id"),
         primary_key=True,
     ),
     Column(
@@ -1289,13 +1289,13 @@ offshore_wind_airtable__cable_landing_association = Table(
     ),
     schema=schema,
 )
-offshore_wind_airtable__port_association = Table(
-    "offshore_wind_airtable__port_association",
+airtable__offshore_wind_port_association = Table(
+    "airtable__offshore_wind_port_association",
     metadata,
     Column(
         "location_id",
         Integer,
-        ForeignKey("data_warehouse.offshore_wind_airtable__locations.location_id"),
+        ForeignKey("data_warehouse.airtable__offshore_wind_locations.location_id"),
         primary_key=True,
     ),
     Column(
@@ -1306,13 +1306,13 @@ offshore_wind_airtable__port_association = Table(
     ),
     schema=schema,
 )
-offshore_wind_airtable__staging_association = Table(
-    "offshore_wind_airtable__staging_association",
+airtable__offshore_wind_staging_association = Table(
+    "airtable__offshore_wind_staging_association",
     metadata,
     Column(
         "location_id",
         Integer,
-        ForeignKey("data_warehouse.offshore_wind_airtable__locations.location_id"),
+        ForeignKey("data_warehouse.airtable__offshore_wind_locations.location_id"),
         primary_key=True,
     ),
     Column(
