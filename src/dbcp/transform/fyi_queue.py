@@ -430,7 +430,7 @@ if __name__ == "__main__":
     fyi_raw_dfs = dbcp.extract.fyi_queue.extract(fyi_uri)
     fyi_transformed_dfs = dbcp.transform.fyi_queue.transform(fyi_raw_dfs)
     fyi_transformed_dfs["fyi__private__resource_capacity"].to_parquet(
-        OUTPUT_DIR / "private_data_warehouse/fyi__private__resource_capacity.parquet"
+        OUTPUT_DIR / "data_warehouse/fyi__private__resource_capacity.parquet"
     )
 
     assert fyi_transformed_dfs

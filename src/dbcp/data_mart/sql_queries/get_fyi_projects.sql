@@ -19,8 +19,8 @@ WITH
             proj.withdrawn_date,
             res.capacity_mw,
             res.resource_clean
-        FROM private_data_warehouse.fyi__private__projects as proj
-        INNER JOIN private_data_warehouse.fyi__private__resource_capacity as res
+        FROM data_warehouse.fyi__private__projects as proj
+        INNER JOIN data_warehouse.fyi__private__resource_capacity as res
         ON proj.project_id = res.project_id
     ),
     loc as (
@@ -35,7 +35,7 @@ WITH
             county_id_fips,
             raw_county_name, -- for validation only
             (1.0 / count(*) over (partition by project_id))::real as frac_locations_in_county
-        FROM private_data_warehouse.fyi__private__locations
+        FROM data_warehouse.fyi__private__locations
     ),
     iso as (
         SELECT

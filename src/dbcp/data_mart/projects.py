@@ -1276,7 +1276,7 @@ def create_data_mart(
 if __name__ == "__main__":
     # debugging entry point
     mart = create_data_mart()
-    parquet_dir = OUTPUT_DIR / "private_data_mart"
+    parquet_dir = OUTPUT_DIR / "data_mart"
     mart["fyi_projects_long_format"].to_parquet(
         parquet_dir / "fyi_projects_long_format.parquet",
     )

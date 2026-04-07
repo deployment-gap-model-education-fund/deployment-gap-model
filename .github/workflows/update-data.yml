@@ -273,6 +273,7 @@ jobs:
             --code-git-sha ${{ steps.checkout.outputs.commit }} \
             --settings-file-git-sha $SETTINGS_FILE_SHA \
             --github-action-run-id ${{ github.run_id }} \
+            --upload-to-postgres
             --target ${{ matrix.target }}
 
       - name: Stop Docker Compose services
