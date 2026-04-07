@@ -2,11 +2,9 @@
 
 import logging
 import re
-import typing
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
 
 import click
 import google.auth
@@ -17,32 +15,22 @@ from pydantic import BaseModel, validator
 
 from dbcp.constants import OUTPUT_DIR
 from dbcp.helpers import get_sql_engine, write_to_postgres
+from dbcp.metadata import SchemaName
 
 logger = logging.getLogger(__name__)
 
-DataDirectoryLiteral = Literal[
-    "data_warehouse", "data_mart", "private_data_warehouse", "private_data_mart"
-]
-VALID_DIRECTORIES = typing.get_args(DataDirectoryLiteral)
 
-
-def _get_bigquery_dataset_id(
-    destination_blob_prefix: DataDirectoryLiteral, target: str
-) -> str:
+def _get_schema_id(schema_name: SchemaName, target: str) -> str:
     """Map an output directory to the BigQuery dataset it should publish into."""
-    destination_suffix = "" if target == "prod" else f"_{target}"
+    destination_suffix = "" if target == "_prod" else target
 
-    # Publish both public and private warehouse tables into one staging dataset.
-    if destination_blob_prefix in {"data_warehouse", "private_data_warehouse"}:
-        return f"data_warehouse_{destination_suffix}"
-
-    return f"{destination_blob_prefix}{destination_suffix}"
+    return f"{schema_name.value}{destination_suffix}"
 
 
 def upload_parquet_directory_to_gcs(
     directory_path: str,
     output_bucket: storage.Bucket,
-    destination_blob_prefix: DataDirectoryLiteral,
+    schema: SchemaName,
     version: str,
 ):
     """Uploads a directory of Parquet files to Google Cloud Storage.
@@ -50,7 +38,7 @@ def upload_parquet_directory_to_gcs(
     Args:
         directory_path: Path to the directory containing Parquet files.
         output_bucket: The GCS output bucket
-        destination_blob_prefix: Prefix to prepend to destination blob names.
+        schema: Name of schema to prepend to destination blob names.
         version: The version of the data to upload.
 
     """
@@ -60,7 +48,7 @@ def upload_parquet_directory_to_gcs(
     # Upload each Parquet file to GCS
     for file in parquet_files:
         # Construct the destination blob name
-        destination_blob_name = f"{version}/{destination_blob_prefix}/{file.name}"
+        destination_blob_name = f"{version}/{schema.value}/{file.name}"
 
         # Create a blob object in the bucket
         blob = output_bucket.blob(destination_blob_name)
@@ -75,7 +63,7 @@ def upload_parquet_directory_to_gcs(
 
 def load_parquet_files_to_postgres(
     output_bucket: storage.Bucket,
-    destination_blob_prefix: DataDirectoryLiteral,
+    schema: SchemaName,
     version: str,
     target: str,
 ):
@@ -83,12 +71,12 @@ def load_parquet_files_to_postgres(
 
     Args:
         output_bucket: the GCS bucket containing the output Parquet files.
-        destination_blob_prefix: the prefix of the GCS blobs to load.
+        schema: The schema of the GCS blobs to load.
         version: the version of the data to load.
 
     """
     engine = get_sql_engine(production=True)
-    for blob in output_bucket.list_blobs(prefix=f"{version}/{destination_blob_prefix}"):
+    for blob in output_bucket.list_blobs(prefix=f"{version}/{schema.value}"):
         if not blob.name.endswith(".parquet"):
             continue
         # get the blob filename without the extension
@@ -102,7 +90,7 @@ def load_parquet_files_to_postgres(
             df,
             table_name=table_name,
             engine=engine,
-            schema_name=destination_blob_prefix,
+            schema_name=schema,
             if_exists="replace",
         )
         logger.info(f"Successfully wrote table {table_name} to production postgres DB.")
@@ -110,7 +98,7 @@ def load_parquet_files_to_postgres(
 
 def load_parquet_files_to_bigquery(
     output_bucket: storage.Bucket,
-    destination_blob_prefix: DataDirectoryLiteral,
+    schema: SchemaName,
     version: str,
     target: str,
 ):
@@ -118,7 +106,7 @@ def load_parquet_files_to_bigquery(
 
     Args:
         output_bucket: the GCS bucket containing the output Parquet files.
-        destination_blob_prefix: the prefix of the GCS blobs to load.
+        schema: The schema of the GCS blobs to load.
         version: the version of the data to load.
         target: the target schema, one of "prod" or "dev".
 
@@ -128,11 +116,11 @@ def load_parquet_files_to_bigquery(
     client = bigquery.Client(credentials=credentials, project=project_id)
 
     # Get the BigQuery dataset
-    dataset_id = _get_bigquery_dataset_id(destination_blob_prefix, target)
+    dataset_id = _get_schema_id(schema, target)
     dataset_ref = client.dataset(dataset_id)
 
     # get all parquet files in the bucket/{version} directory
-    blobs = output_bucket.list_blobs(prefix=f"{version}/{destination_blob_prefix}")
+    blobs = output_bucket.list_blobs(prefix=f"{version}/{schema.value}")
 
     # Load each Parquet file to BigQuery
     for blob in blobs:
@@ -274,12 +262,11 @@ class OutputMetadata(BaseModel):
     help="Upload the data mart tables to production Postgres",
 )
 @click.option(
-    "-d",
-    "--directories",
-    type=click.Choice(VALID_DIRECTORIES),
+    "--schemas",
+    type=click.Choice([option.value for option in SchemaName]),
     multiple=True,
-    default=VALID_DIRECTORIES,
-    help="The directories of local parquet files to publish to GCS and BigQuery",
+    default=[option.value for option in SchemaName],
+    help="The schema to publish to GCS and BigQuery",
 )
 def publish_outputs(
     build_ref: str,
@@ -287,7 +274,7 @@ def publish_outputs(
     code_git_sha: str,
     github_action_run_id: str,
     settings_file_git_sha: str,
-    directories: DataDirectoryLiteral,
+    schemas: list[str],
     upload_to_big_query: bool,
     upload_to_postgres: bool,
 ):
@@ -303,9 +290,9 @@ def publish_outputs(
         github_action_run_id=github_action_run_id,
     )
 
-    for directory in directories:
+    for schema in schemas:
         upload_parquet_directory_to_gcs(
-            OUTPUT_DIR / directory, output_bucket, directory, metadata.version
+            OUTPUT_DIR / schema, output_bucket, SchemaName(schema), metadata.version
         )
     # write metadata file to GCS
     destination_blob_name = f"{metadata.version}/etl-run-metadata.yaml"
@@ -314,15 +301,15 @@ def publish_outputs(
     logger.info(f"Uploaded metadata to gs://{bucket_name}/{destination_blob_name}")
 
     if target is not None:
-        for directory in directories:
+        for schema in schemas:
             if upload_to_big_query:
                 load_parquet_files_to_bigquery(
-                    output_bucket, directory, metadata.version, target
+                    output_bucket, schema, metadata.version, target
                 )
             # At this point postgres is only used for production data mart and private data mart tables
             if upload_to_postgres:
                 load_parquet_files_to_postgres(
-                    output_bucket, directory, metadata.version, target
+                    output_bucket, schema, metadata.version, target
                 )
     else:
         logger.warning("No target schema provided. Skipping BigQuery/Postgres upload.")

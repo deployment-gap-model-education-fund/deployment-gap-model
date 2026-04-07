@@ -9,16 +9,14 @@ from pathlib import Path
 
 import addfips
 import fsspec
-import google.auth
 import pandas as pd
-import pandas_gbq
 import pyarrow as pa
 import sqlalchemy as sa
-from google.cloud import bigquery
 from tqdm import tqdm
 
 import dbcp
 from dbcp.constants import DATA_DIR
+from dbcp.metadata import SchemaName
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +47,7 @@ SA_TO_PA_TYPES = {
 SA_TO_BQ_MODES = {True: "NULLABLE", False: "REQUIRED"}
 
 
-def get_schema_sql_alchemy_metadata(schema: str) -> sa.MetaData:
+def get_schema_sql_alchemy_metadata(schema: SchemaName) -> sa.MetaData:
     """Get SQL Alchemy metadata object for a particular schema.
 
     Args:
@@ -59,19 +57,15 @@ def get_schema_sql_alchemy_metadata(schema: str) -> sa.MetaData:
         metadata: the SQL alchemy metadata associated with the db schema.
 
     """
-    if schema == "data_mart":
-        return dbcp.metadata.data_mart.metadata
-    if schema == "data_warehouse":
-        return dbcp.metadata.data_warehouse.metadata
-    if schema == "private_data_warehouse":
-        return dbcp.metadata.private_data_warehouse.metadata
-    if schema == "private_data_mart":
-        return dbcp.metadata.private_data_mart.metadata
-    raise ValueError(f"{schema} is not a valid schema.")
+    if schema == SchemaName.DATA_MART:
+        metadata = dbcp.metadata.data_mart.metadata
+    if schema == SchemaName.DATA_WAREHOUSE:
+        metadata = dbcp.metadata.data_warehouse.metadata
+    return metadata
 
 
 def get_bq_schema_from_metadata(
-    table_name: str, schema: str, dev: bool = True
+    table_name: str, schema: SchemaName, dev: bool = True
 ) -> list[dict[str, str]]:
     """Create a BigQuery schema from SQL Alchemy metadata.
 
@@ -83,7 +77,7 @@ def get_bq_schema_from_metadata(
         bq_schema: a bigquery schema description.
 
     """
-    table_name = f"{schema}.{table_name}"
+    table_name = f"{schema.value}.{table_name}"
     metadata = get_schema_sql_alchemy_metadata(schema)
     bq_schema = []
     for column in metadata.tables[table_name].columns:
@@ -95,7 +89,7 @@ def get_bq_schema_from_metadata(
     return bq_schema
 
 
-def get_pyarrow_schema_from_metadata(table_name: str, schema: str) -> pa.Schema:
+def get_pyarrow_schema_from_metadata(table_name: str, schema: SchemaName) -> pa.Schema:
     """Create a PyArrow schema from SQL Alchemy metadata.
 
     Args:
@@ -106,7 +100,7 @@ def get_pyarrow_schema_from_metadata(table_name: str, schema: str) -> pa.Schema:
         pyarrow_schema: a PyArrow schema description.
 
     """
-    table_name = f"{schema}.{table_name}"
+    table_name = f"{schema.value}.{table_name}"
     metadata = get_schema_sql_alchemy_metadata(schema)
     table_sa = metadata.tables[table_name]
     pyarrow_schema = []
@@ -115,9 +109,9 @@ def get_pyarrow_schema_from_metadata(table_name: str, schema: str) -> pa.Schema:
     return pa.schema(pyarrow_schema)
 
 
-def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str):
+def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: SchemaName):
     """Apply dtypes to a dataframe using the sqlalchemy metadata."""
-    table_name = f"{schema}.{table_name}"
+    table_name = f"{schema.value}.{table_name}"
     metadata = get_schema_sql_alchemy_metadata(schema)
     try:
         table = metadata.tables[table_name]
@@ -172,7 +166,7 @@ def write_to_postgres(
     df: pd.DataFrame,
     table_name: str,
     engine: sa.engine.Engine,
-    schema_name: str,
+    schema_name: SchemaName,
     if_exists: str = "append",
 ):
     """Create data from a DataFrame to a postgres table.
@@ -192,7 +186,7 @@ def write_to_postgres(
         con=engine,
         if_exists=if_exists,
         index=False,
-        schema="data_mart" if "data_mart" in schema_name else "data_warehouse",
+        schema=schema_name.value,
         method=psql_insert_copy,
         chunksize=5000,  # adjust based on memory capacity
     )
@@ -250,7 +244,7 @@ def track_tar_progress(members):
     yield from tqdm(members)
 
 
-def get_db_schema_tables(engine: sa.engine.Engine, schema: str) -> list[str]:
+def get_db_schema_tables(engine: sa.engine.Engine, schema: SchemaName) -> list[str]:
     """Get table names of database schema.
 
     Args:
@@ -262,7 +256,7 @@ def get_db_schema_tables(engine: sa.engine.Engine, schema: str) -> list[str]:
 
     """
     inspector = sa.inspect(engine)
-    table_names = inspector.get_table_names(schema=schema)
+    table_names = inspector.get_table_names(schema=schema.value)
 
     if not table_names:
         raise ValueError(
@@ -270,56 +264,6 @@ def get_db_schema_tables(engine: sa.engine.Engine, schema: str) -> list[str]:
         )
 
     return table_names
-
-
-def upload_schema_to_bigquery(schema: str, dev: bool = True) -> None:
-    """Upload a postgres schema to BigQuery."""
-    logger.info("Loading tables to BigQuery.")
-
-    # Get the schema table names
-    engine = get_sql_engine()
-    table_names = get_db_schema_tables(engine, schema)
-
-    # read tables from dbcp schema in a dictionary of dfs
-    loaded_tables = {}
-    with engine.connect() as con:
-        for table_name in table_names:
-            loaded_tables[table_name] = pd.read_sql_table(
-                table_name, con, schema=schema
-            )
-            loaded_tables[table_name] = enforce_dtypes(
-                loaded_tables[table_name], table_name, schema
-            )
-
-    # load to big query
-    credentials, project_id = google.auth.default()
-    client = bigquery.Client(credentials=credentials, project=project_id)
-
-    if schema in {"data_warehouse", "private_data_warehouse"}:
-        schema_environment = f"data_warehouse_staging{'_dev' if dev else ''}"
-    else:
-        schema_environment = f"{schema}{'_dev' if dev else ''}"
-
-    for table_name, df in loaded_tables.items():
-        full_table_name = f"{schema_environment}.{table_name}"
-        table_schema = get_bq_schema_from_metadata(table_name, schema, dev)
-        logger.info(f"Loading: {table_name}")
-
-        # Delete the table because pandas_gbq doesn't recreate the BQ
-        # table schema which leads to problems when we change the metadata.
-        table_id = f"{project_id}.{schema_environment}.{table_name}"
-        client.delete_table(table_id, not_found_ok=True)
-
-        pandas_gbq.to_gbq(
-            df,
-            full_table_name,
-            project_id=project_id,
-            if_exists="replace",
-            credentials=credentials,
-            table_schema=table_schema,
-            chunksize=5000,
-        )
-        logger.info(f"Finished: {full_table_name}")
 
 
 def psql_insert_copy(table, conn, keys, data_iter):
