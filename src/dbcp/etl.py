@@ -222,7 +222,7 @@ def write_to_postgres_and_parquet(
     metadata.drop_all(engine)
     metadata.create_all(engine, tables=tables)
 
-    parquet_dir = OUTPUT_DIR / f"{schema_name}"
+    parquet_dir = OUTPUT_DIR / f"{schema_name.value}"
     parquet_dir.mkdir(exist_ok=True)
 
     # Load table into postgres and parquet
