@@ -67,7 +67,7 @@ def extract() -> dict[str, pd.DataFrame]:
     # dictionary of PUDL table names to names used in DGM data warehouse
     tables = {
         "eia860m__annual__generators": _extract_eia860m_annual_generators,
-        "eia860m__changelog__generators": _extract_eia860m_changelog_generators,
+        "_eia860m__changelog__generators": _extract_eia860m_changelog_generators,
         "eia860m__operational_status_codes": _extract_eia860m_operational_status_codes,
     }
     for dgm_table_name, extract_func in tables.items():

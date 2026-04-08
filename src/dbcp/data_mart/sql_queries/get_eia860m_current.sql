@@ -30,12 +30,12 @@ SELECT
     technology_description,
     raw_state,
     raw_county
-FROM data_warehouse.eia860m__changelog__generators as eia
+FROM data_warehouse._eia860m__changelog__generators as eia
 LEFT JOIN data_warehouse.census__state_fips as sfips
 USING (state_id_fips)
 LEFT JOIN data_warehouse.census__county_fips as cfips
 USING (county_id_fips)
 WHERE valid_until_date = (
-    select max(valid_until_date) FROM data_warehouse.eia860m__changelog__generators
+    select max(valid_until_date) FROM data_warehouse._eia860m__changelog__generators
     )
 ORDER BY plant_id_eia, generator_id
