@@ -190,7 +190,7 @@ def write_to_postgres(
         con=engine,
         if_exists=if_exists,
         index=False,
-        schema=None if remote else schema_name.value,
+        schema="catalyst" if remote else schema_name.value,
         method=psql_insert_copy,
         chunksize=5000,  # adjust based on memory capacity
     )
