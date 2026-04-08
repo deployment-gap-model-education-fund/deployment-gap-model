@@ -83,6 +83,92 @@ census__state_fips = (
     ),
 )
 
+ljedf__county_politics_demographics = Table(
+    "ljedf__county_politics_demographics",
+    metadata,
+    Column(
+        "county_id_fips",
+        String,
+        ForeignKey("data_warehouse.census__county_fips.county_id_fips"),
+        nullable=False,
+        primary_key=True,
+    ),
+    Column("registered_voters", BigInteger, nullable=True),
+    Column(
+        "female_pct",
+        Float,
+        CheckConstraint("female_pct >= 0.0 AND female_pct <= 100.0"),
+        nullable=True,
+    ),
+    Column(
+        "male_pct",
+        Float,
+        CheckConstraint("male_pct >= 0.0 AND male_pct <= 100.0"),
+        nullable=True,
+    ),
+    Column(
+        "white_pct",
+        Float,
+        CheckConstraint("white_pct >= 0.0 AND white_pct <= 100.0"),
+        nullable=True,
+    ),
+    Column(
+        "black_pct",
+        Float,
+        CheckConstraint("black_pct >= 0.0 AND black_pct <= 100.0"),
+        nullable=True,
+    ),
+    Column(
+        "asian_pct",
+        Float,
+        CheckConstraint("asian_pct >= 0.0 AND asian_pct <= 100.0"),
+        nullable=True,
+    ),
+    Column(
+        "american_indian_pct",
+        Float,
+        CheckConstraint("american_indian_pct >= 0.0 AND american_indian_pct <= 100.0"),
+        nullable=True,
+    ),
+    Column(
+        "minority_pct",
+        Float,
+        CheckConstraint("minority_pct >= 0.0 AND minority_pct <= 100.0"),
+        nullable=True,
+    ),
+    Column(
+        "age_25_to_64_pct",
+        Float,
+        CheckConstraint("age_25_to_64_pct >= 0.0 AND age_25_to_64_pct <= 100.0"),
+        nullable=True,
+    ),
+    Column(
+        "biden_2020_pct",
+        Float,
+        CheckConstraint("biden_2020_pct >= 0.0 AND biden_2020_pct <= 100.0"),
+        nullable=True,
+    ),
+    Column(
+        "projected_dems_pct",
+        Float,
+        CheckConstraint("projected_dems_pct >= 0.0 AND projected_dems_pct <= 100.0"),
+        nullable=True,
+    ),
+    Column(
+        "below_college_pct",
+        Float,
+        CheckConstraint("below_college_pct >= 0.0 AND below_college_pct <= 100.0"),
+        nullable=True,
+    ),
+    Column(
+        "harris_2024_pct",
+        Float,
+        CheckConstraint("harris_2024_pct >= 0.0 AND harris_2024_pct <= 100.0"),
+        nullable=True,
+    ),
+    schema=schema,
+)
+
 ##############
 # ISO Queues #
 ##############

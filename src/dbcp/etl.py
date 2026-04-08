@@ -13,6 +13,7 @@ from dbcp.archivers.utils import ExtractionSettings
 from dbcp.constants import DATA_DIR, OUTPUT_DIR
 from dbcp.extract.ballot_ready import BR_URI
 from dbcp.extract.fips_tables import CENSUS_URI, TRIBAL_LANDS_URI
+from dbcp.extract.ljedf import extract as extract_ljedf
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.helpers import write_to_postgres
 from dbcp.metadata import SchemaName
@@ -171,6 +172,14 @@ def etl_ballot_ready() -> dict[str, pd.DataFrame]:
     return transformed
 
 
+def etl_ljedf() -> dict[str, pd.DataFrame]:
+    """ETL archived LJEDF county demographics and election results."""
+    raw_dfs = extract_ljedf()
+    county_fips = etl_fips_tables()["census__county_fips"]
+    transformed = dbcp.transform.ljedf.transform(raw_dfs, county_fips=county_fips)
+    return transformed
+
+
 def etl_epa_avert() -> dict[str, pd.DataFrame]:
     """ETL EPA AVERT avoided emissions data."""
     # https://github.com/USEPA/AVERT/blob/v4.1.0/utilities/data/county-fips.txt
@@ -210,16 +219,15 @@ def write_to_postgres_and_parquet(
     dfs: dict[str, pd.DataFrame], engine: sa.engine.Engine, schema_name: SchemaName
 ):
     """Write data mart tables from a schema to postgres and parquet."""
-    # Ensure schema exists in a committed transaction
+    # Recreate the whole schema on each ETL run so stale tables / constraints from
+    # older versions of the warehouse cannot block rebuilds.
     with engine.begin() as con:
-        con.execute(sa.text(f"CREATE SCHEMA IF NOT EXISTS {schema_name.value}"))
+        con.execute(sa.text(f"DROP SCHEMA IF EXISTS {schema_name.value} CASCADE"))
+        con.execute(sa.text(f"CREATE SCHEMA {schema_name.value}"))
 
-    # Delete any existing tables, and create them anew
     metadata = dbcp.helpers.get_schema_sql_alchemy_metadata(schema_name)
     table_names = dfs.keys()
     tables = [metadata.tables[schema_name.value + "." + name] for name in table_names]
-    # Drop tables
-    metadata.drop_all(engine)
     metadata.create_all(engine, tables=tables)
 
     parquet_dir = OUTPUT_DIR / f"{schema_name.value}"
@@ -279,6 +287,7 @@ def create_data_warehouse():
         # "ballot_ready": etl_ballot_ready,
         "acp_projects": etl_acp_projects,
         "fyi_queue": etl_fyi_queue,
+        "ljedf_election_data": etl_ljedf,
     }
     run_etl(etl_funcs, SchemaName.DATA_WAREHOUSE)
 
