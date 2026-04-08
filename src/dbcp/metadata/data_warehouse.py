@@ -83,8 +83,8 @@ census__state_fips = (
     ),
 )
 
-ljedf__county_politics_demographics = Table(
-    "ljedf__county_politics_demographics",
+ljedf__private__counties__election_results = Table(
+    "ljedf__private__counties__election_results",
     metadata,
     Column(
         "county_id_fips",

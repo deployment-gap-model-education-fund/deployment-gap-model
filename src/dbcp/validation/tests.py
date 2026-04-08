@@ -334,7 +334,7 @@ def test_manual_ordinance_fips_coverage(engine: Engine):
 def test_ljedf_county_politics_demographics(engine: Engine):
     """Check LJEDF county politics table keys and percentage ranges."""
     df = pd.read_sql_table(
-        "ljedf__county_politics_demographics", engine, schema="data_warehouse"
+        "ljedf__private__counties__election_results", engine, schema="data_warehouse"
     )
     assert df["county_id_fips"].is_unique, "Found duplicate county FIPS in LJEDF table."
     expected_n_counties = pd.read_sql(
@@ -352,7 +352,7 @@ def test_ljedf_county_politics_demographics(engine: Engine):
     missing_fips = pd.read_sql(
         """
         SELECT l.county_id_fips
-        FROM data_warehouse.ljedf__county_politics_demographics AS l
+        FROM data_warehouse.ljedf__private__counties__election_results AS l
         LEFT JOIN data_warehouse.census__county_fips AS c
         USING (county_id_fips)
         WHERE c.county_id_fips IS NULL

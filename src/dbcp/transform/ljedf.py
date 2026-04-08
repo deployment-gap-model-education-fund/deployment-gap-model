@@ -4,7 +4,7 @@ import pandas as pd
 
 
 def _transform_civis_demographics(raw_df: pd.DataFrame) -> pd.DataFrame:
-    """Standardize county FIPS and column names for archived Civis demographics."""
+    """Standardize and clean archived Civis demographics and Biden election data."""
     civis = raw_df.rename(
         columns={
             "sii_county": "county_id_fips",
@@ -57,7 +57,7 @@ def _transform_civis_demographics(raw_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _transform_2024_president_results(raw_df: pd.DataFrame) -> pd.DataFrame:
-    """Mirror LJEDF's county election shaping from the archived CSV."""
+    """Get the Harris 2024 vote percentage."""
     election = raw_df.copy()
     election["county_id_fips"] = (
         election["FIPS"].astype("Int64").astype(str).str.zfill(5)
@@ -81,12 +81,6 @@ def _transform_2024_president_results(raw_df: pd.DataFrame) -> pd.DataFrame:
         :,
         [
             "county_id_fips",
-            "geographic_name",
-            "geographic_subtype",
-            "total_votes",
-            "harris_votes",
-            "trump_votes",
-            "kennedy_votes",
             "harris_2024_pct",
         ],
     ].convert_dtypes()
@@ -99,7 +93,7 @@ def _transform_2024_president_results(raw_df: pd.DataFrame) -> pd.DataFrame:
 def transform(
     raw_dfs: dict[str, pd.DataFrame], county_fips: pd.DataFrame
 ) -> dict[str, pd.DataFrame]:
-    """Build a normalized county-level politics table anchored on county FIPS."""
+    """Build a county-level table indexed on county FIPS with election results and demographics."""
     civis = _transform_civis_demographics(raw_dfs["raw_ljedf_civis_demographics"])
     election = _transform_2024_president_results(
         raw_dfs["raw_ljedf_2024_president_results_county"]
@@ -130,4 +124,4 @@ def transform(
     assert county_politics["county_id_fips"].is_unique, (
         "Output county FIPS are not unique."
     )
-    return {"ljedf__county_politics_demographics": county_politics}
+    return {"ljedf__private__counties__election_results": county_politics}
