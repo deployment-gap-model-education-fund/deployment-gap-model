@@ -93,6 +93,18 @@ ljedf__private__counties__election_results = Table(
         nullable=False,
         primary_key=True,
     ),
+    Column(
+        "harris_2024_pct",
+        Float,
+        CheckConstraint("harris_2024_pct >= 0.0 AND harris_2024_pct <= 100.0"),
+        nullable=True,
+    ),
+    Column(
+        "biden_2020_pct",
+        Float,
+        CheckConstraint("biden_2020_pct >= 0.0 AND biden_2020_pct <= 100.0"),
+        nullable=True,
+    ),
     Column("registered_voters", BigInteger, nullable=True),
     Column(
         "female_pct",
@@ -143,12 +155,6 @@ ljedf__private__counties__election_results = Table(
         nullable=True,
     ),
     Column(
-        "biden_2020_pct",
-        Float,
-        CheckConstraint("biden_2020_pct >= 0.0 AND biden_2020_pct <= 100.0"),
-        nullable=True,
-    ),
-    Column(
         "projected_dems_pct",
         Float,
         CheckConstraint("projected_dems_pct >= 0.0 AND projected_dems_pct <= 100.0"),
@@ -158,12 +164,6 @@ ljedf__private__counties__election_results = Table(
         "below_college_pct",
         Float,
         CheckConstraint("below_college_pct >= 0.0 AND below_college_pct <= 100.0"),
-        nullable=True,
-    ),
-    Column(
-        "harris_2024_pct",
-        Float,
-        CheckConstraint("harris_2024_pct >= 0.0 AND harris_2024_pct <= 100.0"),
         nullable=True,
     ),
     schema=schema,
