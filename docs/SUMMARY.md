@@ -1,6 +1,7 @@
 # Table of contents
 
 * [Database Documentation](README.md)
+* [Data Warehouse](data-warehouse/README.md)
 * [Data Mart](data-mart/README.md)
   * [iso\_projects\_long\_format](data-mart/iso\_projects\_long\_format.md)
   * [iso\_projects\_wide\_format](data-mart/iso\_projects\_wide\_format.md)
