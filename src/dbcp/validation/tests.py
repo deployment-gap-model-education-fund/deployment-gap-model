@@ -331,7 +331,7 @@ def test_manual_ordinance_fips_coverage(engine: Engine):
     assert actual.empty, "Found mismatched FIPS in airtable__manual_ordinances"
 
 
-def test_ljedf_county_politics_demographics(engine: Engine):
+def test_ljedf_county_election_results(engine: Engine):
     """Check LJEDF county politics table keys and percentage ranges."""
     df = pd.read_sql_table(
         "ljedf__private__counties__election_results", engine, schema="data_warehouse"
@@ -346,7 +346,7 @@ def test_ljedf_county_politics_demographics(engine: Engine):
         engine,
     ).squeeze()
     assert len(df) == expected_n_counties, (
-        "LJEDF county politics table is not anchored to census__county_fips coverage."
+        "LJEDF election results table is not correctly indexed by census__county_fips coverage."
     )
 
     missing_fips = pd.read_sql(
@@ -394,7 +394,7 @@ def _get_non_county_cols_from_wide_format(engine: Engine) -> pd.Index:
 def validate_warehouse(engine: Engine):
     """Run data warehouse validation tests."""
     logger.info("Validating data warehouse")
-    test_ljedf_county_politics_demographics(engine)
+    test_ljedf_county_election_results(engine)
     # test_j40_county_fips_coverage(engine)
     # test_gridstatus_fips_coverage(engine)
     # test_fyi_fips_coverage(engine)

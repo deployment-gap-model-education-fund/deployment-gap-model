@@ -8,7 +8,6 @@ def _transform_civis_demographics(raw_df: pd.DataFrame) -> pd.DataFrame:
     civis = raw_df.rename(
         columns={
             "sii_county": "county_id_fips",
-            "registered_voters": "registered_voters",
             "female_percent": "female_pct",
             "male_percent": "male_pct",
             "white_percent": "white_pct",
@@ -18,7 +17,6 @@ def _transform_civis_demographics(raw_df: pd.DataFrame) -> pd.DataFrame:
             "minority_percent": "minority_pct",
             "age_25_to_64": "age_25_to_64_pct",
             "votes_biden_2020": "biden_2020_pct",
-            "projected_dems_pct": "projected_dems_pct",
             "below_college": "below_college_pct",
         }
     ).copy()
@@ -93,16 +91,32 @@ def _transform_2024_president_results(raw_df: pd.DataFrame) -> pd.DataFrame:
 def transform(
     raw_dfs: dict[str, pd.DataFrame], county_fips: pd.DataFrame
 ) -> dict[str, pd.DataFrame]:
-    """Build a county-level table indexed on county FIPS with election results and demographics."""
+    """Build a county-level table indexed on county FIPS with election results and demographics.
+
+    Args:
+        raw_dfs: dictionary with keys for the raw civis demographics data and the
+                 2024 presidential results data.
+        county_fips: the census__county_fips table, used as the county FIPS index to
+                     construct the table from
+
+    Returns:
+        a dictionary with ljedf__private__counties__election_results as key and the
+        transformed table containing Biden and Harris percentage of vote capture results
+        and demographics data.
+
+    """
     civis = _transform_civis_demographics(raw_dfs["raw_ljedf_civis_demographics"])
     election = _transform_2024_president_results(
         raw_dfs["raw_ljedf_2024_president_results_county"]
     )
 
-    anchor = county_fips.loc[:, ["county_id_fips", "state_id_fips"]].copy()
-    anchor = anchor[pd.to_numeric(anchor["state_id_fips"], errors="coerce") < 60].copy()
+    fips_index = county_fips.loc[:, ["county_id_fips", "state_id_fips"]].copy()
+    # exclude territories
+    fips_index = fips_index[
+        pd.to_numeric(fips_index["state_id_fips"], errors="coerce") < 60
+    ].copy()
 
-    county_politics = anchor.merge(
+    county_politics = fips_index.merge(
         civis, how="left", on="county_id_fips", validate="1:1"
     )
     county_politics = county_politics.merge(
