@@ -1,27 +1,31 @@
 # Data Warehouse
 
-This section documents the data warehouse tables that are currently produced by the active warehouse ETL in [`src/dbcp/etl.py`](/Users/katielamb/CatalystCoop/deployment-gap-model/src/dbcp/etl.py).
+This section documents the data warehouse tables.
 
-The warehouse is organized around source-specific staging and normalization tables. Most sources land as one or more source-owned tables, then the data mart combines them into analysis-ready outputs.
+Data warehouse tables are normalized, source-specific tables which can be
+joined together to get wider tables ready for analysis.
 
 ## Current ETL Coverage
 
-The active `create_data_warehouse()` job currently includes these source pipelines:
+The `create_data_warehouse()` job currently includes these source pipelines:
 
-- Airtable offshore wind
-- Airtable manual ordinances
+- Madrone's Airtable offshore wind base
+- Madrone's Airtable manual ordinances base
 - Columbia RELDI local opposition
 - Census FIPS reference tables
-- PUDL / EIA 860M
+- PUDL's EIA 860M
 - NCSL state permitting
-- ACP projects
-- interconnection.fyi queues
+- American Clean Power projects (private source)
+- interconnection.fyi queues (private source)
 
-The sections below group the resulting warehouse tables by source.
+These tables are generated from these sources:
 
-## Airtable: Offshore Wind
+## Madrone Airtable: Offshore Wind
 
 These tables describe manually curated offshore wind projects and the onshore locations associated with them.
+This data used to override the offshore wind data in the interconnection queue, but since we've
+switched to using interconnection.fyi queue data, it's just used as a reference and may be more utilized
+in the future as a second source of offshore wind data.
 
 | Table | Grain | Purpose |
 | ---- | ---- | ---- |
@@ -36,6 +40,7 @@ These tables describe manually curated offshore wind projects and the onshore lo
 ## Airtable: Manual Ordinances
 
 This table captures manually maintained county-level ordinance flags that supplement the external ordinances datasets.
+This ordinance data has since been de-prioritized and is just used as a reference.
 
 | Table | Grain | Purpose |
 | ---- | ---- | ---- |
@@ -56,7 +61,7 @@ These tables come from the Columbia / RELDI opposition-to-renewables source and 
 
 ## Census: FIPS Reference Tables
 
-These reference tables provide the geography backbone used throughout the warehouse and data mart.
+These reference tables provide the county FIPS backbone used throughout the warehouse and data mart.
 
 | Table | Grain | Purpose |
 | ---- | ---- | ---- |
