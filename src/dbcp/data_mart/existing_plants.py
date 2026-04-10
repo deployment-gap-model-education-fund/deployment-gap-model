@@ -1,4 +1,4 @@
-"""Create table of existing plants (aggregated from pudl_generators generators)."""
+"""Create table of existing plants aggregated from eia860m__annual__generators."""
 
 import pandas as pd
 import sqlalchemy as sa
@@ -10,7 +10,7 @@ from dbcp.helpers import get_sql_engine
 def create_data_mart(
     engine: sa.engine.Engine | None = None,
 ) -> pd.DataFrame:
-    """Create table of existing plants from pudl_generators generators.
+    """Create table of existing plants from eia860m__annual__generators.
 
     Args:
         engine (Optional[sa.engine.Engine], optional): postgres engine. Defaults to None.

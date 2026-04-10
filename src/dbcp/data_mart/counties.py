@@ -224,7 +224,7 @@ def _get_existing_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
     #         plant_id_eia,
     #         generator_id,
     #         count(fuel_type_code_pudl) as fuel_type_count
-    #     FROM "data_warehouse"."pudl_generators"
+    #     FROM "data_warehouse"."eia860m__annual__generators"
     #     GROUP BY 1, 2
     # )
     # SELECT max(fuel_type_count) as max_fuel_type_count
@@ -432,7 +432,7 @@ def _get_ncsl_wind_permitting_df(engine: sa.engine.Engine) -> pd.DataFrame:
         # 'raw_state_name',  # drop raw name in favor of canonical one
         "state_id_fips",
     ]
-    db = "data_warehouse.ncsl_state_permitting"
+    db = "data_warehouse.ncsl__state_permitting"
     df = _subset_db_columns(cols, db, engine)
     return df
 
@@ -648,7 +648,7 @@ def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
     """
     pad = pd.read_sql(query, postgres_engine)
     # county_area_coast_clipped is consistent with clipped PAD-US but
-    # the county_fips.land_area_km2 is more accurate and preferred for
+    # the census__county_fips.land_area_km2 is more accurate and preferred for
     # downstream analysis.
     # I use the consistent value to calculate ratio, then pair that ratio
     #  with the accurate land area in the data mart

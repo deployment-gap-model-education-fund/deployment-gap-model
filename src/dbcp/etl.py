@@ -15,9 +15,10 @@ from dbcp.extract.ballot_ready import BR_URI
 from dbcp.extract.fips_tables import CENSUS_URI, TRIBAL_LANDS_URI
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.helpers import write_to_postgres
+from dbcp.metadata import SchemaName
 from dbcp.transform.fips_tables import SPATIAL_CACHE
 from dbcp.transform.helpers import GEOCODER_CACHES
-from dbcp.validation.tests import validate_data_mart, validate_warehouse
+from dbcp.validation.tests import validate_warehouse
 
 logger = logging.getLogger(__name__)
 
@@ -206,28 +207,22 @@ def etl_acp_projects() -> dict[str, pd.DataFrame]:
 
 
 def write_to_postgres_and_parquet(
-    dfs: dict[str, pd.DataFrame], engine: sa.engine.Engine, schema_name: str
+    dfs: dict[str, pd.DataFrame], engine: sa.engine.Engine, schema_name: SchemaName
 ):
     """Write data mart tables from a schema to postgres and parquet."""
     # Ensure schema exists in a committed transaction
     with engine.begin() as con:
-        con.execute(sa.text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
+        con.execute(sa.text(f"CREATE SCHEMA IF NOT EXISTS {schema_name.value}"))
 
     # Delete any existing tables, and create them anew
     metadata = dbcp.helpers.get_schema_sql_alchemy_metadata(schema_name)
     table_names = dfs.keys()
-    tables = [metadata.tables[schema_name + "." + name] for name in table_names]
-    # There are foreign key dependencies between the data warehouse and
-    # private data warehouse (and data_mart and private_data_mart),
-    # so they share the same metadata respectively. Thus, only drop
-    # a subset of tables when creating the private data warehouse.
-    if (schema_name == "data_warehouse") or (schema_name == "data_mart"):
-        metadata.drop_all(engine)
-    else:
-        metadata.drop_all(engine, tables=tables)
+    tables = [metadata.tables[schema_name.value + "." + name] for name in table_names]
+    # Drop tables
+    metadata.drop_all(engine)
     metadata.create_all(engine, tables=tables)
 
-    parquet_dir = OUTPUT_DIR / f"{schema_name}"
+    parquet_dir = OUTPUT_DIR / f"{schema_name.value}"
     parquet_dir.mkdir(exist_ok=True)
 
     # Load table into postgres and parquet
@@ -248,7 +243,7 @@ def write_to_postgres_and_parquet(
             pq.write_table(pa_table, parquet_dir / f"{table.name}.parquet")
 
 
-def run_etl(funcs: dict[str, Callable], schema_name: str):
+def run_etl(funcs: dict[str, Callable], schema_name: SchemaName):
     """Execute etl functions and save outputs to parquet and postgres."""
     engine = dbcp.helpers.get_sql_engine()
 
@@ -261,129 +256,75 @@ def run_etl(funcs: dict[str, Callable], schema_name: str):
         dfs=transformed_dfs, engine=engine, schema_name=schema_name
     )
 
-    logger.info(f"Sucessfully finished {schema_name} ETL.")
+    logger.info(f"Sucessfully finished {schema_name.value} ETL.")
 
 
 def create_data_warehouse():
     """Create data warehouse tables by ETL-ing each data source."""
     etl_funcs = {
         "offshore_wind": etl_offshore_wind,
-        "gridstatus": etl_gridstatus_isoqueues,
+        # "gridstatus": etl_gridstatus_isoqueues,
         "manual_ordinances": etl_manual_ordinances,
-        "epa_avert": etl_epa_avert,
-        "eip_infrastructure": etl_eip_infrastructure,
+        # "epa_avert": etl_epa_avert,
+        # "eip_infrastructure": etl_eip_infrastructure,
         "columbia_local_opp": etl_columbia_local_opp,
-        "energy_communities_by_county": etl_energy_communities_by_county,
+        # "energy_communities_by_county": etl_energy_communities_by_county,
         "fips_tables": etl_fips_tables,
-        "protected_area_by_county": etl_protected_area_by_county,
-        "justice40_tracts": etl_justice40,
-        "nrel_wind_solar_ordinances": etl_nrel_ordinances,
-        "lbnl_iso_queue": etl_lbnl_iso_queue,
+        # "protected_area_by_county": etl_protected_area_by_county,
+        # "justice40_tracts": etl_justice40,
+        # "nrel_wind_solar_ordinances": etl_nrel_ordinances,
+        # "lbnl_iso_queue": etl_lbnl_iso_queue,
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
-        "ballot_ready": etl_ballot_ready,
-    }
-    run_etl(etl_funcs, "data_warehouse")
-    # Run private ETL functions
-    etl_funcs = {
+        # "ballot_ready": etl_ballot_ready,
         "acp_projects": etl_acp_projects,
         "fyi_queue": etl_fyi_queue,
     }
-    run_etl(etl_funcs, "private_data_warehouse")
+    run_etl(etl_funcs, SchemaName.DATA_WAREHOUSE)
 
 
-def create_data_mart(engine, private_only: bool = False):  # noqa: C901
+def create_data_mart(engine):  # noqa: C901
     """Create data mart tables by calling create_data_mart in each data mart module."""
     modules = dbcp.data_mart.get_data_mart_modules()
     data_mart_tables: dict[str, pd.DataFrame] = {}
-    private_table_names: set[str] = set()
     for module, module_info in modules:
-        module_private = set(getattr(module, "PRIVATE_DATA_MART_TABLES", set()))
-        # If we're creating the private data mart only
-        # and this module doesn't have any private tables
-        # in it, skip it.
-        if private_only and not module_private:
-            continue
-        try:
-            data = module.create_data_mart(engine=engine)
-        except AttributeError as error:
-            raise AttributeError(
-                f"{module_info.name} has no attribute 'create_data_mart'."
-                "Make sure the data mart module implements create_data_mart function."
-            ) from error
+        data = module.create_data_mart(engine=engine)
         if isinstance(data, pd.DataFrame):
             name = module_info.name
-            # If we're creating the private data mart only
-            # and this specific table is not private, skip it.
-            if private_only and name not in module_private:
-                continue
             assert name not in data_mart_tables, (
                 f"Key {name} already exists in data mart"
             )
             data_mart_tables[name] = data
-            if name in module_private:
-                private_table_names.add(name)
         elif isinstance(data, dict):
-            # if only creating private tables, drop non private tables right away
-            if private_only:
-                data = {k: v for k, v in data.items() if k in module_private}
-            # if no private tables are left from this module, skip
-            if not data:
-                continue
-            assert len([key for key in data if key in data_mart_tables]) == 0, (
-                f"Dict key from {module_info.name} already exists"
-            )
             data_mart_tables.update(data)
-            private_table_names.update(module_private.intersection(data.keys()))
         else:
             raise TypeError(
                 f"Expecting pd.DataFrame or dict of dataframes. Got {type(data)}"
             )
 
-    data_mart_dfs = {
-        name: df
-        for name, df in data_mart_tables.items()
-        if name not in private_table_names
-    }
-    private_data_mart_dfs = {
-        name: df for name, df in data_mart_tables.items() if name in private_table_names
-    }
-    if private_only:
-        write_to_postgres_and_parquet(
-            dfs=private_data_mart_dfs,
-            engine=engine,
-            schema_name="private_data_mart",
-        )
-    else:
-        for schema_name in ["data_mart", "private_data_mart"]:
-            if schema_name == "data_mart":
-                write_to_postgres_and_parquet(
-                    dfs=data_mart_dfs, engine=engine, schema_name=schema_name
-                )
-            else:
-                write_to_postgres_and_parquet(
-                    dfs=private_data_mart_dfs, engine=engine, schema_name=schema_name
-                )
+    write_to_postgres_and_parquet(
+        dfs=data_mart_tables, engine=engine, schema_name=SchemaName.DATA_MART
+    )
 
 
-def etl(schema="all"):
-    """Run dbc ETL."""
+def etl(schema: SchemaName | None = None):
+    """Run ETL."""
     # Reduce size of caches if necessary
     GEOCODER_CACHES.reduce_cache_sizes()
     SPATIAL_CACHE.reduce_size()
     engine = dbcp.helpers.get_sql_engine()
 
     # Run public ETL functions
-    if (schema == "data_warehouse") or (schema == "all"):
+    if (schema == SchemaName.DATA_WAREHOUSE) or (schema is None):
         create_data_warehouse()
         validate_warehouse(engine=engine)
-    if (schema == "data_mart") or (schema == "all"):
-        create_data_mart(engine=engine)
-        validate_data_mart(engine=engine)
-    if schema == "private_data_mart":
-        create_data_mart(engine=engine, private_only=True)
+    # if (schema == "data_mart") or (schema == "all"):
+    #     create_data_mart(engine=engine)
+    #     validate_data_mart(engine=engine)
+    # if schema == "private_data_mart":
+    #     create_data_mart(engine=engine, private_only=True)
 
-    logger.info("Sucessfully finished ETL.")
+    logger.info("Successfully finished ETL.")
 
 
 if __name__ == "__main__":

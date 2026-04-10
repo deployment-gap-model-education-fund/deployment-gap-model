@@ -55,9 +55,9 @@ WITH
         'gridstatus' AS source,
         ncsl.permitting_type AS state_permitting_type
     FROM gs
-    LEFT JOIN data_warehouse.ncsl_state_permitting AS ncsl
+    LEFT JOIN data_warehouse.ncsl__state_permitting AS ncsl
         on gs.state_id_fips = ncsl.state_id_fips
-    LEFT JOIN data_warehouse.state_fips AS sfip
+    LEFT JOIN data_warehouse.census__state_fips AS sfip
         ON gs.state_id_fips = sfip.state_id_fips
-    LEFT JOIN data_warehouse.county_fips AS cfip
+    LEFT JOIN data_warehouse.census__county_fips AS cfip
         ON gs.county_id_fips = cfip.county_id_fips

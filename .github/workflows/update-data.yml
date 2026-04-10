@@ -269,6 +269,7 @@ jobs:
           # - target (indicates if this is 'dev' or 'prod' environment target)
           docker compose run --rm app python dbcp/cli.py publish-outputs \
             -bq \
+            --upload-to-postgres \
             --build-ref ${{ matrix.ref }} \
             --code-git-sha ${{ steps.checkout.outputs.commit }} \
             --settings-file-git-sha $SETTINGS_FILE_SHA \

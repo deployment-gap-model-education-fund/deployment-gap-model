@@ -70,7 +70,7 @@ def county_fips(counties: pd.DataFrame, tribal_land: pd.DataFrame) -> pd.DataFra
         counties: raw census table.
 
     Returns:
-        transformed county_fips table.
+        transformed census__county_fips table.
 
     """
     rename_dict = {  # comment out columns to drop
@@ -126,10 +126,10 @@ def state_fips(states: pd.DataFrame) -> pd.DataFrame:
     """Apply transformations to county FIPS table.
 
     Args:
-        states: raw county_fips table.
+        states: raw census__state_fips table.
 
     Returns:
-        transformed county_fips table.
+        transformed census__state_fips table.
 
     """
     states = states.copy()
@@ -166,10 +166,10 @@ def transform(fips_tables: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """
     transformed_fips_tables = {}
 
-    transformed_fips_tables["county_fips"] = county_fips(
+    transformed_fips_tables["census__county_fips"] = county_fips(
         fips_tables["counties"], fips_tables["tribal_land"]
     )
-    transformed_fips_tables["state_fips"] = state_fips(fips_tables["states"])
+    transformed_fips_tables["census__state_fips"] = state_fips(fips_tables["states"])
 
     return transformed_fips_tables
 

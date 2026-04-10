@@ -1,4 +1,5 @@
 """Load manually maintained ordinances from BigQuery."""
+
 import google.auth
 import pandas as pd
 from pandas_gbq import read_gbq
@@ -9,10 +10,11 @@ def extract() -> dict[str, pd.DataFrame]:
 
     Returns:
         dfs: dictionary of dataframe name to raw dataframe.
+
     """
     dfs = {}
     credentials, project_id = google.auth.default()
-    dfs["manual_ordinances"] = read_gbq(
+    dfs["airtable__manual_ordinances"] = read_gbq(
         """SELECT
     county_id_fips,
     CASE
@@ -30,5 +32,5 @@ def extract() -> dict[str, pd.DataFrame]:
 
 if __name__ == "__main__":
     # debugging entry point
-    df = extract()["manual_ordinances"]
+    df = extract()["airtable__manual_ordinances"]
     print(df.info())
