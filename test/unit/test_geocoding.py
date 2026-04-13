@@ -128,7 +128,6 @@ class MockGeocodioClient:
 @pytest.fixture(autouse=True)
 def mock_official_geocodio_client(monkeypatch):
     """Patch Geocodio lookups to use the official client's object response shape."""
-    geocodio.GEOCODER_CACHE.clear(warn=False)
     monkeypatch.setenv("GEOCODIO_API_KEY", "test-key")
     monkeypatch.setattr(geocodio, "Geocodio", MockGeocodioClient)
 
