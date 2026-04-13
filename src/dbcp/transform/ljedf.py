@@ -49,6 +49,10 @@ def _transform_civis_demographics(raw_df: pd.DataFrame) -> pd.DataFrame:
     assert invalid_projected_dems_pct.sum() <= 1, (
         "Found more invalid projected_dems_pct values than expected."
     )
+    assert (
+        civis[~civis["projected_dems_pct"].between(0, 100)]["projected_dems_pct"]
+        == 172.8
+    ).all(), "Invalid projected_dems_pct was not expected value of 172.8"
     civis.loc[invalid_projected_dems_pct, "projected_dems_pct"] = pd.NA
     assert civis["county_id_fips"].is_unique, "Civis county FIPS are not unique."
     return civis

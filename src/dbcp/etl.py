@@ -219,15 +219,16 @@ def write_to_postgres_and_parquet(
     dfs: dict[str, pd.DataFrame], engine: sa.engine.Engine, schema_name: SchemaName
 ):
     """Write data mart tables from a schema to postgres and parquet."""
-    # Recreate the whole schema on each ETL run so stale tables / constraints from
-    # older versions of the warehouse cannot block rebuilds.
+    # Ensure schema exists in a committed transaction
     with engine.begin() as con:
-        con.execute(sa.text(f"DROP SCHEMA IF EXISTS {schema_name.value} CASCADE"))
-        con.execute(sa.text(f"CREATE SCHEMA {schema_name.value}"))
+        con.execute(sa.text(f"CREATE SCHEMA IF NOT EXISTS {schema_name.value}"))
 
+    # Delete any existing tables, and create them anew
     metadata = dbcp.helpers.get_schema_sql_alchemy_metadata(schema_name)
     table_names = dfs.keys()
     tables = [metadata.tables[schema_name.value + "." + name] for name in table_names]
+    # Drop tables
+    metadata.drop_all(engine)
     metadata.create_all(engine, tables=tables)
 
     parquet_dir = OUTPUT_DIR / f"{schema_name.value}"
