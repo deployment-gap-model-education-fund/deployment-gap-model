@@ -1,5 +1,10 @@
 """SQL Alchemy models for the data warehouse and mart."""
 
-from sqlalchemy import MetaData
+from enum import Enum
 
-data_warehouse_metadata = MetaData()
+
+class SchemaName(Enum):
+    """Specify name of all schemas."""
+
+    DATA_WAREHOUSE = "data_warehouse"
+    DATA_MART = "data_mart"

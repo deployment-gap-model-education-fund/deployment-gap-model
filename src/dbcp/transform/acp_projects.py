@@ -558,11 +558,11 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     most_recent_snapshot = snapshots[
         snapshots["report_date"] == most_recent_report_date
     ]
-    transformed_dfs["acp_projects_current"] = _transform_acp_projects_current(
+    transformed_dfs["acp__private__projects"] = _transform_acp_projects_current(
         most_recent_snapshot
     )
-    transformed_dfs["acp_changelog"] = _transform_acp_snapshots_to_changelog(
-        raw_dfs["raw_acp_projects_snapshots"]
+    transformed_dfs["acp__private__changelog__projects"] = (
+        _transform_acp_snapshots_to_changelog(raw_dfs["raw_acp_projects_snapshots"])
     )
 
     return transformed_dfs

@@ -329,11 +329,9 @@ def _add_derived_columns(mart: pd.DataFrame) -> None:
         "ordinance_via_solar_nrel",
         "ordinance_via_wind_nrel",
     ]
-    priority_ban = priority_ban.astype("boolean")
-    secondary_bans = (
-        mart[secondary_ban_cols].astype("boolean").fillna(False).any(axis=1)
+    mart["ordinance_is_restrictive"] = priority_ban.fillna(
+        mart[secondary_ban_cols].fillna(False).any(axis=1)
     )
-    mart["ordinance_is_restrictive"] = priority_ban.fillna(secondary_bans)
     # This categorizes any project with multiple generation or storage types as 'hybrid'
     mart["is_hybrid"] = (
         mart.groupby(["source", "project_id", "county_id_fips"])["resource_clean"]
@@ -970,7 +968,7 @@ def get_eia860m_status_timeseries(
         )
 
     last_report_date = pd.read_sql(
-        "SELECT max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog",
+        "SELECT max(valid_until_date) FROM data_warehouse._eia860m__changelog__generators",
         engine,
     ).iloc[0, 0]
 
@@ -982,7 +980,7 @@ SELECT
     capacity_mw,
     min(report_date) AS start_date,
     max(COALESCE(valid_until_date, timestamp %(last_report_date)s)) AS end_date
-FROM data_warehouse.pudl_eia860m_changelog
+FROM data_warehouse._eia860m__changelog__generators
 GROUP BY 1, 2, 3, 4
 ORDER BY 1, 2, 3, 4
 """
@@ -1093,12 +1091,12 @@ def _get_eia860m_transition_dates(engine: sa.engine.Engine) -> pd.DataFrame:
             operational_status_code,
             report_date,
             MAX(report_date) OVER (PARTITION BY plant_id_eia, generator_id) AS latest_report_date
-        FROM data_warehouse.pudl_eia860m_changelog
+        FROM data_warehouse._eia860m__changelog__generators
         WHERE operational_status_code IS NOT NULL
     ),
     max_date AS (
         SELECT MAX(report_date) AS data_freshness_date
-        FROM data_warehouse.pudl_eia860m_changelog
+        FROM data_warehouse._eia860m__changelog__generators
     )
     SELECT
         wl.plant_id_eia,
@@ -1147,7 +1145,7 @@ def _get_plant_names(
     if not date_as_of:  # get most recent data
         date_as_of = (
             pd.read_sql(
-                "SELECT max(valid_until_date) FROM data_warehouse.pudl_eia860m_changelog",
+                "SELECT max(valid_until_date) FROM data_warehouse._eia860m__changelog__generators",
                 engine,
             )
             .iloc[0, 0]
@@ -1161,7 +1159,7 @@ def _get_plant_names(
     SELECT DISTINCT ON (plant_id_eia)
         plant_id_eia,
         plant_name_eia
-    FROM data_warehouse.pudl_eia860m_changelog
+    FROM data_warehouse._eia860m__changelog__generators
     ORDER BY 1, valid_until_date DESC NULLS FIRST -- nulls are the most recent
     """
     plant_names = pd.read_sql(query, engine)
@@ -1297,7 +1295,7 @@ def create_data_mart(
 if __name__ == "__main__":
     # debugging entry point
     mart = create_data_mart()
-    parquet_dir = OUTPUT_DIR / "private_data_mart"
+    parquet_dir = OUTPUT_DIR / "data_mart"
     mart["fyi_projects_long_format"].to_parquet(
         parquet_dir / "fyi_projects_long_format.parquet",
     )

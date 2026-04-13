@@ -1,10 +1,11 @@
 """Transformations for the PAD-US intersection with TIGER county geometries."""
+
 import pandas as pd
 
 
 def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """Transform the PAD-US intersection with TIGER county geometries."""
-    cols_to_drop = [  # already in county_fips table
+    cols_to_drop = [  # already in census__county_fips table
         "county_land_area_sq_meters",
         "county_water_area_sq_meters",
         "internal_point_latitude",

@@ -15,8 +15,12 @@ def _create_br_election_data_mart(engine: sa.engine.Engine) -> pd.DataFrame:
         br_positions_counties_assoc = pd.read_sql_table(
             "br_positions_counties_assoc", con, schema="data_warehouse"
         )
-        county_fips = pd.read_sql_table("county_fips", con, schema="data_warehouse")
-        state_fips = pd.read_sql_table("state_fips", con, schema="data_warehouse")
+        county_fips = pd.read_sql_table(
+            "census__county_fips", con, schema="data_warehouse"
+        )
+        state_fips = pd.read_sql_table(
+            "census__state_fips", con, schema="data_warehouse"
+        )
 
     # Add state and county names
     br_positions_counties_assoc = br_positions_counties_assoc.merge(

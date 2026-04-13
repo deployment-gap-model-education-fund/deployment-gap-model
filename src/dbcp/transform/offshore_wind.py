@@ -144,8 +144,6 @@ def _add_geocoded_locations(transformed_locs: pd.DataFrame) -> None:
         transformed_locs (pd.DataFrame): locations df after other cleaning has been performed
 
     """
-    # this code is ugly and procedural for the sake of making inplace operations.
-    # And all to save copy operations on a dataframe that is... 50 rows lol. Dumb!
     transformed_locs["city_county"] = (
         transformed_locs["raw_city"] + ", " + transformed_locs["raw_county"]
     )
@@ -172,7 +170,7 @@ def _add_geocoded_locations(transformed_locs: pd.DataFrame) -> None:
         first_pass.update(second_pass.loc[:, cols_to_fill])
 
     transformed_locs.loc[:, cols_to_fill] = first_pass[cols_to_fill]
-    return
+    return transformed_locs
 
 
 def _add_actionable_and_nearly_certain_classification(projects: pd.DataFrame) -> None:
@@ -246,10 +244,10 @@ def _normalize_tables(
     """Normalize the project and location tables.
 
     Create the following tables:
-    - offshore_wind_projects: pk is project_id
-    - offshore_wind_locations: pk is location_id
-    - offshore_wind_projects_cable_landings: association table between projects and locations for cable landings
-    - offshore_wind_port_association: association table between projects and locations for port locations
+    - airtable__offshore_wind_projects: pk is project_id
+    - airtable__offshore_wind_locations: pk is location_id
+    - airtable__offshore_wind_cable_landing_association: association table between projects and locations for cable landings
+    - airtable__offshore_wind_port_association: association table between projects and locations for port locations
 
     Args:
         proj (pd.DataFrame): raw projects data
@@ -266,19 +264,19 @@ def _normalize_tables(
     # Create association tables
     association_table_metadata = [
         {
-            "table_name": "offshore_wind_cable_landing_association",
+            "table_name": "airtable__offshore_wind_cable_landing_association",
             "pk": "project_id",
             "array_col": "cable_location_ids",
             "array_col_rename": "location_id",
         },
         {
-            "table_name": "offshore_wind_port_association",
+            "table_name": "airtable__offshore_wind_port_association",
             "pk": "project_id",
             "array_col": "port_location_ids",
             "array_col_rename": "location_id",
         },
         {
-            "table_name": "offshore_wind_staging_association",
+            "table_name": "airtable__offshore_wind_staging_association",
             "pk": "project_id",
             "array_col": "staging_location_ids",
             "array_col_rename": "location_id",
@@ -292,11 +290,10 @@ def _normalize_tables(
 
     # projects
     _add_actionable_and_nearly_certain_classification(proj)
-    tables["offshore_wind_projects"] = proj
+    tables["airtable__offshore_wind_projects"] = proj
 
     # locations
-    _add_geocoded_locations(locs)
-    tables["offshore_wind_locations"] = locs
+    tables["airtable__offshore_wind_locations"] = _add_geocoded_locations(locs)
 
     return tables
 
@@ -352,13 +349,15 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         "Site assessment underway": "active",
         "TBD": "active",  # assume active
     }
-    transformed_dfs["offshore_wind_projects"]["queue_status"] = (
-        transformed_dfs["offshore_wind_projects"]["construction_status"]
+    transformed_dfs["airtable__offshore_wind_projects"]["queue_status"] = (
+        transformed_dfs["airtable__offshore_wind_projects"]["construction_status"]
         .fillna("TBD")
         .map(queue_mapping)
     )
-    assert transformed_dfs["offshore_wind_projects"]["queue_status"].notnull().all(), (
-        "Unmapped construction status."
-    )
+    assert (
+        transformed_dfs["airtable__offshore_wind_projects"]["queue_status"]
+        .notnull()
+        .all()
+    ), "Unmapped construction status."
 
     return transformed_dfs
