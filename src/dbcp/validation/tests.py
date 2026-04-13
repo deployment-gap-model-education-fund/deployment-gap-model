@@ -331,6 +331,57 @@ def test_manual_ordinance_fips_coverage(engine: Engine):
     assert actual.empty, "Found mismatched FIPS in airtable__manual_ordinances"
 
 
+def test_ljedf_county_election_results(engine: Engine):
+    """Check LJEDF county politics table keys and percentage ranges."""
+    df = pd.read_sql_table(
+        "ljedf__private__counties__election_results", engine, schema="data_warehouse"
+    )
+    assert df["county_id_fips"].is_unique, "Found duplicate county FIPS in LJEDF table."
+    expected_n_counties = pd.read_sql(
+        """
+        SELECT count(*)
+        FROM data_warehouse.census__county_fips
+        WHERE CAST(state_id_fips AS INTEGER) < 60
+        """,
+        engine,
+    ).squeeze()
+    assert len(df) == expected_n_counties, (
+        "LJEDF election results table is not correctly indexed by census__county_fips coverage."
+    )
+
+    missing_fips = pd.read_sql(
+        """
+        SELECT l.county_id_fips
+        FROM data_warehouse.ljedf__private__counties__election_results AS l
+        LEFT JOIN data_warehouse.census__county_fips AS c
+        USING (county_id_fips)
+        WHERE c.county_id_fips IS NULL
+        """,
+        engine,
+    )
+    assert missing_fips.empty, (
+        "Found LJEDF county FIPS missing from census__county_fips."
+    )
+
+    pct_cols = [
+        "female_pct",
+        "male_pct",
+        "white_pct",
+        "black_pct",
+        "asian_pct",
+        "american_indian_pct",
+        "minority_pct",
+        "age_25_to_64_pct",
+        "biden_2020_pct",
+        "projected_dems_pct",
+        "below_college_pct",
+        "harris_2024_pct",
+    ]
+    for col in pct_cols:
+        valid = df[col].between(0, 100) | df[col].isna()
+        assert valid.all(), f"Found out-of-range percentage values in {col}."
+
+
 @lru_cache(maxsize=1)
 def _get_non_county_cols_from_wide_format(engine: Engine) -> pd.Index:
     """Get the columns from counties_wide_format that are not derived from county-level data."""
@@ -343,6 +394,7 @@ def _get_non_county_cols_from_wide_format(engine: Engine) -> pd.Index:
 def validate_warehouse(engine: Engine):
     """Run data warehouse validation tests."""
     logger.info("Validating data warehouse")
+    test_ljedf_county_election_results(engine)
     # test_j40_county_fips_coverage(engine)
     # test_gridstatus_fips_coverage(engine)
     # test_fyi_fips_coverage(engine)
