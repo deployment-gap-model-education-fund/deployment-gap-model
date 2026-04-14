@@ -14,7 +14,7 @@ This table contains the most recent annual EIA 860M generator records sourced fr
 
 ## Transformations
 
-The ETL filters the PUDL generator table ([out_eia__yearly_generators](https://catalystcoop-pudl.readthedocs.io/en/stable/data_dictionaries/pudl_db.html#out-eia-yearly-generators)) to the latest complete calendar year, converts date-like columns to datetimes, and adds state and county FIPS IDs from the generator state/county fields.
+The ETL filters the PUDL generator table ([out_eia__yearly_generators](https://docs.catalyst.coop/pudl/en/latest/data_dictionaries/pudl_db.html#out-eia-yearly-generators)) to the latest complete calendar year, converts date-like columns to datetimes, and adds state and county FIPS IDs from the generator state/county fields.
 
 ## Related Tables
 
