@@ -1,6 +1,6 @@
 # acp__private__changelog__projects
 
-This private warehouse table contains historical ACP project versions across snapshots. A row is emitted whenever a characteristic of a project changes.
+This private warehouse table contains a change log tracking changes in ACP projects across all snapshots of data (including quarterly snapshots going back to Q2 2024). A new row is present in the change log anytime an ACP project is updated.
 
 ## Table Details
 

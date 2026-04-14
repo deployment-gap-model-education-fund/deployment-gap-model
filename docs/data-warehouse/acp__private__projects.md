@@ -1,6 +1,6 @@
 # acp__private__projects
 
-This private warehouse table contains the most recent ACP project snapshot and operational characteristics about those projects. It is updated irregularly in an ad-hoc manner and is used to augment the EIA data to provide a view of projects that are currently operational.
+This private warehouse table contains the most recent ACP project snapshot and operational characteristics about those projects. It is updated irregularly in an ad-hoc manner and is used to augment the EIA data to provide a view of projects that are planned or existing. Data is cleaned and transformed into a uniform schema including adding a unique identifier for each project.
 
 ## Table Details
 

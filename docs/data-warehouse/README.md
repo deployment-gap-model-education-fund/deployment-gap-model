@@ -58,10 +58,9 @@ These reference tables provide the county FIPS code backbone used throughout the
 - [`census__county_fips`](census__county_fips.md)
 - [`census__state_fips`](census__state_fips.md)
 
-## PUDL / EIA 860M
+## EIA 860M (from PUDL)
 
-These tables are sourced from Catalyst Cooperative's Public Utility Data Liberation project pipeline and form the warehouse backbone for existing and near-operational generation assets. The EIA data provides generator-level operational attributes
-that can be aggregated up to the plant level. Data is updated monthly.
+These tables are sourced from Catalyst Cooperative's Public Utility Data Liberation (PUDL) project pipeline and form the warehouse backbone for existing and near-operational generation assets. The EIA data provides generator-level specific information about existing and planned generators and associated environmental equipment at electric power plants with 1 megawatt or greater of combined nameplate capacity. Data can be aggregated up to the plant level. Data is updated monthly.
 
 - [`eia860m__annual__generators`](eia860m__annual__generators.md)
 - [`_eia860m__changelog__generators`](_eia860m__changelog__generators.md)
@@ -75,14 +74,15 @@ This source summarizes whether siting and permitting authority is primarily stat
 
 ## ACP: Project Pipeline
 
-These tables contain private data from the American Clean Power Association and provide project snapshots. They are useful for current-state and historical views of ACP-tracked projects and augment the data provided by EIA.
+These tables contain private data from the American Clean Power Association and provide project snapshots. It contains project-level data that ACP collects from their developer member’s self reporting. It is used for current-state and historical views of ACP-tracked projects and augment the data provided by EIA. Updates are ad-hoc.
 
 - [`acp__private__projects`](acp__private__projects.md)
 - [`acp__private__changelog__projects`](acp__private__changelog__projects.md)
 
 ## interconnection.fyi: Queue Data
 
-These tables contain private data from the interconnection.fyi interconnection queue data. The tables provide information on the projects in the queue, their location, and resource-capacity components of the project. The data covers all ISOs in the US, several ISOs in Canada, and one-off utility data sources.
+These tables contain private data from the interconnection.fyi interconnection queue data. The tables provide information on the projects in the queue, their location, and the potential capacity of the generator resource components of the project. The data covers interconnection queues across the U.S. (ISO’s/RTO’s + non-ISO balancing areas) as well as several ISO's in Canada. We use this as our single source for queue data. Data is updated monthly.
+
 
 - [`fyi__private__projects`](fyi__private__projects.md)
 - [`fyi__private__locations`](fyi__private__locations.md)

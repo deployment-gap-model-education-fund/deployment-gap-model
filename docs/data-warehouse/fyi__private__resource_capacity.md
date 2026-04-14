@@ -1,6 +1,6 @@
 # fyi__private__resource_capacity
 
-This private warehouse table contains normalized resource and capacity records for interconnection.fyi queue projects. Transformations include mapping project resources types to clean, categorized values.
+This private warehouse table contains normalized data on the potential capacity of the generator resource components of projects in the interconnection queue. Transformations include mapping project resources types to clean, categorized values.
 
 ## Table Details
 
