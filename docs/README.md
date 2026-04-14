@@ -10,7 +10,7 @@ Tables in this repo generally follow this naming pattern:
 
 `source_name__private_flag__time_interval__row_granularity_or_aggregation__table_contents_description`
 
-Not every table uses every segment, but this is the guiding schema for naming warehouse and mart tables.
+This is the guiding schema for naming warehouse and mart tables.
 
 ### Segment meanings
 
@@ -27,7 +27,5 @@ Not every table uses every segment, but this is the guiding schema for naming wa
 - `fyi__private__resource_capacity`
 - `acp__private__changelog__projects`
 - `eia860m__annual__generators`
-- `projects_status_monthly_eia860m`
-- `counties_wide_format`
 
 This convention is meant to make table names legible at a glance: where the data came from, whether it is public, the time shape, the row grain, and what the table actually contains.
