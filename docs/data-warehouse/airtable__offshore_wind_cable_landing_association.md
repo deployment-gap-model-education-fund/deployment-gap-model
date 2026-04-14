@@ -4,7 +4,7 @@ This association table links offshore wind projects to cable landing locations.
 
 ## Table Details
 
-**Source:** Madrone Airtable offshore wind base
+**Source:** Madrone Airtable offshore wind
 
 **Grain:** One row per project-location link
 

@@ -4,7 +4,7 @@ This table describes onshore locations associated with manually curated offshore
 
 ## Table Details
 
-**Source:** Madrone Airtable offshore wind base
+**Source:** Madrone Airtable offshore wind
 
 **Grain:** One row per offshore wind location
 

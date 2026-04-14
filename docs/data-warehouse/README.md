@@ -1,7 +1,5 @@
 # Data Warehouse
 
-This section documents the data warehouse tables.
-
 Data warehouse tables are normalized, source-specific tables which can be
 joined together to create wider tables ready for analysis. They are created
 by extracting the raw data from cloud storage archives, and doing transformations
@@ -12,8 +10,8 @@ are built from these data warehouse tables.
 
 The `create_data_warehouse()` job currently includes these source pipelines:
 
-- Madrone's Airtable offshore wind base
-- Madrone's Airtable manual ordinances base
+- Madrone's Airtable offshore wind
+- Madrone's Airtable manual ordinances
 - Columbia RELDI local opposition
 - Census FIPS reference tables
 - PUDL's EIA 860M

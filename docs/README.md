@@ -20,7 +20,7 @@ This is the guiding schema for naming warehouse and mart tables.
 | `private_flag` | Whether the table is intended for non-public use | `private` |
 | `time_interval` | The time cadence or snapshot style represented by the table | `annual`, `monthly`, `quarterly`, `yearly`, `changelog` |
 | `row_granularity_or_aggregation` | The unit of observation or aggregation level | `projects`, `generators`, `counties`, `iso_regions` |
-| `table_contents_description` | The specific subject, shape, or metric captured in the table | `long_format`, `wide_format`, `status_codes`, `resource_capacity` |
+| `table_contents_description` | The specific subject or metric captured in the table | `operational_status_codes`, `resource_capacity`, `active_clean_projects_capacity` |
 
 ### Examples
 

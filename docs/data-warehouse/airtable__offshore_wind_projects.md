@@ -4,7 +4,7 @@ This table describes manually curated offshore wind projects from Madrone's Airt
 
 ## Table Details
 
-**Source:** Madrone Airtable offshore wind base
+**Source:** Madrone Airtable offshore wind
 
 **Grain:** One row per offshore wind project
 

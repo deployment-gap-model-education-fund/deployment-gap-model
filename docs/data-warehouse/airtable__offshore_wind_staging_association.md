@@ -4,7 +4,7 @@ This association table links offshore wind projects to staging locations.
 
 ## Table Details
 
-**Source:** Madrone Airtable offshore wind base
+**Source:** Madrone Airtable offshore wind
 
 **Grain:** One row per project-location link
 

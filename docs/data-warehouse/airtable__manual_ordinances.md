@@ -4,7 +4,7 @@ This table captures manually maintained county-level ordinance flags that supple
 
 ## Table Details
 
-**Source:** Madrone Airtable manual ordinances base
+**Source:** Madrone Airtable manual ordinances
 
 **Grain:** One row per county
 
