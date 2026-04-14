@@ -1888,6 +1888,9 @@ fyi__private__locations = Table(
     Column("geocoded_containing_county", String),
     Column("latitude", Float),
     Column("longitude", Float),
+    Column("gis_latitude", Float),
+    Column("gis_longitude", Float),
+    Column("gis_lat_long_specificity", String),
     Column("country_code", String),
     schema=schema,
 )
