@@ -12,6 +12,10 @@ This reference table provides state and territory FIPS records used throughout t
 
 **Purpose:** Canonical state FIPS, names, and abbreviations.
 
+## Transformations
+
+The ETL deduplicates state records by FIPS code, keeping the shortest available state name when multiple names exist for the same code. It then renames the source fields to `state_id_fips`, `state_name`, and `state_abbrev`.
+
 ## Related Tables
 
 - `census__county_fips`

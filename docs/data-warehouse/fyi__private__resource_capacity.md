@@ -12,6 +12,12 @@ This private warehouse table contains normalized resource and capacity records f
 
 **Purpose:** Resource-level capacity breakout for projects with one or more generation types.
 
+## Transformations
+
+The ETL parses interconnection.fyi's capacity-by-generation-type breakout where available, explodes multi-resource projects into one row per project-resource pair, and sums duplicate resource rows for the same project when appropriate.
+
+For projects without a parsed resource-capacity breakout, the transform falls back to the project-level capacity and canonical generation type. It then maps raw resource values into the cleaned `resource_clean` categories used downstream.
+
 ## Related Tables
 
 - `fyi__private__projects`

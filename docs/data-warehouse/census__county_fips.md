@@ -12,6 +12,12 @@ This reference table provides county-equivalent FIPS records used throughout the
 
 **Purpose:** Canonical county FIPS, names, centroid fields, land/water area, and tribal land share.
 
+## Transformations
+
+The ETL renames Census shapefile fields into warehouse-friendly names, converts land and water area from square meters to square kilometers, and casts centroid coordinates into numeric columns.
+
+It also calculates `raw_tribal_land_frac` and `tribal_land_frac` by spatially intersecting county geometries with Census tribal land geometries. `tribal_land_frac` is capped at 1.0 and rounded to two decimal places.
+
 ## Related Tables
 
 - `census__state_fips`

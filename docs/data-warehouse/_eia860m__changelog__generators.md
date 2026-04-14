@@ -15,6 +15,12 @@ This table is not intended for analysis and is largely just a building block for
 
 **Additional Details:** EIA-860M includes generator tables with the most up-to-date catalog of EIA generators and their operational status and other generator characteristics. EIA-860M is reported monthly, although for the vast majority of the generators nothing changes month-to-month.
 
+## Transformations
+
+The ETL converts date-like columns to datetimes, renames selected raw fields, and adds state/county FIPS IDs from the raw state and county values.
+
+It preserves the original EIA operational status code in `raw_operational_status_code`, maps the status code to Madrone's numeric status scale in `operational_status_code`, and imputes missing ISO/balancing-authority values for some records when the latest county-level data has exactly one non-null balancing authority code.
+
 ## Related Tables
 
 - `eia860m__annual__generators`

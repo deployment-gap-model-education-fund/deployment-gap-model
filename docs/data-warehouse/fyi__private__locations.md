@@ -12,6 +12,15 @@ This private warehouse table contains normalized location data for interconnecti
 
 **Purpose:** County/state/location details for projects with location data.
 
+## Transformations
+
+The ETL splits raw project location fields out of `fyi__private__projects` into a normalized locations table and drops records where both raw state and county are missing.
+
+Before geocoding, the transform applies manual county/state fill-ins for known source-data gaps. It then adds `state_id_fips`, `county_id_fips`, `geocoded_locality_name`, `geocoded_locality_type`, and `geocoded_containing_county`, while preserving the original raw county/state names in the final output.
+
+We're currently dropping the FYI provided `fips_codes` column in favor of the geocded value, but as a future improvement it could potentially be useful to us for filling in FIPS codes that the geocoder misses, or validating the geocoded FIPS codes.
+
+
 ## Related Tables
 
 - `fyi__private__projects`

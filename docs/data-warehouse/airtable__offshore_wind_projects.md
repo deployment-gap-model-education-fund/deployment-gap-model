@@ -12,6 +12,12 @@ This table describes manually curated offshore wind projects from Madrone's Airt
 
 **Purpose:** Core project attributes including developer, capacity, status, and DBCP actionability flags.
 
+## Transformations
+
+The ETL renames Airtable fields into snake_case warehouse columns, casts key fields like project IDs, capacity, and proposed completion year into typed columns, and validates that project IDs and project names are unique.
+
+The transform also maps construction statuses into a queue-style `queue_status` field (`active`, `completed`, or `withdrawn`) so offshore wind projects can be compared more easily with queue-based project sources. It derives `is_actionable` and `is_nearly_certain` flags from construction status.
+
 ## Related Tables
 
 - `airtable__offshore_wind_locations`

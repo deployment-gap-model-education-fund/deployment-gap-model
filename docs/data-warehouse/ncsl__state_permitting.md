@@ -12,6 +12,12 @@ This table summarizes whether wind siting and permitting authority is primarily 
 
 **Purpose:** State-level permitting authority classification and supporting description/link.
 
+## Transformations
+
+The ETL standardizes null-like permitting values, normalizes the District of Columbia state name, applies a manual correction for Mississippi's permitting classification, casts fields to consistent string/categorical dtypes, and adds `state_id_fips`.
+
+The transform validates that state names and permitting-type categories are within expected sets.
+
 ## Related Tables
 
 - `census__state_fips`

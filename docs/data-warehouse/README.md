@@ -46,7 +46,7 @@ The use case for this ordinance data has since been de-prioritized.
 
 ## Columbia RELDI: Local Opposition
 
-These tables come from the Columbia Renewable Energy Legal Defense Initiative opposition-to-renewables data source and contains policy text as well as text to supplement other sources of local ordinances information.
+These tables come from the Columbia Renewable Energy Legal Defense Initiative opposition-to-renewables data source and contain policy text that supplements other sources of local ordinances information.
 
 - [`columbia_reldi_local_opposition__local_ordinance`](columbia_reldi_local_opposition__local_ordinance.md)
 - [`columbia_reldi_local_opposition__state_policy`](columbia_reldi_local_opposition__state_policy.md)
@@ -82,7 +82,7 @@ These tables contain private data from the American Clean Power Association and 
 
 ## interconnection.fyi: Queue Data
 
-These tables contain private data from the interconnection.fyi interconnection queue data. The tables provide information on the projects in the queue, their location, and resource-capacity components of the project. The data covers all ISO's in the US, several ISO's in Canada, and one-off utility data sources.
+These tables contain private data from the interconnection.fyi interconnection queue data. The tables provide information on the projects in the queue, their location, and resource-capacity components of the project. The data covers all ISOs in the US, several ISOs in Canada, and one-off utility data sources.
 
 - [`fyi__private__projects`](fyi__private__projects.md)
 - [`fyi__private__locations`](fyi__private__locations.md)
