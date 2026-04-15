@@ -1,4 +1,4 @@
-APP_RUN_COMMAND = docker compose run --rm app
+APP_RUN_COMMAND = docker compose run --rm app uv run
 POSTGRES_HOST ?= postgres
 POSTGRES_USER ?= postgres
 POSTGRES_PASSWORD ?= postgres
