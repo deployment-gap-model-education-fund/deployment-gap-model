@@ -96,7 +96,7 @@ def load_parquet_files_to_postgres(
             engine=engine,
             schema_name=schema,
             if_exists="replace",
-            remote_schema_id=_get_published_schema_id(schema, target),
+            remote=True,
         )
         logger.info(f"Successfully wrote table {table_name} to production postgres DB.")
 

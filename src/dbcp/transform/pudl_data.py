@@ -132,7 +132,7 @@ def _prepare_eia860m_yearly_generators(generators_raw: pd.DataFrame) -> pd.DataF
 def _transform_eia860m_changelog_generators(
     changelog_generators_raw: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Transform eia860m__changelog__generators table."""
+    """Transform _eia860m__changelog__generators table."""
     changelog_generators = changelog_generators_raw.convert_dtypes().copy()
 
     # Convert every column with date in it to a datetime column

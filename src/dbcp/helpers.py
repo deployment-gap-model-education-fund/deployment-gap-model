@@ -168,7 +168,7 @@ def write_to_postgres(
     engine: sa.engine.Engine,
     schema_name: SchemaName,
     if_exists: str = "append",
-    remote_schema_id: str | None = None,
+    remote: bool = False,
 ):
     """Create data from a DataFrame to a postgres table.
 
@@ -178,19 +178,19 @@ def write_to_postgres(
         engine: sqlalchemy engine.
         schema_name: Name of schema like ``data_mart`` or ``data_warehouse``.
         if_exists: What to do if table already exists in postgres. See Pandas ``to_sql`` for options.
-        remote_schema_id: This can be something like ``data_mart_dev`` to allow for
-             dev / prod split in remote published data.
+        remote: If writing to the production DB, everything goes in a single
+            schema. Eventually, we will remove the data warehouse / mart distinction
+            everywhere.
 
     """
     df = trim_columns_length(df)
     df = enforce_dtypes(df, table_name, schema_name)
-    schema_id = remote_schema_id if remote_schema_id is not None else schema_name.value
     df.to_sql(
         name=table_name,
         con=engine,
         if_exists=if_exists,
         index=False,
-        schema=schema_id,
+        schema="catalyst" if remote else schema_name.value,
         method=psql_insert_copy,
         chunksize=5000,  # adjust based on memory capacity
     )

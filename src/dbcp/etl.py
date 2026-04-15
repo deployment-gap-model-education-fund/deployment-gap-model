@@ -13,6 +13,7 @@ from dbcp.archivers.utils import ExtractionSettings
 from dbcp.constants import DATA_DIR, OUTPUT_DIR
 from dbcp.extract.ballot_ready import BR_URI
 from dbcp.extract.fips_tables import CENSUS_URI, TRIBAL_LANDS_URI
+from dbcp.extract.ljedf import extract as extract_ljedf
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.helpers import write_to_postgres
 from dbcp.metadata import SchemaName
@@ -45,7 +46,7 @@ def etl_lbnl_iso_queue() -> dict[str, pd.DataFrame]:
 
 def etl_fyi_queue() -> dict[str, pd.DataFrame]:
     """Interconnection.fyi ISO Queues ETL."""
-    fyi_uri = "gs://dgm-archive/interconnection.fyi/interconnection_fyi_dataset_2026-03-01.csv"
+    fyi_uri = "gs://dgm-archive/interconnection.fyi/interconnection_fyi_dataset_2026-04-01.csv"
     fyi_raw_dfs = dbcp.extract.fyi_queue.extract(fyi_uri)
     fyi_transformed_dfs = dbcp.transform.fyi_queue.transform(fyi_raw_dfs)
     return fyi_transformed_dfs
@@ -171,6 +172,14 @@ def etl_ballot_ready() -> dict[str, pd.DataFrame]:
     return transformed
 
 
+def etl_ljedf() -> dict[str, pd.DataFrame]:
+    """ETL archived LJEDF county demographics and election results."""
+    raw_dfs = extract_ljedf()
+    county_fips = etl_fips_tables()["census__county_fips"]
+    transformed = dbcp.transform.ljedf.transform(raw_dfs, county_fips=county_fips)
+    return transformed
+
+
 def etl_epa_avert() -> dict[str, pd.DataFrame]:
     """ETL EPA AVERT avoided emissions data."""
     # https://github.com/USEPA/AVERT/blob/v4.1.0/utilities/data/county-fips.txt
@@ -279,6 +288,7 @@ def create_data_warehouse():
         # "ballot_ready": etl_ballot_ready,
         "acp_projects": etl_acp_projects,
         "fyi_queue": etl_fyi_queue,
+        "ljedf_election_data": etl_ljedf,
     }
     run_etl(etl_funcs, SchemaName.DATA_WAREHOUSE)
 
