@@ -295,7 +295,7 @@ def transform(raw_pudl_tables: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """
     transformed_dfs = {
         "_eia860m__changelog__generators": _transform_eia860m_changelog_generators(
-            raw_pudl_tables["eia860m__changelog__generators"]
+            raw_pudl_tables["_eia860m__changelog__generators"]
         ),
         "eia860m__operational_status_codes": _transform_eia860m_operational_status_codes(
             raw_pudl_tables["eia860m__operational_status_codes"]
