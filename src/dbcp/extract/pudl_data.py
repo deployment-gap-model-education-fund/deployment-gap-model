@@ -5,6 +5,7 @@ import pandas as pd
 import dbcp
 
 
+# this is used to create the latest generator snapshot data mart table
 def _extract_eia860m_yearly_generators() -> pd.DataFrame:
     """Extract yearly generator history from PUDL resources."""
     pudl_resource_path = dbcp.helpers.get_pudl_resource(

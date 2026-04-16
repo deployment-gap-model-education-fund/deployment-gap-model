@@ -4,7 +4,6 @@ import pandas as pd
 
 from dbcp.constants import FIPS_CODE_VINTAGE
 from dbcp.helpers import add_fips_ids
-from dbcp.transform.helpers import bedford_addfips_fix
 
 # Map operational_status_code values to numeric scale
 OPERATIONAL_STATUS_CODES_SCALE = {
@@ -90,43 +89,6 @@ SUMMARIZED_STATUS_DESCRIPTIONS = pd.DataFrame(
         },
     ]
 )
-
-
-def _convert_date_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Convert columns containing 'date' to datetimes."""
-    df = df.convert_dtypes().copy()
-    # Convert every column with date in it to a datetime column
-    for col in df.columns:
-        if "date" in col:
-            df[col] = pd.to_datetime(df[col])
-    return df
-
-
-def _add_eia860m_generator_fips(generators: pd.DataFrame) -> pd.DataFrame:
-    """Add county and state FIPS IDs to yearly generator history."""
-    generators = generators.copy()
-    # workaround for addfips Bedford, VA problem
-    bedford_addfips_fix(generators)
-
-    # Correct geocoding of some plants
-    generators.loc[generators.plant_id_eia.eq(65756), "state"] = "MD"
-    generators.loc[generators.plant_id_eia.eq(65756), "timezone"] = "America/New_York"
-
-    filled_location = generators.loc[:, ["state", "county"]].fillna(
-        ""
-    )  # copy; don't want to fill actual table
-    fips = add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
-    generators = pd.concat(
-        [generators, fips[["state_id_fips", "county_id_fips"]]], axis=1, copy=False
-    )
-    return generators
-
-
-def _prepare_eia860m_yearly_generators(generators_raw: pd.DataFrame) -> pd.DataFrame:
-    """Apply shared preprocessing to yearly generator history."""
-    generators = _convert_date_columns(generators_raw)
-    generators = _add_eia860m_generator_fips(generators)
-    return generators
 
 
 def _transform_eia860m_changelog_generators(
@@ -222,41 +184,6 @@ def _transform_eia860m_changelog_generators(
     ).replace(iso_map)
 
     return changelog_generators
-
-
-def _transform_eia860m_changelog_generators_operational_status(
-    generators_raw: pd.DataFrame,
-) -> pd.DataFrame:
-    """Create the operational-status-only generator changelog table."""
-    changelog_generators = _prepare_eia860m_yearly_generators(generators_raw)
-
-    changelog_generators = changelog_generators.sort_values(
-        ["plant_id_eia", "generator_id", "report_date"]
-    ).reset_index(drop=True)
-
-    generator_group = changelog_generators.groupby(
-        ["plant_id_eia", "generator_id"], sort=False
-    )
-    status_changed = generator_group["operational_status"].transform(
-        lambda series: series.ne(series.shift())
-    )
-    changelog_generators = changelog_generators.loc[status_changed].copy()
-
-    changelog_generators["valid_until_date"] = changelog_generators.groupby(
-        ["plant_id_eia", "generator_id"], sort=False
-    )["report_date"].shift(-1)
-
-    return changelog_generators[
-        [
-            "generator_id",
-            "plant_id_eia",
-            "report_date",
-            "valid_until_date",
-            "operational_status",
-            "county_id_fips",
-            "capacity_mw",
-        ]
-    ]
 
 
 def _transform_eia860m_operational_status_codes(

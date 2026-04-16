@@ -7,13 +7,14 @@ import numpy as np
 import pandas as pd
 import sqlalchemy as sa
 
-from dbcp.constants import OUTPUT_DIR, PUDL_LATEST_YEAR
+from dbcp.constants import FIPS_CODE_VINTAGE, OUTPUT_DIR, PUDL_LATEST_YEAR
 from dbcp.data_mart.co2_dashboard import (
     _get_plant_location_data,
     _transfrom_plant_location_data,
 )
 from dbcp.data_mart.helpers import (
     CountyOpposition,
+    _convert_date_columns,
     _estimate_proposed_power_co2e,
     _get_county_fips_df,
     _get_proprietary_proposed_offshore,
@@ -22,8 +23,8 @@ from dbcp.data_mart.helpers import (
     get_query,
 )
 from dbcp.extract.pudl_data import _extract_eia860m_yearly_generators
-from dbcp.helpers import get_sql_engine
-from dbcp.transform.pudl_data import _prepare_eia860m_yearly_generators
+from dbcp.helpers import add_fips_ids, get_sql_engine
+from dbcp.transform.helpers import bedford_addfips_fix
 
 logger = logging.getLogger(__name__)
 
@@ -852,6 +853,33 @@ def get_eia860m_current(engine: sa.engine.Engine) -> pd.DataFrame:
     return current_projects
 
 
+def _add_eia860m_generator_fips(generators: pd.DataFrame) -> pd.DataFrame:
+    """Add county and state FIPS IDs to yearly generator history."""
+    generators = generators.copy()
+    # workaround for addfips Bedford, VA problem
+    bedford_addfips_fix(generators)
+
+    # Correct geocoding of some plants
+    generators.loc[generators.plant_id_eia.eq(65756), "state"] = "MD"
+    generators.loc[generators.plant_id_eia.eq(65756), "timezone"] = "America/New_York"
+
+    filled_location = generators.loc[:, ["state", "county"]].fillna(
+        ""
+    )  # copy; don't want to fill actual table
+    fips = add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
+    generators = pd.concat(
+        [generators, fips[["state_id_fips", "county_id_fips"]]], axis=1, copy=False
+    )
+    return generators
+
+
+def _prepare_eia860m_yearly_generators(generators_raw: pd.DataFrame) -> pd.DataFrame:
+    """Apply shared preprocessing to yearly generator history."""
+    generators = _convert_date_columns(generators_raw)
+    generators = _add_eia860m_generator_fips(generators)
+    return generators
+
+
 def _get_latest_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
     """Get plant-level fuel and capacity attributes from the latest annual PUDL data."""
     current_year = pd.Timestamp.now().year
@@ -1262,11 +1290,8 @@ def create_data_mart(
         {
             "eia860m__latest__generators": eia860m_latest,
             "eia860m__latest__plants": eia860m_latest_plants,
-            # "projects_status_yearly_eia860m": eia860m_status_yearly,
-            # "projects_status_quarterly_eia860m": eia860m_status_quarterly,
             "eia860m__monthly__generators": eia860m_status_monthly,
             "eia860m__generators_operational_status_transition_dates": eia860m_transition_dates,
-            # "fyi_projects_long_format": active_fyi_projects_long_format,
         }
     )
     return data_marts

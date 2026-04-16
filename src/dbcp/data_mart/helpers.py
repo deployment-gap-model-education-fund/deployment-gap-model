@@ -393,3 +393,13 @@ def get_query(filename: str) -> str:
     sql_query_dir = Path(__file__).parent / "sql_queries"
     full_path = sql_query_dir / filename
     return full_path.read_text()
+
+
+def _convert_date_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert columns containing 'date' to datetimes."""
+    df = df.convert_dtypes().copy()
+    # Convert every column with date in it to a datetime column
+    for col in df.columns:
+        if "date" in col:
+            df[col] = pd.to_datetime(df[col])
+    return df
