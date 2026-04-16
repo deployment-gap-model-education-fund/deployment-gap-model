@@ -34,8 +34,8 @@ About 0.5% of ACP projects are associated with multiple counties. For the sake o
 
 The `capacity_under_construction_mw` contains ACP projects with the status "Under Construction" and EIA 860m projects with `operational_status_code` equal to 4, 5, or 6, which correspond to EIA status codes U, V, or TS. The `capacity_awaiting_permitting_mw` contains ACP projects with the status "Advanced Development" and EIA 860m projects with `operational_status_code` equal to 1, 2 or 3, which correspond to EIA status codes P, L, or T. The `capacity_total_proposed_mw` is the sum of the other two columns.
 
-See the documentation for `projects_status_codes_860m` for more details about EIA operational status codes.
+See the documentation for `eia860m__operational_status_codes` for more details about EIA operational status codes.
 
-{% content-ref url="./projects_status_codes_860m.md" %}
-[projects_status_codes_860m.md](./projects_status_codes_860m.md)
+{% content-ref url="../data-warehouse/eia860m__operational_status_codes.md" %}
+[eia860m__operational_status_codes.md](../data-warehouse/eia860m__operational_status_codes.md)
 {% endcontent-ref %}
