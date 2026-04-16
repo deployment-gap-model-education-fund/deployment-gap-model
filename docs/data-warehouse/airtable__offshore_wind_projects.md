@@ -21,6 +21,6 @@ The transform also maps construction statuses into a queue-style `queue_status` 
 ## Related Tables
 
 - `airtable__offshore_wind_locations`
-- `airtable__offshore_wind_cable_landing_association`
+- `airtable__association__offshore_wind_cable_landing`
 - `airtable__offshore_wind_port_association`
 - `airtable__offshore_wind_staging_association`

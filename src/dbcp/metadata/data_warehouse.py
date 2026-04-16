@@ -1217,8 +1217,8 @@ airtable__offshore_wind_locations = Table(
     Column("geocoded_containing_county", String),
     schema=schema,
 )
-airtable__offshore_wind_cable_landing_association = Table(
-    "airtable__offshore_wind_cable_landing_association",
+airtable__association__offshore_wind_cable_landing = Table(
+    "airtable__association__offshore_wind_cable_landing",
     metadata,
     Column(
         "location_id",

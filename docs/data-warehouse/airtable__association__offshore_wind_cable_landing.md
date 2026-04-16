@@ -1,4 +1,4 @@
-# airtable__offshore_wind_cable_landing_association
+# airtable__association__offshore_wind_cable_landing
 
 This association table links offshore wind projects to cable landing locations.
 

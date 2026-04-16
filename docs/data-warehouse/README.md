@@ -30,7 +30,7 @@ in the future as a second source of truth for offshore wind data.
 
 - [`airtable__offshore_wind_projects`](airtable__offshore_wind_projects.md)
 - [`airtable__offshore_wind_locations`](airtable__offshore_wind_locations.md)
-- [`airtable__offshore_wind_cable_landing_association`](airtable__offshore_wind_cable_landing_association.md)
+- [`airtable__association__offshore_wind_cable_landing`](airtable__association__offshore_wind_cable_landing.md)
 - [`airtable__offshore_wind_port_association`](airtable__offshore_wind_port_association.md)
 - [`airtable__offshore_wind_staging_association`](airtable__offshore_wind_staging_association.md)
 

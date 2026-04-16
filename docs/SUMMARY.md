@@ -4,7 +4,7 @@
 * [Data Warehouse](data-warehouse/README.md)
   * [airtable\_\_offshore\_wind\_projects](data-warehouse/airtable__offshore_wind_projects.md)
   * [airtable\_\_offshore\_wind\_locations](data-warehouse/airtable__offshore_wind_locations.md)
-  * [airtable\_\_offshore\_wind\_cable\_landing\_association](data-warehouse/airtable__offshore_wind_cable_landing_association.md)
+  * [airtable\_\_association\_\_offshore\_wind\_cable\_landing](data-warehouse/airtable__association__offshore_wind_cable_landing.md)
   * [airtable\_\_offshore\_wind\_port\_association](data-warehouse/airtable__offshore_wind_port_association.md)
   * [airtable\_\_offshore\_wind\_staging\_association](data-warehouse/airtable__offshore_wind_staging_association.md)
   * [airtable\_\_manual\_ordinances](data-warehouse/airtable__manual_ordinances.md)
