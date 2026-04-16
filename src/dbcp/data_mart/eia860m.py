@@ -1244,51 +1244,14 @@ def create_data_mart(
     if engine is None:
         engine = get_sql_engine()
     data_marts = {}
-    """
-    all_projects_long_format = create_long_format(engine, active_projects_only=False)
-    iso_projects_change_log = create_project_change_log(all_projects_long_format)
-
-    # create counties and region change log tables
-    geographies = {"counties": "county_id_fips", "iso_regions": "iso_region"}
-    for geography, geography_columns in geographies.items():
-        geography_change_log = create_geography_change_log(
-            iso_projects_change_log, geography=geography_columns, freq="Q"
-        )
-        data_marts[f"{geography}_all_projects_change_log"] = geography_change_log
-
-        # create separate tables for active projects
-        metrics = ("n_projects", "capacity_mw")
-        new_iso_projects_change_log = iso_projects_change_log.query(
-            "queue_status == 'new'"
-        )
-        for metric in metrics:
-            data_marts[f"{geography}_active_projects_{metric}_change_log"] = (
-                create_total_active_project_change_logs(
-                    new_iso_projects_change_log,
-                    geography=geography_columns,
-                    metric=metric,
-                    freq="Q",
-                )
-            )
-
-    validate_iso_regions_change_log(
-        data_marts["iso_regions_all_projects_change_log"], all_projects_long_format
-    )
-    """
-
-    # active_fyi_projects_long_format = create_fyi_long_format(
-    #     engine, active_projects_only=True
-    # )
-    eia860m_latest = get_eia860m_current(engine)
+    eia860m_latest_generators = get_eia860m_current(engine)
     eia860m_latest_plants = get_eia860m_latest_plants(engine)
     eia860m_status_monthly = get_eia860m_status_timeseries(engine, frequency="M")
-    # eia860m_status_quarterly = get_eia860m_status_timeseries(engine, frequency="Q")
-    # eia860m_status_yearly = get_eia860m_status_timeseries(engine, frequency="A")
     eia860m_transition_dates = _get_eia860m_transition_dates(engine)
 
     data_marts.update(
         {
-            "eia860m__latest__generators": eia860m_latest,
+            "eia860m__latest__generators": eia860m_latest_generators,
             "eia860m__latest__plants": eia860m_latest_plants,
             "eia860m__monthly__generators": eia860m_status_monthly,
             "eia860m__generators_operational_status_transition_dates": eia860m_transition_dates,
@@ -1301,7 +1264,4 @@ if __name__ == "__main__":
     # debugging entry point
     mart = create_data_mart()
     parquet_dir = OUTPUT_DIR / "data_mart"
-    mart["fyi_projects_long_format"].to_parquet(
-        parquet_dir / "fyi_projects_long_format.parquet",
-    )
     print("yeehaw")
