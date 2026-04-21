@@ -11,12 +11,7 @@ def get_data_mart_modules():
     """Get the modules in the data mart directory in prep for creating data mart tables."""
     modules_to_skip = {
         "helpers",  # helper code; no tables
-        "co2_dashboard",  # obsolete but code imported elsewhere
-        "br_election_data",
-        "counties",
-        "county_concrete_mw",
-        "existing_plants",
-        "fossil_infrastructure_projects",
+        "co2_dashboard",
     }
     modules = []
     for module_info in pkgutil.iter_modules(__path__):

@@ -37,7 +37,6 @@ def create_fyi_long_format(
             offshore["date_proposed_online"]
         )
         fyi = _replace_iso_offshore_with_proprietary(fyi, offshore)
-    # _estimate_proposed_power_co2e(fyi)
     all_counties = _get_county_fips_df(engine)
     all_states = _get_state_fips_df(engine)
 
@@ -91,7 +90,6 @@ def create_fyi_counties_active_clean_projects(
         if codes_dict["type"] == "Renewable"
     ]
     fyi = fyi[fyi["resource_clean"].isin(clean_resources)]
-    # fyi = fyi.drop(columns=["co2e_tonnes_per_year"])
     fyi.loc[:, ["capacity_mw"]] = fyi.loc[:, ["capacity_mw"]].mul(
         fyi["frac_locations_in_county"], axis=0
     )

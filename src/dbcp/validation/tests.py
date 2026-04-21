@@ -6,15 +6,71 @@ from functools import lru_cache
 import pandas as pd
 from sqlalchemy.engine import Engine
 
-from dbcp.data_mart.counties import (
-    _add_derived_columns,
-    _get_county_properties,
-    _get_offshore_wind_extra_cols,
-)
 from dbcp.helpers import get_sql_engine
 from dbcp.metadata.data_mart import counties_wide_format
 
 logger = logging.getLogger(__name__)
+
+COUNTY_LEVEL_WIDE_FORMAT_COLS = pd.Index(
+    [
+        "state_id_fips",
+        "county_id_fips",
+        "state",
+        "county",
+        "ordinance_text",
+        "ordinance_earliest_year_mentioned",
+        "ordinance_jurisdiction_name",
+        "ordinance_jurisdiction_type",
+        "ordinance_is_restrictive",
+        "ordinance_via_reldi",
+        "ordinance_via_solar_nrel",
+        "ordinance_via_wind_nrel",
+        "ordinance_via_nrel_is_de_facto",
+        "ordinance_via_self_maintained",
+        "state_permitting_type",
+        "state_permitting_text",
+        "total_tracts",
+        "justice40_dbcp_index",
+        "n_distinct_qualifying_tracts",
+        "n_tracts_agriculture_loss_low_income",
+        "n_tracts_asthma_low_income",
+        "n_tracts_below_poverty_and_low_high_school",
+        "n_tracts_below_poverty_line_less_than_high_school_islands",
+        "n_tracts_building_loss_low_income",
+        "n_tracts_diabetes_low_income",
+        "n_tracts_diesel_particulates_low_income",
+        "n_tracts_energy_burden_low_income",
+        "n_tracts_hazardous_waste_proximity_low_income",
+        "n_tracts_heart_disease_low_income",
+        "n_tracts_housing_burden_low_income",
+        "n_tracts_lead_paint_and_median_home_price_low_income",
+        "n_tracts_life_expectancy_low_income",
+        "n_tracts_linguistic_isolation_and_low_high_school",
+        "n_tracts_local_to_area_income_ratio_and_low_high_school",
+        "n_tracts_local_to_area_income_ratio_less_than_high_school_islan",
+        "n_tracts_pm2_5_low_income",
+        "n_tracts_population_loss_low_income",
+        "n_tracts_superfund_proximity_low_income",
+        "n_tracts_traffic_low_income",
+        "n_tracts_unemployment_and_low_high_school",
+        "n_tracts_unemployment_less_than_high_school_islands",
+        "n_tracts_wastewater_low_income",
+        "unprotected_land_area_km2",
+        "federal_fraction_unprotected_land",
+        "county_land_area_km2",
+        "tribal_land_frac",
+        "energy_community_coal_closures_area_fraction",
+        "energy_community_qualifies_via_employment",
+        "energy_community_qualifies",
+    ]
+)
+
+OFFSHORE_WIND_EXTRA_COLS = pd.Index(
+    [
+        "offshore_wind_capacity_mw_via_ports",
+        "offshore_wind_interest_type",
+    ]
+)
 
 
 # def test_j40_county_fips_coverage(engine: Engine):
@@ -252,11 +308,10 @@ def test_county_wide_coverage(engine: Engine):
 
 def test_county_long_vs_wide(engine: Engine):
     """Check that the long and wide formats have the same data, where appropriate."""
-    offshore_wind_extra_cols = _get_offshore_wind_extra_cols(engine).columns
     # don't count the extra offshore cols because they are not present in long format (3 extra counties covered)
     cols_to_fetch = list(
         _get_non_county_cols_from_wide_format(engine).difference(
-            offshore_wind_extra_cols
+            OFFSHORE_WIND_EXTRA_COLS
         )
     ) + ["county_id_fips"]
     query = f"SELECT {','.join(cols_to_fetch)} FROM data_mart.counties_wide_format"
@@ -386,8 +441,7 @@ def test_ljedf_county_election_results(engine: Engine):
 def _get_non_county_cols_from_wide_format(engine: Engine) -> pd.Index:
     """Get the columns from counties_wide_format that are not derived from county-level data."""
     wide_cols = pd.Index([col.name for col in counties_wide_format.columns])
-    county_level_cols = _add_derived_columns(_get_county_properties(engine)).columns
-    cols_to_fetch = wide_cols.difference(county_level_cols)
+    cols_to_fetch = wide_cols.difference(COUNTY_LEVEL_WIDE_FORMAT_COLS)
     return cols_to_fetch
 
 
