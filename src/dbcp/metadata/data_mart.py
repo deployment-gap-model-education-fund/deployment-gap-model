@@ -6,7 +6,6 @@ from sqlalchemy import (
     Column,
     DateTime,
     Float,
-    ForeignKey,
     Integer,
     MetaData,
     String,
@@ -222,7 +221,6 @@ fyi__private__counties__active_clean_projects_capacity = Table(
     Column(
         "county_id_fips",
         String,
-        ForeignKey("data_warehouse.census__county_fips.county_id_fips"),
         primary_key=True,
     ),
     Column("battery_storage_active_capacity_mw", Float),
