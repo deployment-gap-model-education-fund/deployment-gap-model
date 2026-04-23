@@ -110,7 +110,7 @@ def main(target_branch=None, base_branch="dev"):
 # point without args.
 if __name__ == "__main__":
     """Main function to call the script without arguments.
-    
+
     This is a wrapper on the main function, which can
     be called directly with arguments.
     """

@@ -4,7 +4,6 @@ import pandas as pd
 
 from dbcp.constants import FIPS_CODE_VINTAGE
 from dbcp.helpers import add_fips_ids
-from dbcp.transform.helpers import bedford_addfips_fix
 
 # Map operational_status_code values to numeric scale
 OPERATIONAL_STATUS_CODES_SCALE = {
@@ -26,40 +25,70 @@ OPERATIONAL_STATUS_CODES_SCALE = {
     "RE": 8,
 }
 
-
-def _transform_eia860m_annual_generators(generators: pd.DataFrame) -> pd.DataFrame:
-    """Transform eia860m__annual__generators table.
-
-    Add FIPS codes to the table and correct Bedford, VA FIPS code.
-
-    Args:
-        generators: The raw eia860m__annual__generators table.
-
-    Returns:
-        The transformed eia860m__annual__generators table.
-
-    """
-    # add FIPS
-    # workaround for addfips Bedford, VA problem
-    bedford_addfips_fix(generators)
-    filled_location = generators.loc[:, ["state", "county"]].fillna(
-        ""
-    )  # copy; don't want to fill actual table
-    fips = add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
-    generators = pd.concat(
-        [generators, fips[["state_id_fips", "county_id_fips"]]], axis=1, copy=False
-    )
-    generators = generators.convert_dtypes()
-    # Convert every column with date in it to a datetime column
-    for col in generators.columns:
-        if "date" in col:
-            generators[col] = pd.to_datetime(generators[col])
-
-    # Correct geocoding of some plants
-    generators.loc[generators.plant_id_eia.eq(65756), "state"] = "MD"
-    generators.loc[generators.plant_id_eia.eq(65756), "timezone"] = "America/New_York"
-
-    return generators
+SUMMARIZED_STATUS_DESCRIPTIONS = pd.DataFrame(
+    [
+        {
+            "status": 1,
+            "summarized_status_description": (
+                "Planned for installation but regulatory approvals "
+                "not initiated; Not under construction"
+            ),
+        },
+        {
+            "status": 2,
+            "summarized_status_description": (
+                "Regulatory approvals pending. Not under construction "
+                "but site preparation could be underway"
+            ),
+        },
+        {
+            "status": 3,
+            "summarized_status_description": (
+                "Regulatory approvals received. Not under construction "
+                "but site preparation could be underway"
+            ),
+        },
+        {
+            "status": 4,
+            "summarized_status_description": (
+                "Under construction, less than or equal to 50 percent "
+                "complete (based on construction time to date of operation)"
+            ),
+        },
+        {
+            "status": 5,
+            "summarized_status_description": (
+                "Under construction, more than 50 percent complete "
+                "(based on construction time to date of operation)"
+            ),
+        },
+        {
+            "status": 6,
+            "summarized_status_description": (
+                "Construction complete, but not yet in commercial operation"
+            ),
+        },
+        {
+            "status": 7,
+            "summarized_status_description": "Various operational categories",
+        },
+        {
+            "status": 8,
+            "summarized_status_description": "Retired",
+        },
+        {
+            "status": 98,
+            "summarized_status_description": (
+                "Planned new generator canceled, indefinitely postponed, "
+                "or no longer in resource plan"
+            ),
+        },
+        {
+            "status": 99,
+            "summarized_status_description": "Other",
+        },
+    ]
+)
 
 
 def _transform_eia860m_changelog_generators(
@@ -176,7 +205,9 @@ def _transform_eia860m_operational_status_codes(
     )
     return op_status_codes_scale.merge(
         operational_status_codes, how="inner", on="code"
-    )[["code", "status", "description"]]
+    ).merge(SUMMARIZED_STATUS_DESCRIPTIONS, how="left", on="status")[
+        ["code", "status", "description", "summarized_status_description"]
+    ]
 
 
 def transform(raw_pudl_tables: pd.DataFrame) -> dict[str, pd.DataFrame]:
@@ -189,16 +220,12 @@ def transform(raw_pudl_tables: pd.DataFrame) -> dict[str, pd.DataFrame]:
         The transformed PUDL tables.
 
     """
-    table_transform_functions = {
-        "eia860m__annual__generators": _transform_eia860m_annual_generators,
-        "_eia860m__changelog__generators": _transform_eia860m_changelog_generators,
-        "eia860m__operational_status_codes": _transform_eia860m_operational_status_codes,
+    transformed_dfs = {
+        "_eia860m__changelog__generators": _transform_eia860m_changelog_generators(
+            raw_pudl_tables["_eia860m__changelog__generators"]
+        ),
+        "eia860m__operational_status_codes": _transform_eia860m_operational_status_codes(
+            raw_pudl_tables["eia860m__operational_status_codes"]
+        ),
     }
-
-    transformed_dfs = {}
-    for pudl_table_name, raw_pudl_table in raw_pudl_tables.items():
-        transformed_dfs[pudl_table_name] = table_transform_functions[pudl_table_name](
-            raw_pudl_table
-        )
-
     return transformed_dfs

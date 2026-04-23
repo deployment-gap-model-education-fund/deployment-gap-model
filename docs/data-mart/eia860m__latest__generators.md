@@ -1,6 +1,6 @@
-# projects_current_eia860m
+# eia860m__latest__generators
 
-This table contains the most recent information from EIA 860m for each generator. Each row represents one generator.
+This table contains the most recent information from EIA 860M for each generator. Each row represents one generator in the latest snapshot.
 
 ## Column Descriptions
 
@@ -43,8 +43,8 @@ This table contains the most recent information from EIA 860m for each generator
 
 ## Operational Status Codes
 
-See the documentation for `projects_status_codes_860m` for a description of the operational status codes.
+See the documentation for `eia860m__operational_status_codes` for a description of the operational status codes.
 
-{% content-ref url="./projects_status_codes_860m.md" %}
-[projects_status_codes_860m.md](./projects_status_codes_860m.md)
+{% content-ref url="../data-warehouse/eia860m__operational_status_codes.md" %}
+[eia860m__operational_status_codes.md](../data-warehouse/eia860m__operational_status_codes.md)
 {% endcontent-ref %}

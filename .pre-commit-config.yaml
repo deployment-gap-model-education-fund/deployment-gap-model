@@ -38,21 +38,17 @@ repos:
 
   # Check for PEP8 non-compliance, code complexity, style, errors, etc:
   - repo: https://github.com/PyCQA/flake8
-    rev: 4.0.1
+    rev: 7.1.1
     hooks:
       - id: flake8
         args: [--max-line-length, "88"]
         additional_dependencies:
-          - flake8-docstrings
-          - flake8-colors
-          - pydocstyle
-          - flake8-builtins
-          - mccabe
-          - naming
-          - pycodestyle
-          - pyflakes
-          - flake8-rst-docstrings
-          - flake8-use-fstring
+          - flake8-docstrings==1.7.0
+          - flake8-colors==0.1.9
+          - flake8-builtins==2.5.0
+          - pep8-naming==0.14.1
+          - flake8-rst-docstrings==0.3.0
+          - flake8-use-fstring==1.4
 
   # Check for known security vulnerabilities:
   - repo: https://github.com/PyCQA/bandit
@@ -65,7 +61,7 @@ repos:
     hooks:
       - id: unit-tests
         name: unit-tests
-        stages: [commit]
+        stages: [pre-commit]
         language: system
         verbose: false
         pass_filenames: false

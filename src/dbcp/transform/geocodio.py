@@ -194,8 +194,8 @@ def _geocode_locality(
             "geocodio-library-python is required to geocode localities."
         )
 
-    GEOCODIO_API_KEY = os.environ["GEOCODIO_API_KEY"]
-    client = Geocodio(GEOCODIO_API_KEY)
+    geocodio_api_key = os.environ["GEOCODIO_API_KEY"]
+    client = Geocodio(geocodio_api_key)
 
     geocoded_results = []
 

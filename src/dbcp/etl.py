@@ -295,7 +295,10 @@ def create_data_warehouse():
 
 def create_data_mart(engine):  # noqa: C901
     """Create data mart tables by calling create_data_mart in each data mart module."""
-    modules = dbcp.data_mart.get_data_mart_modules()
+    modules = [
+        (module, module_info)
+        for module, module_info in dbcp.data_mart.get_data_mart_modules()
+    ]
     data_mart_tables: dict[str, pd.DataFrame] = {}
     for module, module_info in modules:
         data = module.create_data_mart(engine=engine)
@@ -328,11 +331,8 @@ def etl(schema: SchemaName | None = None):
     if (schema == SchemaName.DATA_WAREHOUSE) or (schema is None):
         create_data_warehouse()
         validate_warehouse(engine=engine)
-    # if (schema == "data_mart") or (schema == "all"):
-    #     create_data_mart(engine=engine)
-    #     validate_data_mart(engine=engine)
-    # if schema == "private_data_mart":
-    #     create_data_mart(engine=engine, private_only=True)
+    if (schema == SchemaName.DATA_MART) or (schema is None):
+        create_data_mart(engine=engine)
 
     logger.info("Successfully finished ETL.")
 

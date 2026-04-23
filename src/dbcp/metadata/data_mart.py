@@ -201,14 +201,13 @@ counties_wide_format = Table(
     schema=schema,
 )
 
-existing_plants = Table(
-    "existing_plants",
+eia860m__latest__plants = Table(
+    "eia860m__latest__plants",
     metadata,
     Column("plant_id_eia", Integer, primary_key=True),
     Column("resource", String, nullable=False),
     Column("max_operating_date", DateTime),
     Column("capacity_mw", Float, nullable=False),
-    Column("co2e_tonnes_per_year", Float),
     Column("state_id_fips", String),
     Column("county_id_fips", String),
     Column("state", String),
@@ -216,42 +215,18 @@ existing_plants = Table(
     schema=schema,
 )
 
-fossil_infrastructure_projects = Table(
-    "fossil_infrastructure_projects",
+fyi__private__counties__active_clean_projects_capacity = Table(
+    "fyi__private__counties__active_clean_projects_capacity",
     metadata,
-    Column("project_id", String, primary_key=True),
-    Column("project_name", String, nullable=False),
-    Column("state", String),
-    Column("county", String),
-    Column("county_id_fips", String),
-    Column("state_id_fips", String),
-    Column("latitude", Float),
-    Column("longitude", Float),
-    Column("raw_street_address", String),
-    Column("air_construction_id", String),
-    Column("facility_id", String),
-    Column("facility_name", String),
-    Column("project_classification", String),
-    Column("operating_status", String),
-    Column("industry_sector", String, nullable=False),
-    Column("raw_project_type", String),
-    Column("project_description", String),
-    Column("facility_description", String),
-    Column("permit_description", String),
-    Column("cost_millions", Float),
-    Column("date_modified", DateTime),
-    Column("co2e_tonnes_per_year", Float),
-    Column("voc_tonnes_per_year", Float),
-    Column("so2_tonnes_per_year", Float),
-    Column("nox_tonnes_per_year", Float),
-    Column("co_tonnes_per_year", Float),
-    Column("pm2_5_tonnes_per_year", Float),
-    Column("total_wetlands_affected_permanently_acres", Float),
-    Column("total_wetlands_affected_temporarily_acres", Float),
-    Column("raw_estimated_population_within_3_miles", Float),
-    Column("raw_percent_low_income_within_3_miles", Float),
-    Column("raw_percent_people_of_color_within_3_miles", Float),
-    Column("raw_relative_cancer_risk_per_million_within_3_miles", Float),
+    Column(
+        "county_id_fips",
+        String,
+        primary_key=True,
+    ),
+    Column("battery_storage_active_capacity_mw", Float),
+    Column("onshore_wind_active_capacity_mw", Float),
+    Column("solar_active_capacity_mw", Float),
+    Column("total_active_clean_projects_capacity_mw", Float),
     schema=schema,
 )
 
@@ -568,47 +543,6 @@ iso_regions_active_projects_n_projects_change_log = Table(
     schema=schema,
 )
 
-br_election_data = Table(
-    "br_election_data",
-    metadata,
-    Column("race_id", Integer, nullable=False, primary_key=True),
-    Column("raw_county", String, nullable=False, primary_key=True),
-    Column("state_name", String, nullable=False),
-    Column("county_name", String),
-    Column("election_id", Integer, nullable=False),
-    Column("election_name", String, nullable=False),
-    Column("election_day", DateTime, nullable=False),
-    Column("is_primary", Boolean, nullable=False),
-    Column("is_runoff", Boolean, nullable=False),
-    Column("is_unexpired", Boolean, nullable=False),
-    Column("position_id", Integer, nullable=False),
-    Column("position_name", String, nullable=False),
-    Column("sub_area_name", String),
-    Column("sub_area_value", String),
-    Column("sub_area_name_secondary", String),
-    Column("sub_area_value_secondary", String),
-    Column("raw_state", String, nullable=False),
-    Column("level", String, nullable=False),
-    Column("tier", Integer, nullable=False),
-    Column("is_judicial", Boolean, nullable=False),
-    Column("is_retention", Boolean, nullable=False),
-    Column("number_of_seats", Integer, nullable=False),
-    Column("normalized_position_id", Integer, nullable=False),
-    Column("normalized_position_name", String, nullable=False),
-    Column(
-        "frequency", String, nullable=True
-    ),  # Starting 2023-10-03 update there were a couple hundred nulls
-    Column(
-        "reference_year", String, nullable=True
-    ),  # Starting 2023-10-03 update there were a couple hundred nulls
-    Column("partisan_type", String),
-    Column("race_created_at", DateTime, nullable=False),
-    Column("race_updated_at", DateTime, nullable=False),
-    Column("state_id_fips", String, nullable=False),
-    Column("county_id_fips", String, nullable=False),
-    schema=schema,
-)
-
 county_commission_election_info = Table(
     "county_commission_election_info",
     metadata,
@@ -641,8 +575,8 @@ county_commission_election_info = Table(
     schema=schema,
 )
 
-projects_current_eia860m = Table(
-    "projects_current_eia860m",
+eia860m__latest__generators = Table(
+    "eia860m__latest__generators",
     metadata,
     Column("report_date", DateTime),  # not primary key. Only one row per generator here
     Column("plant_name_eia", String),
@@ -688,8 +622,8 @@ projects_current_eia860m = Table(
 )
 
 
-projects_status_monthly_eia860m = Table(
-    "projects_status_monthly_eia860m",
+eia860m__monthly__generators = Table(
+    "eia860m__monthly__generators",
     metadata,
     Column("plant_name_eia", String),
     Column("plant_id_eia", Integer, primary_key=True),
@@ -728,8 +662,8 @@ projects_status_yearly_eia860m = Table(
 )
 
 
-projects_status_transition_dates_eia860m = Table(
-    "projects_status_transition_dates_eia860m",
+eia860m__generators_operational_status_transition_dates = Table(
+    "eia860m__generators_operational_status_transition_dates",
     metadata,
     Column("plant_name_eia", String),
     Column("plant_id_eia", Integer, primary_key=True),
@@ -745,30 +679,6 @@ projects_status_transition_dates_eia860m = Table(
     Column("date_entered_99", DateTime),
     Column("latest_report_date", DateTime),
     Column("data_freshness_date", DateTime),
-    schema=schema,
-)
-
-projects_status_codes_eia860m = Table(
-    "projects_status_codes_eia860m",
-    metadata,
-    Column("operational_status_code", Integer, primary_key=True),
-    Column("raw_operational_status_code", String),
-    Column("description", String),
-    schema=schema,
-)
-
-county_concrete_mw = Table(
-    "county_concrete_mw",
-    metadata,
-    Column("state_id_fips", String),
-    Column("county_id_fips", String),
-    Column("state", String),
-    Column("county", String),
-    Column("iso_region", String),
-    Column("resource_clean", String),
-    Column("capacity_under_construction_mw", Float),
-    Column("capacity_awaiting_permitting_mw", Float),
-    Column("capacity_total_proposed_mw", Float),
     schema=schema,
 )
 

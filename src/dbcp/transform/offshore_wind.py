@@ -246,7 +246,7 @@ def _normalize_tables(
     Create the following tables:
     - airtable__offshore_wind_projects: pk is project_id
     - airtable__offshore_wind_locations: pk is location_id
-    - airtable__offshore_wind_cable_landing_association: association table between projects and locations for cable landings
+    - airtable__association__offshore_wind_cable_landing: association table between projects and locations for cable landings
     - airtable__offshore_wind_port_association: association table between projects and locations for port locations
 
     Args:
@@ -264,7 +264,7 @@ def _normalize_tables(
     # Create association tables
     association_table_metadata = [
         {
-            "table_name": "airtable__offshore_wind_cable_landing_association",
+            "table_name": "airtable__association__offshore_wind_cable_landing",
             "pk": "project_id",
             "array_col": "cable_location_ids",
             "array_col_rename": "location_id",

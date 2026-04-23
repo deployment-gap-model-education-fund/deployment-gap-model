@@ -12,6 +12,7 @@ class MockRawResponse:
     """Mock raw HTTP response returned by the official Geocodio client."""
 
     def __init__(self, payload: dict[str, object]):
+        """Store the payload that should be returned by ``json()``."""
         self._payload = payload
 
     def json(self) -> dict[str, object]:
@@ -97,6 +98,7 @@ class MockGeocodioClient:
     }
 
     def __init__(self, api_key: str):
+        """Store the API key used to initialize the mock client."""
         self.api_key = api_key
 
     def _request(

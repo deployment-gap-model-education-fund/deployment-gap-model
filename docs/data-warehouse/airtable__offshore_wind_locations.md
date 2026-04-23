@@ -21,6 +21,6 @@ Locations use a two-pass geocoding strategy. The first pass geocodes a combined 
 ## Related Tables
 
 - `airtable__offshore_wind_projects`
-- `airtable__offshore_wind_cable_landing_association`
+- `airtable__association__offshore_wind_cable_landing`
 - `airtable__offshore_wind_port_association`
 - `airtable__offshore_wind_staging_association`
