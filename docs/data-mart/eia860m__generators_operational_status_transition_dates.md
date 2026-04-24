@@ -1,4 +1,4 @@
-# projects_status_transition_dates_eia860m
+# eia860m__generators_operational_status_transition_dates
 
 This table contains the dates of each status transition for each generator in EIA 860m. Each row is one generator.
 
@@ -23,8 +23,8 @@ This table contains the dates of each status transition for each generator in EI
 
 ## Operational Status Codes
 
-See the documentation for `projects_status_codes_860m` for a description of the operational status codes.
+See the documentation for `eia860m__operational_status_codes` for a description of the operational status codes.
 
-{% content-ref url="./projects_status_codes_860m.md" %}
-[projects_status_codes_860m.md](./projects_status_codes_860m.md)
+{% content-ref url="../data-warehouse/eia860m__operational_status_codes.md" %}
+[eia860m__operational_status_codes.md](../data-warehouse/eia860m__operational_status_codes.md)
 {% endcontent-ref %}

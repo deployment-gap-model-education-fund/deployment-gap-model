@@ -9,7 +9,7 @@ WITH
             -- because some projects list multiple towns in the same parent county
             -- in the raw "county" field.
             (1.0 / count(*) over (partition by project_id))::real as frac_locations_in_county
-        FROM data_warehouse.airtable__offshore_wind_cable_landing_association as cable
+        FROM data_warehouse.airtable__association__offshore_wind_cable_landing as cable
         INNER JOIN data_warehouse.airtable__offshore_wind_locations as locs
         USING(location_id)
     )

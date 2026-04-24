@@ -201,7 +201,7 @@ class CountyOpposition:
     def agg_to_counties(
         self,
         include_state_policies=True,
-        include_nrel_bans=False,
+        # include_nrel_bans=False,
         include_manual_ordinances=False,
     ) -> pd.DataFrame:
         """Aggregate local policies, and optionally state policies, to the county level.
@@ -219,9 +219,9 @@ class CountyOpposition:
             opposition = pd.concat([opposition, states_as_counties], axis=0)
         aggregated = self._agg_local_ordinances_to_counties(opposition)
         aggregated["ordinance_via_reldi"] = True
-        if include_nrel_bans:
-            nrel = self._get_nrel_bans()
-            aggregated = aggregated.merge(nrel, on="county_id_fips", how="outer")
+        # if include_nrel_bans:
+        #     nrel = self._get_nrel_bans()
+        #     aggregated = aggregated.merge(nrel, on="county_id_fips", how="outer")
         if include_manual_ordinances:
             manual = self._get_manual_ordinances()
             aggregated = aggregated.merge(manual, on="county_id_fips", how="outer")
@@ -345,6 +345,36 @@ def _estimate_proposed_power_co2e(
     return
 
 
+def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame:
+    """Get proprietary offshore wind data in a format that imitates the ISO queues.
+
+    PK is (project_id, county_id_fips).
+
+    Note that this duplicates projects that have multiple cable landings. Use the frac_locations_in_county
+    column to allocate capacity and co2e estimates to counties when aggregating.
+    Otherwise they will be double-counted.
+    """
+    query = get_query("get_proprietary_proposed_offshore.sql")
+    df = pd.read_sql(query, engine)
+    return df
+
+
+def _replace_iso_offshore_with_proprietary(
+    iso_queues: pd.DataFrame, proprietary: pd.DataFrame
+) -> pd.DataFrame:
+    """Replace offshore wind projects in the ISO queues with proprietary data.
+
+    PK should be (source, project_id, county_id_fips, resource_clean), but county_id_fips has nulls.
+    """
+    iso_to_keep = iso_queues.loc[iso_queues["resource_clean"] != "Offshore Wind", :]
+    out = pd.concat(
+        [iso_to_keep, proprietary],
+        axis=0,
+        ignore_index=True,
+    )
+    return out
+
+
 def get_query(filename: str) -> str:
     """Get the query from a file.
 
@@ -364,3 +394,13 @@ def get_query(filename: str) -> str:
     sql_query_dir = Path(__file__).parent / "sql_queries"
     full_path = sql_query_dir / filename
     return full_path.read_text()
+
+
+def _convert_date_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert columns containing 'date' to datetimes."""
+    df = df.convert_dtypes().copy()
+    # Convert every column with date in it to a datetime column
+    for col in df.columns:
+        if "date" in col:
+            df[col] = pd.to_datetime(df[col])
+    return df

@@ -1,4 +1,4 @@
-# existing_plants
+# eia860m__latest__plants
 
 This table describes existing power plants from the PUDL database (mostly EIA data). Each row represents one plant.
 
@@ -16,7 +16,6 @@ This table describes existing power plants from the PUDL database (mostly EIA da
 |Operational|`resource`|Primary fuel type|PUDL||
 ||`max_operating_date`|The date of the last major change to the plant.|derived from PUDL||
 ||`capacity_mw`|Generation capacity in megawatts|PUDL||
-|Emissions|`co2e_tonnes_per_year`|Estimated annual equivalent CO2 emissions, in metric tonnes.|derived from PUDL|
 
 ## Modeling Decisions
 

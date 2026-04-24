@@ -5,10 +5,7 @@ import dbcp.commands.archive  # noqa: F401
 import dbcp.commands.publish  # noqa: F401
 import dbcp.commands.settings  # noqa: F401
 import dbcp.data_mart  # noqa: F401
-import dbcp.data_mart.br_election_data  # noqa: F401
-import dbcp.data_mart.counties  # noqa: F401
-import dbcp.data_mart.county_concrete_mw  # noqa: F401
-import dbcp.data_mart.projects  # noqa: F401
+import dbcp.data_mart.eia860m  # noqa: F401
 import dbcp.etl  # noqa: F401
 import dbcp.extract  # noqa: F401
 import dbcp.extract.acp_projects  # noqa: F401
@@ -21,6 +18,7 @@ import dbcp.extract.gridstatus_isoqueues  # noqa: F401
 import dbcp.extract.helpers  # noqa: F401
 import dbcp.extract.justice40  # noqa: F401
 import dbcp.extract.lbnl_iso_queue  # noqa: F401
+import dbcp.extract.ljedf  # noqa: F401
 import dbcp.extract.local_opposition  # noqa: F401
 import dbcp.extract.manual_ordinances  # noqa: F401
 import dbcp.extract.ncsl_state_permitting  # noqa: F401
@@ -41,6 +39,7 @@ import dbcp.transform.fyi_queue  # noqa: F401
 import dbcp.transform.gridstatus  # noqa: F401
 import dbcp.transform.justice40  # noqa: F401
 import dbcp.transform.lbnl_iso_queue  # noqa: F401
+import dbcp.transform.ljedf  # noqa: F401
 import dbcp.transform.local_opposition  # noqa: F401
 import dbcp.transform.manual_ordinances  # noqa: F401
 import dbcp.transform.ncsl_state_permitting  # noqa: F401

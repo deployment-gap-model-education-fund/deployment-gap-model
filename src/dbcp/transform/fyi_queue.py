@@ -229,11 +229,14 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> dict[str, pd.DataFrame
     # occasionally in CAISO the parsed capacity by generation type breakdown
     # will list the same resource twice if there are two generators, in
     # these cases, sum the resources
-    n_expected_duped_resources = 10
+    n_expected_duped_resources = 11
     # Expected project IDS that show up in dupes:
     # "caiso-1085","caiso-1088", "caiso-908", "caiso-472",
     # "caiso-54873", "caiso-1212","ladwp-q57"
     # "caiso-955", "tucson-electric-power-94", "tucson-electric-power-94"
+    # "tucson-electric-power-80"
+    # if new project IDs show up, put in a breakpoint and see if the
+    # generator resources should have summed capacity
     assert (
         len(
             resource_capacity_df[
@@ -257,6 +260,7 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> dict[str, pd.DataFrame
         ("caiso-955", "Gas", 60),
         ("tucson-electric-power-94", "Solar", 255),
         ("tucson-electric-power-94", "Battery", 255),
+        ("tucson-electric-power-80", "Solar", 400),
     ]
     indices_to_drop = []
     for project_id, resource, cap in proj_ids_resource_capacity_not_to_sum:
@@ -312,6 +316,9 @@ def _normalize_location(fyi_df: pd.DataFrame) -> dict[str, pd.DataFrame]:
         "raw_state_name",
         "latitude",
         "longitude",
+        "gis_latitude",
+        "gis_longitude",
+        "gis_lat_long_specificity",
         "country_code",
     ]
     location_df = fyi_df[location_cols]
