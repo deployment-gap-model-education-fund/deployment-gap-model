@@ -1,25 +1,25 @@
 # set base image (host OS)
 FROM python:3.13
 
-RUN apt-get -y update && apt-get -y install sqlite3
-RUN apt-get -y install libgdal-dev
+# hadolint ignore=DL3008
+RUN apt-get -y update && \
+    apt-get -y --no-install-recommends install libgdal-dev sqlite3 curl ca-certificates && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN useradd -d /app/ dbcp
-USER dbcp
+# Download the latest uv installer
+ADD https://astral.sh/uv/install.sh /uv-installer.sh
+
+# Run the installer then remove it
+RUN sh /uv-installer.sh && rm /uv-installer.sh
+
+# Ensure the installed binary is on the `PATH`
+ENV PATH="/root/.local/bin/:$PATH"
 
 WORKDIR /app
 
-COPY requirements.txt /app/requirements.txt
 COPY pyproject.toml /app/pyproject.toml
 
-
-RUN python -m pip install --upgrade pip
-RUN python -m pip install -r /app/requirements.txt
+RUN uv sync --no-dev
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN curl https://install.duckdb.org | sh
-RUN rm requirements.txt
-
-# Add the python packages to PATH
-ENV PATH="/app/.local/bin:${PATH}"
-
-# Add dbcp to PYTHONPATH
-ENV PYTHONPATH="/app:${PYTHONPATH}"
