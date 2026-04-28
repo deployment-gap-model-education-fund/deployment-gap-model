@@ -18,5 +18,5 @@ WORKDIR /app
 
 COPY pyproject.toml /app/pyproject.toml
 
-RUN uv sync
+RUN uv sync --no-dev
 RUN curl https://install.duckdb.org | sh
