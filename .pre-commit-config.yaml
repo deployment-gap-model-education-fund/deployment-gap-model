@@ -1,15 +1,17 @@
+---
 repos:
   # Quick content checks based on grepping for python specific patterns:
   - repo: https://github.com/pre-commit/pygrep-hooks
-    rev: v1.9.0
+    rev: v1.10.0
     hooks:
-      - id: python-check-blanket-noqa # Prohibit overly broad QA exclusions.
-      - id: python-no-eval # Never use eval() it's dangerous.
-      - id: python-no-log-warn # logger.warning(), not old .warn()
+      - id: rst-backticks # Find single rather than double backticks
+      - id: rst-directive-colons # Missing double-colons after directives
+      - id: rst-inline-touching-normal # Inline code should never touch normal text
+      - id: python-use-type-annotations # Use annotations not old-style type comments
 
   # Other file formatting, plus common Git mistakes & text file standardization:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.0.1
+    rev: v6.0.0
     hooks:
       - id: check-added-large-files # Don't accidentally commit giant files.
         args: ["--maxkb=100000"]
@@ -17,53 +19,124 @@ repos:
       - id: check-yaml # Validate all YAML files.
       - id: check-case-conflict # Avoid case sensitivity in file names.
       - id: debug-statements # Watch for lingering debugger calls.
-      - id: end-of-file-fixer # Ensure there's a newline at EOF.
-      - id: mixed-line-ending # Only newlines, no line-feeds.
-      - id: trailing-whitespace # Remove trailing whitespace.
+      - id: mixed-line-ending # Use Unix line-endings to avoid big no-op CSV diffs.
+        args: ["--fix=lf"]
+      - id: trailing-whitespace
       - id: name-tests-test # Follow PyTest naming convention.
+      - id: end-of-file-fixer
 
-  # Make sure import statements are sorted uniformly.
-  - repo: https://github.com/pre-commit/mirrors-isort
-    rev: v5.9.3
-    hooks:
-      - id: isort
-        args: ["--profile", "black"]
+  ####################################################################################
+  # Formatters: hooks that re-write code & documentation files
+  ####################################################################################
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.8
+    rev: v0.15.11
     hooks:
       - id: ruff-check
         args: [--fix]
       - id: ruff-format
 
-  # Check for PEP8 non-compliance, code complexity, style, errors, etc:
-  - repo: https://github.com/PyCQA/flake8
-    rev: 7.1.1
+  - repo: https://github.com/rbubley/mirrors-prettier
+    rev: v3.8.3
     hooks:
-      - id: flake8
-        args: [--max-line-length, "88"]
-        additional_dependencies:
-          - flake8-docstrings==1.7.0
-          - flake8-colors==0.1.9
-          - flake8-builtins==2.5.0
-          - pep8-naming==0.14.1
-          - flake8-rst-docstrings==0.3.0
-          - flake8-use-fstring==1.4
+      - id: prettier
+        types_or: [yaml]
 
-  # Check for known security vulnerabilities:
-  - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.0
+  - repo: https://github.com/ComPWA/taplo-pre-commit
+    rev: v0.9.3
     hooks:
-      - id: bandit
-        args: [--configfile, .bandit.yml]
-  # Unit tests
+      - id: taplo-format
+        args: []
+      - id: taplo-lint
+        args: []
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+
+  ####################################################################################
+  # Linters: hooks that check but don't alter files
+  ####################################################################################
+
+  # Spell check our documentation and code comments
+  - repo: https://github.com/adhtruong/mirrors-typos
+    rev: v1.45.1
+    hooks:
+      - id: typos
+        exclude: |
+          (?x)^(
+            .*\.yml
+            |.*\.yaml
+            |.*\.toml
+            |.*\.bib
+            |.*\.csv
+            |.*\.html
+            |.*\.json
+          )$ | test/ | notebooks/
+        args: [] # Make this read, not write
+
+  # Lint Dockerfiles for errors and to ensure best practices
+  - repo: https://github.com/AleksaC/hadolint-py
+    rev: v2.14.0
+    hooks:
+      - id: hadolint
+
+  # Check for errors in restructuredtext (.rst) files under the doc hierarchy
+  - repo: https://github.com/PyCQA/doc8
+    rev: v2.0.0
+    hooks:
+      - id: doc8
+        args: [--config, pyproject.toml]
+
+  # Check Github Actions
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+
+  # Scan for secrets and credentials
+  - repo: https://github.com/trufflesecurity/trufflehog
+    rev: v3.94.3
+    hooks:
+      - id: trufflehog
+        name: TruffleHog
+        entry: trufflehog git file://. --since-commit HEAD --fail
+        language: golang
+        pass_filenames: false
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args:
+          - "--baseline"
+          - ".secrets.baseline"
+          - "--exclude-lines"
+          - "workload_identity_provider:"
+          - "--exclude-files"
+          - "(?x)(.*\\.ipynb|docs/.*\\.html)"
+
   - repo: local
     hooks:
       - id: unit-tests
         name: unit-tests
         stages: [pre-commit]
-        language: system
+        language: unsupported
         verbose: false
         pass_filenames: false
         always_run: true
         entry: docker compose run --rm -T app uv run pytest --doctest-modules dbcp test/unit --ignore input/
+
+# Configuration for pre-commit.ci
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit.com hooks
+
+    For more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: main
+  autoupdate_commit_msg: "[pre-commit.ci] pre-commit autoupdate"
+  autoupdate_schedule: weekly
+  skip: [detect-secrets, nb-output-clear, shellcheck, trufflehog, unit-tests]
+  submodules: false
