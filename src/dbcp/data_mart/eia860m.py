@@ -1,22 +1,30 @@
 """Module to create a project-level table for DBCP to use in spreadsheet tools."""
 
 import logging
-from io import StringIO
 from re import IGNORECASE
 
 import numpy as np
 import pandas as pd
 import sqlalchemy as sa
 
-from dbcp.constants import OUTPUT_DIR
+from dbcp.constants import FIPS_CODE_VINTAGE, OUTPUT_DIR, PUDL_LATEST_YEAR
+from dbcp.data_mart.co2_dashboard import (
+    _get_plant_location_data,
+    _transfrom_plant_location_data,
+)
 from dbcp.data_mart.helpers import (
     CountyOpposition,
+    _convert_date_columns,
     _estimate_proposed_power_co2e,
     _get_county_fips_df,
+    _get_proprietary_proposed_offshore,
     _get_state_fips_df,
+    _replace_iso_offshore_with_proprietary,
     get_query,
 )
-from dbcp.helpers import get_sql_engine
+from dbcp.extract.pudl_data import _extract_eia860m_yearly_generators
+from dbcp.helpers import add_fips_ids, get_sql_engine
+from dbcp.transform.helpers import bedford_addfips_fix
 
 logger = logging.getLogger(__name__)
 
@@ -76,12 +84,6 @@ def _get_lbnl_projects(engine: sa.engine.Engine, non_iso_only=True) -> pd.DataFr
     return df.drop(columns=["raw_county_name"])
 
 
-def _get_fyi_projects(engine: sa.engine.Engine) -> pd.DataFrame:
-    query = get_query("get_fyi_projects.sql")
-    df = pd.read_sql(query, engine)
-    return df.drop(columns=["raw_county_name"])
-
-
 def _get_and_join_iso_tables(
     engine: sa.engine.Engine, use_gridstatus=True, use_proprietary_offshore=False
 ) -> pd.DataFrame:
@@ -115,36 +117,6 @@ def _get_and_join_iso_tables(
         offshore = _get_proprietary_proposed_offshore(engine)
         out = _replace_iso_offshore_with_proprietary(out, offshore)
     _estimate_proposed_power_co2e(out)
-    return out
-
-
-def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame:
-    """Get proprietary offshore wind data in a format that imitates the ISO queues.
-
-    PK is (project_id, county_id_fips).
-
-    Note that this duplicates projects that have multiple cable landings. Use the frac_locations_in_county
-    column to allocate capacity and co2e estimates to counties when aggregating.
-    Otherwise they will be double-counted.
-    """
-    query = get_query("get_proprietary_proposed_offshore.sql")
-    df = pd.read_sql(query, engine)
-    return df
-
-
-def _replace_iso_offshore_with_proprietary(
-    iso_queues: pd.DataFrame, proprietary: pd.DataFrame
-) -> pd.DataFrame:
-    """Replace offshore wind projects in the ISO queues with proprietary data.
-
-    PK should be (source, project_id, county_id_fips, resource_clean), but county_id_fips has nulls.
-    """
-    iso_to_keep = iso_queues.loc[iso_queues["resource_clean"] != "Offshore Wind", :]
-    out = pd.concat(
-        [iso_to_keep, proprietary],
-        axis=0,
-        ignore_index=True,
-    )
     return out
 
 
@@ -437,55 +409,6 @@ def create_long_format(
     long_format["surrogate_id"] = range(len(long_format))
 
     # If we only want active projects, grab active projects and remove withdrawn_date and actual_completion_date
-    if active_projects_only:
-        active_long_format = long_format.query("queue_status == 'active'")
-        # drop actual_completion_date and withdrawn_date columns
-        active_long_format = active_long_format.drop(
-            columns=["actual_completion_date", "withdrawn_date"]
-        )
-        return active_long_format
-    return long_format
-
-
-def create_fyi_long_format(
-    engine: sa.engine.Engine,
-    active_projects_only: bool = True,
-    use_proprietary_offshore: bool = False,
-):
-    """Create long format FYI table."""
-    fyi = _get_fyi_projects(engine)
-    if use_proprietary_offshore:
-        offshore = _get_proprietary_proposed_offshore(engine)
-        offshore["project_id"] = offshore["project_id"].astype("string")
-        offshore["date_proposed_online"] = pd.to_datetime(
-            offshore["date_proposed_online"]
-        )
-        fyi = _replace_iso_offshore_with_proprietary(fyi, offshore)
-    _estimate_proposed_power_co2e(fyi)
-    all_counties = _get_county_fips_df(engine)
-    all_states = _get_state_fips_df(engine)
-    # model local opposition
-    aggregator = CountyOpposition(
-        engine=engine, county_fips_df=all_counties, state_fips_df=all_states
-    )
-    combined_opp = aggregator.agg_to_counties(
-        include_state_policies=False,
-        include_nrel_bans=True,
-        include_manual_ordinances=True,
-    )
-    rename_dict = {
-        "geocoded_locality_name": "ordinance_jurisdiction_name",
-        "geocoded_locality_type": "ordinance_jurisdiction_type",
-        "earliest_year_mentioned": "ordinance_earliest_year_mentioned",
-    }
-    combined_opp = combined_opp.rename(columns=rename_dict).dropna(
-        subset="county_id_fips"
-    )
-
-    long_format = fyi.merge(
-        combined_opp, on="county_id_fips", how="left", validate="m:1"
-    )
-    _add_derived_columns(long_format)
     if active_projects_only:
         active_long_format = long_format.query("queue_status == 'active'")
         # drop actual_completion_date and withdrawn_date columns
@@ -919,7 +842,7 @@ def validate_iso_regions_change_log(
 
 
 def get_eia860m_current(engine: sa.engine.Engine) -> pd.DataFrame:
-    """Get the most recent EIA860M data.
+    """Get the most recent EIA860M generator data across all statuses.
 
     Args:
         engine (sa.engine.Engine): connection to the data warehouse database
@@ -928,6 +851,133 @@ def get_eia860m_current(engine: sa.engine.Engine) -> pd.DataFrame:
     query = get_query("get_eia860m_current.sql")
     current_projects = pd.read_sql(query, engine)
     return current_projects
+
+
+def _add_eia860m_generator_fips(generators: pd.DataFrame) -> pd.DataFrame:
+    """Add county and state FIPS IDs to yearly generator history."""
+    generators = generators.copy()
+    # workaround for addfips Bedford, VA problem
+    bedford_addfips_fix(generators)
+
+    # Correct geocoding of some plants
+    generators.loc[generators.plant_id_eia.eq(65756), "state"] = "MD"
+    generators.loc[generators.plant_id_eia.eq(65756), "timezone"] = "America/New_York"
+
+    filled_location = generators.loc[:, ["state", "county"]].fillna(
+        ""
+    )  # copy; don't want to fill actual table
+    fips = add_fips_ids(filled_location, vintage=FIPS_CODE_VINTAGE)
+    generators = pd.concat(
+        [generators, fips[["state_id_fips", "county_id_fips"]]], axis=1, copy=False
+    )
+    return generators
+
+
+def _prepare_eia860m_yearly_generators(generators_raw: pd.DataFrame) -> pd.DataFrame:
+    """Apply shared preprocessing to yearly generator history."""
+    generators = _convert_date_columns(generators_raw)
+    generators = _add_eia860m_generator_fips(generators)
+    return generators
+
+
+def _get_latest_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
+    """Get plant-level fuel and capacity attributes from the latest annual PUDL data."""
+    current_year = pd.Timestamp.now().year
+    if current_year - PUDL_LATEST_YEAR > 1:
+        logger.warning(
+            "PUDL_LATEST_YEAR=%s is more than one year behind the current year %s.",
+            PUDL_LATEST_YEAR,
+            current_year,
+        )
+
+    generators = _prepare_eia860m_yearly_generators(
+        _extract_eia860m_yearly_generators()
+    )
+    generators = generators[
+        (generators["report_date"].dt.year >= PUDL_LATEST_YEAR)
+        & (generators["report_date"].dt.year < PUDL_LATEST_YEAR + 1)
+        & (generators["operational_status"] == "existing")
+    ].copy()
+
+    generators["resource"] = generators["fuel_type_code_pudl"].astype("string")
+    generators.loc[generators["technology_description"] == "Batteries", "resource"] = (
+        "Battery Storage"
+    )
+    generators.loc[
+        generators["technology_description"] == "Offshore Wind Turbine", "resource"
+    ] = "Offshore Wind"
+    generators.loc[generators["fuel_type_code_pudl"] == "waste", "resource"] = "other"
+
+    plant_fuel_aggs = generators.groupby(
+        ["plant_id_eia", "resource"], dropna=False, as_index=False
+    ).agg(
+        net_gen_by_fuel=("net_generation_mwh", "sum"),
+        capacity_by_fuel=("capacity_mw", "sum"),
+        max_operating_date=("generator_operating_date", "max"),
+    )
+    plant_capacity = (
+        plant_fuel_aggs.groupby("plant_id_eia", as_index=False)["capacity_by_fuel"]
+        .sum()
+        .rename(columns={"capacity_by_fuel": "capacity_mw"})
+    )
+    df = (
+        plant_fuel_aggs.merge(plant_capacity, on="plant_id_eia", how="left")
+        .sort_values(
+            ["plant_id_eia", "net_gen_by_fuel", "capacity_by_fuel"],
+            ascending=[True, False, False],
+            na_position="last",
+        )
+        .drop_duplicates(subset=["plant_id_eia"], keep="first")
+        .loc[:, ["plant_id_eia", "resource", "max_operating_date", "capacity_mw"]]
+    )
+
+    resource_map = {
+        "gas": "Natural Gas",
+        "wind": "Onshore Wind",
+        "hydro": "Hydro",
+        "oil": "Oil",
+        "nuclear": "Nuclear",
+        "coal": "Coal",
+        "other": "Other",
+        "solar": "Solar",
+        "Battery Storage": "Battery Storage",
+        "Offshore Wind": "Offshore Wind",
+    }
+    df.loc[:, "resource"] = df.loc[:, "resource"].map(resource_map)
+    return df
+
+
+def _get_latest_plant_locations(
+    postgres_engine: sa.engine.Engine,
+    state_fips_table: pd.DataFrame | None = None,
+    county_fips_table: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Get standardized plant locations."""
+    if state_fips_table is None:
+        state_fips_table = _get_state_fips_df(postgres_engine)
+    if county_fips_table is None:
+        county_fips_table = _get_county_fips_df(postgres_engine)
+    plant_locations = _get_plant_location_data()
+    plant_locations = _transfrom_plant_location_data(
+        plant_locations, state_table=state_fips_table, county_table=county_fips_table
+    )
+    return plant_locations
+
+
+def get_eia860m_latest_plants(
+    postgres_engine: sa.engine.Engine,
+    state_fips_table: pd.DataFrame | None = None,
+    county_fips_table: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Create a latest plant-level EIA860M table without emissions estimates."""
+    plants = _get_latest_plant_attributes(engine=postgres_engine)
+    locations = _get_latest_plant_locations(
+        postgres_engine=postgres_engine,
+        state_fips_table=state_fips_table,
+        county_fips_table=county_fips_table,
+    )
+    plants = plants.merge(locations, how="left", on="plant_id_eia", copy=False)
+    return plants
 
 
 def get_eia860m_status_timeseries(
@@ -1071,7 +1121,9 @@ def _get_eia860m_transition_dates(engine: sa.engine.Engine) -> pd.DataFrame:
             generator_id,
             operational_status_code,
             report_date,
-            MAX(report_date) OVER (PARTITION BY plant_id_eia, generator_id) AS latest_report_date
+            MAX(report_date) OVER (
+                PARTITION BY plant_id_eia, generator_id
+            ) AS latest_report_date
         FROM data_warehouse._eia860m__changelog__generators
         WHERE operational_status_code IS NOT NULL
     ),
@@ -1185,89 +1237,24 @@ def create_wide_geography_change_log(
     return wide.reset_index()
 
 
-def _create_status_codes() -> pd.DataFrame:
-    """Create a lookup table of the derived operational status codes."""
-    status_codes = pd.read_csv(
-        StringIO(
-            """operational_status_code|raw_operational_status_code|description
-1|P|Planned for installation but regulatory approvals not initiated; Not under construction
-2|L|Regulatory approvals pending. Not under construction but site preparation could be underway
-3|T|Regulatory approvals received. Not under construction but site preparation could be underway
-4|U|Under construction, less than or equal to 50 percent complete (based on construction time to date of operation)
-5|V|Under construction, more than 50 percent complete (based on construction time to date of operation)
-6|TS|Construction complete, but not yet in commercial operation
-7|OA, OP, OS, SB|Various operational categories
-8|RE|Retired
-98|IP|Planned new generator canceled, indefinitely postponed, or no longer in resource plan
-99|OT|Other
-"""
-        ),
-        sep="|",
-    )
-    return status_codes
-
-
 def create_data_mart(
     engine: sa.engine.Engine | None = None,
 ) -> dict[str, pd.DataFrame]:
     """Create projects datamart dataframe."""
     if engine is None:
         engine = get_sql_engine()
-
-    all_projects_long_format = create_long_format(engine, active_projects_only=False)
-    iso_projects_change_log = create_project_change_log(all_projects_long_format)
-
-    # create counties and region change log tables
     data_marts = {}
-    geographies = {"counties": "county_id_fips", "iso_regions": "iso_region"}
-    for geography, geography_columns in geographies.items():
-        geography_change_log = create_geography_change_log(
-            iso_projects_change_log, geography=geography_columns, freq="Q"
-        )
-        data_marts[f"{geography}_all_projects_change_log"] = geography_change_log
-
-        # create separate tables for active projects
-        metrics = ("n_projects", "capacity_mw")
-        new_iso_projects_change_log = iso_projects_change_log.query(
-            "queue_status == 'new'"
-        )
-        for metric in metrics:
-            data_marts[f"{geography}_active_projects_{metric}_change_log"] = (
-                create_total_active_project_change_logs(
-                    new_iso_projects_change_log,
-                    geography=geography_columns,
-                    metric=metric,
-                    freq="Q",
-                )
-            )
-
-    validate_iso_regions_change_log(
-        data_marts["iso_regions_all_projects_change_log"], all_projects_long_format
-    )
-
-    active_long_format = create_long_format(engine, active_projects_only=True)
-    active_wide_format = _convert_long_to_wide(active_long_format)
-    active_fyi_projects_long_format = create_fyi_long_format(
-        engine, active_projects_only=True
-    )
-    eia860m_current = get_eia860m_current(engine)
+    eia860m_latest_generators = get_eia860m_current(engine)
+    eia860m_latest_plants = get_eia860m_latest_plants(engine)
     eia860m_status_monthly = get_eia860m_status_timeseries(engine, frequency="M")
-    eia860m_status_quarterly = get_eia860m_status_timeseries(engine, frequency="Q")
-    eia860m_status_yearly = get_eia860m_status_timeseries(engine, frequency="A")
     eia860m_transition_dates = _get_eia860m_transition_dates(engine)
 
     data_marts.update(
         {
-            "iso_projects_long_format": active_long_format,
-            "iso_projects_wide_format": active_wide_format,
-            "iso_projects_change_log": iso_projects_change_log,
-            "projects_current_eia860m": eia860m_current,
-            "projects_status_yearly_eia860m": eia860m_status_yearly,
-            "projects_status_quarterly_eia860m": eia860m_status_quarterly,
-            "projects_status_monthly_eia860m": eia860m_status_monthly,
-            "projects_status_transition_dates_eia860m": eia860m_transition_dates,
-            "projects_status_codes_eia860m": _create_status_codes(),
-            "fyi_projects_long_format": active_fyi_projects_long_format,
+            "eia860m__latest__generators": eia860m_latest_generators,
+            "eia860m__latest__plants": eia860m_latest_plants,
+            "eia860m__monthly__generators": eia860m_status_monthly,
+            "eia860m__generators_operational_status_transition_dates": eia860m_transition_dates,
         }
     )
     return data_marts
@@ -1277,7 +1264,4 @@ if __name__ == "__main__":
     # debugging entry point
     mart = create_data_mart()
     parquet_dir = OUTPUT_DIR / "data_mart"
-    mart["fyi_projects_long_format"].to_parquet(
-        parquet_dir / "fyi_projects_long_format.parquet",
-    )
     print("yeehaw")

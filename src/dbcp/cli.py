@@ -63,7 +63,7 @@ def etl(data_mart: bool, data_warehouse: bool, clear_cache: bool):
         dbcp.etl.etl(schema=SchemaName("data_mart"))
     if (not data_warehouse) and (not data_mart):
         raise ValueError(
-            "Please specify a target for the ETL process: --data-warehouse and/or --data-mart or --private-data-mart."
+            "Please specify a target for the ETL process: --data-warehouse and/or --data-mart."
         )
 
 

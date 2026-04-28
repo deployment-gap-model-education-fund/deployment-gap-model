@@ -26,12 +26,12 @@ def transform(raw_df: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         "Washington D.C.", "District of Columbia"
     )
     # manual error correction
-    idx_MS = transform_df.index[(transform_df.loc[:, "state"].eq("Mississippi"))][0]
+    idx_ms = transform_df.index[(transform_df.loc[:, "state"].eq("Mississippi"))][0]
     local_string = (
         "Local governments have authority over land use and zoning decisions."
     )
-    if transform_df.at[idx_MS, "description"].endswith(local_string):
-        transform_df.at[idx_MS, "permitting_type"] = "Local"
+    if transform_df.at[idx_ms, "description"].endswith(local_string):
+        transform_df.at[idx_ms, "permitting_type"] = "Local"
 
     dtypes = {
         "state": pd.StringDtype(),
