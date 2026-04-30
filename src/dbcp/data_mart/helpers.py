@@ -12,7 +12,7 @@ from dbcp.helpers import get_sql_engine
 def _subset_db_columns(
     columns: Sequence[str], table: str, engine: sa.engine.Engine
 ) -> pd.DataFrame:
-    query = f"SELECT {', '.join(columns)} FROM {table}"
+    query = f"SELECT {', '.join(columns)} FROM {table}"  # noqa: S608
     df = pd.read_sql(query, engine)
     return df
 
@@ -85,7 +85,7 @@ class CountyOpposition:
             "23",  # Maine (repealed)
             "36",  # New York (pro-renewables policy)
         )
-        query = f"SELECT {', '.join(cols)} FROM {table} WHERE state_id_fips NOT IN {states_to_exclude}"
+        query = f"SELECT {', '.join(cols)} FROM {table} WHERE state_id_fips NOT IN {states_to_exclude}"  # noqa: S608
         df = pd.read_sql(query, self._engine)
         return df
 
@@ -340,8 +340,7 @@ def _estimate_proposed_power_co2e(
         "mod_resource",
         "estimated_capacity_factor",
     ]
-    for intermediate in intermediates:
-        del iso_projects[intermediate]
+    iso_projects = iso_projects.drop(columns=intermediates)
     return
 
 
