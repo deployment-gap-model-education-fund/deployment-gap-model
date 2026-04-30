@@ -296,7 +296,6 @@ def create_total_active_project_change_logs(
         if pd.isna(end):
             end = max_date
 
-        freq = {"Q": "QE", "M": "ME", "Y": "YE", "A": "YE"}.get(freq, freq)
         periods = pd.date_range(start=start, end=end, freq=freq, normalize=True)
         return periods
 
@@ -368,7 +367,7 @@ def create_geography_change_log(
         geography,
         pd.Grouper(
             key="effective_date",
-            freq={"Q": "QE", "M": "ME", "Y": "YE", "A": "YE"}.get(freq, freq),
+            freq=freq,
         ),
         "queue_status",
         "resource_class",
