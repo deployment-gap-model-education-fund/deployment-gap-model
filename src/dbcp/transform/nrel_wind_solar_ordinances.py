@@ -59,11 +59,8 @@ def _convert_multivalued_to_extreme_value(
     # discrete multivalue delimiter: "/"
     # continuous multivalue delimiter: "-"
     split = values.str.split(split_char, expand=True).apply(pd.to_numeric, axis=1)
-    if use_minimum:
-        extreme = split.min(axis=1)
-    else:
-        extreme = split.max(axis=1)
-    return extreme  # type: ignore
+    extreme = split.min(axis=1) if use_minimum else split.max(axis=1)
+    return extreme
 
 
 def _replace_multivalued_with_worst_case(
@@ -140,7 +137,7 @@ def _simplify_wind_ordinance_types(types: pd.Series) -> pd.Series:
     simple = simple.replace(
         {
             "tower density": "density",
-            "tower denisty": "density",
+            "tower denisty": "density",  # spellchecker:ignore
             "highway": "highways",
             "highway 111": "highways",
             "moratorium": "banned",
@@ -171,7 +168,7 @@ def _simplify_solar_ordinance_types(types: pd.Series) -> pd.Series:
             "sounds": "sound",
             "noise": "sound",
             "property lines": "property line",
-            "mimimum lot size": "minimum lot size",
+            "mimimum lot size": "minimum lot size",  # spellchecker:ignore
             "moratorium": "banned",
             "total installation": "total installation size",
             "property": "property line",
@@ -187,7 +184,7 @@ def _simplify_wind_units(units: pd.Series) -> pd.Series:
         {
             "meter": "meters",
             "turbine count": "turbines",
-            "rotor diameter mutliplier": "rotor diameter multiplier",
+            "rotor diameter mutliplier": "rotor diameter multiplier",  # spellchecker:ignore
             "max tip height": "max tip height multiplier",
             "rotor diameter": "rotor diameter multiplier",
             "rotor radius": "rotor radius multiplier",
@@ -402,12 +399,12 @@ def _convert_sound_to_distance(
     # I used derivatives in a newton method but it kept finding the negative roots, which I don't want.
     # def objective_func_derivative(r):
     #     return -20 / (r * np.log(10))- attenuation_dbm
-    # def objective_func_2nd_derivative(r):
+    # def objective_func_second_derivative(r):
     #     return 20 / np.log(10) * np.power(r, -2)
     distance = root_scalar(
         objective_func,
         # fprime=objective_func_derivative,
-        # fprime2=objective_func_2nd_derivative,
+        # fprime2=objective_func_second_derivative,
         bracket=(0.1, 1e5),  # look for positive valued root
         x0=570,  # near 40dB solution
         xtol=0.01,  # don't need great accuracy
@@ -550,7 +547,7 @@ def transform(nrel_raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         nrel_raw_dfs (Dict[str, pd.DataFrame]): raw NREL data
 
     Returns:
-        Dict[str, pd.DataFrame]: transfomed NREL data for the warehouse
+        Dict[str, pd.DataFrame]: transformed NREL data for the warehouse
 
     """
     local_wind = local_wind_transform(nrel_raw_dfs["nrel_local_wind_ordinances"])
