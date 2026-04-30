@@ -541,23 +541,7 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
     operational_active["end_date"] = operational_active["actual_completion_date"]
 
     # combine the withdrawn_active dataframe with the long_format dataframe
-    all_long_format_columns = pd.Index(
-        sorted(
-            {
-                col
-                for df in (long_format, withdrawn_active, operational_active)
-                for col in df.columns
-            }
-        )
-    )
-    concat_ready = [
-        df.dropna(axis="columns", how="all")
-        for df in (long_format, withdrawn_active, operational_active)
-        if not df.empty
-    ]
-    long_format = pd.concat(concat_ready, ignore_index=True).reindex(
-        columns=all_long_format_columns
-    )
+    long_format = pd.concat([long_format, withdrawn_active, operational_active])
 
     # drop withdrawn_date, actual_completion_date and date_entered_queue columns
     long_format = long_format.drop(

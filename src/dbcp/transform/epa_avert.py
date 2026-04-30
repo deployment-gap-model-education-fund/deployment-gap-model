@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 def _capacity_factor_transform(cap_factors: pd.DataFrame) -> pd.DataFrame:
     """Transform capacity factors table."""
     cap_factors = (
-        cap_factors.mask(cap_factors.eq("-"), np.nan)
+        cap_factors.replace("-", np.nan)
         .melt(
             id_vars=["avert_region"],
             var_name="resource_type",
@@ -34,7 +34,7 @@ def _emissions_transform(emissions: pd.DataFrame) -> pd.DataFrame:
     """Transform emissions table."""
     lbs_to_tonnes = 1 / 2204.62
     emissions = (
-        emissions.mask(emissions.eq("-"), np.nan)
+        emissions.replace("-", np.nan)
         # remove energy efficiency columns
         .drop(columns=[col for col in emissions.columns if col.endswith("_ee")])
         .melt(
@@ -93,7 +93,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     crosswalk = _crosswalk_transform(raw_dfs["avert_county_region_assoc"])
     assert set(crosswalk["avert_region"].unique()).symmetric_difference(
         avert_regions
-    ) == set(["Alaska", "Hawaii"])
+    ) == {"Alaska", "Hawaii"}
     return {
         "avert_avoided_emissions_factors": avert_factors,
         "avert_county_region_assoc": crosswalk,
