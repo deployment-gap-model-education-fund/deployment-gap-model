@@ -81,14 +81,14 @@ def _replace_multivalued_with_worst_case(
     assert replace_with_min.sum() + replace_with_max.sum() == is_multivalued.sum(), (
         err_msg
     )
-    replacement_parts = [
-        _convert_multivalued_to_extreme_value(values.loc[replace_with_min]),
-        _convert_multivalued_to_extreme_value(
-            values.loc[replace_with_max], use_minimum=False
-        ),
-    ]
     replacements = pd.concat(
-        [part for part in replacement_parts if not part.empty], axis=0
+        [
+            _convert_multivalued_to_extreme_value(values.loc[replace_with_min]),
+            _convert_multivalued_to_extreme_value(
+                values.loc[replace_with_max], use_minimum=False
+            ),
+        ],
+        axis=0,
     )
     values.update(replacements.astype(values.dtype))
     return
