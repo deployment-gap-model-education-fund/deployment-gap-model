@@ -23,7 +23,7 @@ def add_actionable_and_nearly_certain_classification(
         .isin(
             {
                 "Facilities Study",
-                "Feasibility Study",
+                "Feasability Study",  # spellchecker:ignore
             }
         )
         .any()
@@ -221,13 +221,13 @@ def normalize_point_of_interconnection(ser: pd.Series) -> pd.Series:
     return out
 
 
-def parse_date_columns(queue: pd.DataFrame) -> None:
+def parse_date_columns(queue: pd.DataFrame) -> pd.DataFrame:
     """Identify date columns and parse them to pd.Timestamp.
 
     Original (unparsed) date columns are preserved but with the suffix '_raw'.
 
     Args:
-        queue (pd.DataFrame): an LBNL ISO queue dataframe
+        queue: an LBNL ISO queue dataframe
 
     """
     date_cols = [
@@ -255,4 +255,4 @@ def parse_date_columns(queue: pd.DataFrame) -> None:
         bad = new_dates.dt.year.isin({1899, 1900})
         new_dates.loc[bad] = pd.NaT
         queue.loc[:, date_col] = new_dates
-    return
+    return queue

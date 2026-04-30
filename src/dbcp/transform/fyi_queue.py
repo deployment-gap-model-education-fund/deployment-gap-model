@@ -98,7 +98,7 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     # if there are any new or unexpected values
     _validate_interconnection_status_fyi(projects.loc[:, "interconnection_status_fyi"])
     # convert date columns to datetime dtype
-    parse_date_columns(projects)
+    projects = parse_date_columns(projects)
     projects = projects.drop(
         columns=["schedule_next_event_date_raw", "most_recent_study_date_raw"]
     )
