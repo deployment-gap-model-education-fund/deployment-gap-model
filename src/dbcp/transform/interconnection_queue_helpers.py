@@ -23,7 +23,7 @@ def add_actionable_and_nearly_certain_classification(
         .isin(
             {
                 "Facilities Study",
-                "Feasability Study",
+                "Feasibility Study",
             }
         )
         .any()
@@ -242,9 +242,9 @@ def parse_date_columns(queue: pd.DataFrame) -> None:
 
     # add _raw suffix
     rename_dict: dict[str, str] = dict(
-        zip(date_cols, [col + "_raw" for col in date_cols])
+        zip(date_cols, [col + "_raw" for col in date_cols], strict=True)
     )
-    queue.columns = [rename_dict.get(col, col) for col in queue.columns]
+    queue = queue.rename(columns=rename_dict)
 
     for date_col, raw_col in rename_dict.items():
         if pd.api.types.is_object_dtype(queue.loc[:, raw_col]):
