@@ -5,7 +5,7 @@ import re
 from collections.abc import Callable
 from functools import partial
 
-import geopandas as gpd
+import geopandas as gpd  # noqa: ICN002
 import numpy as np
 import pandas as pd
 
@@ -197,7 +197,7 @@ def _col_transform_mw_total_capacity(
     # Note: this does not combine capacity at plants with both online and decommissioned
     # phases.
 
-    # Confirm that decommisioned capacity is always zero
+    # Confirm that decommissioned capacity is always zero
     is_decom = full_df["raw_status"] == "Decommissioned"
     assert ser.loc[is_decom].eq(0).all(), "Found non-zero Decommissioned capacity."
     out = ser.copy()
@@ -281,7 +281,7 @@ def _transform_location_cols(
     # 2) one of the sources is missing (no fips) but the other is present and
     #    successfully produces a FIPS. (simply fillna. 9% of cases)
     # 3) one of various conflicts (<1% of cases):
-    #    a) both exist but disagree (arbitarily use state/county FIPS and set lat/lon to
+    #    a) both exist but disagree (arbitrarily use state/county FIPS and set lat/lon to
     #       null. This case is about 1/3 of remaining cases)
     #    b) lat/lon present but spatial join fails and state is present but county is
     #       missing. These are all offshore projects with lat/lon in the ocean. Note
@@ -435,7 +435,7 @@ def _int_id_from_str(s: str) -> int:
     # integers are more convenient and we don't need the full 16 bytes for data this
     # small (collision probability is on the order of 1e-12 for 10k items with 64 bits)
     byte_str = s.encode("utf-8")
-    hash_digest = hashlib.md5(byte_str).digest()[:8]  # nosec
+    hash_digest = hashlib.md5(byte_str).digest()[:8]  # noqa: S324
     # Specify byteorder and signedness just for clarity. I don't *really* care what they
     # are as long as the underlying bytes are unique. But Postgres has no unsigned
     # integer types, so I'll use signed int for consistency between the pre-db and
@@ -520,11 +520,11 @@ def _transform_acp_snapshots_to_changelog(
 ) -> pd.DataFrame:
     """Create a changelog of the ACP data over time."""
     trans_df = raw_snapshots_df.reset_index(drop=True).convert_dtypes()
-    cleaned_groups = [
-        _clean_col_names_and_create_id(group)
-        for _, group in trans_df.groupby("report_date", sort=False)
-    ]
-    trans_df = pd.concat(cleaned_groups, ignore_index=True)
+    trans_df = (
+        trans_df.groupby("report_date")
+        .apply(_clean_col_names_and_create_id)
+        .reset_index(drop=True)
+    )
     trans_df = _clean_columns(trans_df)
     trans_df = trans_df.sort_values(by=["proj_id", "report_date"])
     compare_cols = [
