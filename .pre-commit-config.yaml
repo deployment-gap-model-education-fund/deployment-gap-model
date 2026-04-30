@@ -60,8 +60,8 @@ repos:
   ####################################################################################
 
   # Spell check our documentation and code comments
-  - repo: https://github.com/adhtruong/mirrors-typos
-    rev: v1.45.1
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.45.2
     hooks:
       - id: typos
         exclude: |
