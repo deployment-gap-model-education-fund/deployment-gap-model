@@ -194,6 +194,24 @@ def parse_capacity(row):
     }
 
 
+# occasionally in CAISO the parsed capacity by generation type breakdown
+# will list the same resource twice if there are two generators, in
+# these cases, sum the resources
+EXPECTED_DUPLICATE_PROJECTS = {
+    "caiso-1085",
+    "caiso-1088",
+    "caiso-908",
+    "caiso-472",
+    "caiso-54873",
+    "caiso-1212",
+    "caiso-2113",
+    "ladwp-q57",
+    "caiso-955",
+    "tucson-electric-power-94",
+    "tucson-electric-power-80",
+}
+
+
 def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Pull out capacity and resource values into a separate dataframe.
 
@@ -226,29 +244,18 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> dict[str, pd.DataFrame
         & resource_capacity_df["capacity_mw"].notnull()
     ].reset_index()
 
-    # occasionally in CAISO the parsed capacity by generation type breakdown
-    # will list the same resource twice if there are two generators, in
-    # these cases, sum the resources
-    n_expected_duped_resources = 11
-    # Expected project IDS that show up in dupes:
-    # "caiso-1085","caiso-1088", "caiso-908", "caiso-472",
-    # "caiso-54873", "caiso-1212","ladwp-q57"
-    # "caiso-955", "tucson-electric-power-94", "tucson-electric-power-94"
-    # "tucson-electric-power-80"
     # if new project IDs show up, put in a breakpoint and see if the
     # generator resources should have summed capacity
-    assert (
-        len(
-            resource_capacity_df[
-                resource_capacity_df.duplicated(subset=["project_id", "resource"])
-            ]
-        )
-        <= n_expected_duped_resources
-    ), (
-        f"More than {n_expected_duped_resources} projects found with the same resource "
-        "listed twice in capacity_by_generation_type_breakdown. Ensure that their capacities should be summed. "
-        f"They have project IDs: {resource_capacity_df[resource_capacity_df.duplicated(subset=['project_id', 'resource'])].project_id}"
+    found_dupes = set(
+        resource_capacity_df[
+            resource_capacity_df.duplicated(subset=["project_id", "resource"])
+        ]["project_id"]
     )
+    if found_dupes != EXPECTED_DUPLICATE_PROJECTS:
+        raise RuntimeError(
+            "Found unexpected projects listed twice in capacity_by_generation_type_breakdown. Ensure that their capacities should be summed. "
+            f"Unexpected projects: {found_dupes - EXPECTED_DUPLICATE_PROJECTS}"
+        )
     # There are some projects where summing the duplicated resource's capacity
     # doesn't make sense, i.e. when it seems like a mistake that there are
     # two of the same resource listed or it's a cogen gas plant and only one
