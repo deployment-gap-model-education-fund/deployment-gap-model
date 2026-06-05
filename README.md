@@ -27,21 +27,15 @@ To access the processed data, add the `dbcp-dev-350818` project to your Big Quer
 
 # Setup
 
-## Conda Environment
+## Install Dev Environment
 
-Make sure you have [conda installed](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html). Once conda is installed, run:
-
-```
-conda env create --name dbcp-dev --file environment.yml
-```
-
-Then activate the environment:
+Make sure you have [uv installed](https://docs.astral.sh/uv/getting-started/installation/).
+The ETL and tests will run in a docker container, so you only need to install a minimal dev environment
+to run pre-commit hooks. You can do this with the following command:
 
 ```
-conda activate dbcp-dev
+uv sync --only-dev
 ```
-
-This conda environment has python, pip and pre-commit installed in it. This env is just for running pre-commits, the actual ETL development happens in docker.
 
 ## GCP Authentication
 
@@ -68,7 +62,7 @@ authenticated, the command should print out a message:
 Credentials saved to file: <path/to/your_credentials.json>
 ```
 
-Set this path to a local environment varible called `GOOGLE_GHA_CREDS_PATH`
+Set this path to a local environment variable called `GOOGLE_GHA_CREDS_PATH`
 
 ```
 export GOOGLE_GHA_CREDS_PATH=<path/to/your_credentials.json>
@@ -132,7 +126,7 @@ Git hooks let you automatically run scripts at various points as you manage your
 To make sure they are run before you commit any code, you need to enable the pre-commit hooks scripts with this command:
 
 ```
-pre-commit install
+uv run pre-commit install
 ```
 
 The scripts that run are configured in the .pre-commit-config.yaml file.
@@ -147,7 +141,7 @@ Now we can build the docker images by running:
 make build
 ```
 
-This command create a docker image and installs all the packages in `requirements.txt` so it will take a couple minutes to complete.
+This command create a docker image and installs all the packages in `pyproject.toml` so it will take a couple minutes to complete.
 
 If you get this error:
 
