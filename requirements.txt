@@ -15,7 +15,7 @@ beautifulsoup4~=4.14
 plotly~=5.15.0
 gridstatus~=0.29.1
 s3fs>=2022.11.0
-click>=8.1.7
+click>=8.4.1
 pyairtable>=2.3.3
 numpy<3
 sqlalchemy<3.0
