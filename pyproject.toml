@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "deployment-gap-model"
 version = "0.1.0"
@@ -27,7 +31,7 @@ dependencies = [
   "pandas-gbq~=0.34.0",
   "pandera[io]~=0.26.1",
   "plotly~=5.15.0",
-  "psycopg2~=2.9.11",
+  "psycopg2-binary~=2.9.11",
   "pyairtable>=2.3.3",
   "pydantic>=2.9,<2.13",
   "pydata-google-auth~=1.9.1",
@@ -41,8 +45,14 @@ dependencies = [
   "us~=3.2.0",
 ]
 
+[project.scripts]
+branch-compare = "scripts.branch_compare_helper:main"
+
 [project.urls]
 Homepage = "https://github.com/catalyst-cooperative/down_ballot_climate"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dbcp", "src/scripts"]
 
 [tool.ruff]
 # Configurations that apply to both the `format` and `lint` subcommands.

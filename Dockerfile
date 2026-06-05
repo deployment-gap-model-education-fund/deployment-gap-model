@@ -19,6 +19,7 @@ ENV PATH="/root/.local/bin/:$PATH"
 WORKDIR /app
 
 COPY pyproject.toml /app/pyproject.toml
+COPY README.md /app/README.md
 
 RUN uv sync --no-dev
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
