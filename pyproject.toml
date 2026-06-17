@@ -51,9 +51,6 @@ branch-compare = "scripts.branch_compare_helper:main"
 [project.urls]
 Homepage = "https://github.com/catalyst-cooperative/down_ballot_climate"
 
-[tool.hatch.build]
-packages = ["src"]
-
 [tool.hatch.build.targets.wheel]
 packages = ["src/dbcp", "src/scripts"]
 
