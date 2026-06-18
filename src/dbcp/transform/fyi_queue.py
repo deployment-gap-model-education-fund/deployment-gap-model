@@ -207,8 +207,6 @@ EXPECTED_DUPLICATE_PROJECTS = {
     "caiso-2113",
     "ladwp-q57",
     "caiso-955",
-    "tucson-electric-power-94",
-    "tucson-electric-power-80",
 }
 
 

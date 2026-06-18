@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "deployment-gap-model"
+name = "dbcp"
 version = "0.1.0"
 description = "Data engineering for the Down Ballot Climate Project (DBCP)"
 authors = [{ name = "Catalyst Cooperative", email = "hello@catalyst.coop" }]
