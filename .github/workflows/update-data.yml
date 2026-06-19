@@ -5,23 +5,23 @@ on:
   push:
     branches:
       - "main"
-    tags: [ 'v*' ]
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       target:
-        description: 'dev or prod'
+        description: "dev or prod"
         required: true
-        default: 'dev'
+        default: "dev"
         type: choice
         options: [dev, prod]
       release_tag:
-        description: 'Release tag to deploy to prod (leave blank to use latest published release)'
+        description: "Release tag to deploy to prod (leave blank to use latest published release)"
         required: false
-        default: ''
+        default: ""
   schedule:
     - cron: 0 0 * * 0
   release:
-    types: [published]   # immediately deploy prod when a release is published
+    types: [published] # immediately deploy prod when a release is published
 
 jobs:
   archive:
@@ -234,8 +234,8 @@ jobs:
       - uses: EndBug/add-and-commit@v9
         id: commit_settings_file
         if: ${{ steps.write_settings.outcome == 'success'
-                && github.event_name == 'push'
-                && startsWith(github.ref, 'refs/heads/') }}
+          && github.event_name == 'push'
+          && startsWith(github.ref, 'refs/heads/') }}
         with:
           add: "src/dbcp/settings.yaml"
           author_name: "DBCP Bot"
@@ -267,7 +267,7 @@ jobs:
           # - settings-file-git-sha (commit hash of the saved settings.yaml)
           # - github-action-run-id (for tracking the GitHub Action run)
           # - target (indicates if this is 'dev' or 'prod' environment target)
-          docker compose run --rm app python dbcp/cli.py publish-outputs \
+          docker compose run --rm app uv run python -m dbcp.cli publish-outputs \
             -bq \
             --upload-to-postgres \
             --build-ref ${{ matrix.ref }} \
