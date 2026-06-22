@@ -28,7 +28,7 @@ dependencies = [
   "matplotlib~=3.10.8",
   "numpy<3",
   "pandas~=2.3.3",
-  "pandas-gbq~=0.34.0",
+  "pandas-gbq~=0.35.0",
   "pandera[io]~=0.26.1",
   "plotly~=5.15.0",
   "psycopg2-binary~=2.9.11",
