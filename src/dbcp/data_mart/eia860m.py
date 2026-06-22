@@ -1,7 +1,6 @@
 """Module to create a project-level table for DBCP to use in spreadsheet tools."""
 
 import logging
-from re import IGNORECASE
 
 import numpy as np
 import pandas as pd
@@ -10,7 +9,7 @@ import sqlalchemy as sa
 from dbcp.constants import FIPS_CODE_VINTAGE, OUTPUT_DIR, PUDL_LATEST_YEAR
 from dbcp.data_mart.co2_dashboard import (
     _get_plant_location_data,
-    _transfrom_plant_location_data,
+    _transform_plant_location_data,
 )
 from dbcp.data_mart.helpers import (
     CountyOpposition,
@@ -118,179 +117,6 @@ def _get_and_join_iso_tables(
         out = _replace_iso_offshore_with_proprietary(out, offshore)
     _estimate_proposed_power_co2e(out)
     return out
-
-
-def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
-    """Restructure the long-format data as a single row per project.
-
-    PK is (source, project_id)
-    1:m relationships are handled by creating multiple columns for each m.
-    Wide format is ugly but it's what the people want.
-    """
-    long = long_format.copy()
-    # separate generation from storage
-    is_storage = long.loc[:, "resource_clean"].str.contains("storage", flags=IGNORECASE)
-    long["storage_type"] = (
-        long.loc[:, "resource_clean"].where(is_storage).astype("string")
-    )
-    long["generation_type"] = (
-        long.loc[:, "resource_clean"].where(~is_storage).astype("string")
-    )
-    gen = long.loc[~is_storage, :]
-    storage = long.loc[is_storage, :]
-    group_keys = ["project_id", "source", "county_id_fips"]
-    # create multiple generation columns
-    group = gen.groupby(group_keys, dropna=False)[
-        group_keys + ["generation_type", "capacity_mw"]
-    ]
-    # first generation source
-    rename_dict = {
-        "generation_type": "generation_type_1",
-        "capacity_mw": "generation_capacity_mw_1",
-    }
-    gen_1 = group.nth(0).reset_index(drop=True).rename(columns=rename_dict)
-    # second generation source (very few rows)
-    rename_dict = {
-        "generation_type": "generation_type_2",
-        "capacity_mw": "generation_capacity_mw_2",
-    }
-    gen_2 = group.nth(1).reset_index(drop=True).rename(columns=rename_dict)
-    # shouldn't be any with 3 generation types
-    assert group.nth(2).shape[0] == 0
-    gen = gen_1.merge(gen_2, on=group_keys, how="left")
-    # create storage column
-    # Occassionally there are projects with multiple storage resources,
-    # i.e. battery storage and pumped storage
-    # In these cases, we sum the storage capacity the by doing a
-    # groupby and sum on capacity.
-    assert (
-        storage.duplicated(subset=group_keys).sum() < 10
-    )  # less than 10 multi-storage projects (assuming this isn't common)
-
-    storage = (
-        storage.groupby(group_keys, dropna=False)[["capacity_mw"]]
-        .sum()
-        .rename(columns={"capacity_mw": "storage_capacity_mw"})
-    )
-
-    # combine the storage_type column for these dupe storage projects
-    storage_concat = long.groupby(group_keys, dropna=False)["storage_type"].transform(
-        lambda s: " + ".join(pd.unique([x for x in s.dropna() if x != ""]))
-    )
-    # Count how many storage rows per group
-    storage_count = (
-        long.assign(_is_storage=is_storage)
-        .groupby(group_keys, dropna=False)["_is_storage"]
-        .transform("sum")
-    )
-    # Replace only for rows that are storage AND belong to groups with duplicates (>=2)
-    long["storage_type"] = np.where(
-        is_storage & (storage_count >= 2),
-        storage_concat,  # combined e.g. "Battery + Pumped storage"
-        long["storage_type"],  # leave untouched otherwise
-    )
-    long["storage_type"] = long["storage_type"].replace(
-        {"Pumped Storage + Battery Storage": "Battery Storage + Pumped Storage"}
-    )
-    # combine gen and storage cols, handling nans in county_id_fips
-    sentinel = "<NA_FIPS>"
-    g = gen.assign(
-        county_id_fips=lambda d: d["county_id_fips"].astype("string").fillna(sentinel)
-    )
-    s = storage.reset_index().assign(
-        county_id_fips=lambda d: d["county_id_fips"].astype("string").fillna(sentinel)
-    )
-    gen_stor = g.merge(s, how="outer", on=group_keys, suffixes=("_gen", "_stor"))
-    # restore NaNs
-    gen_stor["county_id_fips"] = gen_stor["county_id_fips"].replace(sentinel, np.nan)
-
-    assert (
-        len(gen_stor) == long.groupby(group_keys, dropna=False).ngroups
-    )  # all project-locations accounted for and 1:1
-    co2e = long.groupby(group_keys, dropna=False)["co2e_tonnes_per_year"].sum()
-    other_cols = (
-        long.drop(
-            columns=[
-                "generation_type",
-                "capacity_mw",
-                "resource_clean",
-                "co2e_tonnes_per_year",
-            ]
-        )
-        .groupby(group_keys, dropna=False)
-        .nth(0)
-    )
-    # a left merge works here because the previous assert ensured that all
-    # project-locations are accounted for and 1:1
-    project_locations = gen_stor.merge(
-        other_cols, on=group_keys, how="left", validate="1:1"
-    )
-    project_locations = project_locations.merge(
-        co2e, on=group_keys, how="left", validate="1:1"
-    ).set_index(group_keys)
-    # now create multiple location columns
-    project_keys = ["source", "project_id"]
-    projects = project_locations.reset_index("county_id_fips").groupby(
-        project_keys, dropna=False
-    )
-    loc1 = projects.nth(0).rename(
-        columns={"county_id_fips": "county_id_fips_1", "county": "county_1"}
-    )
-    assert not loc1.index.to_frame().isna().any().any(), (
-        "Nulls found in project_id or source."
-    )
-    loc2 = (
-        projects[["county_id_fips", "county"]]
-        .nth(1)
-        .rename(columns={"county_id_fips": "county_id_fips_2", "county": "county_2"})
-    )
-    assert projects.nth(2).shape[0] == 0, "More than 2 locations found for a project."
-
-    wide = pd.concat([loc1, loc2], axis=1, copy=False)
-    wide = wide.sort_index()
-    wide = wide.reset_index()
-    wide = wide.rename(columns={"state": "state_1", "state_id_fips": "state_id_fips_1"})
-    wide_col_order = [
-        "project_id",
-        "project_name",
-        "iso_region",
-        "entity",
-        "utility",
-        "developer",
-        "state_1",
-        "state_id_fips_1",
-        "county_1",
-        "county_id_fips_1",
-        "county_2",
-        "county_id_fips_2",
-        "resource_class",
-        "is_hybrid",
-        "generation_type_1",
-        "generation_capacity_mw_1",
-        "generation_type_2",
-        "generation_capacity_mw_2",
-        "storage_type",
-        "storage_capacity_mw",
-        "co2e_tonnes_per_year",
-        "date_entered_queue",
-        "date_proposed_online",
-        "interconnection_status",
-        "point_of_interconnection",
-        "queue_status",
-        "ordinance_via_reldi",
-        "ordinance_jurisdiction_name",
-        "ordinance_jurisdiction_type",
-        "ordinance_earliest_year_mentioned",
-        "ordinance_text",
-        "state_permitting_type",
-        "is_actionable",
-        "is_nearly_certain",
-        "source",
-        # "frac_locations_in_county", not needed in wide format
-    ]
-    wide = wide.loc[:, wide_col_order]
-
-    return wide
 
 
 def _add_derived_columns(mart: pd.DataFrame) -> None:
@@ -539,7 +365,10 @@ def create_geography_change_log(
     """
     group_keys = [
         geography,
-        pd.Grouper(key="effective_date", freq=freq),
+        pd.Grouper(
+            key="effective_date",
+            freq=freq,
+        ),
         "queue_status",
         "resource_class",
     ]
@@ -594,13 +423,15 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
 
     """
     original_long_format = long_format.copy()
-    # for projcts where resource_clean == "Unknown", set resource_class to "other" instead of nan
+    # for projects where resource_clean == "Unknown", set resource_class to "other" instead of nan
     long_format["resource_class"] = long_format.resource_class.mask(
         long_format.resource_clean.eq("Unknown"), "other"
     )
 
     # Not all ISO regions have operational and withdrawn dates which are required to make a full change log.
-    long_format = long_format[long_format["iso_region"].isin(CHANGE_LOG_REGIONS)]
+    long_format = long_format.loc[
+        long_format["iso_region"].isin(CHANGE_LOG_REGIONS)
+    ].copy()
 
     # make sure we are missing less than 11% of withdrawn_date
     withdrawn = long_format.query("queue_status == 'withdrawn'")
@@ -610,16 +441,13 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
     ), f"More than {expected_missing} of withdrawn_date is missing."
 
     # For operational projects, fill in missing actual_completion_date with date_proposed_online
-    operational = long_format.query("queue_status == 'operational'")
-    operational["actual_completion_date"] = operational[
-        "actual_completion_date"
-    ].fillna(operational["date_proposed_online"])
-    long_format.loc[operational.index, "actual_completion_date"] = operational[
-        "actual_completion_date"
-    ]
+    operational = long_format["queue_status"].eq("operational")
+    long_format.loc[operational, "actual_completion_date"] = long_format.loc[
+        operational, "actual_completion_date"
+    ].fillna(long_format.loc[operational, "date_proposed_online"])
 
     # make sure we are missing less than 10% of actual_completion_date
-    operational = long_format.query("queue_status == 'operational'")
+    operational = long_format.loc[long_format["queue_status"].eq("operational")]
     expected_missing = 0.1
     assert (
         operational["actual_completion_date"].isna().sum() / len(operational)
@@ -958,7 +786,7 @@ def _get_latest_plant_locations(
     if county_fips_table is None:
         county_fips_table = _get_county_fips_df(postgres_engine)
     plant_locations = _get_plant_location_data()
-    plant_locations = _transfrom_plant_location_data(
+    plant_locations = _transform_plant_location_data(
         plant_locations, state_table=state_fips_table, county_table=county_fips_table
     )
     return plant_locations
@@ -1037,15 +865,15 @@ ORDER BY 1, 2, 3, 4
     last_end_date = pd.Timestamp(last_report_date) + pd.offsets.MonthEnd()
 
     if frequency in ("A", "Y"):
-        freq_end, period_freq = "Y", "A"
+        freq_end, period_freq = "YE", "Y"
         period_name = "year"
         period_ct = lookback_years
     elif frequency == "Q":
-        freq_end, period_freq = "Q", "Q"
+        freq_end, period_freq = "QE", "Q"
         period_name = "quarter"
         period_ct = lookback_years * 4
     elif frequency == "M":
-        freq_end, period_freq = "M", "M"
+        freq_end, period_freq = "ME", "M"
         period_name = "month"
         period_ct = lookback_years * 12
 

@@ -59,11 +59,8 @@ def _convert_multivalued_to_extreme_value(
     # discrete multivalue delimiter: "/"
     # continuous multivalue delimiter: "-"
     split = values.str.split(split_char, expand=True).apply(pd.to_numeric, axis=1)
-    if use_minimum:
-        extreme = split.min(axis=1)
-    else:
-        extreme = split.max(axis=1)
-    return extreme  # type: ignore
+    extreme = split.min(axis=1) if use_minimum else split.max(axis=1)
+    return extreme
 
 
 def _replace_multivalued_with_worst_case(
@@ -71,12 +68,12 @@ def _replace_multivalued_with_worst_case(
 ) -> None:
     # currently assumes all multivalued entries are marked with either "/" or "-"
     # Will raise error if any other values fail to convert to numeric.
-    is_multivalued = values.str.contains("/|-").fillna(False)
-    lower_is_worse = (
-        value_types.str.lower().str.contains("dba").fillna(False)
+    is_multivalued = values.str.contains("/|-", regex=True, na=False)
+    lower_is_worse = value_types.str.lower().str.contains(
+        "dba", regex=False, na=False
     )  # sound restrictions
-    higher_is_worse = (
-        value_types.str.lower().str.contains("meters").fillna(False)
+    higher_is_worse = value_types.str.lower().str.contains(
+        "meters", regex=False, na=False
     )  # setbacks
     replace_with_min = is_multivalued & lower_is_worse
     replace_with_max = is_multivalued & higher_is_worse
@@ -106,9 +103,10 @@ def _convert_linear_expr_to_constant(values: pd.Series, x_meters=151.0) -> pd.Se
     built just shorter than this (at least as of 2019 when I was in the industry).
     """
     pattern = r"(?P<multiplier>\d\.?\d*) ?\+ ?(?P<offset>\d+\.?\d*)\s?(?P<unit>\w*)"  # capture A, b and the unit from "1.5 + 22.86 meters"
-    expr_df = values.str.extract(pattern, expand=True)
-    for col in ["multiplier", "offset"]:
-        expr_df.loc[:, col] = pd.to_numeric(expr_df.loc[:, col])
+    expr_df = values.str.extract(pattern, expand=True).assign(
+        multiplier=lambda df: pd.to_numeric(df["multiplier"]),
+        offset=lambda df: pd.to_numeric(df["offset"]),
+    )
     # unit conversion: feet to meters
     expr_df.loc[:, "offset"] = expr_df.loc[:, "offset"].where(
         expr_df.loc[:, "unit"].str.lower().eq("meters"),
@@ -121,12 +119,12 @@ def _convert_linear_expr_to_constant(values: pd.Series, x_meters=151.0) -> pd.Se
 def _replace_linear_definitions_with_constants(
     values: pd.Series, value_types: pd.Series, new_type="meters"
 ) -> None:
-    is_linear = values.str.contains(r"\+", regex=True).fillna(False)
+    is_linear = values.str.contains(r"\+", regex=True, na=False)
     err_msg = "Assumption violation: expected all linear setbacks to be defined in terms of max tip height."
     assert value_types.loc[is_linear].eq("max tip height multiplier").all(), err_msg
     replacements = _convert_linear_expr_to_constant(values.loc[is_linear])
     values.update(replacements.astype(values.dtype))
-    value_types.loc[is_linear] = new_type
+    value_types.update(pd.Series(new_type, index=value_types.index[is_linear]))
     return
 
 
@@ -139,7 +137,7 @@ def _simplify_wind_ordinance_types(types: pd.Series) -> pd.Series:
     simple = simple.replace(
         {
             "tower density": "density",
-            "tower denisty": "density",
+            "tower denisty": "density",  # spellchecker:ignore
             "highway": "highways",
             "highway 111": "highways",
             "moratorium": "banned",
@@ -170,7 +168,7 @@ def _simplify_solar_ordinance_types(types: pd.Series) -> pd.Series:
             "sounds": "sound",
             "noise": "sound",
             "property lines": "property line",
-            "mimimum lot size": "minimum lot size",
+            "mimimum lot size": "minimum lot size",  # spellchecker:ignore
             "moratorium": "banned",
             "total installation": "total installation size",
             "property": "property line",
@@ -186,7 +184,7 @@ def _simplify_wind_units(units: pd.Series) -> pd.Series:
         {
             "meter": "meters",
             "turbine count": "turbines",
-            "rotor diameter mutliplier": "rotor diameter multiplier",
+            "rotor diameter mutliplier": "rotor diameter multiplier",  # spellchecker:ignore
             "max tip height": "max tip height multiplier",
             "rotor diameter": "rotor diameter multiplier",
             "rotor radius": "rotor radius multiplier",
@@ -307,10 +305,18 @@ def local_wind_transform(raw_local_wind: pd.DataFrame) -> pd.DataFrame:
     )
     wind["energy_type"] = "wind"
 
-    year_cols = ["year_enacted", "year_recorded", "updated_year_recorded"]
-    for col in ["value"] + year_cols:
-        wind.loc[:, col] = pd.to_numeric(wind.loc[:, col], downcast="float")
-    wind.loc[:, year_cols] = wind.loc[:, year_cols].astype(pd.Int16Dtype())
+    wind = wind.assign(
+        value=pd.to_numeric(wind["value"], downcast="float"),
+        year_enacted=pd.to_numeric(wind["year_enacted"], downcast="float").astype(
+            pd.Int16Dtype()
+        ),
+        year_recorded=pd.to_numeric(wind["year_recorded"], downcast="float").astype(
+            pd.Int16Dtype()
+        ),
+        updated_year_recorded=pd.to_numeric(
+            wind["updated_year_recorded"], downcast="float"
+        ).astype(pd.Int16Dtype()),
+    )
 
     wind["combined_locality"] = (
         wind["raw_county_name"].add(" County").fillna(wind["raw_town_name"])
@@ -357,10 +363,18 @@ def local_solar_transform(raw_local_solar: pd.DataFrame) -> pd.DataFrame:
     _replace_multivalued_with_worst_case(solar.loc[:, "value"], solar.loc[:, "units"])
     solar["energy_type"] = "solar"
 
-    year_cols = ["year_enacted", "year_recorded", "updated_year_recorded"]
-    for col in ["value"] + year_cols:
-        solar.loc[:, col] = pd.to_numeric(solar.loc[:, col], downcast="float")
-    solar.loc[:, year_cols] = solar.loc[:, year_cols].astype(pd.Int16Dtype())
+    solar = solar.assign(
+        value=pd.to_numeric(solar["value"], downcast="float"),
+        year_enacted=pd.to_numeric(solar["year_enacted"], downcast="float").astype(
+            pd.Int16Dtype()
+        ),
+        year_recorded=pd.to_numeric(solar["year_recorded"], downcast="float").astype(
+            pd.Int16Dtype()
+        ),
+        updated_year_recorded=pd.to_numeric(
+            solar["updated_year_recorded"], downcast="float"
+        ).astype(pd.Int16Dtype()),
+    )
 
     solar["combined_locality"] = (
         solar["raw_county_name"].add(" County").fillna(solar["raw_town_name"])
@@ -385,12 +399,12 @@ def _convert_sound_to_distance(
     # I used derivatives in a newton method but it kept finding the negative roots, which I don't want.
     # def objective_func_derivative(r):
     #     return -20 / (r * np.log(10))- attenuation_dbm
-    # def objective_func_2nd_derivative(r):
+    # def objective_func_second_derivative(r):
     #     return 20 / np.log(10) * np.power(r, -2)
     distance = root_scalar(
         objective_func,
         # fprime=objective_func_derivative,
-        # fprime2=objective_func_2nd_derivative,
+        # fprime2=objective_func_second_derivative,
         bracket=(0.1, 1e5),  # look for positive valued root
         x0=570,  # near 40dB solution
         xtol=0.01,  # don't need great accuracy
@@ -533,7 +547,7 @@ def transform(nrel_raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         nrel_raw_dfs (Dict[str, pd.DataFrame]): raw NREL data
 
     Returns:
-        Dict[str, pd.DataFrame]: transfomed NREL data for the warehouse
+        Dict[str, pd.DataFrame]: transformed NREL data for the warehouse
 
     """
     local_wind = local_wind_transform(nrel_raw_dfs["nrel_local_wind_ordinances"])

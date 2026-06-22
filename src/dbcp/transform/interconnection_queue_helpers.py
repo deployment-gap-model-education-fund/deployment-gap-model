@@ -23,7 +23,7 @@ def add_actionable_and_nearly_certain_classification(
         .isin(
             {
                 "Facilities Study",
-                "Feasability Study",
+                "Feasability Study",  # spellchecker:ignore
             }
         )
         .any()
@@ -41,6 +41,7 @@ def add_actionable_and_nearly_certain_classification(
         "IA Executed",
         "Operational",
     }
+    queue = queue.copy()
     queue["is_actionable"] = (
         queue[status_col].isin(actionable_ia_statuses).fillna(False)
     )
@@ -216,17 +217,18 @@ def normalize_point_of_interconnection(ser: pd.Series) -> pd.Series:
         index=out.index,
         dtype="string",
     ).str.strip()
-    out.replace("", pd.NA, inplace=True)
+    out = out.replace("", pd.NA)
     return out
 
 
-def parse_date_columns(queue: pd.DataFrame) -> None:
+def parse_date_columns(queue: pd.DataFrame) -> pd.DataFrame:
     """Identify date columns and parse them to pd.Timestamp.
 
     Original (unparsed) date columns are preserved but with the suffix '_raw'.
 
     Args:
-        queue (pd.DataFrame): an LBNL ISO queue dataframe
+        queue: an LBNL ISO queue dataframe
+
     """
     date_cols = [
         col
@@ -240,9 +242,9 @@ def parse_date_columns(queue: pd.DataFrame) -> None:
 
     # add _raw suffix
     rename_dict: dict[str, str] = dict(
-        zip(date_cols, [col + "_raw" for col in date_cols])
+        zip(date_cols, [col + "_raw" for col in date_cols], strict=True)
     )
-    queue.rename(columns=rename_dict, inplace=True)
+    queue = queue.rename(columns=rename_dict)
 
     for date_col, raw_col in rename_dict.items():
         if pd.api.types.is_object_dtype(queue.loc[:, raw_col]):
@@ -253,4 +255,4 @@ def parse_date_columns(queue: pd.DataFrame) -> None:
         bad = new_dates.dt.year.isin({1899, 1900})
         new_dates.loc[bad] = pd.NaT
         queue.loc[:, date_col] = new_dates
-    return
+    return queue

@@ -116,7 +116,7 @@ def _create_association_table(
 
     """
     # drop rows with empty arrays
-    df = df[df[array_col].notnull()]
+    df = df.loc[df[array_col].notnull()].copy()
 
     df[array_col] = df[array_col].str.split(",")
     exploded = df.explode(array_col)

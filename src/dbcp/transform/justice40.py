@@ -15,6 +15,7 @@ def transform(raw_j40: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     Returns:
         dict[str, pd.DataFrame]: transformed justice40 data
+
     """
     rename_dict = {  # empty string names will be dropped
         "Census tract 2010 ID": "tract_id_fips",
@@ -154,8 +155,8 @@ def transform(raw_j40: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     out_df = raw_j40["justice40"].copy()
     out_df = out_df.convert_dtypes()
-    out_df.rename(columns=rename_dict, inplace=True)
-    out_df.drop(columns="", inplace=True)
+    out_df = out_df.rename(columns=rename_dict)
+    out_df = out_df.drop(columns="")
     out_df["tract_id_fips"] = _fips_int_to_string(out_df.loc[:, "tract_id_fips"])
 
     # Correct percentage errors and convert to fractions
@@ -163,10 +164,10 @@ def transform(raw_j40: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     for col in percent_cols:
         col_max = out_df[col].max()
         col_min = out_df[col].min()
-        if 0 <= col_max and 0 <= col_min:
+        if col_max >= 0 and col_min >= 0:
             if col_max <= 1:
                 continue
-            elif col_max <= 105:  # 105 to account for minor numerical errors
+            if col_max <= 105:  # 105 to account for minor numerical errors
                 out_df[col] /= 100
             elif col_max <= 10500:
                 # sometimes percents have been multiplied by 100 twice
@@ -177,7 +178,9 @@ def transform(raw_j40: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
             logger.info(f"{col} is not a percent")
 
     # tract_within_tribal_areas_percent has a couple of values that are over 100%
-    out_df["tract_within_tribal_areas_percent"].clip(upper=1, inplace=True)
+    out_df["tract_within_tribal_areas_percent"] = out_df[
+        "tract_within_tribal_areas_percent"
+    ].clip(upper=1)
     # Correct percentiles
     percentile_cols = list(
         filter(lambda col: col.endswith("_percentile"), list(out_df))

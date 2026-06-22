@@ -489,8 +489,8 @@ def _clean_resource_type(
 
     # The raw NYISO data does have labels for on and offshore wind.
     # Assume all wind projects in coastal counties are offshore.
-    # This isn't the msot robust solution but it looks like all active
-    # wind projets in these counties are infact offshore. I think this
+    # This isn't the most robust solution but it looks like all active
+    # wind projects in these counties are infact offshore. I think this
     # is a reasonable solution because these counties don't have a ton of
     # developable land for large wind projects.
     coastal_county_id_fips = {
@@ -552,7 +552,7 @@ def _create_project_status_classification_from_single_column(
     iso_df["is_nearly_certain"] = pd.NA
 
     is_active = iso_df["queue_status"].eq("Active")
-    active_projects = iso_df[is_active]
+    active_projects = iso_df.loc[is_active].copy()
 
     active_projects["is_actionable"] = (
         active_projects[status_col].isin(actionable_vals).fillna(False)
@@ -606,7 +606,7 @@ def _create_project_status_classification_from_multiple_columns(
     iso_df["is_nearly_certain"] = pd.NA
 
     is_active = iso_df["queue_status"].eq("Active")
-    active_projects = iso_df[is_active]
+    active_projects = iso_df.loc[is_active].copy()
 
     active_projects["is_nearly_certain"] = status_df.loc[:, "executed_ia"]
     active_projects["is_actionable"] = (
@@ -666,7 +666,7 @@ def _transform_miso(post_2017: pd.DataFrame, pre_2017: pd.DataFrame) -> pd.DataF
         f"Expected {expected_n_done_in_service_projects} MISO projects that are In Service but not Done but found {len(done_in_service_projects)}."
     )
 
-    # Mark "Done" projects as "Active" because they are not necesarily operational yet.
+    # Mark "Done" projects as "Active" because they are not necessarily operational yet.
     iso_df["queue_status"] = iso_df["queue_status"].map(
         {
             "Done": "Active",
@@ -704,12 +704,12 @@ def _transform_miso(post_2017: pd.DataFrame, pre_2017: pd.DataFrame) -> pd.DataF
     iso_df = iso_df.rename(columns={"proposed_completion_date": "negInService"})
     iso_df = iso_df.rename(columns={"inService": "proposed_completion_date"})
 
-    # There are about 30 projects that are duplciated because there is an
+    # There are about 30 projects that are duplicated because there is an
     # addition record where studyPhase == "Network Upgrade". I don't fully
     # understand why but it seems like a reasonable drop
     iso_df = iso_df.drop_duplicates(subset="queue_id")
 
-    # There is a project with junk information: project name and resource type are just random collections of words: "rabit fish horse"
+    # There is a project with junk information: project name and resource type are just random collections of words: "rabbit fish horse"
     ids_to_remove = ("AA1234",)
     iso_df = iso_df[~iso_df["queue_id"].isin(ids_to_remove)]
     return iso_df
@@ -746,7 +746,7 @@ def _transform_pjm(iso_df: pd.DataFrame) -> pd.DataFrame:
         "Retracted": "Withdrawn",
         "Suspended": "Suspended",
         "Deactivated": "Withdrawn",
-        "Partially in Service - Under Construction": "Operational",  # LBNL consideres partially in service projects operational
+        "Partially in Service - Under Construction": "Operational",  # LBNL considers partially in service projects operational
         "Under Construction": "Active",
         "Annulled": "Withdrawn",
         "Canceled": "Withdrawn",
@@ -947,9 +947,9 @@ def _transform_isone(iso_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _normalize_project_locations(iso_df: pd.DataFrame) -> pd.DataFrame:
-    """Create a dataframe of project loctions.
+    """Create a dataframe of project locations.
 
-    Some projects list multiple counties in the `county` field. This funciton
+    Some projects list multiple counties in the `county` field. This function
     explodes and geocodes the county names.
 
     Args:
@@ -1033,7 +1033,7 @@ def _normalize_project_capacity(iso_df: pd.DataFrame) -> pd.DataFrame:
     original_capacity = caiso[caiso_capacity_cols].sum().sum().round()
     normalized_capacity = caiso_capacity_df["capacity_mw"].sum().round()
     assert original_capacity == normalized_capacity, (
-        f"Total CAISO capacity not preserved after normaliztion\n\tOriginal: {original_capacity}\n\tNormalized: {normalized_capacity}."
+        f"Total CAISO capacity not preserved after normalization\n\tOriginal: {original_capacity}\n\tNormalized: {normalized_capacity}."
     )
 
     capacity_df = pd.concat(
@@ -1092,7 +1092,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         raw_dfs: raw dataframes for each ISO.
 
     Returns:
-        A dictionary of cleaned Grid Status data queus.
+        A dictionary of cleaned Grid Status data queues.
 
     """
     # create one dataframe

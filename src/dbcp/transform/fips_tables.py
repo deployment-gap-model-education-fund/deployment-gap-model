@@ -97,6 +97,9 @@ def county_fips(counties: pd.DataFrame, tribal_land: pd.DataFrame) -> pd.DataFra
     counties = counties.loc[:, rename_dict.keys()].rename(columns=rename_dict)  # type: ignore
 
     # convert units from m2 to km2
+    counties = counties.astype(
+        {"land_area_km2": "float64", "water_area_km2": "float64"}
+    )
     counties.loc[:, ["land_area_km2", "water_area_km2"]] /= 1e6
 
     for col in ["centroid_latitude", "centroid_longitude"]:

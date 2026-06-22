@@ -132,3 +132,11 @@ extend-select = ["NPY201"] # preview rule to easy migration to Numpy 2.0
 
 [dependency-groups]
 dev = ["pre-commit>=4.6.0"]
+
+[tool.typos.default]
+# Ignore spellchecking all lines with # spellchecker:ignore
+extend-ignore-re = ["(?Rm)^.*(#|//)\\s*spellchecker:ignore$"]
+
+[tool.typos.default.extend-words]
+# Add words that should be excepted from spell-checking
+ser = "ser"

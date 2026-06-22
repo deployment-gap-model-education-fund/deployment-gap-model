@@ -12,7 +12,7 @@ from dbcp.helpers import get_sql_engine
 def _subset_db_columns(
     columns: Sequence[str], table: str, engine: sa.engine.Engine
 ) -> pd.DataFrame:
-    query = f"SELECT {', '.join(columns)} FROM {table}"
+    query = f"SELECT {', '.join(columns)} FROM {table}"  # noqa: S608
     df = pd.read_sql(query, engine)
     return df
 
@@ -85,7 +85,7 @@ class CountyOpposition:
             "23",  # Maine (repealed)
             "36",  # New York (pro-renewables policy)
         )
-        query = f"SELECT {', '.join(cols)} FROM {table} WHERE state_id_fips NOT IN {states_to_exclude}"
+        query = f"SELECT {', '.join(cols)} FROM {table} WHERE state_id_fips NOT IN {states_to_exclude}"  # noqa: S608
         df = pd.read_sql(query, self._engine)
         return df
 
@@ -305,11 +305,11 @@ def _estimate_proposed_power_co2e(
         ~is_oil, other=oil_internal_combustion_mmbtu_per_mwh
     )
 
-    iso_projects["estimated_capacity_factor"] = gt_small_cap_factor
-    iso_projects.loc[:, "estimated_capacity_factor"].where(
+    iso_projects["estimated_capacity_factor"] = pd.Series(
+        gt_small_cap_factor, index=iso_projects.index
+    ).where(
         ~is_cc & iso_projects.loc[:, "capacity_mw"].le(gt_sub_split),
         other=gt_large_cap_factor,
-        inplace=True,
     )
     iso_projects.loc[:, "estimated_capacity_factor"] = iso_projects.loc[
         :, "estimated_capacity_factor"
@@ -340,7 +340,7 @@ def _estimate_proposed_power_co2e(
         "mod_resource",
         "estimated_capacity_factor",
     ]
-    iso_projects.drop(columns=intermediates, inplace=True)
+    iso_projects = iso_projects.drop(columns=intermediates)
     return
 
 

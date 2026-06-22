@@ -1,4 +1,5 @@
 """Transform EPA AVERT avoided emissions database."""
+
 import logging
 
 import numpy as np
@@ -67,6 +68,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
 
     Returns:
         Dict[str, pd.DataFrame]: output dictionary of dataframes
+
     """
     cap_factors = _capacity_factor_transform(raw_dfs["avert_capacity_factors"])
     emissions = _emissions_transform(raw_dfs["avert_emissions_factors"])
@@ -91,7 +93,7 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     crosswalk = _crosswalk_transform(raw_dfs["avert_county_region_assoc"])
     assert set(crosswalk["avert_region"].unique()).symmetric_difference(
         avert_regions
-    ) == set(["Alaska", "Hawaii"])
+    ) == {"Alaska", "Hawaii"}
     return {
         "avert_avoided_emissions_factors": avert_factors,
         "avert_county_region_assoc": crosswalk,
