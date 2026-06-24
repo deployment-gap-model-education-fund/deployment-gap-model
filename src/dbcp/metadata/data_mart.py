@@ -223,6 +223,8 @@ fyi__private__counties__active_clean_projects_capacity = Table(
         String,
         primary_key=True,
     ),
+    Column("state", String),
+    Column("county", String),
     Column("battery_storage_active_capacity_mw", Float),
     Column("onshore_wind_active_capacity_mw", Float),
     Column("offshore_wind_active_capacity_mw", Float),

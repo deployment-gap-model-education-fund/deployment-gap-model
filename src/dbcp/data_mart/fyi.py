@@ -93,7 +93,7 @@ def create_fyi_counties_active_clean_projects(
     fyi.loc[:, ["capacity_mw"]] = fyi.loc[:, ["capacity_mw"]].mul(
         fyi["frac_locations_in_county"], axis=0
     )
-    grp = fyi.groupby(["county_id_fips", "resource_clean"])
+    grp = fyi.groupby(["county_id_fips", "county", "state", "resource_clean"])
     aggs = grp.agg(
         {
             "capacity_mw": "sum",
@@ -137,10 +137,14 @@ def create_fyi_private_counties_active_clean_projects_capacity(
     # Create column with sum of all resources
     wide_df["total_active_clean_projects_capacity_mw"] = wide_df.sum(axis="columns")
 
-    # Reindex so all counties are included
-    wide_df = wide_df.reindex(
-        fyi_counties_active_clean_projects["county_id_fips"].unique()
-    )
+    # Outer merge to get state and county columns back and keep all counties
+    wide_df = wide_df.merge(
+        fyi_counties_active_clean_projects[
+            ["county_id_fips", "state", "county"]
+        ].drop_duplicates(),
+        on="county_id_fips",
+        how="outer",
+    ).set_index("county_id_fips")
     return wide_df
 
 
