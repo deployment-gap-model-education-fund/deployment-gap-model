@@ -225,6 +225,7 @@ fyi__private__counties__active_clean_projects_capacity = Table(
     ),
     Column("battery_storage_active_capacity_mw", Float),
     Column("onshore_wind_active_capacity_mw", Float),
+    Column("offshore_wind_active_capacity_mw", Float),
     Column("solar_active_capacity_mw", Float),
     Column("total_active_clean_projects_capacity_mw", Float),
     schema=schema,

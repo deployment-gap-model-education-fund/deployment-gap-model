@@ -120,6 +120,7 @@ def create_fyi_private_counties_active_clean_projects_capacity(
     resource_name_map = {
         "Solar": "solar_active_capacity_mw",
         "Onshore Wind": "onshore_wind_active_capacity_mw",
+        "Offshore Wind": "offshore_wind_active_capacity_mw",
         "Battery Storage": "battery_storage_active_capacity_mw",
     }
     tidy_df = fyi_counties_active_clean_projects[
