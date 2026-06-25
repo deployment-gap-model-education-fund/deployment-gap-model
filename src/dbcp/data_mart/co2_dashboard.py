@@ -118,10 +118,10 @@ def _co2_from_mwh(
         "coal_CC": 9.997,  # CC = my made up prime mover code!
         "coal_GT": 9.997,
         "coal_IC": 9.997,
-        "coal_OT": 9.997,
+        "coal_OT": 9.997,  # spellchecker:ignore
         "coal_ST": 9.997,
         "gas_ST": 10.368,
-        "gas_OT": 10.368,
+        "gas_OT": 10.368,  # spellchecker:ignore
         "gas_IC": 8.832,
         "gas_GT": 11.069,
         "gas_FC": 7.604,
@@ -172,7 +172,7 @@ def _get_plant_location_data() -> pd.DataFrame:
     return df[["plant_id_eia", "state", "county"]]
 
 
-def _transfrom_plant_location_data(
+def _transform_plant_location_data(
     plant_locations: pd.DataFrame, state_table: pd.DataFrame, county_table: pd.DataFrame
 ) -> pd.DataFrame:
     bedford_addfips_fix(plant_locations)
@@ -214,7 +214,7 @@ def _get_existing_fossil_plants(
     states = _get_state_fips_df(postgres_engine)
     counties = _get_county_fips_df(postgres_engine)
     plant_locations = _get_plant_location_data()
-    plant_locations = _transfrom_plant_location_data(
+    plant_locations = _transform_plant_location_data(
         plant_locations, state_table=states, county_table=counties
     )
 
