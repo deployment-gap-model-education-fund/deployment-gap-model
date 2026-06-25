@@ -1157,119 +1157,6 @@ nrel_local_ordinances = Table(
 )
 
 
-##########################
-# Offshore Wind Projects #
-##########################
-
-
-airtable__offshore_wind_projects = Table(
-    "airtable__offshore_wind_projects",
-    metadata,
-    Column("project_id", Integer, primary_key=True),
-    Column("name", String),
-    Column("lease_areas", String),
-    Column("developer", String),
-    Column("capacity_mw", Integer),
-    Column("proposed_completion_year", Integer),
-    Column("state_power_offtake_agreement_status", String),
-    Column("overall_project_status", String),
-    Column("grid_interconnection", String),
-    Column("contracting_status", String),
-    Column("permitting_status", String),
-    Column("construction_status", String),
-    Column("queue_status", String),
-    Column("federal_source", String),
-    Column("ppa_awarded", String),
-    Column("orec_awarded", String),
-    Column("offtake_agreement_terminated", String),
-    Column("bid_submitted", String),
-    Column("selected_for_negotiations", String),
-    Column("state_contract_held_to_date", String),
-    Column("state_permitting_docs", String),
-    Column("state_source", String),
-    Column("new", String),
-    Column("website", String),
-    Column("is_actionable", Boolean, nullable=True),
-    Column("is_nearly_certain", Boolean, nullable=True),
-    schema=schema,
-)
-airtable__offshore_wind_locations = Table(
-    "airtable__offshore_wind_locations",
-    metadata,
-    Column("location_id", Integer, primary_key=True),
-    Column("raw_city", String),
-    Column("raw_state_abbrev", String),
-    Column("raw_county", String),
-    Column("raw_county_fips", String),
-    Column("why_of_interest", String),
-    Column("priority", String),
-    Column("cable_landing_permitting", String),
-    Column("notes", String),
-    Column("source", String),
-    Column(
-        "county_id_fips",
-        String,
-        ForeignKey("data_warehouse.census__county_fips.county_id_fips"),
-        nullable=True,
-    ),
-    Column("geocoded_locality_name", String),
-    Column("geocoded_locality_type", String),
-    Column("geocoded_containing_county", String),
-    schema=schema,
-)
-airtable__association__offshore_wind_cable_landing = Table(
-    "airtable__association__offshore_wind_cable_landing",
-    metadata,
-    Column(
-        "location_id",
-        Integer,
-        ForeignKey("data_warehouse.airtable__offshore_wind_locations.location_id"),
-        primary_key=True,
-    ),
-    Column(
-        "project_id",
-        Integer,
-        ForeignKey("data_warehouse.airtable__offshore_wind_projects.project_id"),
-        primary_key=True,
-    ),
-    schema=schema,
-)
-airtable__offshore_wind_port_association = Table(
-    "airtable__offshore_wind_port_association",
-    metadata,
-    Column(
-        "location_id",
-        Integer,
-        ForeignKey("data_warehouse.airtable__offshore_wind_locations.location_id"),
-        primary_key=True,
-    ),
-    Column(
-        "project_id",
-        Integer,
-        ForeignKey("data_warehouse.airtable__offshore_wind_projects.project_id"),
-        primary_key=True,
-    ),
-    schema=schema,
-)
-airtable__offshore_wind_staging_association = Table(
-    "airtable__offshore_wind_staging_association",
-    metadata,
-    Column(
-        "location_id",
-        Integer,
-        ForeignKey("data_warehouse.airtable__offshore_wind_locations.location_id"),
-        primary_key=True,
-    ),
-    Column(
-        "project_id",
-        Integer,
-        ForeignKey("data_warehouse.airtable__offshore_wind_projects.project_id"),
-        primary_key=True,
-    ),
-    schema=schema,
-)
-
-
 #################
 # Federal Lands #
 #################
@@ -1491,18 +1378,6 @@ gridstatus_locations = Table(
     Column("geocoded_locality_name", String),
     Column("geocoded_locality_type", String),
     Column("geocoded_containing_county", String),
-    schema=schema,
-)
-
-#####################
-# MANUAL ORDINANCES #
-#####################
-
-airtable__manual_ordinances = Table(
-    "airtable__manual_ordinances",
-    metadata,
-    Column("county_id_fips", String, nullable=False, primary_key=True),
-    Column("ordinance_via_self_maintained", Boolean),
     schema=schema,
 )
 

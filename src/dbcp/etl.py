@@ -9,7 +9,6 @@ import pyarrow.parquet as pq
 import sqlalchemy as sa
 
 import dbcp
-from dbcp.archivers.utils import ExtractionSettings
 from dbcp.constants import DATA_DIR, OUTPUT_DIR
 from dbcp.extract.ballot_ready import BR_URI
 from dbcp.extract.civis import extract as extract_civis
@@ -126,26 +125,6 @@ def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
     )
 
     return nrel_transformed_dfs
-
-
-def etl_offshore_wind() -> dict[str, pd.DataFrame]:
-    """ETL manually curated offshore wind data."""
-    # get the latest version of the offshore wind data from the candidate yaml file
-    projects_uri = "airtable/Offshore Wind Locations DBCP Version/Projects.json"
-    locations_uri = "airtable/Offshore Wind Locations DBCP Version/Locations.json"
-
-    es = ExtractionSettings.from_yaml("/app/dbcp/settings.yaml")
-    es.update_archive_generation_numbers()
-
-    projects_uri = es.get_full_archive_uri(projects_uri)
-    locations_uri = es.get_full_archive_uri(locations_uri)
-
-    raw_offshore_dfs = dbcp.extract.offshore_wind.extract(
-        locations_uri=locations_uri, projects_uri=projects_uri
-    )
-    offshore_transformed_dfs = dbcp.transform.offshore_wind.transform(raw_offshore_dfs)
-
-    return offshore_transformed_dfs
 
 
 def etl_protected_area_by_county() -> dict[str, pd.DataFrame]:
@@ -271,7 +250,6 @@ def run_etl(funcs: dict[str, Callable], schema_name: SchemaName):
 def create_data_warehouse():
     """Create data warehouse tables by ETL-ing each data source."""
     etl_funcs = {
-        "offshore_wind": etl_offshore_wind,
         # "gridstatus": etl_gridstatus_isoqueues,
         "manual_ordinances": etl_manual_ordinances,
         # "epa_avert": etl_epa_avert,
