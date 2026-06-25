@@ -18,7 +18,6 @@ import dbcp.extract.helpers  # noqa: F401
 import dbcp.extract.justice40  # noqa: F401
 import dbcp.extract.lbnl_iso_queue  # noqa: F401
 import dbcp.extract.local_opposition  # noqa: F401
-import dbcp.extract.manual_ordinances  # noqa: F401
 import dbcp.extract.ncsl_state_permitting  # noqa: F401
 import dbcp.extract.nrel_wind_solar_ordinances  # noqa: F401
 import dbcp.extract.protected_area_by_county  # noqa: F401
@@ -38,7 +37,6 @@ import dbcp.transform.gridstatus  # noqa: F401
 import dbcp.transform.justice40  # noqa: F401
 import dbcp.transform.lbnl_iso_queue  # noqa: F401
 import dbcp.transform.local_opposition  # noqa: F401
-import dbcp.transform.manual_ordinances  # noqa: F401
 import dbcp.transform.ncsl_state_permitting  # noqa: F401
 import dbcp.transform.nrel_wind_solar_ordinances  # noqa: F401
 import dbcp.transform.protected_area_by_county  # noqa: F401

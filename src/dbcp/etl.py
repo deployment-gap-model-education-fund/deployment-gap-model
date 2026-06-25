@@ -180,13 +180,6 @@ def etl_gridstatus_isoqueues():
     return transformed
 
 
-def etl_manual_ordinances() -> dict[str, pd.DataFrame]:
-    """ETL manually maintained ordinances."""
-    raw_dfs = dbcp.extract.manual_ordinances.extract()
-    transformed = dbcp.transform.manual_ordinances.transform(raw_dfs)
-    return transformed
-
-
 def etl_acp_projects() -> dict[str, pd.DataFrame]:
     """ETL ACP projects."""
     raw_dfs = dbcp.extract.acp_projects.extract()
@@ -251,7 +244,6 @@ def create_data_warehouse():
     """Create data warehouse tables by ETL-ing each data source."""
     etl_funcs = {
         # "gridstatus": etl_gridstatus_isoqueues,
-        "manual_ordinances": etl_manual_ordinances,
         # "epa_avert": etl_epa_avert,
         # "eip_infrastructure": etl_eip_infrastructure,
         "columbia_local_opp": etl_columbia_local_opp,
