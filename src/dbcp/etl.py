@@ -243,19 +243,10 @@ def run_etl(funcs: dict[str, Callable], schema_name: SchemaName):
 def create_data_warehouse():
     """Create data warehouse tables by ETL-ing each data source."""
     etl_funcs = {
-        # "gridstatus": etl_gridstatus_isoqueues,
-        # "epa_avert": etl_epa_avert,
-        # "eip_infrastructure": etl_eip_infrastructure,
         "columbia_local_opp": etl_columbia_local_opp,
-        # "energy_communities_by_county": etl_energy_communities_by_county,
         "fips_tables": etl_fips_tables,
-        # "protected_area_by_county": etl_protected_area_by_county,
-        # "justice40_tracts": etl_justice40,
-        # "nrel_wind_solar_ordinances": etl_nrel_ordinances,
-        # "lbnl_iso_queue": etl_lbnl_iso_queue,
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
-        # "ballot_ready": etl_ballot_ready,
         "acp_projects": etl_acp_projects,
         "fyi_queue": etl_fyi_queue,
         "civis_election_data": etl_civis,
