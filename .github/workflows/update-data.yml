@@ -169,23 +169,20 @@ jobs:
         run: |
           make test
 
+      # Set necessary environment variables for publish step
+      - name: Set publish environment variables
+        run: |
+          {
+            echo "BUILD_REF=${{ matrix.ref }}";
+            echo "CODE_GIT_SHA=${{ steps.checkout.outputs.commit }}";
+            echo "GITHUB_ACTION_RUN_ID=${{ github.run_id }}";
+            echo "TARGET=${{ matrix.target }}";
+          } >> "$GITHUB_ENV"
+
       # Publish the outputs, grab the git SHA of the commit step
       - name: Publish outputs
         run: |
-          # Run the publish-outputs command inside the Docker container
-          # Pass:
-          # - upload-to-postgres to upload tables to production postgres, disabled temporarily
-          # - build-ref (the git ref, e.g. a tag or branch) for versioning
-          # - code-git-sha (commit hash of the code used for build)
-          # - github-action-run-id (for tracking the GitHub Action run)
-          # - target (indicates if this is 'dev' or 'prod' environment target)
-          docker compose run --rm app uv run python -m dbcp.cli publish-outputs \
-            -bq \
-            --upload-to-postgres \
-            --build-ref ${{ matrix.ref }} \
-            --code-git-sha ${{ steps.checkout.outputs.commit }} \
-            --github-action-run-id ${{ github.run_id }} \
-            --target ${{ matrix.target }}
+          make publish
 
       - name: Stop Docker Compose services
         if: always()
