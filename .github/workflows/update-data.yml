@@ -181,7 +181,6 @@ jobs:
             --upload-to-postgres \
             --build-ref ${{ matrix.ref }} \
             --code-git-sha ${{ steps.checkout.outputs.commit }} \
-            --settings-file-git-sha $SETTINGS_FILE_SHA \
             --github-action-run-id ${{ github.run_id }} \
             --target ${{ matrix.target }}
 
