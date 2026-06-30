@@ -168,7 +168,6 @@ class OutputMetadata(BaseModel):
         git_ref: The git reference used to build the outputs.
         target: The target for publishing the outputs (dev or prod).
         code_git_sha: The git sha of the code used to build the outputs.
-        settings_file_git_sha: The git sha of the settings file used to build the outputs.
         github_action_run_id: The run id of the github action that built the outputs.
 
     """
@@ -177,7 +176,6 @@ class OutputMetadata(BaseModel):
     git_ref: str | None = None
     target: str | None = None
     code_git_sha: str | None = None
-    settings_file_git_sha: str | None = None
     github_action_run_id: str | None = None
     date_created: datetime = datetime.now()
 
@@ -215,9 +213,6 @@ class OutputMetadata(BaseModel):
         settings_dict = self.dict()
         repo_base_url = "https://github.com/deployment-gap-model-education-fund/deployment-gap-model"
         settings_dict["code_git_sha_url"] = f"{repo_base_url}/tree/{self.git_ref}"
-        settings_dict["settings_file_git_sha_url"] = (
-            f"{repo_base_url}/blob/{self.settings_file_git_sha}/src/dbcp/settings.yaml"
-        )
         settings_dict["github_action_run_url"] = (
             f"{repo_base_url}/actions/runs/{self.github_action_run_id}"
         )
@@ -240,13 +235,6 @@ class OutputMetadata(BaseModel):
     "--code-git-sha",
     default=None,
     help="The git sha of the code used to build the outputs",
-)
-@click.option(
-    "--settings-file-git-sha",
-    default=None,
-    help="The git sha of the settings file used to build the outputs. This is different than the"
-    "code git sha because the updated settings file used in the ETL is commited once the ETL"
-    "and tests have passed.",
 )
 @click.option(
     "--github-action-run-id",
@@ -278,7 +266,6 @@ def publish_outputs(
     target: str,
     code_git_sha: str,
     github_action_run_id: str,
-    settings_file_git_sha: str,
     schemas: list[str],
     upload_to_big_query: bool,
     upload_to_postgres: bool,
@@ -291,7 +278,6 @@ def publish_outputs(
         git_ref=build_ref,
         target=target,
         code_git_sha=code_git_sha,
-        settings_file_git_sha=settings_file_git_sha,
         github_action_run_id=github_action_run_id,
     )
 
