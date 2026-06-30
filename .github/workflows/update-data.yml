@@ -152,6 +152,9 @@ jobs:
       - name: Give the dbcp user ownership of the workspace
         run: sudo chown -R 1000:1000 $GITHUB_WORKSPACE
 
+      - name: Build image
+        run: docker compose build --no-cache app
+
       - name: Build and run Docker Compose services
         run: |
           docker compose up -d
