@@ -22,6 +22,13 @@ from dbcp.validation.tests import validate_warehouse
 
 logger = logging.getLogger(__name__)
 
+def etl_file_modification_dates() -> dict[str, pd.DataFrame]:
+    """Return a DF with last modified dates for all raw data inputs."""
+    with open ('extract/file_paths.yml') as file:
+        file_paths = yaml.safe_load(file)
+    #for file in file_paths:
+    # TODO: Actually process all this data and return a cleaned up table with timestamps
+    #return
 
 def etl_eip_infrastructure() -> dict[str, pd.DataFrame]:
     """EIP Infrastructure ETL."""

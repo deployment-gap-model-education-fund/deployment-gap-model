@@ -44,6 +44,7 @@ def cache_gcs_archive_bucket_contents_locally(
 
     Returns:
         Path to the local cache of the file.
+        Max creation time of files in bucket.
 
     """
     archive_bucket_name = "dgm-archive"
@@ -52,13 +53,17 @@ def cache_gcs_archive_bucket_contents_locally(
     storage_client = storage.Client()
     blobs = storage_client.list_blobs(archive_bucket_name)
     paths = []
+    time_created = None
     for blob in blobs:
         if blob.name != gcs_dir_name and blob.name.startswith(gcs_dir_name):
             uri = f"gs://{archive_bucket_name}/{blob.name}"
             paths.append(
                 cache_gcs_archive_file_locally(uri, local_cache_dir, generation_num)
             )
-    return paths
+            # Also return time last updated
+            if time_created is None or blob.time_created > time_created:
+                time_created = blob.time_created
+    return paths, time_created
 
 
 def cache_gcs_archive_file_locally(
@@ -77,6 +82,7 @@ def cache_gcs_archive_file_locally(
 
     Returns:
         Path to the local cache of the file.
+        Time remote file created.
 
     """
     bucket_url, object_name = re.match("gs://(.*?)/(.*)", str(uri)).groups()
@@ -103,4 +109,56 @@ def cache_gcs_archive_file_locally(
         filepath.parent.mkdir(parents=True, exist_ok=True)
         with Path(filepath).open("wb+") as f:
             f.write(blob.download_as_bytes())
-    return filepath
+    return filepath, blob.time_created
+
+def get_last_modified_time_from_path(filepath: str):
+    """Get a datetime noting the last date of file modification from a file path.
+
+    Args:
+        filepath: the path to a local file or a file in a GCS bucket.
+    
+    Returns:
+        A datetime.
+    """
+    time = None
+    # Get time for GCS files
+    if filepath.startswith("gs://"):
+        storage_client = storage.Client()
+        bucket = storage_client.bucket("dgm-archive")
+        if filepath.endswith("/"): # If path is a folder:
+            for blob in storage_client.list_blobs(bucket, prefix=filepath.split('dgm-archive/')[-1]):
+                if time is None or blob.updated > time:
+                    time = blob.updated
+        else: # Else if path is a regular file
+            blob = bucket.get_blob(filepath.split('dgm-archive/')[-1]) # Everything after the bucket is the path
+            time = blob.updated
+    # Get time for S3 files
+    elif filepath.startswith("s3://"):
+        fs = fsspec.filesystem("s3", anon=True)
+        files = fs.find(filepath.split("s3://")[-1], detail=True)
+        time = max(info.get("LastModified") for info in files.values())
+    # Get time for Airtable files
+    elif filepath.startswith('airtable/')
+        with Path(path).open() as f:
+            data = json.load(f)
+        time = data["fields"]["Last Modified"]
+    # Get time for local files
+    # We do this by getting the time that the file was last committed to on Github to avoid
+    # confusing local pull activity with actual file changes.
+    else:
+        result = subprocess.run(
+            [
+                "git",
+                "log",
+                "-1",
+                "--format=%cI",
+                "--",
+                filepath,
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        
+        time = datetime.datetime.fromisoformat(result.stdout.strip())
+    return time
