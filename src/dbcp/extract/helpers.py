@@ -46,7 +46,6 @@ def cache_gcs_archive_bucket_contents_locally(
 
     Returns:
         Path to the local cache of the file.
-        Max creation time of files in bucket.
 
     """
     archive_bucket_name = "dgm-archive"
@@ -80,7 +79,6 @@ def cache_gcs_archive_file_locally(
 
     Returns:
         Path to the local cache of the file.
-        Time remote file created.
 
     """
     bucket_url, object_name = re.match("gs://(.*?)/(.*)", str(uri)).groups()
@@ -107,7 +105,7 @@ def cache_gcs_archive_file_locally(
         filepath.parent.mkdir(parents=True, exist_ok=True)
         with Path(filepath).open("wb+") as f:
             f.write(blob.download_as_bytes())
-    return filepath, blob.time_created
+    return filepath
 
 def get_last_modified_time_from_path(filepath: str):
     """Get a datetime noting the last date of file modification from a file path.
