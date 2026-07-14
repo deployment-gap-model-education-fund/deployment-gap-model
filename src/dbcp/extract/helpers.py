@@ -130,10 +130,11 @@ def get_last_modified_time_from_path(filepath: str):
         else: # Else if path is a regular file
             blob = bucket.get_blob(filepath.split('dgm-archive/')[-1]) # Everything after the bucket is the path
             time = blob.updated
-    # Get time for S3 files
+    # Get time for S3 files (PUDL DB)
     elif filepath.startswith("s3://"):
         fs = fsspec.filesystem("s3", anon=True)
-        files = fs.find(filepath.split("s3://")[-1], detail=True)
+        filepath = filepath.split("s3://")[-1] + os.getenv("PUDL_VERSION") + "/" # Add in env variable to PUDL S3 path
+        files = fs.find(filepath, detail=True)
         time = max(info.get("LastModified") for info in files.values())
     elif filepath.startswith('raw/'):
     # Get time for local files
