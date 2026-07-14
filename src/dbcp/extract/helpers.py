@@ -9,6 +9,8 @@ import google.auth
 import pandas as pd
 from google.cloud import storage
 
+from dbcp.constants import DATA_DIR
+
 logger = logging.getLogger(__name__)
 
 
@@ -53,17 +55,13 @@ def cache_gcs_archive_bucket_contents_locally(
     storage_client = storage.Client()
     blobs = storage_client.list_blobs(archive_bucket_name)
     paths = []
-    time_created = None
     for blob in blobs:
         if blob.name != gcs_dir_name and blob.name.startswith(gcs_dir_name):
             uri = f"gs://{archive_bucket_name}/{blob.name}"
             paths.append(
                 cache_gcs_archive_file_locally(uri, local_cache_dir, generation_num)
             )
-            # Also return time last updated
-            if time_created is None or blob.time_created > time_created:
-                time_created = blob.time_created
-    return paths, time_created
+    return paths
 
 
 def cache_gcs_archive_file_locally(
@@ -137,15 +135,11 @@ def get_last_modified_time_from_path(filepath: str):
         fs = fsspec.filesystem("s3", anon=True)
         files = fs.find(filepath.split("s3://")[-1], detail=True)
         time = max(info.get("LastModified") for info in files.values())
-    # Get time for Airtable files
-    elif filepath.startswith('airtable/')
-        with Path(path).open() as f:
-            data = json.load(f)
-        time = data["fields"]["Last Modified"]
+    elif filepath.startswith('raw/'):
     # Get time for local files
     # We do this by getting the time that the file was last committed to on Github to avoid
     # confusing local pull activity with actual file changes.
-    else:
+        filepath = DATA_DIR / filepath
         result = subprocess.run(
             [
                 "git",
@@ -161,4 +155,6 @@ def get_last_modified_time_from_path(filepath: str):
         )
         
         time = datetime.datetime.fromisoformat(result.stdout.strip())
+    else:
+        raise ValueError(f"File path {filepath} not currently configured for date extraction.")
     return time

@@ -11,13 +11,13 @@ fyi_queue: "gs://dgm-archive/interconnection.fyi/interconnection_fyi_dataset_202
 # lbnl_iso_queue: gs://dgm-archive/lbnl_iso_queue/queues_2024_clean_data.xlsx
 ljedf_civis_demographics: "gs://dgm-archive/ljedf/civis_demographics.csv"
 ljedf_president_results_2024: "gs://dgm-archive/ljedf/2024_president_results_county.csv"
-local_opposition: "${DATA_DIR}/raw/2023.05.30 Opposition to Renewable Energy Facilities - FINAL.docx"
+local_opposition: "raw/2023.05.30 Opposition to Renewable Energy Facilities - FINAL.docx"
 # manual_ordinances: # BIG QUERY
-ncsl_state_permitting: "${DATA_DIR}/raw/ncsl_state_permitting_wind.csv"
+ncsl_state_permitting: "raw/ncsl_state_permitting_wind.csv"
 # nrel_wind_ordinances: raw/NREL_Wind_Ordinances.xlsx
 # nrel_solar_ordinances: raw/NREL_Solar_Ordinances.xlsx
-offshore_wind_projects: "airtable/Offshore Wind Locations DBCP Version/Projects.json"
-offshore_wind_locations: "airtable/Offshore Wind Locations DBCP Version/Locations.json"
+# offshore_wind_projects: "airtable/Offshore Wind Locations DBCP Version/Projects.json"
+# offshore_wind_locations: "airtable/Offshore Wind Locations DBCP Version/Locations.json"
 # protected_areas_by_county: raw/padus_intersect_counties.parquet
 pudl_data: "s3://pudl.catalyst.coop/${PUDL_VERSION}/"
 # rmi_energy_communities: raw/rmi_energy_communities_counties.parquet
