@@ -2,7 +2,6 @@
 
 import logging
 from collections.abc import Callable
-from functools import lru_cache
 
 import pandas as pd
 import pyarrow as pa
@@ -24,11 +23,11 @@ from dbcp.validation.tests import validate_warehouse
 
 logger = logging.getLogger(__name__)
 
-@lru_cache
 def etl_file_modification_dates() -> dict[str, pd.DataFrame]:
     """Return a DF with last modified dates for all raw data inputs."""
     file_paths = load_yml_file(DATA_DIR / 'file_paths.yml')
-    #for file in file_paths:
+    breakpoint()
+    return 
     # TODO: Actually process all this data and return a cleaned up table with timestamps
     #return
 
@@ -252,6 +251,7 @@ def run_etl(funcs: dict[str, Callable], schema_name: SchemaName):
 def create_data_warehouse():
     """Create data warehouse tables by ETL-ing each data source."""
     etl_funcs = {
+        "last_modified": etl_file_modification_dates,
         "columbia_local_opp": etl_columbia_local_opp,
         "fips_tables": etl_fips_tables,
         "pudl": etl_pudl_tables,

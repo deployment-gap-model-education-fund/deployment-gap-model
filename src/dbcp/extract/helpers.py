@@ -4,6 +4,7 @@ import json
 import logging
 import re
 from pathlib import Path
+from functools import lru_cache
 
 import google.auth
 import pandas as pd
