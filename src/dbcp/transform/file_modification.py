@@ -2,10 +2,44 @@
 
 import datetime
 import os
+import urllib
+from pathlib import Path
 
 import fsspec
 import pandas as pd
+import requests
 from google.cloud import storage
+
+
+def _parse_iso_z(dt_str: str) -> datetime.datetime:
+    """Parse an ISO 8601 timestamp.
+
+    Parse the timestamp returned by GitHub (e.g., "2021-01-01T12:00:00Z" or with offset)
+    and return a timezone-aware datetime.
+    """
+    if dt_str.endswith("Z"):
+        dt_str = dt_str[:-1] + "+00:00"
+    return datetime.datetime.fromisoformat(dt_str)
+
+
+def _github_latest_commit_date(repo_rel_path: str) -> datetime.datetime:
+    """Query GitHub REST API to get the latest commit touching repo_rel_path.
+
+    Returns a timezone-aware datetime.
+    """
+    quoted_path = urllib.parse.quote(repo_rel_path, safe="")
+    url = f"https://api.github.com/repos/deployment-gap-model-education-fund/deployment-gap-model/commits?path={quoted_path}&per_page=1"
+    headers = {
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "get-last-mod-time/1.0",
+    }
+
+    resp = requests.get(url, headers=headers, timeout=200)
+    commits = resp.json()
+    commit = commits[0]
+    # Prefer committer date since it reflects repository commit time
+    date_str = commit["commit"]["committer"]["date"]
+    return _parse_iso_z(date_str)
 
 
 def get_last_modified_time_from_path(filepath: str):
@@ -42,29 +76,13 @@ def get_last_modified_time_from_path(filepath: str):
         )  # Add in env variable to PUDL S3 path
         files = fs.find(filepath, detail=True)
         time = max(info.get("LastModified") for info in files.values())
-    elif filepath.startswith("raw/"):
-        # Get time for local files
-        # We do this by getting the time that the file was last committed to on Github to avoid
-        # confusing local pull activity with actual file changes.
-        # TODO: FIX ME! Figure out correct filepath.
-        time = datetime.datetime.now(datetime.UTC)  # Placeholder
-        # filepath = DATA_DIR / filepath
-        # breakpoint()
-        # result = subprocess.run(
-        #     [
-        #         "git",
-        #         "log",
-        #         "-1",
-        #         "--format=%cI",
-        #         "--",
-        #         str(filepath),
-        #     ],
-        #     capture_output=True,
-        #     text=True,
-        #     check=True,
-        # )
-
-        # time = datetime.datetime.fromisoformat(result.stdout.strip())
+    elif filepath.startswith("data/raw/"):
+        # Convert to a repo-relative POSIX string with no leading slash
+        repo_rel_path = Path(filepath).as_posix().lstrip("/")
+        # Query GitHub API for the most recent commit touching this path
+        # We do this because the Docker build does not have the .git project
+        # embedded within it, meaning that running git log is not an option.
+        time = _github_latest_commit_date(repo_rel_path)
     else:
         raise ValueError(
             f"File path {filepath} not currently configured for date extraction."
