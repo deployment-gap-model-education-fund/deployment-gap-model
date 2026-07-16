@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Callable
+from functools import lru_cache
 
 import pandas as pd
 import pyarrow as pa
@@ -14,6 +15,7 @@ from dbcp.extract.ballot_ready import BR_URI
 from dbcp.extract.civis import extract as extract_civis
 from dbcp.extract.fips_tables import CENSUS_URI, TRIBAL_LANDS_URI
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
+from dbcp.extract.helpers import load_yml_file, get_last_modified_time_from_path
 from dbcp.helpers import write_to_postgres
 from dbcp.metadata import SchemaName
 from dbcp.transform.fips_tables import SPATIAL_CACHE
@@ -22,10 +24,10 @@ from dbcp.validation.tests import validate_warehouse
 
 logger = logging.getLogger(__name__)
 
+@lru_cache
 def etl_file_modification_dates() -> dict[str, pd.DataFrame]:
     """Return a DF with last modified dates for all raw data inputs."""
-    with open ('extract/file_paths.yml') as file:
-        file_paths = yaml.safe_load(file)
+    file_paths = load_yml_file(DATA_DIR / 'file_paths.yml')
     #for file in file_paths:
     # TODO: Actually process all this data and return a cleaned up table with timestamps
     #return

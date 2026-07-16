@@ -157,3 +157,10 @@ def get_last_modified_time_from_path(filepath: str):
     else:
         raise ValueError(f"File path {filepath} not currently configured for date extraction.")
     return time
+
+@lru_cache
+def load_yml_file(path) -> dict[str, pd.DataFrame]:
+    """Return a DF with last modified dates for all raw data inputs."""
+    with open (path) as file:
+        file_json = yaml.safe_load(file)
+    return pd.json_normalize(file_json)
