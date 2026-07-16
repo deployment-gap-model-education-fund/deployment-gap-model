@@ -3,14 +3,13 @@
 import json
 import logging
 import re
-from pathlib import Path
 from functools import lru_cache
+from pathlib import Path
 
 import google.auth
 import pandas as pd
+import yaml
 from google.cloud import storage
-
-from dbcp.constants import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -108,60 +107,10 @@ def cache_gcs_archive_file_locally(
             f.write(blob.download_as_bytes())
     return filepath
 
-def get_last_modified_time_from_path(filepath: str):
-    """Get a datetime noting the last date of file modification from a file path.
-
-    Args:
-        filepath: the path to a local file or a file in a GCS bucket.
-    
-    Returns:
-        A datetime.
-    """
-    time = None
-    # Get time for GCS files
-    if filepath.startswith("gs://"):
-        storage_client = storage.Client()
-        bucket = storage_client.bucket("dgm-archive")
-        if filepath.endswith("/"): # If path is a folder:
-            for blob in storage_client.list_blobs(bucket, prefix=filepath.split('dgm-archive/')[-1]):
-                if time is None or blob.updated > time:
-                    time = blob.updated
-        else: # Else if path is a regular file
-            blob = bucket.get_blob(filepath.split('dgm-archive/')[-1]) # Everything after the bucket is the path
-            time = blob.updated
-    # Get time for S3 files (PUDL DB)
-    elif filepath.startswith("s3://"):
-        fs = fsspec.filesystem("s3", anon=True)
-        filepath = filepath.split("s3://")[-1] + os.getenv("PUDL_VERSION") + "/" # Add in env variable to PUDL S3 path
-        files = fs.find(filepath, detail=True)
-        time = max(info.get("LastModified") for info in files.values())
-    elif filepath.startswith('raw/'):
-    # Get time for local files
-    # We do this by getting the time that the file was last committed to on Github to avoid
-    # confusing local pull activity with actual file changes.
-        filepath = DATA_DIR / filepath
-        result = subprocess.run(
-            [
-                "git",
-                "log",
-                "-1",
-                "--format=%cI",
-                "--",
-                filepath,
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        
-        time = datetime.datetime.fromisoformat(result.stdout.strip())
-    else:
-        raise ValueError(f"File path {filepath} not currently configured for date extraction.")
-    return time
 
 @lru_cache
 def load_yml_file(path) -> dict[str, pd.DataFrame]:
     """Return a DF with last modified dates for all raw data inputs."""
-    with open (path) as file:
+    with Path(path).open() as file:
         file_json = yaml.safe_load(file)
     return pd.json_normalize(file_json)

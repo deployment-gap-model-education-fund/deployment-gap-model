@@ -13,8 +13,8 @@ from dbcp.constants import DATA_DIR, OUTPUT_DIR
 from dbcp.extract.ballot_ready import BR_URI
 from dbcp.extract.civis import extract as extract_civis
 from dbcp.extract.fips_tables import CENSUS_URI, TRIBAL_LANDS_URI
+from dbcp.extract.helpers import load_yml_file
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
-from dbcp.extract.helpers import load_yml_file, get_last_modified_time_from_path
 from dbcp.helpers import write_to_postgres
 from dbcp.metadata import SchemaName
 from dbcp.transform.fips_tables import SPATIAL_CACHE
@@ -23,13 +23,13 @@ from dbcp.validation.tests import validate_warehouse
 
 logger = logging.getLogger(__name__)
 
+
 def etl_file_modification_dates() -> dict[str, pd.DataFrame]:
     """Return a DF with last modified dates for all raw data inputs."""
-    file_paths = load_yml_file(DATA_DIR / 'file_paths.yml')
-    breakpoint()
-    return 
-    # TODO: Actually process all this data and return a cleaned up table with timestamps
-    #return
+    file_paths = load_yml_file(DATA_DIR / "file_paths.yml")
+    file_df = dbcp.transform.file_modification.transform(file_paths)
+    return file_df
+
 
 def etl_eip_infrastructure() -> dict[str, pd.DataFrame]:
     """EIP Infrastructure ETL."""
@@ -252,6 +252,14 @@ def create_data_warehouse():
     """Create data warehouse tables by ETL-ing each data source."""
     etl_funcs = {
         "last_modified": etl_file_modification_dates,
+<<<<<<< HEAD
+=======
+        "offshore_wind": etl_offshore_wind,
+        # "gridstatus": etl_gridstatus_isoqueues,
+        "manual_ordinances": etl_manual_ordinances,
+        # "epa_avert": etl_epa_avert,
+        # "eip_infrastructure": etl_eip_infrastructure,
+>>>>>>> 9565956 (Finish ETL and write to DB (except for local files))
         "columbia_local_opp": etl_columbia_local_opp,
         "fips_tables": etl_fips_tables,
         "pudl": etl_pudl_tables,

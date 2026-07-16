@@ -19,6 +19,5 @@ ncsl_state_permitting: "raw/ncsl_state_permitting_wind.csv"
 # offshore_wind_projects: "airtable/Offshore Wind Locations DBCP Version/Projects.json"
 # offshore_wind_locations: "airtable/Offshore Wind Locations DBCP Version/Locations.json"
 # protected_areas_by_county: raw/padus_intersect_counties.parquet
-pudl_data: "s3://pudl.catalyst.coop/${PUDL_VERSION}/"
+pudl_data: "s3://pudl.catalyst.coop/"
 # rmi_energy_communities: raw/rmi_energy_communities_counties.parquet
-
