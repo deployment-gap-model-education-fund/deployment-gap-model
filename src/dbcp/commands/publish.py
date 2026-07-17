@@ -85,6 +85,8 @@ def load_parquet_files_to_postgres(
             continue
         # get the blob filename without the extension
         table_name = blob.name.split("/")[-1].split(".")[0]
+        if "__" not in table_name:
+            continue
 
         # Read parquet then write to postgres
         df = pd.read_parquet(f"gs://{output_bucket.id}/{blob.name}")
