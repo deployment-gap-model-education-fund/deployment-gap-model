@@ -56,7 +56,7 @@ packages = ["src/dbcp", "src/scripts"]
 
 [tool.typos.default]
 # Ignore spellchecking all lines with # spellchecker:ignore
-extend-ignore-re = ["(?Rm)^.*(#|//)\\s*spellchecker:ignore$"]
+extend-ignore-re = ["(?Rm)^.*(#|//)\\s*spellchecker:ignore$", "emiss"]
 
 [tool.ruff]
 # Configurations that apply to both the `format` and `lint` subcommands.

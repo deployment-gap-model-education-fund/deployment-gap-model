@@ -9,6 +9,7 @@ import pyarrow.parquet as pq
 import sqlalchemy as sa
 
 import dbcp
+from dbcp.archivers.utils import ExtractionSettings
 from dbcp.constants import DATA_DIR, OUTPUT_DIR
 from dbcp.extract.ballot_ready import BR_URI
 from dbcp.extract.civis import extract as extract_civis
@@ -187,6 +188,13 @@ def etl_acp_projects() -> dict[str, pd.DataFrame]:
     return transformed
 
 
+def etl_manual_ordinances() -> dict[str, pd.DataFrame]:
+    """ETL manually maintained ordinances."""
+    raw_dfs = dbcp.extract.manual_ordinances.extract()
+    transformed = dbcp.transform.manual_ordinances.transform(raw_dfs)
+    return transformed
+
+
 def write_to_postgres_and_parquet(
     dfs: dict[str, pd.DataFrame], engine: sa.engine.Engine, schema_name: SchemaName
 ):
@@ -240,14 +248,42 @@ def run_etl(funcs: dict[str, Callable], schema_name: SchemaName):
     logger.info(f"Successfully finished {schema_name.value} ETL.")
 
 
+def etl_offshore_wind() -> dict[str, pd.DataFrame]:
+    """ETL manually curated offshore wind data."""
+    # get the latest version of the offshore wind data from the candidate yaml file
+    projects_uri = "airtable/Offshore Wind Locations DBCP Version/Projects.json"
+    locations_uri = "airtable/Offshore Wind Locations DBCP Version/Locations.json"
+
+    es = ExtractionSettings.from_yaml("/app/dbcp/settings.yaml")
+    es.update_archive_generation_numbers()
+
+    projects_uri = es.get_full_archive_uri(projects_uri)
+    locations_uri = es.get_full_archive_uri(locations_uri)
+
+    raw_offshore_dfs = dbcp.extract.offshore_wind.extract(
+        locations_uri=locations_uri, projects_uri=projects_uri
+    )
+    offshore_transformed_dfs = dbcp.transform.offshore_wind.transform(raw_offshore_dfs)
+
+    return offshore_transformed_dfs
+
+
 def create_data_warehouse():
     """Create data warehouse tables by ETL-ing each data source."""
     etl_funcs = {
+        "offshore_wind": etl_offshore_wind,
         "columbia_local_opp": etl_columbia_local_opp,
         "fips_tables": etl_fips_tables,
+        "manual_ordinances": etl_manual_ordinances,
+        "protected_area_by_county": etl_protected_area_by_county,
+        "energy_communities_by_county": etl_energy_communities_by_county,
+        "eip_infrastructure": etl_eip_infrastructure,
+        "epa_avert": etl_epa_avert,
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
         "acp_projects": etl_acp_projects,
+        "justice40_tracts": etl_justice40,
+        "nrel_wind_solar_ordinances": etl_nrel_ordinances,
         "fyi_queue": etl_fyi_queue,
         "civis_election_data": etl_civis,
     }

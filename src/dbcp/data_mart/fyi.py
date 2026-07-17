@@ -5,6 +5,7 @@ import sqlalchemy as sa
 
 from dbcp.constants import FYI_RESOURCE_DICT
 from dbcp.data_mart.helpers import (
+    _estimate_proposed_power_co2e,
     _get_proprietary_proposed_offshore,
     _replace_iso_offshore_with_proprietary,
     get_query,
@@ -35,6 +36,7 @@ def create_fyi_long_format(
         )
         fyi = _replace_iso_offshore_with_proprietary(fyi, offshore)
 
+    fyi = _estimate_proposed_power_co2e(fyi)
     active_long_format = fyi.query("queue_status == 'active'")
     # drop actual_completion_date and withdrawn_date columns
     active_long_format = active_long_format.drop(
