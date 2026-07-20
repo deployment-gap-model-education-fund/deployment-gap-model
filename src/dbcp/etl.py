@@ -12,9 +12,9 @@ import dbcp
 from dbcp.constants import DATA_DIR, OUTPUT_DIR
 from dbcp.extract.ballot_ready import BR_URI
 from dbcp.extract.civis import extract as extract_civis
-from dbcp.extract.fips_tables import CENSUS_URI, TRIBAL_LANDS_URI
 from dbcp.extract.helpers import load_yml_file
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
+from dbcp.extract.fips_tables import TRIBAL_LANDS_URI
 from dbcp.helpers import write_to_postgres
 from dbcp.metadata import SchemaName
 from dbcp.transform.fips_tables import SPATIAL_CACHE
@@ -53,8 +53,8 @@ def etl_lbnl_iso_queue() -> dict[str, pd.DataFrame]:
 
 def etl_fyi_queue() -> dict[str, pd.DataFrame]:
     """Interconnection.fyi ISO Queues ETL."""
-    fyi_uri = "gs://dgm-archive/interconnection.fyi/interconnection_fyi_dataset_2026-06-01.csv"
-    fyi_raw_dfs = dbcp.extract.fyi_queue.extract(fyi_uri)
+    file_paths = load_yml_file(DATA_DIR / "file_paths.yml")
+    fyi_raw_dfs = dbcp.extract.fyi_queue.extract(file_paths["fyi_queue"].item())
     fyi_transformed_dfs = dbcp.transform.fyi_queue.transform(fyi_raw_dfs)
     return fyi_transformed_dfs
 
@@ -62,13 +62,9 @@ def etl_fyi_queue() -> dict[str, pd.DataFrame]:
 def etl_columbia_local_opp() -> dict[str, pd.DataFrame]:
     """Columbia Local Opposition ETL."""
     # Extract
-    source_path = (
-        DATA_DIR
-        / "raw/2023.05.30 Opposition to Renewable Energy Facilities - FINAL.docx"
-    )
-
+    file_paths = load_yml_file(DATA_DIR / "file_paths.yml")
     extractor = dbcp.extract.local_opposition.ColumbiaDocxParser()
-    extractor.load_docx(source_path)
+    extractor.load_docx(file_paths["local_opposition"].item())
     docx_dfs = extractor.extract()
 
     # Transform
@@ -85,10 +81,10 @@ def etl_pudl_tables() -> dict[str, pd.DataFrame]:
 
 def etl_ncsl_state_permitting() -> dict[str, pd.DataFrame]:
     """NCSL State Permitting for Wind ETL."""
-    source_path = DATA_DIR / "raw/ncsl_state_permitting_wind.csv"
-    if not source_path.exists():
-        NCSLScraper().scrape_and_save_to_disk(source_path)
-    raw_df = dbcp.extract.ncsl_state_permitting.extract(source_path)
+    file_paths = load_yml_file(DATA_DIR / "file_paths.yml")
+    raw_df = dbcp.extract.ncsl_state_permitting.extract(
+        file_paths["ncsl_state_permitting"].item()
+    )
 
     out = dbcp.transform.ncsl_state_permitting.transform(raw_df)
 
@@ -97,7 +93,8 @@ def etl_ncsl_state_permitting() -> dict[str, pd.DataFrame]:
 
 def etl_fips_tables() -> dict[str, pd.DataFrame]:
     """Master state and county FIPS table ETL."""
-    fips = dbcp.extract.fips_tables.extract_fips(CENSUS_URI)
+    file_paths = load_yml_file(DATA_DIR / "file_paths.yml")
+    fips = dbcp.extract.fips_tables.extract_fips(file_paths["fips_census_uri"].item())
 
     fips["tribal_land"] = dbcp.extract.fips_tables.extract_census_tribal_land(
         TRIBAL_LANDS_URI

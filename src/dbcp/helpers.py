@@ -200,7 +200,7 @@ def write_to_postgres(
 
 
 def get_pudl_resource(
-    pudl_resource: str, bucket: str = "s3://pudl.catalyst.coop"
+    pudl_resource: str, bucket: str = "s3://pudl.catalyst.coop/"
 ) -> Path:
     """Given the name of a PUDL resource, return the path to the cached file.
 
@@ -213,6 +213,13 @@ def get_pudl_resource(
         pudl_resource_path: The path to the cached PUDL resource.
 
     """
+    try:
+        file_paths = dbcp.extract.helpers.load_yml_file(DATA_DIR / "file_paths.yml")
+        bucket = file_paths["pudl_data"].item()
+    except Exception as e:
+        logger.info(f"{e}: reverting to default input bucket.")
+        bucket = bucket  # If failure, use default value of bucket provided.
+
     pudl_version = os.environ["PUDL_VERSION"]
 
     pudl_cache = DATA_DIR / "data_cache/pudl/"
@@ -220,7 +227,7 @@ def get_pudl_resource(
     pudl_version_cache = pudl_cache / pudl_version
     pudl_version_cache.mkdir(exist_ok=True)
 
-    remote_pudl_resource_path = f"{bucket}/{pudl_version}/{pudl_resource}"
+    remote_pudl_resource_path = f"{bucket}{pudl_version}/{pudl_resource}"
     local_pudl_resource_path = pudl_version_cache / pudl_resource
 
     if not local_pudl_resource_path.exists():
@@ -229,12 +236,12 @@ def get_pudl_resource(
 
         # open the remote_pudl_resource_path and track progress with tqdm
         with (
-            fs.open(remote_pudl_resource_path) as fo,
+            fs.open(remote_pudl_resource_path) as file,
             Path(local_pudl_resource_path).open("wb") as local_file,
             tqdm(total=file_size, unit="B", unit_scale=True, unit_divisor=1024) as pbar,
         ):
             while True:
-                buf = fo.read(8192)
+                buf = file.read(8192)
                 if not buf:
                     break
                 local_file.write(buf)
