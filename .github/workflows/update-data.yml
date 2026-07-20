@@ -130,7 +130,7 @@ jobs:
 
       - name: Checkout Repository
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # Checkout the ref (branch or tag) from matrix
           ref: ${{ matrix.ref }}
