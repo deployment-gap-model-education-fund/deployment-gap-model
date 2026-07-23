@@ -21,6 +21,7 @@
   * [fyi\_\_private\_\_projects](data-warehouse/fyi__private__projects.md)
   * [fyi\_\_private\_\_locations](data-warehouse/fyi__private__locations.md)
   * [fyi\_\_private\_\_resource\_capacity](data-warehouse/fyi__private__resource_capacity.md)
+  * [madrone\_\_data\_last\_updated](data-warehouse/madrone__data_last_updated.md)
 * [Data Mart](data-mart/README.md)
   * [eia860m\_\_latest\_\_plants](data-mart/eia860m__latest__plants.md)
   * [eia860m\_\_latest\_\_generators](data-mart/eia860m__latest__generators.md)

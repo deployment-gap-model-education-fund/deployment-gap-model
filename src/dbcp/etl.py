@@ -10,9 +10,7 @@ import sqlalchemy as sa
 
 import dbcp
 from dbcp.constants import DATA_DIR, OUTPUT_DIR
-from dbcp.extract.ballot_ready import BR_URI
 from dbcp.extract.civis import extract as extract_civis
-from dbcp.extract.fips_tables import TRIBAL_LANDS_URI
 from dbcp.extract.helpers import load_yml_file
 from dbcp.helpers import write_to_postgres
 from dbcp.metadata import SchemaName
@@ -28,26 +26,6 @@ def etl_file_modification_dates() -> dict[str, pd.DataFrame]:
     file_paths = load_yml_file(DATA_DIR / "file_paths.yml")
     file_df = dbcp.transform.file_modification.transform(file_paths)
     return file_df
-
-
-def etl_eip_infrastructure() -> dict[str, pd.DataFrame]:
-    """EIP Infrastructure ETL."""
-    # Extract
-    eip_raw_dfs = dbcp.extract.eip_infrastructure.extract()
-
-    # Transform
-    eip_transformed_dfs = dbcp.transform.eip_infrastructure.transform(eip_raw_dfs)
-
-    return eip_transformed_dfs
-
-
-def etl_lbnl_iso_queue() -> dict[str, pd.DataFrame]:
-    """LBNL ISO Queues ETL."""
-    lbnl_uri = "gs://dgm-archive/lbnl_iso_queue/queues_2024_clean_data.xlsx"
-    lbnl_raw_dfs = dbcp.extract.lbnl_iso_queue.extract(lbnl_uri)
-    lbnl_transformed_dfs = dbcp.transform.lbnl_iso_queue.transform(lbnl_raw_dfs)
-
-    return lbnl_transformed_dfs
 
 
 def etl_fyi_queue() -> dict[str, pd.DataFrame]:
@@ -92,11 +70,11 @@ def etl_ncsl_state_permitting() -> dict[str, pd.DataFrame]:
 
 def etl_fips_tables() -> dict[str, pd.DataFrame]:
     """Master state and county FIPS table ETL."""
-    file_paths = load_yml_file(DATA_DIR / "file_paths.yml")
-    fips = dbcp.extract.fips_tables.extract_fips(file_paths["fips_census_uri"].item())
+    fips = dbcp.extract.fips_tables.extract_fips()
 
+    file_paths = load_yml_file(DATA_DIR / "file_paths.yml")
     fips["tribal_land"] = dbcp.extract.fips_tables.extract_census_tribal_land(
-        TRIBAL_LANDS_URI
+        file_paths["fips_tribal_lands_uri"].item()
     )
 
     out = dbcp.transform.fips_tables.transform(fips)
@@ -104,83 +82,11 @@ def etl_fips_tables() -> dict[str, pd.DataFrame]:
     return out
 
 
-def etl_justice40() -> dict[str, pd.DataFrame]:
-    """ETL white house environmental justice dataset."""
-    source_path = DATA_DIR / "raw/1.0-communities.csv"
-    raw = dbcp.extract.justice40.extract(source_path)
-    out = dbcp.transform.justice40.transform(raw)
-    return out
-
-
-def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
-    """ETL NREL state and local ordinances for wind and solar."""
-    wind_source_path = DATA_DIR / "raw/NREL_Wind_Ordinances.xlsx"
-    solar_source_path = DATA_DIR / "raw/NREL_Solar_Ordinances.xlsx"
-    wind_raw_dfs = dbcp.extract.nrel_wind_solar_ordinances.extract(
-        wind_source_path, wind_or_solar="wind"
-    )
-    solar_raw_dfs = dbcp.extract.nrel_wind_solar_ordinances.extract(
-        solar_source_path, wind_or_solar="solar"
-    )
-    nrel_raw_dfs = wind_raw_dfs | solar_raw_dfs
-
-    nrel_transformed_dfs = dbcp.transform.nrel_wind_solar_ordinances.transform(
-        nrel_raw_dfs
-    )
-
-    return nrel_transformed_dfs
-
-
-def etl_protected_area_by_county() -> dict[str, pd.DataFrame]:
-    """ETL the PAD-US intersection with TIGER county geometries."""
-    source_path = DATA_DIR / "raw/padus_intersect_counties.parquet"
-    raw_df = dbcp.extract.protected_area_by_county.extract(source_path)
-    transformed = dbcp.transform.protected_area_by_county.transform(raw_df)
-    return transformed
-
-
-def etl_energy_communities_by_county() -> dict[str, pd.DataFrame]:
-    """ETL RMI's energy communities analysis."""
-    source_path = DATA_DIR / "raw/rmi_energy_communities_counties.parquet"
-    raw_df = dbcp.extract.rmi_energy_communities.extract(source_path)
-    transformed = dbcp.transform.rmi_energy_communities.transform(raw_df)
-    return transformed
-
-
-def etl_ballot_ready() -> dict[str, pd.DataFrame]:
-    """ETL Ballot Ready election data."""
-    source_uri = BR_URI
-    raw_df = dbcp.extract.ballot_ready.extract(source_uri)
-    transformed = dbcp.transform.ballot_ready.transform(raw_df)
-    return transformed
-
-
 def etl_civis() -> dict[str, pd.DataFrame]:
     """ETL archived LJEDF county demographics and election results."""
     raw_dfs = extract_civis()
     county_fips = etl_fips_tables()["census__county_fips"]
     transformed = dbcp.transform.civis.transform(raw_dfs, county_fips=county_fips)
-    return transformed
-
-
-def etl_epa_avert() -> dict[str, pd.DataFrame]:
-    """ETL EPA AVERT avoided emissions data."""
-    # https://github.com/USEPA/AVERT/blob/v4.1.0/utilities/data/county-fips.txt
-    path_county_region_xwalk = DATA_DIR / "raw/avert_county-fips.txt"
-    # https://www.epa.gov/avert/avoided-emission-rates-generated-avert
-    path_emission_rates = DATA_DIR / "raw/avert_emission_rates_04-25-23.xlsx"
-    raw_dfs = dbcp.extract.epa_avert.extract(
-        county_crosswalk_path=path_county_region_xwalk,
-        emission_rates_path=path_emission_rates,
-    )
-    transformed = dbcp.transform.epa_avert.transform(raw_dfs)
-    return transformed
-
-
-def etl_gridstatus_isoqueues():
-    """ETL gridstatus ISO queues."""
-    raw_dfs = dbcp.extract.gridstatus_isoqueues.extract()
-    transformed = dbcp.transform.gridstatus.transform(raw_dfs)
     return transformed
 
 
@@ -307,3 +213,99 @@ if __name__ == "__main__":
     # debugging entry point
     etl()
     print("yay")
+
+
+##########################################
+### DEPRECATED ETL PIPELINES ###
+#############################
+
+# def etl_eip_infrastructure() -> dict[str, pd.DataFrame]:
+#     """EIP Infrastructure ETL."""
+#     # Extract
+#     eip_raw_dfs = dbcp.extract.eip_infrastructure.extract()
+
+#     # Transform
+#     eip_transformed_dfs = dbcp.transform.eip_infrastructure.transform(eip_raw_dfs)
+
+#     return eip_transformed_dfs
+
+
+# def etl_lbnl_iso_queue() -> dict[str, pd.DataFrame]:
+#     """LBNL ISO Queues ETL."""
+#     lbnl_uri = "gs://dgm-archive/lbnl_iso_queue/queues_2024_clean_data.xlsx"
+#     lbnl_raw_dfs = dbcp.extract.lbnl_iso_queue.extract(lbnl_uri)
+#     lbnl_transformed_dfs = dbcp.transform.lbnl_iso_queue.transform(lbnl_raw_dfs)
+
+#     return lbnl_transformed_dfs
+
+
+# def etl_epa_avert() -> dict[str, pd.DataFrame]:
+#     """ETL EPA AVERT avoided emissions data."""
+#     # https://github.com/USEPA/AVERT/blob/v4.1.0/utilities/data/county-fips.txt
+#     path_county_region_xwalk = DATA_DIR / "raw/avert_county-fips.txt"
+#     # https://www.epa.gov/avert/avoided-emission-rates-generated-avert
+#     path_emission_rates = DATA_DIR / "raw/avert_emission_rates_04-25-23.xlsx"
+#     raw_dfs = dbcp.extract.epa_avert.extract(
+#         county_crosswalk_path=path_county_region_xwalk,
+#         emission_rates_path=path_emission_rates,
+#     )
+#     transformed = dbcp.transform.epa_avert.transform(raw_dfs)
+#     return transformed
+
+
+# def etl_gridstatus_isoqueues():
+#     """ETL gridstatus ISO queues."""
+#     raw_dfs = dbcp.extract.gridstatus_isoqueues.extract()
+#     transformed = dbcp.transform.gridstatus.transform(raw_dfs)
+#     return transformed
+
+
+# def etl_justice40() -> dict[str, pd.DataFrame]:
+#     """ETL white house environmental justice dataset."""
+#     source_path = DATA_DIR / "raw/1.0-communities.csv"
+#     raw = dbcp.extract.justice40.extract(source_path)
+#     out = dbcp.transform.justice40.transform(raw)
+#     return out
+
+
+# def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
+#     """ETL NREL state and local ordinances for wind and solar."""
+#     wind_source_path = DATA_DIR / "raw/NREL_Wind_Ordinances.xlsx"
+#     solar_source_path = DATA_DIR / "raw/NREL_Solar_Ordinances.xlsx"
+#     wind_raw_dfs = dbcp.extract.nrel_wind_solar_ordinances.extract(
+#         wind_source_path, wind_or_solar="wind"
+#     )
+#     solar_raw_dfs = dbcp.extract.nrel_wind_solar_ordinances.extract(
+#         solar_source_path, wind_or_solar="solar"
+#     )
+#     nrel_raw_dfs = wind_raw_dfs | solar_raw_dfs
+
+#     nrel_transformed_dfs = dbcp.transform.nrel_wind_solar_ordinances.transform(
+#         nrel_raw_dfs
+#     )
+
+#     return nrel_transformed_dfs
+
+
+# def etl_protected_area_by_county() -> dict[str, pd.DataFrame]:
+#     """ETL the PAD-US intersection with TIGER county geometries."""
+#     source_path = DATA_DIR / "raw/padus_intersect_counties.parquet"
+#     raw_df = dbcp.extract.protected_area_by_county.extract(source_path)
+#     transformed = dbcp.transform.protected_area_by_county.transform(raw_df)
+#     return transformed
+
+
+# def etl_energy_communities_by_county() -> dict[str, pd.DataFrame]:
+#     """ETL RMI's energy communities analysis."""
+#     source_path = DATA_DIR / "raw/rmi_energy_communities_counties.parquet"
+#     raw_df = dbcp.extract.rmi_energy_communities.extract(source_path)
+#     transformed = dbcp.transform.rmi_energy_communities.transform(raw_df)
+#     return transformed
+
+
+# def etl_ballot_ready() -> dict[str, pd.DataFrame]:
+#     """ETL Ballot Ready election data."""
+#     source_uri = BR_URI
+#     raw_df = dbcp.extract.ballot_ready.extract(source_uri)
+#     transformed = dbcp.transform.ballot_ready.transform(raw_df)
+#     return transformed
