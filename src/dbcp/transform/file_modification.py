@@ -58,11 +58,11 @@ def get_last_modified_time_from_path(filepath: str):
         storage_client = storage.Client()
         bucket = storage_client.bucket("dgm-archive")
         if filepath.endswith("/"):  # If path is a folder:
-            for blob in storage_client.list_blobs(
-                bucket, prefix=filepath.split("dgm-archive/")[-1]
-            ):
-                if time is None or blob.updated > time:
-                    time = blob.updated
+            time = max(
+                blob.updated for blob in storage_client.list_blobs(
+                    bucket, prefix=filepath.split("dgm-archive/")[-1]
+                )
+            )
         else:  # Else if path is a regular file
             blob = bucket.get_blob(
                 filepath.split("dgm-archive/")[-1]
