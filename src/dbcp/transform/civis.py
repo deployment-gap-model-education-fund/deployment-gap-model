@@ -109,9 +109,9 @@ def transform(
         and demographics data.
 
     """
-    civis = _transform_civis_demographics(raw_dfs["raw_ljedf_civis_demographics"])
+    civis = _transform_civis_demographics(raw_dfs["raw_civis_demographics"])
     election = _transform_2024_president_results(
-        raw_dfs["raw_ljedf_2024_president_results_county"]
+        raw_dfs["raw_civis_2024_president_results_county"]
     )
 
     fips_index = county_fips.loc[:, ["county_id_fips", "state_id_fips"]].copy()

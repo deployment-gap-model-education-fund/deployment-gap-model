@@ -3,10 +3,12 @@
 import json
 import logging
 import re
+from functools import lru_cache
 from pathlib import Path
 
 import google.auth
 import pandas as pd
+import yaml
 from google.cloud import storage
 
 logger = logging.getLogger(__name__)
@@ -104,3 +106,11 @@ def cache_gcs_archive_file_locally(
         with Path(filepath).open("wb+") as f:
             f.write(blob.download_as_bytes())
     return filepath
+
+
+@lru_cache
+def load_yml_file(path) -> dict[str, pd.DataFrame]:
+    """Return a DF with last modified dates for all raw data inputs."""
+    with Path(path).open() as file:
+        file_json = yaml.safe_load(file)
+    return pd.json_normalize(file_json)
