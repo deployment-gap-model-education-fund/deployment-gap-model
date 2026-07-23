@@ -12,9 +12,8 @@ import dbcp
 from dbcp.constants import DATA_DIR, OUTPUT_DIR
 from dbcp.extract.ballot_ready import BR_URI
 from dbcp.extract.civis import extract as extract_civis
-from dbcp.extract.helpers import load_yml_file
-from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.extract.fips_tables import TRIBAL_LANDS_URI
+from dbcp.extract.helpers import load_yml_file
 from dbcp.helpers import write_to_postgres
 from dbcp.metadata import SchemaName
 from dbcp.transform.fips_tables import SPATIAL_CACHE
@@ -249,14 +248,6 @@ def create_data_warehouse():
     """Create data warehouse tables by ETL-ing each data source."""
     etl_funcs = {
         "last_modified": etl_file_modification_dates,
-<<<<<<< HEAD
-=======
-        "offshore_wind": etl_offshore_wind,
-        # "gridstatus": etl_gridstatus_isoqueues,
-        "manual_ordinances": etl_manual_ordinances,
-        # "epa_avert": etl_epa_avert,
-        # "eip_infrastructure": etl_eip_infrastructure,
->>>>>>> 9565956 (Finish ETL and write to DB (except for local files))
         "columbia_local_opp": etl_columbia_local_opp,
         "fips_tables": etl_fips_tables,
         "pudl": etl_pudl_tables,
