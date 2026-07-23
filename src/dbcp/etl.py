@@ -9,11 +9,10 @@ import pyarrow.parquet as pq
 import sqlalchemy as sa
 
 import dbcp
-from dbcp.archivers.utils import ExtractionSettings
 from dbcp.constants import DATA_DIR, OUTPUT_DIR
 from dbcp.extract.ballot_ready import BR_URI
+from dbcp.extract.civis import extract as extract_civis
 from dbcp.extract.fips_tables import CENSUS_URI, TRIBAL_LANDS_URI
-from dbcp.extract.ljedf import extract as extract_ljedf
 from dbcp.extract.ncsl_state_permitting import NCSLScraper
 from dbcp.helpers import write_to_postgres
 from dbcp.metadata import SchemaName
@@ -128,26 +127,6 @@ def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
     return nrel_transformed_dfs
 
 
-def etl_offshore_wind() -> dict[str, pd.DataFrame]:
-    """ETL manually curated offshore wind data."""
-    # get the latest version of the offshore wind data from the candidate yaml file
-    projects_uri = "airtable/Offshore Wind Locations DBCP Version/Projects.json"
-    locations_uri = "airtable/Offshore Wind Locations DBCP Version/Locations.json"
-
-    es = ExtractionSettings.from_yaml("/app/dbcp/settings.yaml")
-    es.update_archive_generation_numbers()
-
-    projects_uri = es.get_full_archive_uri(projects_uri)
-    locations_uri = es.get_full_archive_uri(locations_uri)
-
-    raw_offshore_dfs = dbcp.extract.offshore_wind.extract(
-        locations_uri=locations_uri, projects_uri=projects_uri
-    )
-    offshore_transformed_dfs = dbcp.transform.offshore_wind.transform(raw_offshore_dfs)
-
-    return offshore_transformed_dfs
-
-
 def etl_protected_area_by_county() -> dict[str, pd.DataFrame]:
     """ETL the PAD-US intersection with TIGER county geometries."""
     source_path = DATA_DIR / "raw/padus_intersect_counties.parquet"
@@ -172,11 +151,11 @@ def etl_ballot_ready() -> dict[str, pd.DataFrame]:
     return transformed
 
 
-def etl_ljedf() -> dict[str, pd.DataFrame]:
+def etl_civis() -> dict[str, pd.DataFrame]:
     """ETL archived LJEDF county demographics and election results."""
-    raw_dfs = extract_ljedf()
+    raw_dfs = extract_civis()
     county_fips = etl_fips_tables()["census__county_fips"]
-    transformed = dbcp.transform.ljedf.transform(raw_dfs, county_fips=county_fips)
+    transformed = dbcp.transform.civis.transform(raw_dfs, county_fips=county_fips)
     return transformed
 
 
@@ -198,13 +177,6 @@ def etl_gridstatus_isoqueues():
     """ETL gridstatus ISO queues."""
     raw_dfs = dbcp.extract.gridstatus_isoqueues.extract()
     transformed = dbcp.transform.gridstatus.transform(raw_dfs)
-    return transformed
-
-
-def etl_manual_ordinances() -> dict[str, pd.DataFrame]:
-    """ETL manually maintained ordinances."""
-    raw_dfs = dbcp.extract.manual_ordinances.extract()
-    transformed = dbcp.transform.manual_ordinances.transform(raw_dfs)
     return transformed
 
 
@@ -271,24 +243,13 @@ def run_etl(funcs: dict[str, Callable], schema_name: SchemaName):
 def create_data_warehouse():
     """Create data warehouse tables by ETL-ing each data source."""
     etl_funcs = {
-        "offshore_wind": etl_offshore_wind,
-        # "gridstatus": etl_gridstatus_isoqueues,
-        "manual_ordinances": etl_manual_ordinances,
-        # "epa_avert": etl_epa_avert,
-        # "eip_infrastructure": etl_eip_infrastructure,
         "columbia_local_opp": etl_columbia_local_opp,
-        # "energy_communities_by_county": etl_energy_communities_by_county,
         "fips_tables": etl_fips_tables,
-        # "protected_area_by_county": etl_protected_area_by_county,
-        # "justice40_tracts": etl_justice40,
-        # "nrel_wind_solar_ordinances": etl_nrel_ordinances,
-        # "lbnl_iso_queue": etl_lbnl_iso_queue,
         "pudl": etl_pudl_tables,
         "ncsl_state_permitting": etl_ncsl_state_permitting,
-        # "ballot_ready": etl_ballot_ready,
         "acp_projects": etl_acp_projects,
         "fyi_queue": etl_fyi_queue,
-        "ljedf_election_data": etl_ljedf,
+        "civis_election_data": etl_civis,
     }
     run_etl(etl_funcs, SchemaName.DATA_WAREHOUSE)
 

@@ -283,7 +283,7 @@ def test_county_commission_election_info(engine: Engine):
 def test_county_wide_coverage(engine: Engine):
     """Check how many counties have technical data in counties_wide_format."""
     cols_to_fetch = _get_non_county_cols_from_wide_format(engine)
-    query = f"SELECT {','.join(cols_to_fetch)} FROM data_mart.counties_wide_format"
+    query = f"SELECT {','.join(cols_to_fetch)} FROM data_mart.counties_wide_format"  # noqa: S608
     df = pd.read_sql(query, engine)
     n_counties = pd.read_sql(
         "SELECT count(*) FROM data_warehouse.census__county_fips", engine
@@ -314,7 +314,7 @@ def test_county_long_vs_wide(engine: Engine):
             OFFSHORE_WIND_EXTRA_COLS
         )
     ) + ["county_id_fips"]
-    query = f"SELECT {','.join(cols_to_fetch)} FROM data_mart.counties_wide_format"
+    query = f"SELECT {','.join(cols_to_fetch)} FROM data_mart.counties_wide_format"  # noqa: S608
     wide_format_technical = pd.read_sql(query, engine).set_index("county_id_fips")
 
     # filter long_format for only the same resources as wide_format
@@ -340,7 +340,7 @@ def test_county_long_vs_wide(engine: Engine):
         "Petrochemicals and Plastics",
     }
     string_wrapped = (f"'{item}'" for item in resources_to_keep)
-    shorter_long_query = f"SELECT * FROM data_mart.counties_long_format WHERE resource_or_sector in ({','.join(string_wrapped)})"
+    shorter_long_query = f"SELECT * FROM data_mart.counties_long_format WHERE resource_or_sector in ({','.join(string_wrapped)})"  # noqa: S608
     shorter_long_format = pd.read_sql(shorter_long_query, engine)
 
     # county coverage ~~of technical data~~ should be the same (not true for
@@ -386,10 +386,10 @@ def test_manual_ordinance_fips_coverage(engine: Engine):
     assert actual.empty, "Found mismatched FIPS in airtable__manual_ordinances"
 
 
-def test_ljedf_county_election_results(engine: Engine):
+def test_civis_county_election_results(engine: Engine):
     """Check LJEDF county politics table keys and percentage ranges."""
     df = pd.read_sql_table(
-        "ljedf__private__counties__election_results", engine, schema="data_warehouse"
+        "civis__counties__election_results", engine, schema="data_warehouse"
     )
     assert df["county_id_fips"].is_unique, "Found duplicate county FIPS in LJEDF table."
     expected_n_counties = pd.read_sql(
@@ -407,7 +407,7 @@ def test_ljedf_county_election_results(engine: Engine):
     missing_fips = pd.read_sql(
         """
         SELECT l.county_id_fips
-        FROM data_warehouse.ljedf__private__counties__election_results AS l
+        FROM data_warehouse.civis__counties__election_results AS l
         LEFT JOIN data_warehouse.census__county_fips AS c
         USING (county_id_fips)
         WHERE c.county_id_fips IS NULL
@@ -448,7 +448,7 @@ def _get_non_county_cols_from_wide_format(engine: Engine) -> pd.Index:
 def validate_warehouse(engine: Engine):
     """Run data warehouse validation tests."""
     logger.info("Validating data warehouse")
-    test_ljedf_county_election_results(engine)
+    test_civis_county_election_results(engine)
     # test_j40_county_fips_coverage(engine)
     # test_gridstatus_fips_coverage(engine)
     # test_fyi_fips_coverage(engine)

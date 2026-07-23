@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from dbcp.constants import FIPS_CODE_VINTAGE, OUTPUT_DIR, PUDL_LATEST_YEAR
 from dbcp.data_mart.co2_dashboard import (
     _get_plant_location_data,
-    _transfrom_plant_location_data,
+    _transform_plant_location_data,
 )
 from dbcp.data_mart.helpers import (
     CountyOpposition,
@@ -116,8 +116,7 @@ def _get_and_join_iso_tables(
     if use_proprietary_offshore:
         offshore = _get_proprietary_proposed_offshore(engine)
         out = _replace_iso_offshore_with_proprietary(out, offshore)
-    _estimate_proposed_power_co2e(out)
-    return out
+    return _estimate_proposed_power_co2e(out)
 
 
 def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
@@ -159,7 +158,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     assert group.nth(2).shape[0] == 0
     gen = gen_1.merge(gen_2, on=group_keys, how="left")
     # create storage column
-    # Occassionally there are projects with multiple storage resources,
+    # Occasionally there are projects with multiple storage resources,
     # i.e. battery storage and pumped storage
     # In these cases, we sum the storage capacity the by doing a
     # groupby and sum on capacity.
@@ -594,7 +593,7 @@ def create_project_change_log(long_format: pd.DataFrame) -> pd.DataFrame:
 
     """
     original_long_format = long_format.copy()
-    # for projcts where resource_clean == "Unknown", set resource_class to "other" instead of nan
+    # for projects where resource_clean == "Unknown", set resource_class to "other" instead of nan
     long_format["resource_class"] = long_format.resource_class.mask(
         long_format.resource_clean.eq("Unknown"), "other"
     )
@@ -958,7 +957,7 @@ def _get_latest_plant_locations(
     if county_fips_table is None:
         county_fips_table = _get_county_fips_df(postgres_engine)
     plant_locations = _get_plant_location_data()
-    plant_locations = _transfrom_plant_location_data(
+    plant_locations = _transform_plant_location_data(
         plant_locations, state_table=state_fips_table, county_table=county_fips_table
     )
     return plant_locations

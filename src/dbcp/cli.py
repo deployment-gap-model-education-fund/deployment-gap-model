@@ -6,9 +6,7 @@ import click
 import coloredlogs
 
 import dbcp
-from dbcp.commands.archive import run_archivers
 from dbcp.commands.publish import publish_outputs
-from dbcp.commands.settings import save_settings
 from dbcp.metadata import SchemaName
 from dbcp.transform.fips_tables import SPATIAL_CACHE
 from dbcp.transform.helpers import GEOCODER_CACHES
@@ -68,8 +66,6 @@ def etl(data_mart: bool, data_warehouse: bool, clear_cache: bool):
 
 
 cli.add_command(publish_outputs)
-cli.add_command(run_archivers)
-cli.add_command(save_settings)
 
 if __name__ == "__main__":
     cli()

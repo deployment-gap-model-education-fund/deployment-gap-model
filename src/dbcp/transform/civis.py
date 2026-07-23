@@ -104,7 +104,7 @@ def transform(
                      construct the table from
 
     Returns:
-        a dictionary with ljedf__private__counties__election_results as key and the
+        a dictionary with civis__counties__election_results as key and the
         transformed table containing Biden and Harris percentage of vote capture results
         and demographics data.
 
@@ -142,4 +142,4 @@ def transform(
     assert county_politics["county_id_fips"].is_unique, (
         "Output county FIPS are not unique."
     )
-    return {"ljedf__private__counties__election_results": county_politics}
+    return {"civis__counties__election_results": county_politics}
