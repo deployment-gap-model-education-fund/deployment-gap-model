@@ -21,7 +21,7 @@ are active in the interconnection queue. Projects from the interconnection.fyi d
 ### Active Clean Projects
 
 This table uses data from the three FYI data warehouse tables. It first filters to active queue projects,
-then keeps clean resources from the FYI resource mapping.
+then keeps only projects with clean resources (battery, solar, and wind).
 
 ### County Level Aggragation
 
