@@ -152,7 +152,7 @@ def etl_ballot_ready() -> dict[str, pd.DataFrame]:
 
 
 def etl_civis() -> dict[str, pd.DataFrame]:
-    """ETL archived LJEDF county demographics and election results."""
+    """ETL archived Civis county demographics and election results."""
     raw_dfs = extract_civis()
     county_fips = etl_fips_tables()["census__county_fips"]
     transformed = dbcp.transform.civis.transform(raw_dfs, county_fips=county_fips)
