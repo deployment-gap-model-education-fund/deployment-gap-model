@@ -236,7 +236,7 @@ FYI_RESOURCE_DICT = {
         ],
         "type": "Renewable",
     },
-    "Offshore Wind": {"codes": [], "type": "Renewable"},
+    "Offshore Wind": {"codes": ["Offshore Wind"], "type": "Renewable"},
     "Other": {
         "codes": [
             "Biomass + Oil",
@@ -289,11 +289,11 @@ US_STATES_TERRITORIES = US_STATES.union(US_TERRITORIES)
 
 try:
     DATA_DIR_ENV_VAR = os.environ["DATA_DIR"]
-except KeyError:
+except KeyError as e:
     raise KeyError(
         "Please set the DATA_DIR environment variable to the path"
         "of the data directory.\n"
         "This is typically set in the .env file."
-    )
+    ) from e
 DATA_DIR = Path(DATA_DIR_ENV_VAR)
 OUTPUT_DIR = DATA_DIR / "output"

@@ -22,6 +22,15 @@ private_data_mart:
 all:
 	$(APP_RUN_COMMAND) python -m dbcp.cli etl --data-mart --data-warehouse
 
+publish:
+	$(APP_RUN_COMMAND) python -m dbcp.cli publish-outputs \
+        -bq \
+        --upload-to-postgres \
+        --build-ref $(BUILD_REF) \
+        --code-git-sha $(CODE_GIT_SHA) \
+        --github-action-run-id $(GITHUB_ACTION_RUN_ID) \
+        --target $(TARGET)
+
 sql_shell:
 	docker compose run --rm postgres bash -c 'psql -U $(POSTGRES_USER) -h $(POSTGRES_HOST) $(POSTGRES_DB)'
 

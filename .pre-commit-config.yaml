@@ -73,6 +73,7 @@ repos:
             |.*\.csv
             |.*\.html
             |.*\.json
+            |.*constants\.py
           )$ | test/ | notebooks/
         args: [] # Make this read, not write
 
