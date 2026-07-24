@@ -1643,3 +1643,16 @@ fyi__private__resource_capacity = Table(
     Column("capacity_mw", Float),
     schema=schema,
 )
+
+###################################
+# DATABASE METADATA TABLES #
+##################################
+
+madrone_data_last_updated = Table(
+    "madrone__data_last_updated",
+    metadata,
+    Column("dataset_name", String, primary_key=True),
+    Column("dataset_link", String),
+    Column("last_modified", String),
+    schema=schema,
+)

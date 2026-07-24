@@ -5,11 +5,11 @@ import re
 from collections.abc import Callable
 from functools import partial
 
-import geopandas as gpd
+import geopandas
 import numpy as np
 import pandas as pd
 
-from dbcp.extract.fips_tables import CENSUS_URI, _extract_census_counties
+from dbcp.extract.fips_tables import extract_fips
 from dbcp.transform.helpers import add_county_fips_with_backup_geocoding
 
 
@@ -197,7 +197,7 @@ def _col_transform_mw_total_capacity(
     # Note: this does not combine capacity at plants with both online and decommissioned
     # phases.
 
-    # Confirm that decommisioned capacity is always zero
+    # Confirm that decommissioned capacity is always zero
     is_decom = full_df["raw_status"] == "Decommissioned"
     assert ser.loc[is_decom].eq(0).all(), "Found non-zero Decommissioned capacity."
     out = ser.copy()
@@ -206,7 +206,7 @@ def _col_transform_mw_total_capacity(
 
 
 def _transform_location_cols(
-    full_df: pd.DataFrame, county_shapes: gpd.GeoDataFrame
+    full_df: pd.DataFrame, county_shapes: geopandas.GeoDataFrame
 ) -> pd.DataFrame:
     """Clean state, county, and lat/lon columns simultaneously."""
     # County FIPS codes can be defined by either state and county names or by lat/lon.
@@ -228,7 +228,7 @@ def _transform_location_cols(
         "Longitude is not float64"
     )
     county_shapes["GEOID"] = county_shapes["GEOID"].astype(pd.StringDtype())
-    points = gpd.GeoSeries.from_xy(
+    points = geopandas.GeoSeries.from_xy(
         full_df["raw_avg_longitude"].astype(np.float64),
         full_df["raw_avg_latitude"].astype(np.float64),
         index=full_df.index,
@@ -281,7 +281,7 @@ def _transform_location_cols(
     # 2) one of the sources is missing (no fips) but the other is present and
     #    successfully produces a FIPS. (simply fillna. 9% of cases)
     # 3) one of various conflicts (<1% of cases):
-    #    a) both exist but disagree (arbitarily use state/county FIPS and set lat/lon to
+    #    a) both exist but disagree (arbitrarily use state/county FIPS and set lat/lon to
     #       null. This case is about 1/3 of remaining cases)
     #    b) lat/lon present but spatial join fails and state is present but county is
     #       missing. These are all offshore projects with lat/lon in the ocean. Note
@@ -435,7 +435,7 @@ def _int_id_from_str(s: str) -> int:
     # integers are more convenient and we don't need the full 16 bytes for data this
     # small (collision probability is on the order of 1e-12 for 10k items with 64 bits)
     byte_str = s.encode("utf-8")
-    hash_digest = hashlib.md5(byte_str).digest()[:8]  # nosec
+    hash_digest = hashlib.md5(byte_str).digest()[:8]  # noqa:S324
     # Specify byteorder and signedness just for clarity. I don't *really* care what they
     # are as long as the underlying bytes are unique. But Postgres has no unsigned
     # integer types, so I'll use signed int for consistency between the pre-db and
@@ -466,7 +466,7 @@ def _clean_columns(df: pd.DataFrame) -> pd.DataFrame:
     for raw_col, transform in col_transforms.items():
         new_col_name = raw_col[4:]  # remove 'raw_'
         df[new_col_name] = transform(df[raw_col])
-    county_shapes = _extract_census_counties(CENSUS_URI).set_geometry("geometry")
+    county_shapes = extract_fips()["counties"].set_geometry("geometry")
     location_cols = _transform_location_cols(df, county_shapes)
     out = pd.concat((df, location_cols), axis=1)
 

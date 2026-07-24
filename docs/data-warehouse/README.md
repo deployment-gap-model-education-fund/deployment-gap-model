@@ -86,6 +86,13 @@ These tables contain private data from the interconnection.fyi interconnection q
 - [`fyi__private__locations`](fyi__private__locations.md)
 - [`fyi__private__resource_capacity`](fyi__private__resource_capacity.md)
 
+## Metadata tables
+
+The following tables capture metadata about the ETL pipeline to ensure transparency and
+legibility of data warehouse and data mart table outputs:
+
+- [`madrone__data_last_updated`](madrone__data_last_updated.md)
+
 ## Notes
 
 - This page reflects the sources currently enabled in `create_data_warehouse()`, not every table defined in warehouse metadata.
