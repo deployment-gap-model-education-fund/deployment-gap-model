@@ -1569,6 +1569,7 @@ fyi__private__projects = Table(
     Column("queue_date", DateTime),
     Column("queue_date_raw", DateTime),
     Column("queue_year", Integer),
+    Column("queue_process_type", String),
     Column("county_state_pairs", String),
     Column("point_of_interconnection", String),
     Column("canonical_generation_types", String),
