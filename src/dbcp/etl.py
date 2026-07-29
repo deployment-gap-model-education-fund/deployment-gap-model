@@ -11,10 +11,8 @@ import sqlalchemy as sa
 import dbcp
 from dbcp.archivers.utils import ExtractionSettings
 from dbcp.constants import DATA_DIR, OUTPUT_DIR
-from dbcp.extract.ballot_ready import BR_URI
 from dbcp.extract.civis import extract as extract_civis
-from dbcp.extract.fips_tables import CENSUS_URI, TRIBAL_LANDS_URI
-from dbcp.extract.ncsl_state_permitting import NCSLScraper
+from dbcp.extract.helpers import load_yml_file
 from dbcp.helpers import write_to_postgres
 from dbcp.metadata import SchemaName
 from dbcp.transform.fips_tables import SPATIAL_CACHE
@@ -35,19 +33,17 @@ def etl_eip_infrastructure() -> dict[str, pd.DataFrame]:
     return eip_transformed_dfs
 
 
-def etl_lbnl_iso_queue() -> dict[str, pd.DataFrame]:
-    """LBNL ISO Queues ETL."""
-    lbnl_uri = "gs://dgm-archive/lbnl_iso_queue/queues_2024_clean_data.xlsx"
-    lbnl_raw_dfs = dbcp.extract.lbnl_iso_queue.extract(lbnl_uri)
-    lbnl_transformed_dfs = dbcp.transform.lbnl_iso_queue.transform(lbnl_raw_dfs)
-
-    return lbnl_transformed_dfs
+def etl_file_modification_dates() -> dict[str, pd.DataFrame]:
+    """Return a DF with last modified dates for all raw data inputs."""
+    file_paths = load_yml_file(DATA_DIR / "file_paths.yml")
+    file_df = dbcp.transform.file_modification.transform(file_paths)
+    return file_df
 
 
 def etl_fyi_queue() -> dict[str, pd.DataFrame]:
     """Interconnection.fyi ISO Queues ETL."""
-    fyi_uri = "gs://dgm-archive/interconnection.fyi/interconnection_fyi_dataset_2026-07-01.csv"
-    fyi_raw_dfs = dbcp.extract.fyi_queue.extract(fyi_uri)
+    file_paths = load_yml_file(DATA_DIR / "file_paths.yml")
+    fyi_raw_dfs = dbcp.extract.fyi_queue.extract(file_paths["fyi_queue"].item())
     fyi_transformed_dfs = dbcp.transform.fyi_queue.transform(fyi_raw_dfs)
     return fyi_transformed_dfs
 
@@ -55,13 +51,9 @@ def etl_fyi_queue() -> dict[str, pd.DataFrame]:
 def etl_columbia_local_opp() -> dict[str, pd.DataFrame]:
     """Columbia Local Opposition ETL."""
     # Extract
-    source_path = (
-        DATA_DIR
-        / "raw/2023.05.30 Opposition to Renewable Energy Facilities - FINAL.docx"
-    )
-
+    file_paths = load_yml_file(DATA_DIR / "file_paths.yml")
     extractor = dbcp.extract.local_opposition.ColumbiaDocxParser()
-    extractor.load_docx(source_path)
+    extractor.load_docx(file_paths["local_opposition"].item())
     docx_dfs = extractor.extract()
 
     # Transform
@@ -78,10 +70,10 @@ def etl_pudl_tables() -> dict[str, pd.DataFrame]:
 
 def etl_ncsl_state_permitting() -> dict[str, pd.DataFrame]:
     """NCSL State Permitting for Wind ETL."""
-    source_path = DATA_DIR / "raw/ncsl_state_permitting_wind.csv"
-    if not source_path.exists():
-        NCSLScraper().scrape_and_save_to_disk(source_path)
-    raw_df = dbcp.extract.ncsl_state_permitting.extract(source_path)
+    file_paths = load_yml_file(DATA_DIR / "file_paths.yml")
+    raw_df = dbcp.extract.ncsl_state_permitting.extract(
+        file_paths["ncsl_state_permitting"].item()
+    )
 
     out = dbcp.transform.ncsl_state_permitting.transform(raw_df)
 
@@ -90,10 +82,11 @@ def etl_ncsl_state_permitting() -> dict[str, pd.DataFrame]:
 
 def etl_fips_tables() -> dict[str, pd.DataFrame]:
     """Master state and county FIPS table ETL."""
-    fips = dbcp.extract.fips_tables.extract_fips(CENSUS_URI)
+    fips = dbcp.extract.fips_tables.extract_fips()
 
+    file_paths = load_yml_file(DATA_DIR / "file_paths.yml")
     fips["tribal_land"] = dbcp.extract.fips_tables.extract_census_tribal_land(
-        TRIBAL_LANDS_URI
+        file_paths["fips_tribal_lands_uri"].item()
     )
 
     out = dbcp.transform.fips_tables.transform(fips)
@@ -144,22 +137,6 @@ def etl_energy_communities_by_county() -> dict[str, pd.DataFrame]:
     return transformed
 
 
-def etl_ballot_ready() -> dict[str, pd.DataFrame]:
-    """ETL Ballot Ready election data."""
-    source_uri = BR_URI
-    raw_df = dbcp.extract.ballot_ready.extract(source_uri)
-    transformed = dbcp.transform.ballot_ready.transform(raw_df)
-    return transformed
-
-
-def etl_civis() -> dict[str, pd.DataFrame]:
-    """ETL archived LJEDF county demographics and election results."""
-    raw_dfs = extract_civis()
-    county_fips = etl_fips_tables()["census__county_fips"]
-    transformed = dbcp.transform.civis.transform(raw_dfs, county_fips=county_fips)
-    return transformed
-
-
 def etl_epa_avert() -> dict[str, pd.DataFrame]:
     """ETL EPA AVERT avoided emissions data."""
     # https://github.com/USEPA/AVERT/blob/v4.1.0/utilities/data/county-fips.txt
@@ -174,10 +151,11 @@ def etl_epa_avert() -> dict[str, pd.DataFrame]:
     return transformed
 
 
-def etl_gridstatus_isoqueues():
-    """ETL gridstatus ISO queues."""
-    raw_dfs = dbcp.extract.gridstatus_isoqueues.extract()
-    transformed = dbcp.transform.gridstatus.transform(raw_dfs)
+def etl_civis() -> dict[str, pd.DataFrame]:
+    """ETL archived Civis county demographics and election results."""
+    raw_dfs = extract_civis()
+    county_fips = etl_fips_tables()["census__county_fips"]
+    transformed = dbcp.transform.civis.transform(raw_dfs, county_fips=county_fips)
     return transformed
 
 
@@ -272,6 +250,7 @@ def create_data_warehouse():
     """Create data warehouse tables by ETL-ing each data source."""
     etl_funcs = {
         "offshore_wind": etl_offshore_wind,
+        "last_modified": etl_file_modification_dates,
         "columbia_local_opp": etl_columbia_local_opp,
         "fips_tables": etl_fips_tables,
         "manual_ordinances": etl_manual_ordinances,
@@ -338,3 +317,31 @@ if __name__ == "__main__":
     # debugging entry point
     etl()
     print("yay")
+
+
+##########################################
+### DEPRECATED ETL PIPELINES ###
+#############################
+
+# def etl_lbnl_iso_queue() -> dict[str, pd.DataFrame]:
+#     """LBNL ISO Queues ETL."""
+#     lbnl_uri = "gs://dgm-archive/lbnl_iso_queue/queues_2024_clean_data.xlsx"
+#     lbnl_raw_dfs = dbcp.extract.lbnl_iso_queue.extract(lbnl_uri)
+#     lbnl_transformed_dfs = dbcp.transform.lbnl_iso_queue.transform(lbnl_raw_dfs)
+
+#     return lbnl_transformed_dfs
+
+
+# def etl_gridstatus_isoqueues():
+#     """ETL gridstatus ISO queues."""
+#     raw_dfs = dbcp.extract.gridstatus_isoqueues.extract()
+#     transformed = dbcp.transform.gridstatus.transform(raw_dfs)
+#     return transformed
+
+
+# def etl_ballot_ready() -> dict[str, pd.DataFrame]:
+#     """ETL Ballot Ready election data."""
+#     source_uri = BR_URI
+#     raw_df = dbcp.extract.ballot_ready.extract(source_uri)
+#     transformed = dbcp.transform.ballot_ready.transform(raw_df)
+#     return transformed

@@ -11,6 +11,18 @@ This dataset tracks interconnection queue requests from 1995 to current. Interco
 have requested to connect to the electric grid. The team at interconnection.fyi builds this data using publicly-available data
 from ISOs/RTOS and non-ISO utilities. This is a non-public data source.
 
+### Tables
+#### Data Warehouse
+There are three normalized data warehouse tables produced from FYI data:
+- [fyi__private__projects](./data-warehouse/fyi__private__projects.md)
+- [fyi__private__resource_capacity](./data-warehouse/fyi__private__resource_capacity.md)
+- [fyi__private__locations](./data-warehouse/fyi__private__locations)
+
+#### Data Mart
+The three data warehouse tables feed into the following data mart table:
+- [fyi__private__counties__active_clean_projects_capacity](./data-mart/fyi__private__counties__active_clean_projects_capacity)
+
+
 ## Proposed Power Plants via LBNL
 
 Researchers at Lawrence Berkeley National Lab [compile a dataset](https://emp.lbl.gov/queues) of power plants from the interconnection queues of the 7 ISOs plus the 35 largest non-ISO utilities in the United States. In their own words: "Data from these queues ... provide a general indicator for mid-term trends in developer interest." This data is no longer the primary
