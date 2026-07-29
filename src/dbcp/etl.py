@@ -96,7 +96,7 @@ def etl_fips_tables() -> dict[str, pd.DataFrame]:
 
 def etl_justice40() -> dict[str, pd.DataFrame]:
     """ETL white house environmental justice dataset."""
-    source_path = DATA_DIR / "raw/1.0-communities.csv"
+    source_path = load_yml_file(DATA_DIR / "file_paths.yml")["justice40"].item()
     raw = dbcp.extract.justice40.extract(source_path)
     out = dbcp.transform.justice40.transform(raw)
     return out
@@ -104,8 +104,12 @@ def etl_justice40() -> dict[str, pd.DataFrame]:
 
 def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
     """ETL NREL state and local ordinances for wind and solar."""
-    wind_source_path = DATA_DIR / "raw/NREL_Wind_Ordinances.xlsx"
-    solar_source_path = DATA_DIR / "raw/NREL_Solar_Ordinances.xlsx"
+    wind_source_path = load_yml_file(DATA_DIR / "file_paths.yml")[
+        "nrel_wind_ordinances"
+    ].item()
+    solar_source_path = load_yml_file(DATA_DIR / "file_paths.yml")[
+        "nrel_solar_ordinances"
+    ].item()
     wind_raw_dfs = dbcp.extract.nrel_wind_solar_ordinances.extract(
         wind_source_path, wind_or_solar="wind"
     )
@@ -123,7 +127,9 @@ def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
 
 def etl_protected_area_by_county() -> dict[str, pd.DataFrame]:
     """ETL the PAD-US intersection with TIGER county geometries."""
-    source_path = DATA_DIR / "raw/padus_intersect_counties.parquet"
+    source_path = load_yml_file(DATA_DIR / "file_paths.yml")[
+        "padus_intersect_counties"
+    ].item()
     raw_df = dbcp.extract.protected_area_by_county.extract(source_path)
     transformed = dbcp.transform.protected_area_by_county.transform(raw_df)
     return transformed
@@ -131,7 +137,9 @@ def etl_protected_area_by_county() -> dict[str, pd.DataFrame]:
 
 def etl_energy_communities_by_county() -> dict[str, pd.DataFrame]:
     """ETL RMI's energy communities analysis."""
-    source_path = DATA_DIR / "raw/rmi_energy_communities_counties.parquet"
+    source_path = load_yml_file(DATA_DIR / "file_paths.yml")[
+        "rmi_energy_communities_counties"
+    ].item()
     raw_df = dbcp.extract.rmi_energy_communities.extract(source_path)
     transformed = dbcp.transform.rmi_energy_communities.transform(raw_df)
     return transformed
@@ -140,9 +148,13 @@ def etl_energy_communities_by_county() -> dict[str, pd.DataFrame]:
 def etl_epa_avert() -> dict[str, pd.DataFrame]:
     """ETL EPA AVERT avoided emissions data."""
     # https://github.com/USEPA/AVERT/blob/v4.1.0/utilities/data/county-fips.txt
-    path_county_region_xwalk = DATA_DIR / "raw/avert_county-fips.txt"
+    path_county_region_xwalk = load_yml_file(DATA_DIR / "file_paths.yml")[
+        "epa_avert_county_fips"
+    ].item()
     # https://www.epa.gov/avert/avoided-emission-rates-generated-avert
-    path_emission_rates = DATA_DIR / "raw/avert_emission_rates_04-25-23.xlsx"
+    path_emission_rates = load_yml_file(DATA_DIR / "file_paths.yml")[
+        "epa_avert_emission_rates"
+    ].item()
     raw_dfs = dbcp.extract.epa_avert.extract(
         county_crosswalk_path=path_county_region_xwalk,
         emission_rates_path=path_emission_rates,
