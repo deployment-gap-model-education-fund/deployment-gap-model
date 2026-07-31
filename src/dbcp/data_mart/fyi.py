@@ -11,7 +11,7 @@ from dbcp.data_mart.helpers import (
 )
 
 # from dbcp.data_mart.eia860m import create_fyi_long_format
-from dbcp.helpers import get_sql_engine
+from dbcp.helpers import get_duckdb_engine
 
 
 def _get_fyi_projects(engine: sa.engine.Engine) -> pd.DataFrame:
@@ -133,7 +133,7 @@ def create_data_mart(
     """
     postgres_engine = engine
     if postgres_engine is None:
-        postgres_engine = get_sql_engine()
+        postgres_engine = get_duckdb_engine()
 
     counties_active_clean_projects = create_fyi_counties_active_clean_projects(
         postgres_engine=postgres_engine
@@ -154,7 +154,7 @@ def create_data_mart(
 
 if __name__ == "__main__":
     # debugging entry point
-    engine = get_sql_engine()
+    engine = get_duckdb_engine()
     marts = create_data_mart(engine=engine)
 
     print("hooray")

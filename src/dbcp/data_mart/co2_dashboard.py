@@ -9,7 +9,7 @@ import sqlalchemy as sa
 
 from dbcp.constants import PUDL_LATEST_YEAR
 from dbcp.data_mart.helpers import _get_county_fips_df, _get_state_fips_df, get_query
-from dbcp.helpers import get_pudl_resource, get_sql_engine
+from dbcp.helpers import get_duckdb_engine, get_pudl_resource
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
     bedford_addfips_fix,
@@ -343,7 +343,7 @@ def create_data_mart(
     """
     postgres_engine = engine
     if postgres_engine is None:
-        postgres_engine = get_sql_engine()
+        postgres_engine = get_duckdb_engine()
 
     tables = [
         func(engine=postgres_engine)

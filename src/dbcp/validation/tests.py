@@ -6,7 +6,7 @@ from functools import lru_cache
 import pandas as pd
 from sqlalchemy.engine import Engine
 
-from dbcp.helpers import get_sql_engine
+from dbcp.helpers import get_duckdb_engine
 from dbcp.metadata.data_mart import counties_wide_format
 
 logger = logging.getLogger(__name__)
@@ -471,5 +471,5 @@ def validate_all(engine: Engine):
 
 if __name__ == "__main__":
     # debugging entry point
-    engine = get_sql_engine()
+    engine = get_duckdb_engine()
     validate_all(engine)

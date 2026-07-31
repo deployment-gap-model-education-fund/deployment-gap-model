@@ -77,6 +77,7 @@ target/
 
 # disk caches
 data/*_cache/
+data/dbcp.duckdb
 
 # EIP api reverse engineering stuff
 references/eip_api_reverse_eng/*

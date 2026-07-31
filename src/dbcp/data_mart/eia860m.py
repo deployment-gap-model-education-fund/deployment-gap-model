@@ -23,7 +23,7 @@ from dbcp.data_mart.helpers import (
     get_query,
 )
 from dbcp.extract.pudl_data import _extract_eia860m_yearly_generators
-from dbcp.helpers import add_fips_ids, get_sql_engine
+from dbcp.helpers import add_fips_ids, get_duckdb_engine
 from dbcp.transform.helpers import bedford_addfips_fix
 
 logger = logging.getLogger(__name__)
@@ -1002,18 +1002,18 @@ def get_eia860m_status_timeseries(
         engine,
     ).iloc[0, 0]
 
-    query = """
+    query = sa.text("""
 SELECT
     plant_id_eia,
     generator_id,
     operational_status_code,
     capacity_mw,
     min(report_date) AS start_date,
-    max(COALESCE(valid_until_date, timestamp %(last_report_date)s)) AS end_date
+    max(COALESCE(valid_until_date, :last_report_date)) AS end_date
 FROM data_warehouse._eia860m__changelog__generators
 GROUP BY 1, 2, 3, 4
 ORDER BY 1, 2, 3, 4
-"""
+""")
     status_history = pd.read_sql(
         query,
         engine,
@@ -1241,7 +1241,7 @@ def create_data_mart(
 ) -> dict[str, pd.DataFrame]:
     """Create projects datamart dataframe."""
     if engine is None:
-        engine = get_sql_engine()
+        engine = get_duckdb_engine()
     data_marts = {}
     eia860m_latest_generators = get_eia860m_current(engine)
     eia860m_latest_plants = get_eia860m_latest_plants(engine)
