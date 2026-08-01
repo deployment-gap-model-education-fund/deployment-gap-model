@@ -15,7 +15,7 @@ import sqlalchemy as sa
 from tqdm import tqdm
 
 import dbcp
-from dbcp.constants import DATA_DIR
+from dbcp.constants import DATA_DIR, DUCKDB_PATH
 from dbcp.metadata import SchemaName
 
 logger = logging.getLogger(__name__)
@@ -165,7 +165,7 @@ def get_postgres_engine(production: bool = False) -> sa.engine.Engine:
 def get_duckdb_engine() -> sa.engine.Engine:
     """Return duckdb engine used for local storage when ETL runs."""
     DATA_DIR.mkdir(exist_ok=True)
-    return sa.create_engine(f"duckdb:///{DATA_DIR / 'dbcp.duckdb'}")
+    return sa.create_engine(f"duckdb:///{DUCKDB_PATH}")
 
 
 def write_to_sql(

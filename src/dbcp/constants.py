@@ -296,4 +296,5 @@ except KeyError as e:
         "This is typically set in the .env file."
     ) from e
 DATA_DIR = Path(DATA_DIR_ENV_VAR).absolute()
+DUCKDB_PATH = DATA_DIR / "dbcp.duckdb"
 OUTPUT_DIR = DATA_DIR / "output"

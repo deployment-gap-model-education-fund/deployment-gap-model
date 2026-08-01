@@ -11,6 +11,8 @@ import pandas as pd
 import yaml
 from google.cloud import storage
 
+from dbcp.constants import DATA_DIR
+
 logger = logging.getLogger(__name__)
 
 
@@ -32,7 +34,7 @@ def extract_airtable_data(path: Path) -> pd.DataFrame:
 
 def cache_gcs_archive_bucket_contents_locally(
     gcs_dir_name: str,
-    local_cache_dir: str | Path = "/app/data/data_cache",
+    local_cache_dir: str | Path = DATA_DIR / "data_cache/",
     generation_num: str | None = None,
 ) -> list[Path]:
     """Cache all files in a folder of the GCS archive bucket.
@@ -65,7 +67,7 @@ def cache_gcs_archive_bucket_contents_locally(
 
 def cache_gcs_archive_file_locally(
     uri: str,
-    local_cache_dir: str | Path = "/app/data/data_cache",
+    local_cache_dir: str | Path = DATA_DIR / "data_cache/",
     generation_num: str | None = None,
 ) -> Path:
     """Cache a file stored in the GCS archive locally to a local directory.

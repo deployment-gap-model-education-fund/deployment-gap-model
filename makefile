@@ -1,29 +1,17 @@
-APP_RUN_COMMAND = docker compose run --rm app uv run
-POSTGRES_HOST ?= postgres
-POSTGRES_USER ?= postgres
-POSTGRES_PASSWORD ?= postgres
-POSTGRES_DB ?= postgres
-
-build:
-	docker compose build
-
-shell:
-	$(APP_RUN_COMMAND) /bin/bash
-
 data_warehouse:
-	$(APP_RUN_COMMAND) python -m dbcp.cli etl --data-warehouse
+	uv run python -m dbcp.cli etl --data-warehouse
 
 data_mart:
-	$(APP_RUN_COMMAND) python -m dbcp.cli etl --data-mart
+	uv run python -m dbcp.cli etl --data-mart
 
 private_data_mart:
-	$(APP_RUN_COMMAND) python -m dbcp.cli etl --private-data-mart
+	uv run python -m dbcp.cli etl --private-data-mart
 
 all:
-	$(APP_RUN_COMMAND) python -m dbcp.cli etl --data-mart --data-warehouse
+	uv run python -m dbcp.cli etl --data-mart --data-warehouse
 
 publish:
-	$(APP_RUN_COMMAND) python -m dbcp.cli publish-outputs \
+	uv run python -m dbcp.cli publish-outputs \
         -bq \
         --upload-to-postgres \
         --build-ref $(BUILD_REF) \
@@ -31,34 +19,28 @@ publish:
         --github-action-run-id $(GITHUB_ACTION_RUN_ID) \
         --target $(TARGET)
 
-sql_shell:
-	docker compose run --rm postgres bash -c 'psql -U $(POSTGRES_USER) -h $(POSTGRES_HOST) $(POSTGRES_DB)'
-
 duckdb:
-	docker compose run --publish 4213:4213 --rm app  duckdb /app/data/dbcp.duckdb \
+	uv run duckdb -c 'INSTALL ui;'
+	uv run duckdb ./data/dbcp.duckdb \
+		-cmd 'LOAD UI; CALL start_ui();' \
 		-cmd 'INSTALL bigquery FROM community; LOAD bigquery;' \
 		-cmd "ATTACH 'dbname=postgres user=$$PROD_POSTGRES_USER host=$$PROD_POSTGRES_HOST password=$$PROD_POSTGRES_PASSWORD port=6543 connect_timeout=0' AS pg_prod (TYPE postgres, SCHEMA catalyst, READ_ONLY);" \
+		-cmd "ATTACH 'dbname=postgres user=$$STAGING_POSTGRES_USER host=$$STAGING_POSTGRES_HOST password=$$STAGING_POSTGRES_PASSWORD port=5432 connect_timeout=0' AS pg_dev (TYPE postgres, SCHEMA catalyst, READ_ONLY);" \
 		-cmd "ATTACH 'project=dbcp-dev-350818' AS bq (TYPE bigquery, READ_ONLY);"
 
 test:
-	$(APP_RUN_COMMAND) pytest --ignore=input/w
-
-clean:
-	docker compose down -v
+	uv run pytest --ignore=input/w
 
 validate:
-	$(APP_RUN_COMMAND) python -m dbcp.validation.tests
-
-update_conda:
-	conda env update --file environment.yml --name dbcp-dev --prune
+	uv run python -m dbcp.validation.tests
 
 jupyter_lab:
-	docker compose up
+	uv run jupyter lab
 
 archive_all:
-	$(APP_RUN_COMMAND) python -m dbcp.cli run-archivers
+	uv run python -m dbcp.cli run-archivers
 
 save_settings:
-	$(APP_RUN_COMMAND) python -m dbcp.cli save-settings
+	uv run python -m dbcp.cli save-settings
 
 .PHONY: test # "test" collides with a directory name. This tells make to run the command even if there is a directory named "test"

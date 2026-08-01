@@ -127,7 +127,7 @@ repos:
         verbose: false
         pass_filenames: false
         always_run: true
-        entry: docker compose run --rm -T app uv run pytest --doctest-modules dbcp test/unit --ignore input/
+        entry: uv run pytest --doctest-modules src/dbcp test/unit --ignore input/
 
 # Configuration for pre-commit.ci
 ci:
