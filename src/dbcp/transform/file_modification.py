@@ -10,6 +10,8 @@ import pandas as pd
 import requests
 from google.cloud import storage
 
+from dbcp.archivers.utils import ExtractionSettings
+
 
 def _parse_iso_z(dt_str: str) -> datetime.datetime:
     """Parse an ISO 8601 timestamp.
@@ -42,6 +44,28 @@ def _github_latest_commit_date(repo_rel_path: str) -> datetime.datetime:
     return _parse_iso_z(date_str)
 
 
+def get_gcs_modified_time(
+    filepath: str, generation_num: str | None = None
+) -> datetime.datetime:
+    """Get last modified time for GCS based data."""
+    storage_client = storage.Client()
+    bucket = storage_client.bucket("dgm-archive")
+    if filepath.endswith("/"):  # If path is a folder:
+        time = max(
+            blob.updated
+            for blob in storage_client.list_blobs(
+                bucket, prefix=filepath.split("dgm-archive/")[-1]
+            )
+        )
+    else:  # Else if path is a regular file
+        # We only use generation_num when looking at individual objects
+        blob = bucket.get_blob(
+            filepath.split("dgm-archive/")[-1], generation=generation_num
+        )  # Everything after the bucket is the path
+        time = blob.updated
+    return time
+
+
 def get_last_modified_time_from_path(filepath: str):
     """Get a datetime noting the last date of file modification from a file path.
 
@@ -55,19 +79,7 @@ def get_last_modified_time_from_path(filepath: str):
     time = None
     # Get time for GCS files
     if filepath.startswith("gs://"):
-        storage_client = storage.Client()
-        bucket = storage_client.bucket("dgm-archive")
-        if filepath.endswith("/"):  # If path is a folder:
-            time = max(
-                blob.updated for blob in storage_client.list_blobs(
-                    bucket, prefix=filepath.split("dgm-archive/")[-1]
-                )
-            )
-        else:  # Else if path is a regular file
-            blob = bucket.get_blob(
-                filepath.split("dgm-archive/")[-1]
-            )  # Everything after the bucket is the path
-            time = blob.updated
+        time = get_gcs_modified_time(filepath)
     # Get time for S3 files (PUDL DB)
     elif filepath.startswith("s3://"):
         fs = fsspec.filesystem("s3", anon=True)
@@ -83,6 +95,13 @@ def get_last_modified_time_from_path(filepath: str):
         # We do this because the Docker build does not have the .git project
         # embedded within it, meaning that running git log is not an option.
         time = _github_latest_commit_date(repo_rel_path)
+    elif filepath.startswith("airtable"):
+        es = ExtractionSettings.from_yaml("/app/dbcp/settings.yaml")
+        es.update_archive_generation_numbers()
+
+        # Airtable tables all get archived on GCS so we can reuse our existing functionality here
+        gcs_filepath, generation_num = es.get_full_archive_uri(filepath).split("#")
+        time = get_gcs_modified_time(gcs_filepath, generation_num=generation_num)
     else:
         raise ValueError(
             f"File path {filepath} not currently configured for date extraction."
