@@ -1,0 +1,30 @@
+# eia860m__generators_operational_status_transition_dates
+
+This table contains the dates of each status transition for each generator in EIA 860m. Each row is one generator.
+
+## Column Descriptions
+
+**Unique Key Column(s):** (`plant_id_eia`, `generator_id`)
+
+|Subject|Column|Description|Source|Notes|
+|----|----|----|----|----|
+|Identifiers|`plant_id_eia`|The EIA Plant ID number: a unique six-digit facility identification number, also called an ORISPL, assigned by the Energy Information Administration.|EIA||
+||`generator_id`|The EIA Generator ID string|EIA|Generator ID is usually numeric, but sometimes includes letters. Make sure you treat it as a string!|
+|Properties|`plant_name_eia`|The name of the plant|EIA||
+||`date_entered_1`|The date the generator entered status code 1|EIA||
+||`date_entered_2`|The date the generator entered status code 2|EIA||
+||`date_entered_3`|The date the generator entered status code 3|EIA||
+||`date_entered_4`|The date the generator entered status code 4|EIA||
+||`date_entered_5`|The date the generator entered status code 5|EIA||
+||`date_entered_6`|The date the generator entered status code 6|EIA||
+||`date_entered_7`|The date the generator entered status code 7|EIA||
+||`date_entered_8`|The date the generator entered status code 8|EIA||
+||`date_entered_99`|The datethe generator entered status code 99|EIA||
+
+## Operational Status Codes
+
+See the documentation for `eia860m__operational_status_codes` for a description of the operational status codes.
+
+{% content-ref url="../data-warehouse/eia860m__operational_status_codes.md" %}
+[eia860m__operational_status_codes.md](../data-warehouse/eia860m__operational_status_codes.md)
+{% endcontent-ref %}

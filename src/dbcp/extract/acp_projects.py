@@ -4,9 +4,8 @@ import re
 
 import pandas as pd
 
-import dbcp
-import dbcp.extract
 import dbcp.extract.helpers
+from dbcp.constants import DATA_DIR
 
 
 def _extract_acp_projects_snapshots() -> pd.DataFrame:
@@ -14,8 +13,11 @@ def _extract_acp_projects_snapshots() -> pd.DataFrame:
 
     Used for creating the ACP changelog.
     """
+    file_paths = dbcp.extract.helpers.load_yml_file(DATA_DIR / "file_paths.yml")
+    acp_file_path = file_paths["acp_projects"].item().split("dgm-archive/")[-1]
+
     file_paths = dbcp.extract.helpers.cache_gcs_archive_bucket_contents_locally(
-        gcs_dir_name="acp"
+        gcs_dir_name=acp_file_path
     )
     concat_df = pd.DataFrame()
     snapshots = []
@@ -43,6 +45,7 @@ def extract() -> dict[str, pd.DataFrame]:
 
     Returns:
         dict[str, pd.DataFrame]: raw data, with key "raw_acp_projects_snapshots"
+
     """
     acp_raw_dfs = {}
     acp_raw_dfs["raw_acp_projects_snapshots"] = _extract_acp_projects_snapshots()

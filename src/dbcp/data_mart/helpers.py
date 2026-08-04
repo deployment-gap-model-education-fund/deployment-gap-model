@@ -12,21 +12,21 @@ from dbcp.helpers import get_sql_engine
 def _subset_db_columns(
     columns: Sequence[str], table: str, engine: sa.engine.Engine
 ) -> pd.DataFrame:
-    query = f"SELECT {', '.join(columns)} FROM {table}"
+    query = f"SELECT {', '.join(columns)} FROM {table}"  # noqa: S608
     df = pd.read_sql(query, engine)
     return df
 
 
 def _get_county_fips_df(engine: sa.engine.Engine) -> pd.DataFrame:
     cols = ["*"]
-    db = "data_warehouse.county_fips"
+    db = "data_warehouse.census__county_fips"
     df = _subset_db_columns(cols, db, engine)
     return df
 
 
 def _get_state_fips_df(engine: sa.engine.Engine) -> pd.DataFrame:
     cols = ["*"]
-    db = "data_warehouse.state_fips"
+    db = "data_warehouse.census__state_fips"
     df = _subset_db_columns(cols, db, engine)
     return df
 
@@ -70,32 +70,27 @@ class CountyOpposition:
             # 'raw_state_name',  # drop raw name in favor of canonical one
             # 'state_id_fips',  # will join on 5-digit county FIPS, which includes state
         ]
-        db = "data_warehouse.local_ordinance"
+        db = "data_warehouse.columbia_reldi_local_opposition__local_ordinance"
         df = _subset_db_columns(cols, db, self._engine)
         return df
 
     def _get_state_opposition_df(self) -> pd.DataFrame:
         cols = [
             "earliest_year_mentioned",
-            # 'latest_year_mentioned',  # for simplicity, only include one year metric (earliest_year_mentioned)
-            # 'n_years_mentioned',  # for simplicity, only include one year metric (earliest_year_mentioned)
             "policy",
-            # 'raw_state_name',  # drop raw name in favor of canonical one
             "state_id_fips",
         ]
-        table = "data_warehouse.state_policy"
+        table = "data_warehouse.columbia_reldi_local_opposition__state_policy"
         states_to_exclude = (
             "23",  # Maine (repealed)
             "36",  # New York (pro-renewables policy)
         )
-        query = f"SELECT {', '.join(cols)} FROM {table} WHERE state_id_fips NOT IN {states_to_exclude}"
+        query = f"SELECT {', '.join(cols)} FROM {table} WHERE state_id_fips NOT IN {states_to_exclude}"  # noqa: S608
         df = pd.read_sql(query, self._engine)
         return df
 
     def _represent_state_policy_as_local_ordinances(self) -> pd.DataFrame:
         """Downscale state policies to look like county-level ordinances at each county in the respective state.
-
-        To make concatenation easier, the output dataframe imitates the columns of the local ordinance table.
 
         Returns:
             pd.DataFrame: fanned out state policy dataframe
@@ -199,7 +194,7 @@ class CountyOpposition:
 
     def _get_manual_ordinances(self) -> pd.DataFrame:
         df = pd.read_sql_table(
-            "manual_ordinances", self._engine, schema="data_warehouse"
+            "airtable__manual_ordinances", self._engine, schema="data_warehouse"
         )
         return df
 
@@ -207,7 +202,7 @@ class CountyOpposition:
         self,
         include_state_policies=True,
         include_nrel_bans=False,
-        include_manual_ordinances=False,
+        include_manual_ordinances=True,
     ) -> pd.DataFrame:
         """Aggregate local policies, and optionally state policies, to the county level.
 
@@ -227,9 +222,11 @@ class CountyOpposition:
         if include_nrel_bans:
             nrel = self._get_nrel_bans()
             aggregated = aggregated.merge(nrel, on="county_id_fips", how="outer")
+
         if include_manual_ordinances:
             manual = self._get_manual_ordinances()
             aggregated = aggregated.merge(manual, on="county_id_fips", how="outer")
+
         return aggregated
 
 
@@ -251,7 +248,7 @@ def _add_emissions_factors(
 
 def _estimate_proposed_power_co2e(
     iso_projects: pd.DataFrame,
-) -> None:
+) -> pd.DataFrame:
     """Estimate CO2e tons per year from capacity and fuel type. Currently for fossil plants only.
 
     This is essentially a manual decision tree. Capacity factors were simple mean
@@ -311,10 +308,11 @@ def _estimate_proposed_power_co2e(
     )
 
     iso_projects["estimated_capacity_factor"] = gt_small_cap_factor
-    iso_projects.loc[:, "estimated_capacity_factor"].where(
+    iso_projects.loc[:, "estimated_capacity_factor"] = iso_projects.loc[
+        :, "estimated_capacity_factor"
+    ].where(
         ~is_cc & iso_projects.loc[:, "capacity_mw"].le(gt_sub_split),
         other=gt_large_cap_factor,
-        inplace=True,
     )
     iso_projects.loc[:, "estimated_capacity_factor"] = iso_projects.loc[
         :, "estimated_capacity_factor"
@@ -345,8 +343,37 @@ def _estimate_proposed_power_co2e(
         "mod_resource",
         "estimated_capacity_factor",
     ]
-    iso_projects.drop(columns=intermediates, inplace=True)
-    return
+    return iso_projects.drop(columns=intermediates)
+
+
+def _get_proprietary_proposed_offshore(engine: sa.engine.Engine) -> pd.DataFrame:
+    """Get proprietary offshore wind data in a format that imitates the ISO queues.
+
+    PK is (project_id, county_id_fips).
+
+    Note that this duplicates projects that have multiple cable landings. Use the frac_locations_in_county
+    column to allocate capacity and co2e estimates to counties when aggregating.
+    Otherwise they will be double-counted.
+    """
+    query = get_query("get_proprietary_proposed_offshore.sql")
+    df = pd.read_sql(query, engine)
+    return df
+
+
+def _replace_iso_offshore_with_proprietary(
+    iso_queues: pd.DataFrame, proprietary: pd.DataFrame
+) -> pd.DataFrame:
+    """Replace offshore wind projects in the ISO queues with proprietary data.
+
+    PK should be (source, project_id, county_id_fips, resource_clean), but county_id_fips has nulls.
+    """
+    iso_to_keep = iso_queues.loc[iso_queues["resource_clean"] != "Offshore Wind", :]
+    out = pd.concat(
+        [iso_to_keep, proprietary],
+        axis=0,
+        ignore_index=True,
+    )
+    return out
 
 
 def get_query(filename: str) -> str:
@@ -361,14 +388,20 @@ def get_query(filename: str) -> str:
     Returns:
         the query as a string
     Example:
-        >>> import pandas as pd
-        >>> from dbcp.data_mart.helpers import get_query
-        >>> from dbcp.helpers import get_sql_engine
-        >>> engine = get_sql_engine()
-        >>> query = get_query("get_proposed_infra_projects.sql")
-        >>> df = pd.read_sql(query, engine)
+        Use `query = get_query("get_proposed_infra_projects.sql")` and pass the
+        returned SQL string to `pd.read_sql(...)`.
 
     """
     sql_query_dir = Path(__file__).parent / "sql_queries"
     full_path = sql_query_dir / filename
     return full_path.read_text()
+
+
+def _convert_date_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert columns containing 'date' to datetimes."""
+    df = df.convert_dtypes().copy()
+    # Convert every column with date in it to a datetime column
+    for col in df.columns:
+        if "date" in col:
+            df[col] = pd.to_datetime(df[col])
+    return df

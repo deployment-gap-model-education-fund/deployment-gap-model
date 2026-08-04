@@ -58,7 +58,7 @@ def _transform_state_policy(state_policy_df: pd.DataFrame) -> pd.DataFrame:
     ).drop(columns="county_id_fips")
     year_summaries = _extract_years(state.loc[:, "policy"])
     state = pd.concat([state, year_summaries], axis=1)
-    state.rename(columns={"state": "raw_state_name"}, inplace=True)
+    state = state.rename(columns={"state": "raw_state_name"})
     return state
 
 
@@ -76,7 +76,7 @@ def _transform_state_notes(state_notes_df: pd.DataFrame) -> pd.DataFrame:
     # Just rename a column for compatibility, then rename it back.
     notes = state_notes_df.rename(columns={"notes": "policy"})
     notes = _transform_state_policy(notes)
-    notes.rename(columns={"policy": "notes"}, inplace=True)
+    notes = notes.rename(columns={"policy": "notes"})
     return notes
 
 
@@ -97,9 +97,6 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
     for col in string_cols:
         local.loc[:, col] = local.loc[:, col].str.strip()
 
-    # TODO: check if Saratoga County still needs a correction
-    # when geocodio-library-python goes in
-    # manual corrections
     location_corrections = {
         "Batavia Township (Clermont County)": "Branch County",
         "Town of Albion (Kennebec County)": "Albion (Kennebec County)",
@@ -119,7 +116,7 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
         "Town of Ballston (Saratoga County)": "Saratoga County",
     }
     raw_locality = local["locality"].copy()
-    local.loc[:, "locality"].replace(location_corrections, inplace=True)
+    local.loc[:, "locality"] = local.loc[:, "locality"].replace(location_corrections)
 
     # Remove (Count Name) from localities because geocodio performs better with just the locality name
     local["locality"] = local["locality"].str.replace(r"\s?\(.*?\)", "", regex=True)
@@ -137,9 +134,8 @@ def _transform_local_ordinances(local_ord_df: pd.DataFrame) -> pd.DataFrame:
     with_fips.loc[:, "locality"] = raw_locality
     year_summaries = _extract_years(local["ordinance_text"])
     local = pd.concat([with_fips, year_summaries], axis=1)
-    local.rename(
-        columns={"locality": "raw_locality_name", "state": "raw_state_name"},
-        inplace=True,
+    local = local.rename(
+        columns={"locality": "raw_locality_name", "state": "raw_state_name"}
     )
     _validate_ordinances(local)
 
@@ -162,19 +158,23 @@ def _transform_contested_projects(project_df: pd.DataFrame) -> pd.DataFrame:
     )
     year_summaries = _extract_years(proj.loc[:, "description"])
     proj = pd.concat([proj, year_summaries], axis=1)
-    proj.rename(columns={"state": "raw_state_name"}, inplace=True)
+    proj = proj.rename(columns={"state": "raw_state_name"})
     return proj
 
 
 def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """Transform local opposition data."""
     transform_funcs = {
-        "state_policy": _transform_state_policy,
-        "state_notes": _transform_state_notes,
-        "local_ordinance": _transform_local_ordinances,
-        "contested_project": _transform_contested_projects,
+        "columbia_reldi_local_opposition__state_policy": _transform_state_policy,
+        # "state_notes": _transform_state_notes,
+        "columbia_reldi_local_opposition__local_ordinance": _transform_local_ordinances,
+        # "contested_project": _transform_contested_projects,
     }
-    transformed = {key: transform_funcs[key](raw_dfs[key]) for key in raw_dfs}
+    transformed = {
+        key: transform_funcs[key](raw_dfs[key])
+        for key in transform_funcs
+        if key in raw_dfs
+    }
     return transformed
 
 

@@ -29,12 +29,15 @@ import sqlalchemy as sa
 from dbcp.data_mart.co2_dashboard import (
     _estimate_existing_co2e,
     _get_existing_plant_fuel_data,
-    _get_plant_location_data,
-    _transfrom_plant_location_data,
+)
+from dbcp.data_mart.eia860m import (
+    _get_latest_plant_attributes,
+    _get_latest_plant_locations,
 )
 from dbcp.data_mart.fossil_infrastructure_projects import (
     create_data_mart as create_fossil_infra_data_mart,
 )
+from dbcp.data_mart.fyi import create_fyi_long_format as create_fyi_data_mart
 from dbcp.data_mart.helpers import (
     CountyOpposition,
     _get_county_fips_df,
@@ -42,7 +45,6 @@ from dbcp.data_mart.helpers import (
     _subset_db_columns,
     get_query,
 )
-from dbcp.data_mart.projects import create_fyi_long_format as create_fyi_data_mart
 from dbcp.helpers import get_sql_engine
 
 JUSTICE40_AGGREGATES = pd.read_csv(
@@ -98,7 +100,7 @@ def _create_dbcp_ej_index(j40_df: pd.DataFrame) -> pd.Series:
     1. By counties: If any of the indicators (within a category) has >1 (meaning at least 1 tract is affected), then it's a YES.
     2. Each indicator category has a unique weight, so each YES is counted by the weight assigned to that category
     3. For each county, sum all of the YES indicator categories with its appropriate weight.
-    4. Final number sums all indicator catergories and gives you the Justice 40 DBCP Index.
+    4. Final number sums all indicator categories and gives you the Justice 40 DBCP Index.
     """
     category_weights = {  # specified by client
         "climate": 1.0,
@@ -213,61 +215,10 @@ def _get_env_justice_df(engine: sa.engine.Engine) -> pd.DataFrame:
     return df
 
 
-def _get_existing_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
-    # get plant_id, fuel_type, capacity_mw
-
-    # The query here relies on the fact that each generator has only one fuel_type_pudl.
-    # I confirmed that this is true because the following query returns 1:
-    # WITH
-    # gen_fuels as (
-    #     SELECT
-    #         plant_id_eia,
-    #         generator_id,
-    #         count(fuel_type_code_pudl) as fuel_type_count
-    #     FROM "data_warehouse"."pudl_generators"
-    #     GROUP BY 1, 2
-    # )
-    # SELECT max(fuel_type_count) as max_fuel_type_count
-    # FROM gen_fuels
-
-    query = get_query("get_existing_plant_attributes.sql")
-    df = pd.read_sql(query, engine)
-    resource_map = {
-        "gas": "Natural Gas",
-        "wind": "Onshore Wind",
-        "hydro": "Hydro",
-        "oil": "Oil",
-        "nuclear": "Nuclear",
-        "coal": "Coal",
-        "other": "Other",
-        "solar": "Solar",
-        "Battery Storage": "Battery Storage",
-        "Offshore Wind": "Offshore Wind",
-    }
-    df.loc[:, "resource"] = df.loc[:, "resource"].map(resource_map)
-    return df
-
-
 def _get_existing_fossil_plant_co2e_estimates() -> pd.Series:
     gen_fuel_923 = _get_existing_plant_fuel_data()
     plant_co2e = _estimate_existing_co2e(gen_fuel_923)
     return plant_co2e
-
-
-def _get_existing_plant_locations(
-    postgres_engine: sa.engine.Engine,
-    state_fips_table: pd.DataFrame | None = None,
-    county_fips_table: pd.DataFrame | None = None,
-):
-    if state_fips_table is None:
-        state_fips_table = _get_state_fips_df(postgres_engine)
-    if county_fips_table is None:
-        county_fips_table = _get_county_fips_df(postgres_engine)
-    plant_locations = _get_plant_location_data()
-    plant_locations = _transfrom_plant_location_data(
-        plant_locations, state_table=state_fips_table, county_table=county_fips_table
-    )
-    return plant_locations
 
 
 def _get_existing_plants(
@@ -275,9 +226,9 @@ def _get_existing_plants(
     state_fips_table: pd.DataFrame | None = None,
     county_fips_table: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    plants = _get_existing_plant_attributes(engine=postgres_engine)
+    plants = _get_latest_plant_attributes(engine=postgres_engine)
     co2e = _get_existing_fossil_plant_co2e_estimates()
-    locations = _get_existing_plant_locations(
+    locations = _get_latest_plant_locations(
         postgres_engine=postgres_engine,
         state_fips_table=state_fips_table,
         county_fips_table=county_fips_table,
@@ -432,7 +383,7 @@ def _get_ncsl_wind_permitting_df(engine: sa.engine.Engine) -> pd.DataFrame:
         # 'raw_state_name',  # drop raw name in favor of canonical one
         "state_id_fips",
     ]
-    db = "data_warehouse.ncsl_state_permitting"
+    db = "data_warehouse.ncsl__state_permitting"
     df = _subset_db_columns(cols, db, engine)
     return df
 
@@ -648,7 +599,7 @@ def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
     """
     pad = pd.read_sql(query, postgres_engine)
     # county_area_coast_clipped is consistent with clipped PAD-US but
-    # the county_fips.land_area_km2 is more accurate and preferred for
+    # the census__county_fips.land_area_km2 is more accurate and preferred for
     # downstream analysis.
     # I use the consistent value to calculate ratio, then pair that ratio
     #  with the accurate land area in the data mart
