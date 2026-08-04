@@ -18,8 +18,7 @@ geocoder_local_cache = DATA_DIR / "google_geocoder_cache"
 geocoder_local_cache.mkdir(parents=True, exist_ok=True)
 assert geocoder_local_cache.exists()
 # cache needs to be accessed outside this module to call .clear()
-# limit cache size to keep most recently accessed first
-GEOCODER_CACHE = Memory(location=geocoder_local_cache, bytes_limit=2**19)
+GEOCODER_CACHE = Memory(location=geocoder_local_cache)
 
 
 class GoogleGeocoder:
@@ -44,7 +43,7 @@ class GoogleGeocoder:
                     raise ValueError(
                         "API_KEY_GOOGLE_MAPS environment variable not set. "
                         " See README.md for how to set it."
-                    )
+                    ) from e
                 raise e
 
         self.client = googlemaps.Client(key=key)
@@ -54,7 +53,7 @@ class GoogleGeocoder:
     def geocode_request(
         self, name: str, state: str, country: str | None = None
     ) -> None:
-        """Make a geocode equest."""
+        """Make a geocode request."""
         self._clear_cache()
         if country is None:
             country = "US"
@@ -94,7 +93,7 @@ class GoogleGeocoder:
             raise AttributeError("No response yet. Call geocode_request() first.")
 
         # check special case where Google returns a street address.
-        # In this special case we don't want the most specifc name
+        # In this special case we don't want the most specific name
         # but instead the 'administrative_area_level_3' name.
         # An example of this special case is "Town of Seneca (Ontario County), NY"
         # where the 'locality' name is "Stanley", but we want "Seneca". I don't
@@ -108,16 +107,17 @@ class GoogleGeocoder:
             if GoogleGeocoder.STREET_LABELS & set(component["types"]):
                 is_street_address = True
                 continue  # skip street address components
-            if (
-                is_street_address
-            ):  # special case: skip until 'administrative_area_level_3'
-                if GoogleGeocoder.TOWN_LABEL not in component["types"]:
-                    continue
+            # special case: skip until 'administrative_area_level_3'
+            if (is_street_address) and GoogleGeocoder.TOWN_LABEL not in component[
+                "types"
+            ]:
+                continue
             self._locality_name = component["short_name"]
             break
         if not self._locality_name:
             warn(
-                f"Unable to find locality name for {self._name}, {self._state}, {self._country}"
+                f"Unable to find locality name for {self._name}, {self._state}, {self._country}",
+                stacklevel=2,
             )
             self._locality_name = ""
         return self._locality_name
@@ -169,7 +169,8 @@ class GoogleGeocoder:
             self._admin_type = "county"
         else:
             warn(
-                f"Unknown administrative area type for {self._name}, {self._state}, {self._country}"
+                f"Unknown administrative area type for {self._name}, {self._state}, {self._country}",
+                stacklevel=2,
             )
             self._admin_type = ""
         return self._admin_type

@@ -1,9 +1,9 @@
-"""Tranform raw FIPS tables to a database-ready form."""
+"""Transform raw FIPS tables to a database-ready form."""
 
 import logging
 from collections.abc import Sequence
 
-import geopandas as gpd
+import geopandas as geopandas
 import pandas as pd
 from joblib import Memory
 
@@ -12,14 +12,13 @@ from dbcp.constants import DATA_DIR
 logger = logging.getLogger(__name__)
 
 # cache needs to be accessed outside this module to call .clear()
-# limit cache size to 1 MB, keeps most recently accessed first
-SPATIAL_CACHE = Memory(location=DATA_DIR / "spatial_cache", bytes_limit=2**20)
+SPATIAL_CACHE = Memory(location=DATA_DIR / "spatial_cache")
 
 
 @SPATIAL_CACHE.cache()
 def _add_tribal_land_frac(
-    counties: gpd.GeoDataFrame, tribal_land: gpd.GeoDataFrame
-) -> gpd.GeoDataFrame:
+    counties: geopandas.GeoDataFrame, tribal_land: geopandas.GeoDataFrame
+) -> geopandas.GeoDataFrame:
     """Add tribal_land_frac column to the counties table.
 
     Args:
@@ -94,7 +93,7 @@ def county_fips(counties: pd.DataFrame, tribal_land: pd.DataFrame) -> pd.DataFra
         "INTPTLON": "centroid_longitude",
         "geometry": "geometry",
     }
-    counties = counties.loc[:, rename_dict.keys()].rename(columns=rename_dict)  # type: ignore
+    counties = counties.loc[:, rename_dict.keys()].rename(columns=rename_dict)
 
     # convert units from m2 to km2
     counties.loc[:, ["land_area_km2", "water_area_km2"]] /= 1e6
