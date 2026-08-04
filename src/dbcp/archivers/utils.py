@@ -106,8 +106,8 @@ class ExtractionSettings:
         """Get the full archive name with the folder name."""
         try:
             archive = self.archived_data[archive_name]
-        except KeyError:
-            raise KeyError(f"Archive {archive_name} not found in the settings.")
+        except KeyError as e:
+            raise KeyError(f"Archive {archive_name} not found in the settings.") from e
         return f"gs://{self.bucket.name}/{archive.get_full_path}"
 
     def update_archive_generation_numbers(self):

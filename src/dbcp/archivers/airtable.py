@@ -32,11 +32,11 @@ class AirtableArchiver(AbstractArchiver):
     archive_name = "airtable"
 
     def __init__(self, api: Api = None):
-        """
-        Initialize the Airtable archiver.
+        """Initialize the Airtable archiver.
 
         Args:
             api: The Airtable API object to use. If None, the API key is read from the AIRTABLE_API_KEY environment variable.
+
         """
         super().__init__()
         if api is None:
@@ -45,8 +45,7 @@ class AirtableArchiver(AbstractArchiver):
         self.api = api
 
     def archive_base(self, base_info: AirtableBaseInfo) -> None:
-        """
-        Archive a single Airtable base to GCS.
+        """Archive a single Airtable base to GCS.
 
         This method archives the schema of the base which includes the schema of all tables in the base.
         Then it archives the data of each table in the base. The GCS generation number of the
@@ -54,6 +53,7 @@ class AirtableArchiver(AbstractArchiver):
 
         Args:
             base_info: Information about the Airtable base to archive.
+
         """
         logger.info(f"Archiving base {base_info.base_name}")
         base = self.api.base(base_info.base_id)

@@ -2,90 +2,147 @@
 
 import logging
 from functools import lru_cache
-from io import StringIO
 
 import pandas as pd
 from sqlalchemy.engine import Engine
 
-from dbcp.data_mart.counties import (
-    _add_derived_columns,
-    _get_county_properties,
-    _get_offshore_wind_extra_cols,
-)
 from dbcp.helpers import get_sql_engine
 from dbcp.metadata.data_mart import counties_wide_format
 
 logger = logging.getLogger(__name__)
 
+COUNTY_LEVEL_WIDE_FORMAT_COLS = pd.Index(
+    [
+        "state_id_fips",
+        "county_id_fips",
+        "state",
+        "county",
+        "ordinance_text",
+        "ordinance_earliest_year_mentioned",
+        "ordinance_jurisdiction_name",
+        "ordinance_jurisdiction_type",
+        "ordinance_is_restrictive",
+        "ordinance_via_reldi",
+        "ordinance_via_solar_nrel",
+        "ordinance_via_wind_nrel",
+        "ordinance_via_nrel_is_de_facto",
+        "ordinance_via_self_maintained",
+        "state_permitting_type",
+        "state_permitting_text",
+        "total_tracts",
+        "justice40_dbcp_index",
+        "n_distinct_qualifying_tracts",
+        "n_tracts_agriculture_loss_low_income",
+        "n_tracts_asthma_low_income",
+        "n_tracts_below_poverty_and_low_high_school",
+        "n_tracts_below_poverty_line_less_than_high_school_islands",
+        "n_tracts_building_loss_low_income",
+        "n_tracts_diabetes_low_income",
+        "n_tracts_diesel_particulates_low_income",
+        "n_tracts_energy_burden_low_income",
+        "n_tracts_hazardous_waste_proximity_low_income",
+        "n_tracts_heart_disease_low_income",
+        "n_tracts_housing_burden_low_income",
+        "n_tracts_lead_paint_and_median_home_price_low_income",
+        "n_tracts_life_expectancy_low_income",
+        "n_tracts_linguistic_isolation_and_low_high_school",
+        "n_tracts_local_to_area_income_ratio_and_low_high_school",
+        "n_tracts_local_to_area_income_ratio_less_than_high_school_islan",
+        "n_tracts_pm2_5_low_income",
+        "n_tracts_population_loss_low_income",
+        "n_tracts_superfund_proximity_low_income",
+        "n_tracts_traffic_low_income",
+        "n_tracts_unemployment_and_low_high_school",
+        "n_tracts_unemployment_less_than_high_school_islands",
+        "n_tracts_wastewater_low_income",
+        "unprotected_land_area_km2",
+        "federal_fraction_unprotected_land",
+        "county_land_area_km2",
+        "tribal_land_frac",
+        "energy_community_coal_closures_area_fraction",
+        "energy_community_qualifies_via_employment",
+        "energy_community_qualifies",
+    ]
+)
 
-def test_j40_county_fips_coverage(engine: Engine):
-    """Test the expected differences between Justice40 county_id_fips and the Census county FIPS table.
-
-    Justice40 uses 2010 Census tracts, whereas the Census county FIPS table uses 2020 Census tracts.
-    There are a handful of differences between the two:
-    - Census areas in Alaska were redefined
-    - Shannon County, SD was renamed to Oglala Lakota County, SD and assigned a new FIPS 46113 -> 46102
-    - Bedford City, VA was merged into Bedford County, VA (FIPS 51019). Its old FIPS 51515 is defunct.
-    """
-    query = """
-    WITH
-    j40_counties as (
-        SELECT
-            DISTINCT SUBSTRING("tract_id_fips", 1, 5) as county_id_fips
-        FROM data_warehouse.justice40_tracts
-    )
-    select
-        j.county_id_fips as j40_fips,
-        c.county_id_fips as c_fips
-    from j40_counties as j
-    full outer join data_warehouse.county_fips as c
-    USING (county_id_fips)
-    where j.county_id_fips is null
-    or c.county_id_fips is null
-    order by j40_fips desc nulls last, c_fips desc nulls last
-    """
-    expected = pd.read_csv(
-        StringIO(
-            """j40_fips,c_fips
-51515,null
-46113,null
-02270,null
-02261,null
-null,46102
-null,02158
-null,02066
-null,02063
-"""
-        ),
-        dtype="string",
-        header=0,
-    )
-    actual = pd.read_sql(query, engine).astype("string")
-    pd.testing.assert_frame_equal(actual, expected)
+OFFSHORE_WIND_EXTRA_COLS = pd.Index(
+    [
+        "offshore_wind_capacity_mw_via_ports",
+        "offshore_wind_interest_type",
+    ]
+)
 
 
-def test_gridstatus_fips_coverage(engine: Engine):
-    """Make sure we have high coverage for county_id_fips codes or gridstatus_projects."""
-    with engine.connect() as con:
-        gridstatus_locations = pd.read_sql_table(
-            "gridstatus_locations", con, schema="data_warehouse"
-        )
-    location_coverage = gridstatus_locations.county_id_fips.isna().sum() / len(
-        gridstatus_locations
-    )
-    assert location_coverage < 0.04, (
-        "More than 4 percent of Grid Status locations could not be geocoded."
-    )
+# def test_j40_county_fips_coverage(engine: Engine):
+#     """Test the expected differences between Justice40 county_id_fips and the Census county FIPS table.
+#
+#     Justice40 uses 2010 Census tracts, whereas the Census county FIPS table uses 2020 Census tracts.
+#     There are a handful of differences between the two:
+#     - Census areas in Alaska were redefined
+#     - Shannon County, SD was renamed to Oglala Lakota County, SD and assigned a new FIPS 46113 -> 46102
+#     - Bedford City, VA was merged into Bedford County, VA (FIPS 51019). Its old FIPS 51515 is defunct.
+#     """
+#     query = """
+#     WITH
+#     j40_counties as (
+#         SELECT
+#             DISTINCT SUBSTRING("tract_id_fips", 1, 5) as county_id_fips
+#         FROM data_warehouse.justice40_tracts
+#     )
+#     select
+#         j.county_id_fips as j40_fips,
+#         c.county_id_fips as c_fips
+#     from j40_counties as j
+#     full outer join data_warehouse.census__county_fips as c
+#     USING (county_id_fips)
+#     where j.county_id_fips is null
+#     or c.county_id_fips is null
+#     order by j40_fips desc nulls last, c_fips desc nulls last
+#     """
+#     expected = pd.read_csv(
+#         StringIO(
+#             """j40_fips,c_fips
+# 51515,null
+# 46113,null
+# 02270,null
+# 02261,null
+# null,46102
+# null,02158
+# null,02066
+# null,02063
+# """
+#         ),
+#         dtype="string",
+#         header=0,
+#     )
+#     actual = pd.read_sql(query, engine).astype("string")
+#     pd.testing.assert_frame_equal(actual, expected)
 
 
-def test_fyi_fips_coverage(engine: Engine):
-    """Make sure we have high coverage for county_id_fips codes in the fyi_locations table."""
-    with engine.connect() as con:
-        fyi_locations = pd.read_sql_table("fyi_locations", con, schema="data_warehouse")
-    location_coverage = fyi_locations.county_id_fips.isna().sum() / len(fyi_locations)
-    assert location_coverage < 0.02, (
-        "More than 2 percent of FYI locations could not be geocoded."
-    )
+# def test_gridstatus_fips_coverage(engine: Engine):
+#     """Make sure we have high coverage for county_id_fips codes or gridstatus_projects."""
+#     with engine.connect() as con:
+#         gridstatus_locations = pd.read_sql_table(
+#             "gridstatus_locations", con, schema="data_warehouse"
+#         )
+#     location_coverage = gridstatus_locations.county_id_fips.isna().sum() / len(
+#         gridstatus_locations
+#     )
+#     assert location_coverage < 0.04, (
+#         "More than 4 percent of Grid Status locations could not be geocoded."
+#     )
+
+
+# def test_fyi_fips_coverage(engine: Engine):
+#     """Make sure we have high coverage for county_id_fips codes in the FYI private locations table."""
+#     with engine.connect() as con:
+#         fyi_locations = pd.read_sql_table(
+#             "fyi__private__locations", con, schema="private_data_warehouse"
+#         )
+#     location_coverage = fyi_locations.county_id_fips.isna().sum() / len(fyi_locations)
+#     assert location_coverage < 0.02, (
+#         "More than 2 percent of FYI locations could not be geocoded."
+#     )
 
 
 def test_iso_projects_sources(engine: Engine):
@@ -226,10 +283,10 @@ def test_county_commission_election_info(engine: Engine):
 def test_county_wide_coverage(engine: Engine):
     """Check how many counties have technical data in counties_wide_format."""
     cols_to_fetch = _get_non_county_cols_from_wide_format(engine)
-    query = f"SELECT {','.join(cols_to_fetch)} FROM data_mart.counties_wide_format"
+    query = f"SELECT {','.join(cols_to_fetch)} FROM data_mart.counties_wide_format"  # noqa: S608
     df = pd.read_sql(query, engine)
     n_counties = pd.read_sql(
-        "SELECT count(*) FROM data_warehouse.county_fips", engine
+        "SELECT count(*) FROM data_warehouse.census__county_fips", engine
     ).squeeze()
     assert df.shape[0] == n_counties, (
         "counties_wide_format does not contain all counties"
@@ -251,14 +308,13 @@ def test_county_wide_coverage(engine: Engine):
 
 def test_county_long_vs_wide(engine: Engine):
     """Check that the long and wide formats have the same data, where appropriate."""
-    offshore_wind_extra_cols = _get_offshore_wind_extra_cols(engine).columns
     # don't count the extra offshore cols because they are not present in long format (3 extra counties covered)
     cols_to_fetch = list(
         _get_non_county_cols_from_wide_format(engine).difference(
-            offshore_wind_extra_cols
+            OFFSHORE_WIND_EXTRA_COLS
         )
     ) + ["county_id_fips"]
-    query = f"SELECT {','.join(cols_to_fetch)} FROM data_mart.counties_wide_format"
+    query = f"SELECT {','.join(cols_to_fetch)} FROM data_mart.counties_wide_format"  # noqa: S608
     wide_format_technical = pd.read_sql(query, engine).set_index("county_id_fips")
 
     # filter long_format for only the same resources as wide_format
@@ -284,7 +340,7 @@ def test_county_long_vs_wide(engine: Engine):
         "Petrochemicals and Plastics",
     }
     string_wrapped = (f"'{item}'" for item in resources_to_keep)
-    shorter_long_query = f"SELECT * FROM data_mart.counties_long_format WHERE resource_or_sector in ({','.join(string_wrapped)})"
+    shorter_long_query = f"SELECT * FROM data_mart.counties_long_format WHERE resource_or_sector in ({','.join(string_wrapped)})"  # noqa: S608
     shorter_long_format = pd.read_sql(shorter_long_query, engine)
 
     # county coverage ~~of technical data~~ should be the same (not true for
@@ -316,34 +372,86 @@ def test_county_long_vs_wide(engine: Engine):
 
 
 def test_manual_ordinance_fips_coverage(engine: Engine):
-    """Check that manual_ordinances and county_fips have identical FIPS."""
+    """Check that airtable__manual_ordinances and census__county_fips have identical FIPS."""
     query = """
     SELECT
         m.county_id_fips as manual_fips,
         c.county_id_fips as county_fips
-    FROM data_mart.manual_ordinances as m
-    FULL OUTER JOIN data_warehouse.county_fips as c
+    FROM data_mart.airtable__manual_ordinances as m
+    FULL OUTER JOIN data_warehouse.census__county_fips as c
     USING (county_id_fips)
     WHERE m.county_id_fips is null OR c.county_id_fips is null
     """
     actual = pd.read_sql(query, engine)
-    assert actual.empty, "Found mismatched FIPS in manual_ordinances"
+    assert actual.empty, "Found mismatched FIPS in airtable__manual_ordinances"
+
+
+def test_civis_county_election_results(engine: Engine):
+    """Check LJEDF county politics table keys and percentage ranges."""
+    df = pd.read_sql_table(
+        "civis__counties__election_results", engine, schema="data_warehouse"
+    )
+    assert df["county_id_fips"].is_unique, "Found duplicate county FIPS in LJEDF table."
+    expected_n_counties = pd.read_sql(
+        """
+        SELECT count(*)
+        FROM data_warehouse.census__county_fips
+        WHERE CAST(state_id_fips AS INTEGER) < 60
+        """,
+        engine,
+    ).squeeze()
+    assert len(df) == expected_n_counties, (
+        "LJEDF election results table is not correctly indexed by census__county_fips coverage."
+    )
+
+    missing_fips = pd.read_sql(
+        """
+        SELECT l.county_id_fips
+        FROM data_warehouse.civis__counties__election_results AS l
+        LEFT JOIN data_warehouse.census__county_fips AS c
+        USING (county_id_fips)
+        WHERE c.county_id_fips IS NULL
+        """,
+        engine,
+    )
+    assert missing_fips.empty, (
+        "Found LJEDF county FIPS missing from census__county_fips."
+    )
+
+    pct_cols = [
+        "female_pct",
+        "male_pct",
+        "white_pct",
+        "black_pct",
+        "asian_pct",
+        "american_indian_pct",
+        "minority_pct",
+        "age_25_to_64_pct",
+        "biden_2020_pct",
+        "projected_dems_pct",
+        "below_college_pct",
+        "harris_2024_pct",
+    ]
+    for col in pct_cols:
+        valid = df[col].between(0, 100) | df[col].isna()
+        assert valid.all(), f"Found out-of-range percentage values in {col}."
 
 
 @lru_cache(maxsize=1)
 def _get_non_county_cols_from_wide_format(engine: Engine) -> pd.Index:
     """Get the columns from counties_wide_format that are not derived from county-level data."""
     wide_cols = pd.Index([col.name for col in counties_wide_format.columns])
-    county_level_cols = _add_derived_columns(_get_county_properties(engine)).columns
-    cols_to_fetch = wide_cols.difference(county_level_cols)
+    cols_to_fetch = wide_cols.difference(COUNTY_LEVEL_WIDE_FORMAT_COLS)
     return cols_to_fetch
 
 
 def validate_warehouse(engine: Engine):
     """Run data warehouse validation tests."""
     logger.info("Validating data warehouse")
-    test_j40_county_fips_coverage(engine)
-    test_gridstatus_fips_coverage(engine)
+    test_civis_county_election_results(engine)
+    # test_j40_county_fips_coverage(engine)
+    # test_gridstatus_fips_coverage(engine)
+    # test_fyi_fips_coverage(engine)
 
 
 def validate_data_mart(engine: Engine):

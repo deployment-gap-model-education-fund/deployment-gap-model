@@ -17,7 +17,7 @@ geocoder_local_cache.mkdir(parents=True, exist_ok=True)
 assert geocoder_local_cache.exists()
 # cache needs to be accessed outside this module to call .clear()
 # limit cache size to keep most recently accessed first
-GEOCODER_CACHE = Memory(location=geocoder_local_cache, bytes_limit=2**19)
+GEOCODER_CACHE = Memory(location=geocoder_local_cache)
 
 
 class AddressComponents(BaseModel):
@@ -42,7 +42,7 @@ class Location(BaseModel):
     lng: float
 
 
-class AccuracyType(str, Enum):
+class AccuracyType(Enum):
     """Accuracy types from Geocodio.
 
     Valid values are documented at https://www.geocod.io/guides/accuracy-types-scores/
@@ -138,10 +138,10 @@ def _geocode_batch(
     batch["address"] = batch[locality_col] + ", " + batch[state_col]
     try:
         responses = _get_batch_responses(client, batch["address"].tolist())
-    except AuthenticationError:
+    except AuthenticationError as err:
         raise AuthenticationError(
             "Geocodio API key is invalid or you hit the daily geocoding limit which you can change in the Geocodio billing tab."
-        )
+        ) from err
 
     geocoded_localities = []
     for response_item in responses:
@@ -191,8 +191,8 @@ def _geocode_locality(
             "geocodio-library-python is required to geocode localities."
         )
 
-    GEOCODIO_API_KEY = os.environ["GEOCODIO_API_KEY"]
-    client = Geocodio(GEOCODIO_API_KEY)
+    geocodio_api_key = os.environ["GEOCODIO_API_KEY"]
+    client = Geocodio(geocodio_api_key)
 
     geocoded_results = []
 

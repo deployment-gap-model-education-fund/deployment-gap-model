@@ -14,6 +14,7 @@ def extract(*, locations_uri: str, projects_uri: str) -> dict[str, pd.DataFrame]
 
     Returns:
         dict[str, pd.DataFrame]: raw data, with keys "offshore_locations" and "offshore_projects"
+
     """
     offshore_transformed_dfs = {}
 

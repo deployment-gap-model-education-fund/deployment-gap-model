@@ -1,5 +1,7 @@
 """Tests for interconnection.fyi ETL code."""
 
+from unittest.mock import patch
+
 import pandas as pd
 
 from dbcp.transform.fyi_queue import _normalize_resource_capacity
@@ -129,11 +131,15 @@ def test__resource_capacity_normalization():
         .sort_values(by=["project_id", "resource"])
         .reset_index(drop=True)
     )
-    actual_resource_capacity_df = (
-        _normalize_resource_capacity(fyi_df=fyi_df)["resource_capacity_df"]
-        .sort_values(by=["project_id", "resource"])
-        .reset_index(drop=True)
-    )
+    with patch(
+        "dbcp.transform.fyi_queue.EXPECTED_DUPLICATE_PROJECTS",
+        {"caiso-955", "ladwp-q57"},
+    ):
+        actual_resource_capacity_df = (
+            _normalize_resource_capacity(fyi_df=fyi_df)["resource_capacity_df"]
+            .sort_values(by=["project_id", "resource"])
+            .reset_index(drop=True)
+        )
     pd.testing.assert_frame_equal(
         actual_resource_capacity_df,
         expected_resource_capacity_df,
