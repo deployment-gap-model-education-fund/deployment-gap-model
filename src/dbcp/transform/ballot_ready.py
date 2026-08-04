@@ -21,6 +21,7 @@ def _normalize_entities(ballot_ready: pd.DataFrame) -> dict[str, pd.DataFrame]:
 
     Returns:
         trns_dfs: dataframes for elecitons, positions and races.
+
     """
     trns_dfs = {}
     # Elections
@@ -72,9 +73,9 @@ def _normalize_entities(ballot_ready: pd.DataFrame) -> dict[str, pd.DataFrame]:
     duplicate_positions = br_positions[is_duplciate_position].copy()
 
     logger.info(f"Found {len(duplicate_positions)} duplicate positions.")
-    assert (
-        len(duplicate_positions) <= 100
-    ), f"Found more duplicate positions than expected: {len(duplicate_positions)}"
+    assert len(duplicate_positions) <= 100, (
+        f"Found more duplicate positions than expected: {len(duplicate_positions)}"
+    )
 
     # dropnas in frequency and reference_year
     duplicate_positions = duplicate_positions.dropna(
@@ -91,9 +92,9 @@ def _normalize_entities(ballot_ready: pd.DataFrame) -> dict[str, pd.DataFrame]:
         [duplicate_positions, br_positions[~is_duplciate_position]]
     )[position_fields]
 
-    assert (
-        br_positions.position_id.is_unique
-    ), "position_id is not unique. Deduplication did not work as expected."
+    assert br_positions.position_id.is_unique, (
+        "position_id is not unique. Deduplication did not work as expected."
+    )
     trns_dfs["br_positions"] = br_positions
 
     # Races
@@ -142,8 +143,10 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
 
     Args:
         raw_ballot_ready: raw ballot ready data.
+
     Returns:
         ballot_ready: lightly cleaned and exploded dataframe.
+
     """
     # Correct datatypes
     ballot_ready = raw_ballot_ready.convert_dtypes()
@@ -167,18 +170,18 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
         subset=["county", "race_id"], keep=False
     )
     # Initial batch of raw data has duplicates in counties
-    assert (
-        duplicate_race.sum() <= 500
-    ), "Found more duplicate county/race combinations that expected."
+    assert duplicate_race.sum() <= 500, (
+        "Found more duplicate county/race combinations that expected."
+    )
 
     # Drop duplicates. A later version of ballot ready data will remedy this problem.
     ballot_ready = exp_ballot_ready.drop_duplicates(subset=["county", "race_id"])
 
     # Add state and county fips codes
     # Fix LaSalle Parish spelling to match addfips library
-    ballot_ready.loc[
-        (ballot_ready.county == "LaSalle Parish"), "county"
-    ] = "La Salle Parish"
+    ballot_ready.loc[(ballot_ready.county == "LaSalle Parish"), "county"] = (
+        "La Salle Parish"
+    )
     ballot_ready = add_fips_ids(ballot_ready)
 
     # Valdez-Cordova Census Area was split into two areas in 2019
@@ -217,9 +220,9 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
     state_match = ballot_ready.geo_id.str[0:2] == ballot_ready.state_id_fips
     expected_state_match = 0.99
     result_state_match_coverage = sum(state_match) / len(state_match)
-    assert (
-        sum(state_match) / len(state_match) > expected_state_match
-    ), f"State FIPS codes:{sum(state_match)} of {len(state_match)} geocoded state FIPS IDs match the Ballot Ready data ({result_state_match_coverage:.0%}). Expected atleast {expected_state_match:.0%}"
+    assert sum(state_match) / len(state_match) > expected_state_match, (
+        f"State FIPS codes:{sum(state_match)} of {len(state_match)} geocoded state FIPS IDs match the Ballot Ready data ({result_state_match_coverage:.0%}). Expected atleast {expected_state_match:.0%}"
+    )
 
     # All GEO IDs contain the state FIPS code. But only these contain the County FIPS:
     # 5 digits: State FIPS + County FIPS
@@ -232,7 +235,10 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
     ]
     county_match = geo_ids.geo_id.str[0:5] == geo_ids.county_id_fips
     logger.info(
-        f"County FIPS codes:Of {len(county_match)} geocoded county FIPS IDs compared to the Ballot Ready data, {sum(county_match)} match ({sum(county_match)/len(county_match):.0%})"
+        f"County FIPS codes:Of {len(county_match)} geocoded county FIPS IDs "
+        "compared to the Ballot Ready data, "
+        f"{sum(county_match)} match "
+        f"({sum(county_match) / len(county_match):.0%})"
     )
     assert sum(county_match) / len(county_match) > 0.75
 
@@ -247,10 +253,9 @@ def _explode_counties(raw_ballot_ready: pd.DataFrame) -> pd.DataFrame:
     for col in bool_columns:
         if is_bool_dtype(ballot_ready[col]):
             continue
-        else:
-            ballot_ready[col] = ballot_ready[col].map(
-                {["true", "t"]: True, ["false", "f"]: False}
-            )
+        ballot_ready[col] = ballot_ready[col].map(
+            {["true", "t"]: True, ["false", "f"]: False}
+        )
     return ballot_ready
 
 
@@ -264,8 +269,9 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     Args:
         raw_dfs: dictionary of dataframe names to raw dataframes.
 
-    Returns
+    Returns:
         trns_dfs: dictionary of dataframe names to cleaned dataframes.
+
     """
     raw_ballot_ready = raw_dfs["raw_ballot_ready"]
     ballot_ready = _explode_counties(raw_ballot_ready)

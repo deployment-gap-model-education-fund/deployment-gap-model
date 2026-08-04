@@ -56,10 +56,10 @@ WITH
         'lbnl' as source,
         ncsl.permitting_type as state_permitting_type
     from iso
-    left join data_warehouse.state_fips as sfip
+    left join data_warehouse.census__state_fips as sfip
         on iso.state_id_fips = sfip.state_id_fips
-    left join data_warehouse.county_fips as cfip
+    left join data_warehouse.census__county_fips as cfip
         on iso.county_id_fips = cfip.county_id_fips
-    left join data_warehouse.ncsl_state_permitting as ncsl
+    left join data_warehouse.ncsl__state_permitting as ncsl
         on iso.state_id_fips = ncsl.state_id_fips
     ;

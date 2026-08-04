@@ -27,21 +27,15 @@ To access the processed data, add the `dbcp-dev-350818` project to your Big Quer
 
 # Setup
 
-## Conda Environment
+## Install Dev Environment
 
-Make sure you have [conda installed](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html). Once conda is installed, run:
-
-```
-conda env create --name dbcp-dev --file environment.yml
-```
-
-Then activate the environment:
+Make sure you have [uv installed](https://docs.astral.sh/uv/getting-started/installation/).
+The ETL and tests will run in a docker container, so you only need to install a minimal dev environment
+to run pre-commit hooks. You can do this with the following command:
 
 ```
-conda activate dbcp-dev
+uv sync --only-dev
 ```
-
-This conda environment has python, pip and pre-commit installed in it. This env is just for running pre-commits, the actual ETL development happens in docker.
 
 ## GCP Authentication
 
@@ -68,7 +62,7 @@ authenticated, the command should print out a message:
 Credentials saved to file: <path/to/your_credentials.json>
 ```
 
-Set this path to a local environment varible called `GOOGLE_GHA_CREDS_PATH`
+Set this path to a local environment variable called `GOOGLE_GHA_CREDS_PATH`
 
 ```
 export GOOGLE_GHA_CREDS_PATH=<path/to/your_credentials.json>
@@ -96,6 +90,35 @@ then set environment variables:
 echo 'export GOOGLE_GHA_CREDS_PATH="value"' > $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
 ```
 
+## Postgres Authentication
+Madrone is moving towards using a `postgres` instance for accessing data,
+and we have configured the ETL to auto-publish data to this instance when
+running the `update-data` job from github. We generally avoid accessing
+this instance during local runs of the ETL, so setting up credentials is
+not strictly necessary, but it can be useful for testing and validation
+purposes. To access this instance you must first set the following environment
+variables:
+
+- `PROD_POSTGRES_HOST`
+- `PROD_POSTGRES_USER`
+- `PROD_POSTGRES_PASSWORD`
+
+See the secret `DBCP Postgres Credentials` in Bitwarden to access the
+corresponding values for each of these variables.
+
+Once you have set these variables, there are various ways to access data
+from the postgres instance. For example, you could run `make jupyter_lab`
+then from a notebook:
+
+```py
+from dbcp.helpers import get_sql_engine
+
+engine = get_sql_engine(production=True)
+```
+
+To explore the data using SQL you can use the `make duckdb` target (see
+details below).
+
 ## Git Pre-commit Hooks
 
 Git hooks let you automatically run scripts at various points as you manage your source code. “Pre-commit” hook scripts are run when you try to make a new commit. These scripts can review your code and identify bugs, formatting errors, bad coding habits, and other issues before the code gets checked in. This gives you the opportunity to fix those issues before publishing them.
@@ -103,7 +126,7 @@ Git hooks let you automatically run scripts at various points as you manage your
 To make sure they are run before you commit any code, you need to enable the pre-commit hooks scripts with this command:
 
 ```
-pre-commit install
+uv run pre-commit install
 ```
 
 The scripts that run are configured in the .pre-commit-config.yaml file.
@@ -118,7 +141,7 @@ Now we can build the docker images by running:
 make build
 ```
 
-This command create a docker image and installs all the packages in `requirements.txt` so it will take a couple minutes to complete.
+This command create a docker image and installs all the packages in `pyproject.toml` so it will take a couple minutes to complete.
 
 If you get this error:
 
@@ -187,6 +210,17 @@ starts a jupyter lab instance at `http://127.0.0.1:8888/`. If you have another j
 ```
 export JUPYTER_PORT=8890
 ```
+
+```
+make duckdb
+```
+
+Will open a `duckdb` shell instance which can be used access data from
+BigQuery and the dev/prod postgres instances in one unified interface. Tables
+can then be referenced in queries like `{bq|pg_prod|pg_dev}.{schema_name}.{table_name}`.
+Note that we currently only have one schema in the production Postgres
+instance, so no schema name is required for this database.
+
 
 # Development Process
 

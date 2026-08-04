@@ -193,7 +193,7 @@ FYI_RESOURCE_DICT = {
     "Coal": {"codes": ["Coal + Gas", "Coal + Oil"], "type": "Fossil"},
     "Fuel Cell": {"codes": [], "type": "Fossil"},
     "Geothermal": {
-        "codes": ["Geothermal + Solar"],
+        "codes": ["Geothermal + Solar", "Battery + Geothermal + Solar"],
         "type": "Renewable",
     },
     "Hydro": {"codes": ["Battery + Hydro", "Wave"], "type": "Renewable"},
@@ -209,6 +209,7 @@ FYI_RESOURCE_DICT = {
             "Compressed Air + Gas",
             "Methane",
             "Battery + Fuel Cell + Gas",
+            "Fuel Cell + Gas",
         ],
         "type": "Fossil",
     },
@@ -236,7 +237,7 @@ FYI_RESOURCE_DICT = {
         ],
         "type": "Renewable",
     },
-    "Offshore Wind": {"codes": [], "type": "Renewable"},
+    "Offshore Wind": {"codes": ["Offshore Wind"], "type": "Renewable"},
     "Other": {
         "codes": [
             "Biomass + Oil",
@@ -271,7 +272,7 @@ FYI_RESOURCE_DICT = {
 
 FIPS_CODE_VINTAGE = 2020
 
-PUDL_LATEST_YEAR = 2024
+PUDL_LATEST_YEAR = 2025
 """The latest year of PUDL data available for data that is reported annually.
 
 Note some datasets we use here are reported quarterly like EIA 860m.
@@ -289,11 +290,11 @@ US_STATES_TERRITORIES = US_STATES.union(US_TERRITORIES)
 
 try:
     DATA_DIR_ENV_VAR = os.environ["DATA_DIR"]
-except KeyError:
+except KeyError as e:
     raise KeyError(
         "Please set the DATA_DIR environment variable to the path"
         "of the data directory.\n"
         "This is typically set in the .env file."
-    )
+    ) from e
 DATA_DIR = Path(DATA_DIR_ENV_VAR)
 OUTPUT_DIR = DATA_DIR / "output"

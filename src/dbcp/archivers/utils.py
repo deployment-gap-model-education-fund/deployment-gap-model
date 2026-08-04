@@ -1,5 +1,6 @@
 """Utility functions and classes for archivers."""
 
+import pathlib
 from abc import ABC, abstractmethod
 
 import google.auth
@@ -23,20 +24,21 @@ class AbstractArchiver(ABC):
     @abstractmethod
     def archive(self):
         """Archive raw data to GCS."""
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def upload_blob(
         self, blob_name: str, data: str, metadata: dict[str, str] = None
     ) -> storage.Blob:
-        """
-        Upload a blob to GCS.
+        """Upload a blob to GCS.
 
         Args:
             blob_name: The name of the blob.
             data: The data to upload.
             metadata: Metadata to attach to the blob.
+
         Returns:
             The uploaded blob object.
+
         """
         blob = self.bucket.blob(blob_name)
         blob.metadata = metadata
@@ -75,7 +77,7 @@ class ExtractionSettings:
     @classmethod
     def from_yaml(cls, yaml_path: str) -> "ExtractionSettings":
         """Create an ExtractionSettings object from a YAML file."""
-        with open(yaml_path, "r") as file:
+        with pathlib.Path(yaml_path).open() as file:
             archive_dicts = yaml.safe_load(file)
         archived_data = {
             archive_dict["name"]: ArchivedData(**archive_dict)
@@ -86,7 +88,7 @@ class ExtractionSettings:
     def to_yaml(self, yaml_path: str):
         """Save the ExtractionSettings object to a YAML file."""
         archive_dicts = [archive.dict() for archive in self.archived_data.values()]
-        with open(yaml_path, "w") as file:
+        with pathlib.Path(yaml_path).open("w") as file:
             yaml.dump(archive_dicts, file, default_flow_style=False)
 
     @classmethod
@@ -104,8 +106,8 @@ class ExtractionSettings:
         """Get the full archive name with the folder name."""
         try:
             archive = self.archived_data[archive_name]
-        except KeyError:
-            raise KeyError(f"Archive {archive_name} not found in the settings.")
+        except KeyError as e:
+            raise KeyError(f"Archive {archive_name} not found in the settings.") from e
         return f"gs://{self.bucket.name}/{archive.get_full_path}"
 
     def update_archive_generation_numbers(self):
@@ -119,6 +121,6 @@ class ExtractionSettings:
                     )
                 archive.generation_num = blob.generation
                 archive.metadata = blob.metadata
-            assert (
-                archive.generation_num is not None
-            ), f"Generation number for {archive.name} is None"
+            assert archive.generation_num is not None, (
+                f"Generation number for {archive.name} is None"
+            )

@@ -1,13 +1,11 @@
 """Retrieve data from the FYI ISO Queue spreadsheet."""
 
-from typing import Dict
-
 import pandas as pd
 
 import dbcp
 
 
-def extract(uri: str) -> Dict[str, pd.DataFrame]:
+def extract(uri: str) -> dict[str, pd.DataFrame]:
     """Read CSV file with FYI ISO Queue dataset.
 
     Args:
@@ -15,6 +13,7 @@ def extract(uri: str) -> Dict[str, pd.DataFrame]:
 
     Returns:
         dfs: dictionary of dataframe name to raw dataframe.
+
     """
     path = dbcp.extract.helpers.cache_gcs_archive_file_locally(uri)
     all_projects = pd.read_csv(path)
@@ -26,7 +25,9 @@ def extract(uri: str) -> Dict[str, pd.DataFrame]:
         "ia_status_raw": "interconnection_status_raw",
         "ia_status_clean": "interconnection_status_fyi",
     }
-    all_projects.rename(columns=rename_dict, inplace=True)
+    all_projects = all_projects.rename(
+        columns=rename_dict,
+    )
     return {
         "fyi_queue": all_projects,
     }

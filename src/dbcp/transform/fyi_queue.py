@@ -1,7 +1,6 @@
 """Functions to transform interconnection.FYI interconnection queue tables."""
 
 import logging
-from typing import Dict
 
 import pandas as pd
 import yaml
@@ -68,7 +67,9 @@ def _prep_for_deduplication(df: pd.DataFrame) -> None:
         "not started",
     ]
     # assign numerical values for sorting. Largest value is prioritized.
-    status_map = dict(zip(reversed(status_order), range(len(status_order))))
+    status_map = dict(
+        zip(reversed(status_order), range(len(status_order)), strict=True)
+    )
     df["status_rank"] = (
         df["interconnection_status_fyi"]
         .str.strip()
@@ -88,9 +89,9 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
         "unique_id": "project_id",
         "raw_developer": "developer_raw",
     }
-    assert (
-        projects.unique_id.is_unique
-    ), "unique_id is not unique in the raw interconnection.FYI data!"
+    assert projects.unique_id.is_unique, (
+        "unique_id is not unique in the raw interconnection.FYI data!"
+    )
     projects = projects.rename(columns=rename_dict)
     # the interconnection_status_fyi column is already a cleaned
     # version of interconnection_status_raw, but validate to see
@@ -124,8 +125,8 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
     )
     n_dupes = pre_dedupe - len(projects)
     logger.info(f"Deduplicated {n_dupes} ({n_dupes / pre_dedupe:.2%}) projects.")
-    projects.set_index("project_id", inplace=True)
-    projects.sort_index(inplace=True)
+    projects = projects.set_index("project_id")
+    projects = projects.sort_index()
     # clean up whitespace
     for col in projects.columns:
         if pd.api.types.is_object_dtype(projects.loc[:, col]):
@@ -146,7 +147,9 @@ def _clean_all_fyi_projects(raw_projects: pd.DataFrame) -> pd.DataFrame:
         .isna()
         .all()
         .all()
-    ), "Some operational or withdrawn projects have is_actionable or is_nearly_certain values."
+    ), (
+        "Some operational or withdrawn projects have is_actionable or is_nearly_certain values."
+    )
 
     # Replace ISO-NE values in region with ISONE to match gridstatus
     projects["power_market"] = projects["power_market"].replace({"ISO-NE": "ISONE"})
@@ -167,13 +170,13 @@ def parse_capacity(row):
     # do anything with this but it could be useful if
     # we want to save total energy storage capacity later
     allowed_keys = {"canonical_gen_type", "mw", "mwh"}
-    keys = {key for item in data for key in item.keys()}
-    assert (
-        len(keys - allowed_keys) == 0
-    ), f"New key found in the capacity_by_generation_type_breakdown yaml string: {keys - allowed_keys}. For project_id: {row.name}"
+    keys = {key for item in data for key in item}
+    assert len(keys - allowed_keys) == 0, (
+        f"New key found in the capacity_by_generation_type_breakdown yaml string: {keys - allowed_keys}. For project_id: {row.name}"
+    )
     # remove the mwh keys, we don't do anything with the total battery
     # storage capacity right now
-    data = [item for item in data if "mwh" not in item.keys()]
+    data = [item for item in data if "mwh" not in item]
     # if a row is from NYISO we expect it to only have "mwh"
     if row["power_market"] == "NYISO":
         assert len(data) == 0, (
@@ -191,7 +194,23 @@ def parse_capacity(row):
     }
 
 
-def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+# occasionally in CAISO the parsed capacity by generation type breakdown
+# will list the same resource twice if there are two generators, in
+# these cases, sum the resources
+EXPECTED_DUPLICATE_PROJECTS = {
+    "caiso-1085",
+    "caiso-1088",
+    "caiso-908",
+    "caiso-472",
+    "caiso-54873",
+    "caiso-1212",
+    "caiso-2113",
+    "ladwp-q57",
+    "caiso-955",
+}
+
+
+def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Pull out capacity and resource values into a separate dataframe.
 
     Args:
@@ -199,6 +218,7 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
 
     Returns:
         Dict[str, pd.DataFrame]: dict with the projects and multivalues split into two dataframes
+
     """
     # NYISO, CAISO, and West report capacity broken out by resource type
     # for some projects.
@@ -207,7 +227,7 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
         fyi_df[
             ~fyi_df["capacity_by_generation_type_breakdown"].isnull()
         ].power_market.unique()
-    ) == set(["CAISO", "West", "NYISO"]), (
+    ) == set({"CAISO", "West", "NYISO"}), (
         "There's a new power market with non-null values in capacity_by_generation_type_breakdown, check to see how this column interacts with capacity_mw in this power market."
         f"Power markets are: {set(fyi_df[~fyi_df['capacity_by_generation_type_breakdown'].isnull()].power_market.unique())}"
     )
@@ -222,26 +242,18 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
         & resource_capacity_df["capacity_mw"].notnull()
     ].reset_index()
 
-    # occasionally in CAISO the parsed capacity by generation type breakdown
-    # will list the same resource twice if there are two generators, in
-    # these cases, sum the resources
-    n_expected_duped_resources = 10
-    # Expected project IDS that show up in dupes:
-    # "caiso-1085","caiso-1088", "caiso-908", "caiso-472",
-    # "caiso-54873", "caiso-1212","ladwp-q57"
-    # "caiso-955", "tucson-electric-power-94", "tucson-electric-power-94"
-    assert (
-        len(
-            resource_capacity_df[
-                resource_capacity_df.duplicated(subset=["project_id", "resource"])
-            ]
-        )
-        <= n_expected_duped_resources
-    ), (
-        f"More than {n_expected_duped_resources} projects found with the same resource "
-        "listed twice in capacity_by_generation_type_breakdown. Ensure that their capacities should be summed. "
-        f"They have project IDs: {resource_capacity_df[resource_capacity_df.duplicated(subset=['project_id', 'resource'])].project_id}"
+    # if new project IDs show up, put in a breakpoint and see if the
+    # generator resources should have summed capacity
+    found_dupes = set(
+        resource_capacity_df[
+            resource_capacity_df.duplicated(subset=["project_id", "resource"])
+        ]["project_id"]
     )
+    if found_dupes != EXPECTED_DUPLICATE_PROJECTS:
+        raise RuntimeError(
+            "Found unexpected projects listed twice in capacity_by_generation_type_breakdown. Ensure that their capacities should be summed. "
+            f"Unexpected projects: {found_dupes - EXPECTED_DUPLICATE_PROJECTS}"
+        )
     # There are some projects where summing the duplicated resource's capacity
     # doesn't make sense, i.e. when it seems like a mistake that there are
     # two of the same resource listed or it's a cogen gas plant and only one
@@ -253,6 +265,7 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
         ("caiso-955", "Gas", 60),
         ("tucson-electric-power-94", "Solar", 255),
         ("tucson-electric-power-94", "Battery", 255),
+        ("tucson-electric-power-80", "Solar", 400),
     ]
     indices_to_drop = []
     for project_id, resource, cap in proj_ids_resource_capacity_not_to_sum:
@@ -293,7 +306,7 @@ def _normalize_resource_capacity(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame
     return {"resource_capacity_df": resource_capacity_df, "project_df": project_df}
 
 
-def _normalize_location(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+def _normalize_location(fyi_df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Pull out the county and state columns to a separate dataframe.
 
     Args:
@@ -301,17 +314,21 @@ def _normalize_location(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
 
     Returns:
         Dict[str, pd.DataFrame]: dict with the projects and locations split into two dataframes
+
     """
     location_cols = [
         "raw_county_name",
         "raw_state_name",
         "latitude",
         "longitude",
+        "gis_latitude",
+        "gis_longitude",
+        "gis_lat_long_specificity",
         "country_code",
     ]
     location_df = fyi_df[location_cols]
-    location_df.dropna(
-        subset=["raw_state_name", "raw_county_name"], how="all", inplace=True
+    location_df = location_df.dropna(
+        subset=["raw_state_name", "raw_county_name"], how="all"
     )
     # reset project_id index
     location_df = location_df.reset_index()
@@ -320,7 +337,7 @@ def _normalize_location(fyi_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     return {"location_df": location_df, "project_df": project_df}
 
 
-def normalize_fyi_dfs(fyi_transformed_dfs: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+def normalize_fyi_dfs(fyi_transformed_dfs: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Normalize one-to-many columns and combine the three queues.
 
     Args:
@@ -328,78 +345,91 @@ def normalize_fyi_dfs(fyi_transformed_dfs: pd.DataFrame) -> Dict[str, pd.DataFra
 
     Returns:
         Dict[str, pd.DataFrame]: the combined queues, normalized into projects, locations, and resource_capacity
+
     """
     resource_capacity_dfs = _normalize_resource_capacity(fyi_transformed_dfs)
     location_dfs = _normalize_location(resource_capacity_dfs["project_df"])
     return {
-        "fyi_projects": location_dfs["project_df"],
-        "fyi_locations": location_dfs["location_df"],
-        "fyi_resource_capacity": resource_capacity_dfs["resource_capacity_df"],
+        "fyi__private__projects": location_dfs["project_df"],
+        "fyi__private__locations": location_dfs["location_df"],
+        "fyi__private__resource_capacity": resource_capacity_dfs[
+            "resource_capacity_df"
+        ],
     }
 
 
-def transform(fyi_raw_dfs: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
-    """
-    Transform LBNL ISO Queues dataframes.
+def transform(fyi_raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+    """Transform LBNL ISO Queues dataframes.
 
     Args:
         lbnl_raw_dfs: Dictionary of the raw extracted data for each table.
 
     Returns:
         lbnl_transformed_dfs: Dictionary of the transformed tables.
+
     """
     transformed = _clean_all_fyi_projects(
         fyi_raw_dfs["fyi_queue"]
     )  # sets index to project_id
     # Combine and normalize iso queue tables
     fyi_normalized_dfs = normalize_fyi_dfs(transformed)
-    fyi_normalized_dfs["fyi_projects"].reset_index(inplace=True)
+    fyi_normalized_dfs["fyi__private__projects"] = fyi_normalized_dfs[
+        "fyi__private__projects"
+    ].reset_index()
     # data enrichment
     # Add Fips Codes
     # I write to a new variable because _manual_county_state_name_fixes overwrites
     # raw names with lowercase + manual corrections. I want to preserve raw names in the final
     # output but didn't want to refactor these functions to do it.
     new_locs = fyi_manual_county_state_name_fill_ins(
-        fyi_normalized_dfs["fyi_locations"]
+        fyi_normalized_dfs["fyi__private__locations"]
     )
     # we may have manually filled in locations for projects that are no
     # longer in the projects table. If so, they should be removed
     # from the manual fill ins.
     in_locations_not_in_projects = new_locs[
-        ~new_locs["project_id"].isin(fyi_normalized_dfs["fyi_projects"]["project_id"])
+        ~new_locs["project_id"].isin(
+            fyi_normalized_dfs["fyi__private__projects"]["project_id"]
+        )
     ]
     if len(in_locations_not_in_projects) > 0:
         logger.warning(
-            "Found projects in the locations table that aren't in the fyi_projects table. "
+            "Found projects in the locations table that aren't in the fyi__private__projects table. "
             "Remove these projects from the FYI manual county-state locations fill ins:\n"
             f"{in_locations_not_in_projects}"
         )
     new_locs = new_locs[
-        new_locs["project_id"].isin(fyi_normalized_dfs["fyi_projects"]["project_id"])
+        new_locs["project_id"].isin(
+            fyi_normalized_dfs["fyi__private__projects"]["project_id"]
+        )
     ]
     # add state_id_fips, county_id_fips, geocoded_locality_name, geocoded_locality_type, geocoded_containing_county
     new_locs = add_county_fips_with_backup_geocoding(
         new_locs, state_col="raw_state_name", locality_col="raw_county_name"
     )
     new_locs.loc[:, ["raw_state_name", "raw_county_name"]] = (
-        fyi_normalized_dfs["fyi_locations"]
+        fyi_normalized_dfs["fyi__private__locations"]
         .loc[:, ["raw_state_name", "raw_county_name"]]
         .copy()
     )
-    fyi_normalized_dfs["fyi_locations"] = new_locs
+    fyi_normalized_dfs["fyi__private__locations"] = new_locs
     # Clean up and categorize resources
-    fyi_normalized_dfs["fyi_resource_capacity"] = clean_resource_type(
-        fyi_normalized_dfs["fyi_resource_capacity"], FYI_RESOURCE_DICT
+    fyi_normalized_dfs["fyi__private__resource_capacity"] = clean_resource_type(
+        fyi_normalized_dfs["fyi__private__resource_capacity"], FYI_RESOURCE_DICT
     )
-    if fyi_normalized_dfs["fyi_resource_capacity"].resource_clean.isna().any():
+    if (
+        fyi_normalized_dfs["fyi__private__resource_capacity"]
+        .resource_clean.isna()
+        .any()
+    ):
         raise AssertionError("Missing Resources!")
     # Most projects missing queue_status are from the early 2000s so I'm going to assume
     # they were withrawn.
     assert (
-        fyi_normalized_dfs["fyi_projects"]["queue_status"].isna().sum() <= 42
+        fyi_normalized_dfs["fyi__private__projects"]["queue_status"].isna().sum() <= 42
     ), "Unexpected number of projects missing queue status."
-    fyi_normalized_dfs["fyi_projects"]["queue_status"] = fyi_normalized_dfs[
-        "fyi_projects"
+    fyi_normalized_dfs["fyi__private__projects"]["queue_status"] = fyi_normalized_dfs[
+        "fyi__private__projects"
     ]["queue_status"].fillna("Withdrawn")
     return fyi_normalized_dfs
 
@@ -411,8 +441,8 @@ if __name__ == "__main__":
     fyi_uri = "gs://dgm-archive/interconnection.fyi/interconnection_fyi_dataset_2026-01-01.csv"
     fyi_raw_dfs = dbcp.extract.fyi_queue.extract(fyi_uri)
     fyi_transformed_dfs = dbcp.transform.fyi_queue.transform(fyi_raw_dfs)
-    fyi_transformed_dfs["fyi_resource_capacity"].to_parquet(
-        OUTPUT_DIR / "private_data_warehouse/fyi_resource_capacity.parquet"
+    fyi_transformed_dfs["fyi__private__resource_capacity"].to_parquet(
+        OUTPUT_DIR / "data_warehouse/fyi__private__resource_capacity.parquet"
     )
 
     assert fyi_transformed_dfs

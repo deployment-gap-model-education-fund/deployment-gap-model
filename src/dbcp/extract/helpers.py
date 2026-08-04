@@ -3,26 +3,28 @@
 import json
 import logging
 import re
+from functools import lru_cache
 from pathlib import Path
-from typing import Optional, Union
 
 import google.auth
 import pandas as pd
+import yaml
 from google.cloud import storage
 
 logger = logging.getLogger(__name__)
 
 
 def extract_airtable_data(path: Path) -> pd.DataFrame:
-    """
-    Extract data from an Airtable JSON file.
+    """Extract data from an Airtable JSON file.
 
     Args:
         path: Path to the Airtable JSON file.
+
     Returns:
         the extracted data as a pandas DataFrame.
+
     """
-    with open(path, "r") as f:
+    with Path(path).open() as f:
         data = json.load(f)
     records = [r["fields"] for r in data]
     return pd.DataFrame.from_records(records)
@@ -30,8 +32,8 @@ def extract_airtable_data(path: Path) -> pd.DataFrame:
 
 def cache_gcs_archive_bucket_contents_locally(
     gcs_dir_name: str,
-    local_cache_dir: Union[str, Path] = "/app/data/data_cache",
-    generation_num: Optional[str] = None,
+    local_cache_dir: str | Path = "/app/data/data_cache",
+    generation_num: str | None = None,
 ) -> list[Path]:
     """Cache all files in a folder of the GCS archive bucket.
 
@@ -44,6 +46,7 @@ def cache_gcs_archive_bucket_contents_locally(
 
     Returns:
         Path to the local cache of the file.
+
     """
     archive_bucket_name = "dgm-archive"
     if not gcs_dir_name.endswith("/"):
@@ -62,11 +65,10 @@ def cache_gcs_archive_bucket_contents_locally(
 
 def cache_gcs_archive_file_locally(
     uri: str,
-    local_cache_dir: Union[str, Path] = "/app/data/data_cache",
-    generation_num: Optional[str] = None,
+    local_cache_dir: str | Path = "/app/data/data_cache",
+    generation_num: str | None = None,
 ) -> Path:
-    """
-    Cache a file stored in the GCS archive locally to a local directory.
+    """Cache a file stored in the GCS archive locally to a local directory.
 
     Args:
         uri: the full file GCS URI.
@@ -77,6 +79,7 @@ def cache_gcs_archive_file_locally(
 
     Returns:
         Path to the local cache of the file.
+
     """
     bucket_url, object_name = re.match("gs://(.*?)/(.*)", str(uri)).groups()
     credentials, project_id = google.auth.default()
@@ -100,6 +103,14 @@ def cache_gcs_archive_file_locally(
         blob = bucket.blob(str(object_name), generation=generation_num)
 
         filepath.parent.mkdir(parents=True, exist_ok=True)
-        with open(filepath, "wb+") as f:
+        with Path(filepath).open("wb+") as f:
             f.write(blob.download_as_bytes())
     return filepath
+
+
+@lru_cache
+def load_yml_file(path) -> dict[str, pd.DataFrame]:
+    """Return a DF with last modified dates for all raw data inputs."""
+    with Path(path).open() as file:
+        file_json = yaml.safe_load(file)
+    return pd.json_normalize(file_json)

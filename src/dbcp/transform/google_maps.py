@@ -3,7 +3,6 @@
 import os
 from functools import lru_cache
 from logging import getLogger
-from typing import Dict, List, Optional
 from warnings import warn
 
 import googlemaps
@@ -19,11 +18,10 @@ geocoder_local_cache = DATA_DIR / "google_geocoder_cache"
 geocoder_local_cache.mkdir(parents=True, exist_ok=True)
 assert geocoder_local_cache.exists()
 # cache needs to be accessed outside this module to call .clear()
-# limit cache size to keep most recently accessed first
-GEOCODER_CACHE = Memory(location=geocoder_local_cache, bytes_limit=2**19)
+GEOCODER_CACHE = Memory(location=geocoder_local_cache)
 
 
-class GoogleGeocoder(object):
+class GoogleGeocoder:
     """Class to interact with Google's Geocoding API."""
 
     # this class has the wrong boundaries. The geocoder object should return a separate
@@ -45,18 +43,17 @@ class GoogleGeocoder(object):
                     raise ValueError(
                         "API_KEY_GOOGLE_MAPS environment variable not set. "
                         " See README.md for how to set it."
-                    )
-                else:
-                    raise e
+                    ) from e
+                raise e
 
         self.client = googlemaps.Client(key=key)
         self._clear_cache()
         return
 
     def geocode_request(
-        self, name: str, state: str, country: Optional[str] = None
+        self, name: str, state: str, country: str | None = None
     ) -> None:
-        """Make a geocode equest."""
+        """Make a geocode request."""
         self._clear_cache()
         if country is None:
             country = "US"
@@ -80,11 +77,11 @@ class GoogleGeocoder(object):
         self._country = ""
 
         # derived
-        self._response: Dict[str, List[Dict[str, str]]] = {}
+        self._response: dict[str, list[dict[str, str]]] = {}
         # need to distinguish unknown ("") from untried (None)
-        self._containing_county: Optional[str] = None
-        self._locality_name: Optional[str] = None
-        self._admin_type: Optional[str] = None
+        self._containing_county: str | None = None
+        self._locality_name: str | None = None
+        self._admin_type: str | None = None
         return
 
     @property
@@ -92,11 +89,11 @@ class GoogleGeocoder(object):
         """Return the name of the locality."""
         if self._locality_name is not None:
             return self._locality_name
-        elif not self._response:  # no response yet
+        if not self._response:  # no response yet
             raise AttributeError("No response yet. Call geocode_request() first.")
 
         # check special case where Google returns a street address.
-        # In this special case we don't want the most specifc name
+        # In this special case we don't want the most specific name
         # but instead the 'administrative_area_level_3' name.
         # An example of this special case is "Town of Seneca (Ontario County), NY"
         # where the 'locality' name is "Stanley", but we want "Seneca". I don't
@@ -110,16 +107,17 @@ class GoogleGeocoder(object):
             if GoogleGeocoder.STREET_LABELS & set(component["types"]):
                 is_street_address = True
                 continue  # skip street address components
-            if (
-                is_street_address
-            ):  # special case: skip until 'administrative_area_level_3'
-                if GoogleGeocoder.TOWN_LABEL not in component["types"]:
-                    continue
+            # special case: skip until 'administrative_area_level_3'
+            if (is_street_address) and GoogleGeocoder.TOWN_LABEL not in component[
+                "types"
+            ]:
+                continue
             self._locality_name = component["short_name"]
             break
         if not self._locality_name:
             warn(
-                f"Unable to find locality name for {self._name}, {self._state}, {self._country}"
+                f"Unable to find locality name for {self._name}, {self._state}, {self._country}",
+                stacklevel=2,
             )
             self._locality_name = ""
         return self._locality_name
@@ -131,7 +129,7 @@ class GoogleGeocoder(object):
         # This only returns one county - the one that contains the city center.
         if self._containing_county is not None:
             return self._containing_county
-        elif not self._response:  # no response yet
+        if not self._response:  # no response yet
             raise AttributeError("No response yet. Call geocode_request() first.")
 
         for component in self._response["address_components"]:
@@ -151,7 +149,7 @@ class GoogleGeocoder(object):
         """Describe type of administrative area."""
         if self._admin_type is not None:
             return self._admin_type
-        elif not self._response:  # no response yet
+        if not self._response:  # no response yet
             raise AttributeError("No response yet. Call geocode_request() first.")
         types = set(
             sum(
@@ -171,12 +169,13 @@ class GoogleGeocoder(object):
             self._admin_type = "county"
         else:
             warn(
-                f"Unknown administrative area type for {self._name}, {self._state}, {self._country}"
+                f"Unknown administrative area type for {self._name}, {self._state}, {self._country}",
+                stacklevel=2,
             )
             self._admin_type = ""
         return self._admin_type
 
-    def describe(self) -> List[str]:  # noqa: D102
+    def describe(self) -> list[str]:  # noqa: D102
         if not self._response:  # empty
             return [
                 "",
@@ -190,7 +189,7 @@ class GoogleGeocoder(object):
 @lru_cache(maxsize=512)
 def _get_geocode_response(
     *, client: googlemaps.Client, name: str, state: str, country: str
-) -> Dict:
+) -> dict:
     """Get Google Maps Platform's interpretation of which place a name belongs to.
 
     This pure function with hashable inputs is factored out of the GoogleGeocoder class
@@ -204,6 +203,7 @@ def _get_geocode_response(
 
     Returns:
         Dict: JSON response as a nested python dictionary
+
     """
     address = f"{name}, {state}"
     components = {"administrative_area": state, "country": country}
@@ -218,7 +218,7 @@ def _get_geocode_response(
 
 def _geocode_row(
     ser: pd.Series, client: GoogleGeocoder, state_col="state", locality_col="county"
-) -> List[str]:
+) -> list[str]:
     """Function to pass into pandas df.apply() to geocode state/locality pairs.
 
     Args:
@@ -229,6 +229,7 @@ def _geocode_row(
 
     Returns:
         List[str]: geocoded_locality_name, geocoded_locality_type, and geocoded_containing_county
+
     """
     client.geocode_request(name=ser[locality_col], state=ser[state_col])
     return client.describe()
@@ -247,6 +248,7 @@ def _geocode_locality(
 
     Returns:
         pd.DataFrame: new columns 'geocoded_locality_name', 'geocoded_locality_type', 'geocoded_containing_county'
+
     """
     # NOTE: the purpose of the cache decorator is primarily to
     # reduce API calls during development. A secondary benefit is to reduce

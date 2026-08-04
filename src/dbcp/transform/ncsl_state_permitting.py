@@ -1,7 +1,5 @@
 """Tranform functions for NCSL state permitting."""
 
-from typing import Dict
-
 import numpy as np
 import pandas as pd
 
@@ -9,17 +7,18 @@ from dbcp.constants import US_STATES_TERRITORIES
 from dbcp.helpers import add_fips_ids
 
 
-def transform(raw_df: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
+def transform(raw_df: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """Standardize null values, state names, and dtypes. Add state FIPS codes.
 
     Args:
-        raw_df (Dict[str, pd.DataFrame]): dataframe from .docx parser
+        raw_df (dict[str, pd.DataFrame]): dataframe from .docx parser
 
     Returns:
-        Dict[str, pd.DataFrame]: cleaned and transformed state permitting dataset
+        dict[str, pd.DataFrame]: cleaned and transformed state permitting dataset
+
     """
     # only one df in dict
-    transform_df = raw_df["ncsl_state_permitting"].copy()
+    transform_df = raw_df["ncsl__state_permitting"].copy()
     transform_df.loc[:, "permitting_type"] = transform_df.loc[
         :, "permitting_type"
     ].replace("n/a", pd.NA)
@@ -27,12 +26,12 @@ def transform(raw_df: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
         "Washington D.C.", "District of Columbia"
     )
     # manual error correction
-    idx_MS = transform_df.index[(transform_df.loc[:, "state"].eq("Mississippi"))][0]
+    idx_ms = transform_df.index[(transform_df.loc[:, "state"].eq("Mississippi"))][0]
     local_string = (
         "Local governments have authority over land use and zoning decisions."
     )
-    if transform_df.at[idx_MS, "description"].endswith(local_string):
-        transform_df.at[idx_MS, "permitting_type"] = "Local"
+    if transform_df.at[idx_ms, "description"].endswith(local_string):
+        transform_df.at[idx_ms, "permitting_type"] = "Local"
 
     dtypes = {
         "state": pd.StringDtype(),
@@ -46,7 +45,7 @@ def transform(raw_df: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
     )
     transform_df = transform_df.rename(columns={"state": "raw_state_name"})
     validate(transform_df)
-    return {"ncsl_state_permitting": transform_df}
+    return {"ncsl__state_permitting": transform_df}
 
 
 def validate(ncsl_df: pd.DataFrame) -> None:
@@ -58,6 +57,7 @@ def validate(ncsl_df: pd.DataFrame) -> None:
     Raises:
         AssertionError: if unexpected state name is found
         AssertionError: if unexpected permitting type is found
+
     """
     expected_states = US_STATES_TERRITORIES
     df_states = set(ncsl_df.loc[:, "raw_state_name"].unique())

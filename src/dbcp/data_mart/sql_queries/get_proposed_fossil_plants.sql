@@ -26,13 +26,13 @@ WITH
         cfip.state_id_fips,
         proj.*
     from projects as proj
-    left join data_warehouse.county_fips as cfip
+    left join data_warehouse.census__county_fips as cfip
         on proj.county_id_fips = cfip.county_id_fips
     )
     SELECT
         sfip.state_name as state,
         proj.*
     from w_county_names as proj
-    left join data_warehouse.state_fips as sfip
+    left join data_warehouse.census__state_fips as sfip
         on proj.state_id_fips = sfip.state_id_fips
     ;

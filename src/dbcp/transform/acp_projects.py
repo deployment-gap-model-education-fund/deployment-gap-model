@@ -2,14 +2,14 @@
 
 import hashlib
 import re
+from collections.abc import Callable
 from functools import partial
-from typing import Callable
 
-import geopandas as gpd
+import geopandas
 import numpy as np
 import pandas as pd
 
-from dbcp.extract.fips_tables import CENSUS_URI, _extract_census_counties
+from dbcp.extract.fips_tables import extract_fips
 from dbcp.transform.helpers import add_county_fips_with_backup_geocoding
 
 
@@ -49,9 +49,9 @@ def _col_transform_status(ser: pd.Series) -> pd.Series:
         pd.NA,
     }
     is_expected = out.isin(expected_values)
-    assert (
-        is_expected.all()
-    ), f"Unexpected status values: {out[~is_expected].value_counts()}"
+    assert is_expected.all(), (
+        f"Unexpected status values: {out[~is_expected].value_counts()}"
+    )
     return out
 
 
@@ -78,9 +78,9 @@ def _col_transform_phase_type(ser: pd.Series) -> pd.Series:
         pd.NA,
     }
     is_expected = out.isin(expected_values)
-    assert (
-        is_expected.all()
-    ), f"Unexpected status values: {out[~is_expected].value_counts()}"
+    assert is_expected.all(), (
+        f"Unexpected status values: {out[~is_expected].value_counts()}"
+    )
     return out
 
 
@@ -89,9 +89,9 @@ def _col_transform_iso_rtos(ser: pd.Series) -> pd.Series:
     # I think this is a reasonable simplification because only 0.37% are multivalued.
     # But first check that multi-valued items are still a small minority of records
     is_multi = ser.str.contains("|", regex=False).fillna(False)
-    assert (
-        is_multi.mean() < 0.01
-    ), f"Too many multi-valued ISO/RTOS: {ser[is_multi].value_counts()}"
+    assert is_multi.mean() < 0.01, (
+        f"Too many multi-valued ISO/RTOS: {ser[is_multi].value_counts()}"
+    )
     out = ser.str.split("|", regex=False).str[0].str.strip().astype(pd.StringDtype())
 
     # Standardize some variations
@@ -117,9 +117,9 @@ def _col_transform_iso_rtos(ser: pd.Series) -> pd.Series:
         pd.NA,
     }
     is_expected = out.isin(expected_values)
-    assert (
-        is_expected.all()
-    ), f"Unexpected ISO/RTOS values: {out[~is_expected].value_counts()}"
+    assert is_expected.all(), (
+        f"Unexpected ISO/RTOS values: {out[~is_expected].value_counts()}"
+    )
     return out
 
 
@@ -128,9 +128,9 @@ def _col_transform_owner_types(ser: pd.Series, full_df: pd.DataFrame) -> pd.Seri
     # Only 0.15% of proposed projects (1.4% overall) are multivalued.
     # But first check that multi-valued items are still a small minority of records
     is_multi = ser.str.contains("|", regex=False).fillna(False)
-    assert (
-        is_multi.mean() < 0.02
-    ), f"Too many multi-valued owner types: {ser[is_multi].value_counts()}"
+    assert is_multi.mean() < 0.02, (
+        f"Too many multi-valued owner types: {ser[is_multi].value_counts()}"
+    )
     out = (
         ser.str.split("|", regex=False, n=1)
         .str[0]
@@ -148,9 +148,7 @@ def _col_transform_owner_types(ser: pd.Series, full_df: pd.DataFrame) -> pd.Seri
         .max()
     )
     n_known_investor_owned = 1
-    assert (
-        n_max_investor_owned_owner_type_per_date == n_known_investor_owned
-    ), f"""
+    assert n_max_investor_owned_owner_type_per_date == n_known_investor_owned, f"""
         Found {n_max_investor_owned_owner_type_per_date} 'Investor Owned' owner types from one report date, expected {n_known_investor_owned}:
         {full_df[full_df["raw_owner_types"].str.contains("Investor Owned")][["raw_owner_types", "raw_owners", "report_date"]]}
         If these are all IPPs, then increase the number of expected.
@@ -179,9 +177,9 @@ def _col_transform_owner_types(ser: pd.Series, full_df: pd.DataFrame) -> pd.Seri
         pd.NA,
     }
     is_expected = out.isin(expected_values)
-    assert (
-        is_expected.all()
-    ), f"Unexpected owner type values: {out[~is_expected].value_counts()}"
+    assert is_expected.all(), (
+        f"Unexpected owner type values: {out[~is_expected].value_counts()}"
+    )
     return out
 
 
@@ -199,7 +197,7 @@ def _col_transform_mw_total_capacity(
     # Note: this does not combine capacity at plants with both online and decommissioned
     # phases.
 
-    # Confirm that decommisioned capacity is always zero
+    # Confirm that decommissioned capacity is always zero
     is_decom = full_df["raw_status"] == "Decommissioned"
     assert ser.loc[is_decom].eq(0).all(), "Found non-zero Decommissioned capacity."
     out = ser.copy()
@@ -208,7 +206,7 @@ def _col_transform_mw_total_capacity(
 
 
 def _transform_location_cols(
-    full_df: pd.DataFrame, county_shapes: gpd.GeoDataFrame
+    full_df: pd.DataFrame, county_shapes: geopandas.GeoDataFrame
 ) -> pd.DataFrame:
     """Clean state, county, and lat/lon columns simultaneously."""
     # County FIPS codes can be defined by either state and county names or by lat/lon.
@@ -223,14 +221,14 @@ def _transform_location_cols(
     #    have multivalued entries.
 
     # first check dtypes
-    assert (
-        full_df["raw_avg_latitude"].dtype == pd.Float64Dtype()
-    ), "Latitude is not float64"
-    assert (
-        full_df["raw_avg_longitude"].dtype == pd.Float64Dtype()
-    ), "Longitude is not float64"
+    assert full_df["raw_avg_latitude"].dtype == pd.Float64Dtype(), (
+        "Latitude is not float64"
+    )
+    assert full_df["raw_avg_longitude"].dtype == pd.Float64Dtype(), (
+        "Longitude is not float64"
+    )
     county_shapes["GEOID"] = county_shapes["GEOID"].astype(pd.StringDtype())
-    points = gpd.GeoSeries.from_xy(
+    points = geopandas.GeoSeries.from_xy(
         full_df["raw_avg_longitude"].astype(np.float64),
         full_df["raw_avg_latitude"].astype(np.float64),
         index=full_df.index,
@@ -283,7 +281,7 @@ def _transform_location_cols(
     # 2) one of the sources is missing (no fips) but the other is present and
     #    successfully produces a FIPS. (simply fillna. 9% of cases)
     # 3) one of various conflicts (<1% of cases):
-    #    a) both exist but disagree (arbitarily use state/county FIPS and set lat/lon to
+    #    a) both exist but disagree (arbitrarily use state/county FIPS and set lat/lon to
     #       null. This case is about 1/3 of remaining cases)
     #    b) lat/lon present but spatial join fails and state is present but county is
     #       missing. These are all offshore projects with lat/lon in the ocean. Note
@@ -317,7 +315,7 @@ def _transform_location_cols(
     joined.loc[
         failed_sjoin & has_point & ~is_offshore, ["avg_latitude", "avg_longitude"]
     ] = pd.NA
-    joined.rename(columns={"GEOID": "census_county_id_fips"}, inplace=True)
+    joined = joined.rename(columns={"GEOID": "census_county_id_fips"})
 
     # fill in any remaining missing and multi-valued entries with the first value
     is_missing_multi = joined["county_id_fips"].isna() & is_multivalued
@@ -383,6 +381,7 @@ def _make_surrogate_key(raw_df: pd.DataFrame) -> pd.Series:
 
     Arguments:
         raw_df (pd.DataFrame): The raw dataframe to create a key for.
+
     """
     # The surrogate key is a hash of several columns that should uniquely identify a row
     # The main design decisions are whether to use raw data or transformed data as
@@ -410,9 +409,9 @@ def _make_surrogate_key(raw_df: pd.DataFrame) -> pd.Series:
     ]
     dupes = raw_df.duplicated(subset=pk, keep=False)
     assert not dupes.any(), f"Uniqueness violation: {dupes.sum()} duplicate PKs found."
-    assert (
-        raw_df["MW_Total_Capacity"].dtype == pd.Float64Dtype()
-    ), "Capacity is not float dtype"
+    assert raw_df["MW_Total_Capacity"].dtype == pd.Float64Dtype(), (
+        "Capacity is not float dtype"
+    )
 
     to_hash = raw_df.loc[:, pk].copy()
     str_cols = to_hash.select_dtypes(include="string").columns
@@ -436,7 +435,7 @@ def _int_id_from_str(s: str) -> int:
     # integers are more convenient and we don't need the full 16 bytes for data this
     # small (collision probability is on the order of 1e-12 for 10k items with 64 bits)
     byte_str = s.encode("utf-8")
-    hash_digest = hashlib.md5(byte_str).digest()[:8]  # nosec
+    hash_digest = hashlib.md5(byte_str).digest()[:8]  # noqa:S324
     # Specify byteorder and signedness just for clarity. I don't *really* care what they
     # are as long as the underlying bytes are unique. But Postgres has no unsigned
     # integer types, so I'll use signed int for consistency between the pre-db and
@@ -467,7 +466,7 @@ def _clean_columns(df: pd.DataFrame) -> pd.DataFrame:
     for raw_col, transform in col_transforms.items():
         new_col_name = raw_col[4:]  # remove 'raw_'
         df[new_col_name] = transform(df[raw_col])
-    county_shapes = _extract_census_counties(CENSUS_URI).set_geometry("geometry")
+    county_shapes = extract_fips()["counties"].set_geometry("geometry")
     location_cols = _transform_location_cols(df, county_shapes)
     out = pd.concat((df, location_cols), axis=1)
 
@@ -489,8 +488,8 @@ def _clean_columns(df: pd.DataFrame) -> pd.DataFrame:
         "phase_type": "resource",  # match LBNL/gridstatus
         "mw_total_capacity": "capacity_mw",  # match PUDL/LBNL/gridstatus
     }
-    out.rename(columns=rename_dict, inplace=True)
-    out.drop(columns=cols_to_drop, inplace=True)
+    out = out.rename(columns=rename_dict)
+    out = out.drop(columns=cols_to_drop)
     return out
 
 
@@ -559,11 +558,11 @@ def transform(raw_dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     most_recent_snapshot = snapshots[
         snapshots["report_date"] == most_recent_report_date
     ]
-    transformed_dfs["acp_projects_current"] = _transform_acp_projects_current(
+    transformed_dfs["acp__private__projects"] = _transform_acp_projects_current(
         most_recent_snapshot
     )
-    transformed_dfs["acp_changelog"] = _transform_acp_snapshots_to_changelog(
-        raw_dfs["raw_acp_projects_snapshots"]
+    transformed_dfs["acp__private__changelog__projects"] = (
+        _transform_acp_snapshots_to_changelog(raw_dfs["raw_acp_projects_snapshots"])
     )
 
     return transformed_dfs

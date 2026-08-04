@@ -1,8 +1,9 @@
-"""Tranform raw FIPS tables to a database-ready form."""
-import logging
-from typing import Dict, Sequence
+"""Transform raw FIPS tables to a database-ready form."""
 
-import geopandas as gpd
+import logging
+from collections.abc import Sequence
+
+import geopandas as geopandas
 import pandas as pd
 from joblib import Memory
 
@@ -11,16 +12,14 @@ from dbcp.constants import DATA_DIR
 logger = logging.getLogger(__name__)
 
 # cache needs to be accessed outside this module to call .clear()
-# limit cache size to 1 MB, keeps most recently accessed first
-SPATIAL_CACHE = Memory(location=DATA_DIR / "spatial_cache", bytes_limit=2**20)
+SPATIAL_CACHE = Memory(location=DATA_DIR / "spatial_cache")
 
 
 @SPATIAL_CACHE.cache()
 def _add_tribal_land_frac(
-    counties: gpd.GeoDataFrame, tribal_land: gpd.GeoDataFrame
-) -> gpd.GeoDataFrame:
-    """
-    Add tribal_land_frac column to the counties table.
+    counties: geopandas.GeoDataFrame, tribal_land: geopandas.GeoDataFrame
+) -> geopandas.GeoDataFrame:
+    """Add tribal_land_frac column to the counties table.
 
     Args:
         counties: clean county fips table.
@@ -28,6 +27,7 @@ def _add_tribal_land_frac(
 
     Return:
         counties: clean county fips table with tribal_land_frac column.
+
     """
     logger.info("Add tribal_land_frac to counties table.")
     # Convert to a project we can use to calculate areas and perform intersections
@@ -53,24 +53,24 @@ def _add_tribal_land_frac(
         tribal_land_larger_than_county, 1.0
     )
     counties["tribal_land_frac"] = counties["tribal_land_frac"].round(2)
-    counties.drop(columns=["tribal_land_intersection", "geometry"], inplace=True)
+    counties = counties.drop(columns=["tribal_land_intersection", "geometry"])
 
-    assert (
-        counties.tribal_land_frac <= 1.0
-    ).all(), "Found a county where tribal land is greater than 100%"
+    assert (counties.tribal_land_frac <= 1.0).all(), (
+        "Found a county where tribal land is greater than 100%"
+    )
 
     return counties
 
 
 def county_fips(counties: pd.DataFrame, tribal_land: pd.DataFrame) -> pd.DataFrame:
-    """
-    Apply transformations to county table.
+    """Apply transformations to county table.
 
     Args:
         counties: raw census table.
 
     Returns:
-        transformed county_fips table.
+        transformed census__county_fips table.
+
     """
     rename_dict = {  # comment out columns to drop
         "STATEFP": "state_id_fips",
@@ -93,7 +93,7 @@ def county_fips(counties: pd.DataFrame, tribal_land: pd.DataFrame) -> pd.DataFra
         "INTPTLON": "centroid_longitude",
         "geometry": "geometry",
     }
-    counties = counties.loc[:, rename_dict.keys()].rename(columns=rename_dict)  # type: ignore
+    counties = counties.loc[:, rename_dict.keys()].rename(columns=rename_dict)
 
     # convert units from m2 to km2
     counties.loc[:, ["land_area_km2", "water_area_km2"]] /= 1e6
@@ -122,14 +122,14 @@ def county_fips(counties: pd.DataFrame, tribal_land: pd.DataFrame) -> pd.DataFra
 
 
 def state_fips(states: pd.DataFrame) -> pd.DataFrame:
-    """
-    Apply transformations to county FIPS table.
+    """Apply transformations to county FIPS table.
 
     Args:
-        states: raw county_fips table.
+        states: raw census__state_fips table.
 
     Returns:
-        transformed county_fips table.
+        transformed census__state_fips table.
+
     """
     states = states.copy()
     states = _dedupe_keep_shortest_name(
@@ -153,22 +153,22 @@ def state_fips(states: pd.DataFrame) -> pd.DataFrame:
     return states
 
 
-def transform(fips_tables: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
-    """
-    Transform state and county FIPS dataframes.
+def transform(fips_tables: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+    """Transform state and county FIPS dataframes.
 
     Args:
         fips_tables: Dictionary of the raw extracted data for each FIPS table.
 
     Returns:
         transformed_fips_tables: Dictionary of the transformed tables.
+
     """
     transformed_fips_tables = {}
 
-    transformed_fips_tables["county_fips"] = county_fips(
+    transformed_fips_tables["census__county_fips"] = county_fips(
         fips_tables["counties"], fips_tables["tribal_land"]
     )
-    transformed_fips_tables["state_fips"] = state_fips(fips_tables["states"])
+    transformed_fips_tables["census__state_fips"] = state_fips(fips_tables["states"])
 
     return transformed_fips_tables
 
@@ -187,6 +187,7 @@ def _dedupe_keep_shortest_name(
 
     Returns:
         pd.DataFrame: deduplicated copy of input dataframe, sorted by idx_cols
+
     """
     sorted_idx = df[name_col].str.len().sort_values(ascending=True).index
     sorted_ = df.loc[sorted_idx, :]

@@ -21,7 +21,6 @@ separately, such as non-commutative aggregations over nested groupings, eg
 """
 
 from io import StringIO
-from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -30,12 +29,15 @@ import sqlalchemy as sa
 from dbcp.data_mart.co2_dashboard import (
     _estimate_existing_co2e,
     _get_existing_plant_fuel_data,
-    _get_plant_location_data,
-    _transfrom_plant_location_data,
+)
+from dbcp.data_mart.eia860m import (
+    _get_latest_plant_attributes,
+    _get_latest_plant_locations,
 )
 from dbcp.data_mart.fossil_infrastructure_projects import (
     create_data_mart as create_fossil_infra_data_mart,
 )
+from dbcp.data_mart.fyi import create_fyi_long_format as create_fyi_data_mart
 from dbcp.data_mart.helpers import (
     CountyOpposition,
     _get_county_fips_df,
@@ -43,7 +45,6 @@ from dbcp.data_mart.helpers import (
     _subset_db_columns,
     get_query,
 )
-from dbcp.data_mart.projects import create_fyi_long_format as create_fyi_data_mart
 from dbcp.helpers import get_sql_engine
 
 JUSTICE40_AGGREGATES = pd.read_csv(
@@ -99,7 +100,7 @@ def _create_dbcp_ej_index(j40_df: pd.DataFrame) -> pd.Series:
     1. By counties: If any of the indicators (within a category) has >1 (meaning at least 1 tract is affected), then it's a YES.
     2. Each indicator category has a unique weight, so each YES is counted by the weight assigned to that category
     3. For each county, sum all of the YES indicator categories with its appropriate weight.
-    4. Final number sums all indicator catergories and gives you the Justice 40 DBCP Index.
+    4. Final number sums all indicator categories and gives you the Justice 40 DBCP Index.
     """
     category_weights = {  # specified by client
         "climate": 1.0,
@@ -214,71 +215,20 @@ def _get_env_justice_df(engine: sa.engine.Engine) -> pd.DataFrame:
     return df
 
 
-def _get_existing_plant_attributes(engine: sa.engine.Engine) -> pd.DataFrame:
-    # get plant_id, fuel_type, capacity_mw
-
-    # The query here relies on the fact that each generator has only one fuel_type_pudl.
-    # I confirmed that this is true because the following query returns 1:
-    # WITH
-    # gen_fuels as (
-    #     SELECT
-    #         plant_id_eia,
-    #         generator_id,
-    #         count(fuel_type_code_pudl) as fuel_type_count
-    #     FROM "data_warehouse"."pudl_generators"
-    #     GROUP BY 1, 2
-    # )
-    # SELECT max(fuel_type_count) as max_fuel_type_count
-    # FROM gen_fuels
-
-    query = get_query("get_existing_plant_attributes.sql")
-    df = pd.read_sql(query, engine)
-    resource_map = {
-        "gas": "Natural Gas",
-        "wind": "Onshore Wind",
-        "hydro": "Hydro",
-        "oil": "Oil",
-        "nuclear": "Nuclear",
-        "coal": "Coal",
-        "other": "Other",
-        "solar": "Solar",
-        "Battery Storage": "Battery Storage",
-        "Offshore Wind": "Offshore Wind",
-    }
-    df.loc[:, "resource"] = df.loc[:, "resource"].map(resource_map)
-    return df
-
-
 def _get_existing_fossil_plant_co2e_estimates() -> pd.Series:
     gen_fuel_923 = _get_existing_plant_fuel_data()
     plant_co2e = _estimate_existing_co2e(gen_fuel_923)
     return plant_co2e
 
 
-def _get_existing_plant_locations(
-    postgres_engine: sa.engine.Engine,
-    state_fips_table: Optional[pd.DataFrame] = None,
-    county_fips_table: Optional[pd.DataFrame] = None,
-):
-    if state_fips_table is None:
-        state_fips_table = _get_state_fips_df(postgres_engine)
-    if county_fips_table is None:
-        county_fips_table = _get_county_fips_df(postgres_engine)
-    plant_locations = _get_plant_location_data()
-    plant_locations = _transfrom_plant_location_data(
-        plant_locations, state_table=state_fips_table, county_table=county_fips_table
-    )
-    return plant_locations
-
-
 def _get_existing_plants(
     postgres_engine: sa.engine.Engine,
-    state_fips_table: Optional[pd.DataFrame] = None,
-    county_fips_table: Optional[pd.DataFrame] = None,
+    state_fips_table: pd.DataFrame | None = None,
+    county_fips_table: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    plants = _get_existing_plant_attributes(engine=postgres_engine)
+    plants = _get_latest_plant_attributes(engine=postgres_engine)
     co2e = _get_existing_fossil_plant_co2e_estimates()
-    locations = _get_existing_plant_locations(
+    locations = _get_latest_plant_locations(
         postgres_engine=postgres_engine,
         state_fips_table=state_fips_table,
         county_fips_table=county_fips_table,
@@ -290,8 +240,8 @@ def _get_existing_plants(
 
 def _existing_plants_counties(
     postgres_engine: sa.engine.Engine,
-    state_fips_table: Optional[pd.DataFrame] = None,
-    county_fips_table: Optional[pd.DataFrame] = None,
+    state_fips_table: pd.DataFrame | None = None,
+    county_fips_table: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Create existing plant county-plant aggs for the long-format county table."""
     plants = _get_existing_plants(
@@ -361,12 +311,11 @@ def _fossil_infrastructure_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     aggs["facility_type"] = "fossil infrastructure"
     aggs["status"] = "proposed"
     aggs = aggs.reset_index()
-    aggs.rename(
+    aggs = aggs.rename(
         columns={
             "project_id": "facility_count",
             "industry_sector": "resource_or_sector",
         },
-        inplace=True,
     )
     return aggs
 
@@ -405,7 +354,7 @@ def _fyi_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     grp = queue.groupby(["county_id_fips", "resource_clean"])
     aggs = grp.agg(
         {
-            "co2e_tonnes_per_year": "sum",  # type: ignore
+            "co2e_tonnes_per_year": "sum",
             "capacity_mw": "sum",
             "project_id": "count",
         }
@@ -416,13 +365,12 @@ def _fyi_projects_counties(engine: sa.engine.Engine) -> pd.DataFrame:
     )  # sums of 0 are simply unmodeled
     aggs["facility_type"] = "power plant"
     aggs["status"] = "proposed"
-    aggs.reset_index(inplace=True)
-    aggs.rename(
+    aggs = aggs.reset_index()
+    aggs = aggs.rename(
         columns={
             "project_id": "facility_count",
             "resource_clean": "resource_or_sector",
         },
-        inplace=True,
     )
     return aggs
 
@@ -435,7 +383,7 @@ def _get_ncsl_wind_permitting_df(engine: sa.engine.Engine) -> pd.DataFrame:
         # 'raw_state_name',  # drop raw name in favor of canonical one
         "state_id_fips",
     ]
-    db = "data_warehouse.ncsl_state_permitting"
+    db = "data_warehouse.ncsl__state_permitting"
     df = _subset_db_columns(cols, db, engine)
     return df
 
@@ -520,7 +468,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     # counties with power infrastructure in them
 
     wide = long.pivot(index=idx_cols, columns=col_cols, values=val_cols)
-    wide.reset_index(inplace=True)
+    wide = wide.reset_index()
 
     wide.columns = wide.columns.rename(
         {None: "measures"}
@@ -583,7 +531,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
         infra_cols_to_sum = [f"infra_{sector}_{measure}" for sector in sectors]
         wide[f"infra_total_{measure}"] = wide.loc[:, infra_cols_to_sum].sum(axis=1)
 
-    wide.dropna(axis=1, how="all", inplace=True)
+    wide = wide.dropna(axis=1, how="all")
     cols_to_drop = [
         # A handful of hybrid facilities with co-located diesel generators.
         # They produce tiny amounts of CO2 but large amounts of confusion.
@@ -596,7 +544,7 @@ def _convert_long_to_wide(long_format: pd.DataFrame) -> pd.DataFrame:
     ]
     # some columns pop in and out of existence based on minor fluctuations in the data
     cols_to_drop = [col for col in cols_to_drop if col in wide.columns]
-    wide.drop(columns=cols_to_drop, inplace=True)
+    wide = wide.drop(columns=cols_to_drop)
 
     return wide
 
@@ -635,7 +583,7 @@ def _get_offshore_wind_extra_cols(engine: sa.engine.Engine) -> pd.DataFrame:
     # to know how much total capacity is at stake in each port county.
     query = get_query("get_offshore_wind_extra_cols.sql")
     df = pd.read_sql(query, engine)
-    df.set_index("county_id_fips", inplace=True)
+    df = df.set_index("county_id_fips")
     return df
 
 
@@ -651,13 +599,11 @@ def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
     """
     pad = pd.read_sql(query, postgres_engine)
     # county_area_coast_clipped is consistent with clipped PAD-US but
-    # the county_fips.land_area_km2 is more accurate and preferred for
+    # the census__county_fips.land_area_km2 is more accurate and preferred for
     # downstream analysis.
     # I use the consistent value to calculate ratio, then pair that ratio
     #  with the accurate land area in the data mart
-    county_areas = pad.groupby("county_id_fips")[
-        "county_area_coast_clipped_km2"
-    ].first()
+    county_areas = pad.groupby("county_id_fips")["county_area_coast_clipped_km2"].max()
     is_developable = pad["gap_status"].str.match("^[34]")
     is_federally_managed = pad["manager_type"] == "Federal"
 
@@ -676,7 +622,9 @@ def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
     areas = pd.concat(
         [county_areas, federal_developable, un_developable], axis=1, join="outer"
     )
-    areas.loc[:, ["fed_dev", "protected"]].fillna(0, inplace=True)
+    areas.loc[:, ["fed_dev", "protected"]] = areas.loc[
+        :, ["fed_dev", "protected"]
+    ].fillna(0)
     areas["unprotected_land_area_km2"] = (
         areas["county_area_coast_clipped_km2"] - areas["protected"]
     )
@@ -688,12 +636,12 @@ def _get_federal_land_fraction(postgres_engine: sa.engine.Engine):
         "federal_fraction_unprotected_land",
     ]
     correlated_rounding_errors = areas["federal_fraction_unprotected_land"].gt(1)
-    assert (
-        correlated_rounding_errors.sum() == 1
-    ), f"Expected 1 bad rounding error, got {correlated_rounding_errors.sum()}"
-    areas.loc[
-        correlated_rounding_errors, "federal_fraction_unprotected_land"
-    ] = 1.0  # manually clip
+    assert correlated_rounding_errors.sum() == 1, (
+        f"Expected 1 bad rounding error, got {correlated_rounding_errors.sum()}"
+    )
+    areas.loc[correlated_rounding_errors, "federal_fraction_unprotected_land"] = (
+        1.0  # manually clip
+    )
 
     return areas.loc[:, out_cols].copy()
 
@@ -709,7 +657,7 @@ def _get_energy_community_qualification(postgres_engine: sa.engine.Engine):
 def _get_county_properties(
     postgres_engine: sa.engine.Engine,
     include_state_policies=False,
-    rename_dict: Optional[Dict[str, str]] = None,
+    rename_dict: dict[str, str] | None = None,
 ):
     if rename_dict is None:
         rename_dict = {
@@ -774,13 +722,12 @@ def _get_county_properties(
     )
     #  EC data currently only includes counties that have qualifying features.
     #  Fill in nulls for counties that do not qualify.
-    county_properties.fillna(
+    county_properties = county_properties.fillna(
         {
             "energy_community_coal_closures_area_fraction": 0.0,
             "energy_community_qualifies_via_employment": False,
             "energy_community_qualifies": False,
         },
-        inplace=True,
     )
 
     county_properties = county_properties.rename(columns=rename_dict)
@@ -847,7 +794,7 @@ def _get_actionable_aggs_for_wide_format(engine: sa.engine.Engine) -> pd.DataFra
                     }
                 )
             )
-            agg.rename(columns=rename_dict, inplace=True)
+            agg = agg.rename(columns=rename_dict)
             aggs.append(agg)
         # and avoided co2 totals. This doesn't belong in this function but c'est la vie.
         agg = (
@@ -880,10 +827,9 @@ def _get_actionable_aggs_for_long_format(engine: sa.engine.Engine) -> pd.DataFra
     )
     frac_actionable["facility_type"] = "power plant"
     frac_actionable["status"] = "proposed"
-    frac_actionable.reset_index(inplace=True)
-    frac_actionable.rename(
+    frac_actionable = frac_actionable.reset_index()
+    frac_actionable = frac_actionable.rename(
         columns={0: "actionable_mw_fraction", "resource_clean": "resource_or_sector"},
-        inplace=True,
     )
 
     return frac_actionable
@@ -891,16 +837,15 @@ def _get_actionable_aggs_for_long_format(engine: sa.engine.Engine) -> pd.DataFra
 
 def _add_avoided_co2e(iso: pd.DataFrame, engine: sa.engine.Engine) -> pd.DataFrame:
     emiss_fac_by_county = _get_avoided_emissions_by_county_resource(engine)
-    emiss_fac_by_county["resource_type"].replace(
+    emiss_fac_by_county["resource_type"] = emiss_fac_by_county["resource_type"].replace(
         {
             "onshore_wind": "Onshore Wind",
             "offshore_wind": "Offshore Wind",
             "utility_pv": "Solar",
         },
-        inplace=True,
     )
-    emiss_fac_by_county.rename(
-        columns={"resource_type": "resource_clean"}, inplace=True
+    emiss_fac_by_county = emiss_fac_by_county.rename(
+        columns={"resource_type": "resource_clean"}
     )
 
     iso = iso.merge(
@@ -936,16 +881,16 @@ def _get_avoided_emissions_by_county_resource(engine: sa.engine.Engine) -> pd.Da
     emiss_fac_by_county = emiss_fac_by_county.merge(
         national_avgs, on="resource_type", how="left"
     )
-    emiss_fac_by_county["co2e_tonnes_per_year_per_mw"].fillna(
-        emiss_fac_by_county["avg_co2"], inplace=True
-    )
-    emiss_fac_by_county.drop(columns=["avg_co2", "avert_region"], inplace=True)
+    emiss_fac_by_county["co2e_tonnes_per_year_per_mw"] = emiss_fac_by_county[
+        "co2e_tonnes_per_year_per_mw"
+    ].fillna(emiss_fac_by_county["avg_co2"])
+    emiss_fac_by_county = emiss_fac_by_county.drop(columns=["avg_co2", "avert_region"])
     return emiss_fac_by_county
 
 
 def create_wide_format(
-    postgres_engine: Optional[sa.engine.Engine] = None,
-    long_format: Optional[pd.DataFrame] = None,
+    postgres_engine: sa.engine.Engine | None = None,
+    long_format: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Create wide format county aggregates."""
     if postgres_engine is None:
@@ -972,7 +917,7 @@ def create_wide_format(
         axis=1,
         join="outer",
     )
-    wide_format.reset_index(inplace=True)
+    wide_format = wide_format.reset_index()
     assert (
         wide_format["renewable_and_battery_proposed_facility_count"]
         .fillna(0)
@@ -1027,8 +972,8 @@ def _get_category_project_counts(engine: sa.engine.Engine) -> pd.DataFrame:
 
 
 def create_data_mart(
-    engine: Optional[sa.engine.Engine] = None,
-) -> Dict[str, pd.DataFrame]:
+    engine: sa.engine.Engine | None = None,
+) -> dict[str, pd.DataFrame]:
     """Create county data marts.
 
     Args:
@@ -1036,6 +981,7 @@ def create_data_mart(
 
     Returns:
         Dict[str, pd.DataFrame]: county tables in both wide and long format
+
     """
     postgres_engine = engine
     if postgres_engine is None:

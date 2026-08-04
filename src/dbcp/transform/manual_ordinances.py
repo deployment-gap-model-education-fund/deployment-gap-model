@@ -1,4 +1,5 @@
 """Transform manual ordinances."""
+
 import pandas as pd
 
 

@@ -3,22 +3,20 @@
 import csv
 import logging
 import os
-from datetime import timezone
+from datetime import UTC
 from io import StringIO
 from pathlib import Path
 
 import addfips
 import fsspec
-import google.auth
 import pandas as pd
-import pandas_gbq
 import pyarrow as pa
 import sqlalchemy as sa
-from google.cloud import bigquery
 from tqdm import tqdm
 
 import dbcp
 from dbcp.constants import DATA_DIR
+from dbcp.metadata import SchemaName
 
 logger = logging.getLogger(__name__)
 
@@ -49,40 +47,37 @@ SA_TO_PA_TYPES = {
 SA_TO_BQ_MODES = {True: "NULLABLE", False: "REQUIRED"}
 
 
-def get_schema_sql_alchemy_metadata(schema: str) -> sa.MetaData:
-    """
-    Get SQL Alchemy metadata object for a particular schema.
+def get_schema_sql_alchemy_metadata(schema: SchemaName) -> sa.MetaData:
+    """Get SQL Alchemy metadata object for a particular schema.
 
     Args:
         schema: the name of the database schema.
+
     Returns:
         metadata: the SQL alchemy metadata associated with the db schema.
+
     """
-    if schema == "data_mart":
-        return dbcp.metadata.data_mart.metadata
-    elif schema == "data_warehouse":
-        return dbcp.metadata.data_warehouse.metadata
-    elif schema == "private_data_warehouse":
-        return dbcp.metadata.private_data_warehouse.metadata
-    elif schema == "private_data_mart":
-        return dbcp.metadata.private_data_mart.metadata
-    else:
-        raise ValueError(f"{schema} is not a valid schema.")
+    if schema == SchemaName.DATA_MART:
+        metadata = dbcp.metadata.data_mart.metadata
+    if schema == SchemaName.DATA_WAREHOUSE:
+        metadata = dbcp.metadata.data_warehouse.metadata
+    return metadata
 
 
 def get_bq_schema_from_metadata(
-    table_name: str, schema: str, dev: bool = True
+    table_name: str, schema: SchemaName, dev: bool = True
 ) -> list[dict[str, str]]:
-    """
-    Create a BigQuery schema from SQL Alchemy metadata.
+    """Create a BigQuery schema from SQL Alchemy metadata.
 
     Args:
         table_name: the name of the table.
         schema: the name of the database schema.
+
     Returns:
         bq_schema: a bigquery schema description.
+
     """
-    table_name = f"{schema}.{table_name}"
+    table_name = f"{schema.value}.{table_name}"
     metadata = get_schema_sql_alchemy_metadata(schema)
     bq_schema = []
     for column in metadata.tables[table_name].columns:
@@ -94,17 +89,18 @@ def get_bq_schema_from_metadata(
     return bq_schema
 
 
-def get_pyarrow_schema_from_metadata(table_name: str, schema: str) -> pa.Schema:
-    """
-    Create a PyArrow schema from SQL Alchemy metadata.
+def get_pyarrow_schema_from_metadata(table_name: str, schema: SchemaName) -> pa.Schema:
+    """Create a PyArrow schema from SQL Alchemy metadata.
 
     Args:
         table_name: the name of the table.
         schema: the name of the database schema.
+
     Returns:
         pyarrow_schema: a PyArrow schema description.
+
     """
-    table_name = f"{schema}.{table_name}"
+    table_name = f"{schema.value}.{table_name}"
     metadata = get_schema_sql_alchemy_metadata(schema)
     table_sa = metadata.tables[table_name]
     pyarrow_schema = []
@@ -113,14 +109,14 @@ def get_pyarrow_schema_from_metadata(table_name: str, schema: str) -> pa.Schema:
     return pa.schema(pyarrow_schema)
 
 
-def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str):
+def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: SchemaName):
     """Apply dtypes to a dataframe using the sqlalchemy metadata."""
-    table_name = f"{schema}.{table_name}"
+    table_name = f"{schema.value}.{table_name}"
     metadata = get_schema_sql_alchemy_metadata(schema)
     try:
         table = metadata.tables[table_name]
-    except KeyError:
-        raise KeyError(f"{table_name} does not exist in metadata.")
+    except KeyError as e:
+        raise KeyError(f"{table_name} does not exist in metadata.") from e
 
     for col in table.columns:
         # Add the column if it doesn't exist
@@ -130,9 +126,7 @@ def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: str):
             if not pd.api.types.is_datetime64_any_dtype(df[col.name]):
                 df[col.name] = pd.to_datetime(df[col.name], errors="coerce")
             # drop the timezone in order to enable migration to Postgres.
-            if (df[col.name].dt.tz is not None) and (
-                df[col.name].dt.tz != timezone.utc
-            ):
+            if (df[col.name].dt.tz is not None) and (df[col.name].dt.tz != UTC):
                 logger.error(
                     f"Non-UTC timezone encountered in column {col.name} "
                     "while enforcing dtypes before postgres migration. "
@@ -172,9 +166,9 @@ def write_to_postgres(
     df: pd.DataFrame,
     table_name: str,
     engine: sa.engine.Engine,
-    schema_name: str,
+    schema_name: SchemaName,
     if_exists: str = "append",
-    use_catalyst_schema: bool = False,
+    remote: bool = False,
 ):
     """Create data from a DataFrame to a postgres table.
 
@@ -184,8 +178,10 @@ def write_to_postgres(
         engine: sqlalchemy engine.
         schema_name: Name of schema like ``data_mart`` or ``data_warehouse``.
         if_exists: What to do if table already exists in postgres. See Pandas ``to_sql`` for options.
-        use_catalyst_schema: In the production postgres instance we only use the schema 'catalyst'
-            but still need the actual schema name for ``enforce_dtypes``.
+        remote: If writing to the production DB, everything goes in a single
+            schema. Eventually, we will remove the data warehouse / mart distinction
+            everywhere.
+
     """
     df = trim_columns_length(df)
     df = enforce_dtypes(df, table_name, schema_name)
@@ -194,7 +190,7 @@ def write_to_postgres(
         con=engine,
         if_exists=if_exists,
         index=False,
-        schema="catalyst" if use_catalyst_schema else schema_name,
+        schema="catalyst" if remote else schema_name.value,
         method=psql_insert_copy,
         chunksize=5000,  # adjust based on memory capacity
     )
@@ -204,7 +200,7 @@ def write_to_postgres(
 
 
 def get_pudl_resource(
-    pudl_resource: str, bucket: str = "s3://pudl.catalyst.coop"
+    pudl_resource: str, bucket: str = "s3://pudl.catalyst.coop/"
 ) -> Path:
     """Given the name of a PUDL resource, return the path to the cached file.
 
@@ -212,17 +208,26 @@ def get_pudl_resource(
 
     Args:
         pudl_resource: The name of the PUDL resource to retrieve.
+
     Returns:
         pudl_resource_path: The path to the cached PUDL resource.
+
     """
-    PUDL_VERSION = os.environ["PUDL_VERSION"]
+    try:
+        file_paths = dbcp.extract.helpers.load_yml_file(DATA_DIR / "file_paths.yml")
+        bucket = file_paths["pudl_data"].item()
+    except Exception as e:
+        logger.info(f"{e}: reverting to default input bucket.")
+        bucket = bucket  # If failure, use default value of bucket provided.
+
+    pudl_version = os.environ["PUDL_VERSION"]
 
     pudl_cache = DATA_DIR / "data_cache/pudl/"
     pudl_cache.mkdir(exist_ok=True)
-    pudl_version_cache = pudl_cache / PUDL_VERSION
+    pudl_version_cache = pudl_cache / pudl_version
     pudl_version_cache.mkdir(exist_ok=True)
 
-    remote_pudl_resource_path = f"{bucket}/{PUDL_VERSION}/{pudl_resource}"
+    remote_pudl_resource_path = f"{bucket}{pudl_version}/{pudl_resource}"
     local_pudl_resource_path = pudl_version_cache / pudl_resource
 
     if not local_pudl_resource_path.exists():
@@ -230,40 +235,39 @@ def get_pudl_resource(
         file_size = fs.size(remote_pudl_resource_path)
 
         # open the remote_pudl_resource_path and track progress with tqdm
-        with fs.open(remote_pudl_resource_path) as fo:
-            with open(local_pudl_resource_path, "wb") as local_file:
-                with tqdm(
-                    total=file_size, unit="B", unit_scale=True, unit_divisor=1024
-                ) as pbar:
-                    while True:
-                        buf = fo.read(8192)
-                        if not buf:
-                            break
-                        local_file.write(buf)
-                        pbar.update(len(buf))
+        with (
+            fs.open(remote_pudl_resource_path) as file,
+            Path(local_pudl_resource_path).open("wb") as local_file,
+            tqdm(total=file_size, unit="B", unit_scale=True, unit_divisor=1024) as pbar,
+        ):
+            while True:
+                buf = file.read(8192)
+                if not buf:
+                    break
+                local_file.write(buf)
+                pbar.update(len(buf))
 
     return local_pudl_resource_path
 
 
 def track_tar_progress(members):
     """Use tqdm to track progress of tar extraction."""
-    for member in tqdm(members):
-        # this will be the current file being extracted
-        yield member
+    yield from tqdm(members)
 
 
-def get_db_schema_tables(engine: sa.engine.Engine, schema: str) -> list[str]:
-    """
-    Get table names of database schema.
+def get_db_schema_tables(engine: sa.engine.Engine, schema: SchemaName) -> list[str]:
+    """Get table names of database schema.
 
     Args:
         engine: sqlalchemy connection engine.
         schema: the name of the database schema.
+
     Return:
         table_names: the table names in the db schema.
+
     """
     inspector = sa.inspect(engine)
-    table_names = inspector.get_table_names(schema=schema)
+    table_names = inspector.get_table_names(schema=schema.value)
 
     if not table_names:
         raise ValueError(
@@ -271,52 +275,6 @@ def get_db_schema_tables(engine: sa.engine.Engine, schema: str) -> list[str]:
         )
 
     return table_names
-
-
-def upload_schema_to_bigquery(schema: str, dev: bool = True) -> None:
-    """Upload a postgres schema to BigQuery."""
-    logger.info("Loading tables to BigQuery.")
-
-    # Get the schema table names
-    engine = get_sql_engine()
-    table_names = get_db_schema_tables(engine, schema)
-
-    # read tables from dbcp schema in a dictionary of dfs
-    loaded_tables = {}
-    with engine.connect() as con:
-        for table_name in table_names:
-            loaded_tables[table_name] = pd.read_sql_table(
-                table_name, con, schema=schema
-            )
-            loaded_tables[table_name] = enforce_dtypes(
-                loaded_tables[table_name], table_name, schema
-            )
-
-    # load to big query
-    credentials, project_id = google.auth.default()
-    client = bigquery.Client(credentials=credentials, project=project_id)
-
-    for table_name, df in loaded_tables.items():
-        schema_environment = f"{schema}{'_dev' if dev else ''}"
-        full_table_name = f"{schema_environment}.{table_name}"
-        table_schema = get_bq_schema_from_metadata(table_name, schema, dev)
-        logger.info(f"Loading: {table_name}")
-
-        # Delete the table because pandas_gbq doesn't recreate the BQ
-        # table schema which leads to problems when we change the metadata.
-        table_id = f"{project_id}.{schema_environment}.{table_name}"
-        client.delete_table(table_id, not_found_ok=True)
-
-        pandas_gbq.to_gbq(
-            df,
-            full_table_name,
-            project_id=project_id,
-            if_exists="replace",
-            credentials=credentials,
-            table_schema=table_schema,
-            chunksize=5000,
-        )
-        logger.info(f"Finished: {full_table_name}")
 
 
 def psql_insert_copy(table, conn, keys, data_iter):
@@ -329,6 +287,7 @@ def psql_insert_copy(table, conn, keys, data_iter):
     keys : list of str
         Column names
     data_iter : Iterable that iterates the values to be inserted
+
     """
     # gets a DBAPI connection that can provide a cursor
     dbapi_conn = conn.connection
@@ -339,10 +298,9 @@ def psql_insert_copy(table, conn, keys, data_iter):
         s_buf.seek(0)
 
         columns = ", ".join([f'"{k}"' for k in keys])
-        if table.schema:
-            table_name = f"{table.schema}.{table.name}"
-        else:
-            table_name = table.name
+        table_name = (
+            f"{table.schema}.{table.name}" if table.schema is not None else table.name
+        )
 
         sql = f"COPY {table_name} ({columns}) FROM STDIN WITH CSV"
         cur.copy_expert(sql=sql, file=s_buf)
