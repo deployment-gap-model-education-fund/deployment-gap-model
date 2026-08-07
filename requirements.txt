@@ -20,7 +20,7 @@ pyairtable>=2.3.3
 numpy<3
 sqlalchemy<3.0
 coloredlogs~=15.0.1
-scipy~=1.17.1
+scipy~=1.18.0
 google-cloud-storage~=3.8.0
 geopandas~=1.1.2
 gcsfs~=2026.1.0
