@@ -6,6 +6,7 @@ import os
 from datetime import UTC
 from io import StringIO
 from pathlib import Path
+from typing import Literal
 
 import addfips
 import fsspec
@@ -173,7 +174,7 @@ def write_to_sql(
     table_name: str,
     engine: sa.engine.Engine,
     schema_name: SchemaName,
-    if_exists: str = "append",
+    if_exists: Literal["fail", "replace", "append"] = "append",
     remote: bool = False,
 ):
     """Create data from a DataFrame to a postgres table.
