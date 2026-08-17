@@ -30,6 +30,7 @@ jobs:
       PROD_POSTGRES_USER: ${{ secrets.PROD_POSTGRES_USER }}
       PROD_POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD }}
       PROD_POSTGRES_HOST: ${{ secrets.PROD_POSTGRES_HOST }}
+      DATA_DIR: "./data"
     steps:
       - name: Checkout Repository
         id: checkout
