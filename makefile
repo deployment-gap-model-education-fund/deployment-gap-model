@@ -10,10 +10,8 @@ private_data_mart:
 all:
 	uv run python -m dbcp.cli etl --data-mart --data-warehouse
 
-publish:
-	uv run python -m dbcp.cli publish-outputs \
-        -bq \
-        --upload-to-postgres \
+upload_outputs:
+	uv run python -m dbcp.cli upload-outputs \
         --build-ref $(BUILD_REF) \
         --code-git-sha $(CODE_GIT_SHA) \
         --github-action-run-id $(GITHUB_ACTION_RUN_ID) \

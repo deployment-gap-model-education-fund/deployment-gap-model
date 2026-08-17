@@ -24,97 +24,9 @@ on:
     types: [published] # immediately deploy prod when a release is published
 
 jobs:
-  matrix_prep:
-    if: ${{ always() }}
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - name: Authenticate gh (needed for release lookups)
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-
-      - name: Fetch latest prod tag
-        id: latest_release
-        run: |
-          REPO="${{ github.repository }}"
-
-          # Get latest tag matching pattern (e.g. v*.*.*)
-          LATEST_TAG=$(gh release list \
-            --repo "$REPO" \
-            --exclude-drafts \
-            --exclude-pre-releases \
-            --json tagName \
-            --jq '.[0].tagName')
-
-          echo "Latest tag: $LATEST_TAG"
-          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
-
-      - name: Set matrix
-        id: set-matrix
-        run: |
-          if [[ "${{ github.event_name }}" == "push" ]]; then
-            # Any push (branch or tag) runs as dev against that ref
-            REF="${{ github.ref_name }}"
-            TARGET="dev"
-
-          elif [[ "${{ github.event_name }}" == "schedule" ]]; then
-            # Scheduled run: deploy prod from latest *published release* tag
-            TAG="${{ steps.latest_release.outputs.tag }}"
-            if [[ -z "${TAG:-}" ]]; then
-              echo "No published releases found; falling back to dev main."
-              TARGET="dev"; REF="main"
-            else
-              TARGET="prod"; REF="$TAG"
-            fi
-
-          elif [[ "${{ github.event_name }}" == "release" ]]; then
-            # Release published: deploy prod from this release tag
-            TAG="${{ github.event.release.tag_name }}"
-            TARGET="prod"; REF="$TAG"
-
-          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            REQ_TARGET="${{ inputs.target }}"
-              if [[ "$REQ_TARGET" == "prod" ]]; then
-                USER_TAG="${{ inputs.release_tag }}"
-                if [[ -n "$USER_TAG" ]]; then
-                  # validate the release exists and is published
-                  if gh release view "$USER_TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
-                    TARGET="prod"; REF="$USER_TAG"
-                  else
-                    echo "Requested release tag '$USER_TAG' not found or not published."
-                    exit 1
-                  fi
-                else
-                  TAG="${{ steps.latest_release.outputs.tag }}"
-                  if [[ -z "${TAG:-}" ]]; then
-                    echo "No published releases found; cannot deploy prod."
-                    exit 1
-                  fi
-                  TARGET="prod"; REF="$TAG"
-                fi
-              else
-                REF_INPUT="${{ github.ref_name }}"
-                TARGET="dev"; REF="${REF_INPUT:-main}"
-              fi
-
-          else
-            # fallback, default to dev (main branch)
-            TARGET="dev"; REF="main"
-
-          fi
-          echo "matrix={\"include\":[{\"target\":\"$TARGET\",\"ref\":\"$REF\"}]}" >> $GITHUB_OUTPUT
-
-      - name: Echo matrix
-        run: |
-          echo "${{ steps.set-matrix.outputs.matrix }}"
-
   etl:
-    needs: matrix_prep # Ensure archive job finishes first
     runs-on: ubuntu-latest
-    if: ${{ always() && needs.matrix_prep.result == 'success' }}
-    strategy:
-      matrix: ${{ fromJSON(needs.matrix_prep.outputs.matrix) }}
-      fail-fast: false
+    if: ${{ always() }}
     env:
       GEOCODIO_API_KEY: ${{ secrets.GEOCODIO_API_KEY }}
       API_KEY_GOOGLE_MAPS: ${{ secrets.API_KEY_GOOGLE_MAPS }}
@@ -123,20 +35,9 @@ jobs:
       PROD_POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD }}
       PROD_POSTGRES_HOST: ${{ secrets.PROD_POSTGRES_HOST }}
     steps:
-      - name: Print matrix info
-        run: |
-          echo "Target: ${{ matrix.target }}"
-          echo "Ref: ${{ matrix.ref }}"
-
       - name: Checkout Repository
         id: checkout
         uses: actions/checkout@v7
-        with:
-          # Checkout the ref (branch or tag) from matrix
-          ref: ${{ matrix.ref }}
-
-      - name: Who owns the workspace?
-        run: ls -ld $GITHUB_WORKSPACE
 
       - uses: "google-github-actions/auth@v2"
         with:
@@ -146,18 +47,6 @@ jobs:
         run: |
           echo "Workspace directory: $GITHUB_WORKSPACE" \
           echo "Google credentials path: $GOOGLE_GHA_CREDS_PATH" \
-
-      # Give the dbcp user ownership of the workspace
-      # So it can read and write files to the workspace
-      - name: Give the dbcp user ownership of the workspace
-        run: sudo chown -R 1000:1000 $GITHUB_WORKSPACE
-
-      - name: Build image
-        run: docker compose build --no-cache app
-
-      - name: Build and run Docker Compose services
-        run: |
-          docker compose up -d
 
       - name: Run full ETL
         if: ${{ success() }}
@@ -170,31 +59,16 @@ jobs:
           make test
 
       # Set necessary environment variables for publish step
-      - name: Set publish environment variables
+      - name: Set upload outputs environment variables
         run: |
           {
-            echo "BUILD_REF=${{ matrix.ref }}";
+            echo "BUILD_REF=${{ github.ref_name }}";
             echo "CODE_GIT_SHA=${{ steps.checkout.outputs.commit }}";
             echo "GITHUB_ACTION_RUN_ID=${{ github.run_id }}";
-            echo "TARGET=${{ matrix.target }}";
+            echo "TARGET=${{ inputs.target }}";
           } >> "$GITHUB_ENV"
 
       # Publish the outputs, grab the git SHA of the commit step
-      - name: Publish outputs
+      - name: Upload outputs
         run: |
-          make publish
-
-      - name: Stop Docker Compose services
-        if: always()
-        run: |
-          docker compose down
-
-      # The google-github-actions/auth step is run as runner:docker,
-      # so we need to give the workspace back to runner:docker
-      - name: Give ownership of the workspace back to root
-        if: always()
-        run: sudo chown -R runner:docker $GITHUB_WORKSPACE
-
-      - name: Who owns the workspace?
-        if: always()
-        run: ls -ld $GITHUB_WORKSPACE
+          make upload_outputs

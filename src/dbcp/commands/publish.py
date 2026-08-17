@@ -4,6 +4,7 @@ import logging
 import re
 import uuid
 from datetime import datetime
+from pathlib import Path
 
 import click
 import duckdb
@@ -151,10 +152,12 @@ class OutputMetadata(BaseModel):
 
     version: str = str(uuid.uuid4())
     git_ref: str | None = None
-    target: str | None = None
+    target: str
     code_git_sha: str | None = None
     github_action_run_id: str | None = None
     date_created: datetime = datetime.now()
+    version_file: Path = Path("./version.txt")
+    output_bucket: UPath = UPath("gs://dgm-outputs")
 
     @field_validator("git_ref")
     def git_ref_must_be_branch_or_tag(cls, git_ref: str | None) -> str | None:  # noqa: N805
@@ -175,26 +178,40 @@ class OutputMetadata(BaseModel):
         )
 
     @field_validator("target")
-    def target_must_be_dev_or_prod(cls, target: str | None) -> str | None:  # noqa: N805
+    def target_must_be_dev_or_prod(cls, target: str) -> str | None:  # noqa: N805
         """Validate that the target is either "dev" or "prod"."""
-        if target:
-            if target in ("dev", "prod"):
-                return target
-            raise ValueError(
-                f'{target} is not a valid target. Must be "dev" or "prod".'
-            )
-        return target
+        if target in ("dev", "prod"):
+            return target
+        raise ValueError(f'{target} is not a valid target. Must be "dev" or "prod".')
 
-    def to_yaml(self) -> str:
+    @property
+    def output_directory(self) -> UPath:
+        """Return directory within output bucket corresponding to current version."""
+        return self.output_bucket / self.version
+
+    def to_yaml(self):
         """Convert the metadata to a YAML string."""
-        settings_dict = self.model_dump()
+        settings_dict = self.model_dump(exclude={"version_file", "output_bucket"})
         repo_base_url = "https://github.com/deployment-gap-model-education-fund/deployment-gap-model"
         settings_dict["code_git_sha_url"] = f"{repo_base_url}/tree/{self.git_ref}"
         settings_dict["github_action_run_url"] = (
             f"{repo_base_url}/actions/runs/{self.github_action_run_id}"
         )
 
-        return yaml.dump(settings_dict)
+        (self.output_directory / "etl-run-metadata.yaml").write_text(
+            yaml.dump(settings_dict)
+        )
+
+    def write_version(self):
+        """Write version to disk so it can be saved as an artifact to pass to distribute workflow."""
+        self.version_file.write_text(self.version)
+
+    @classmethod
+    def from_version_file(cls) -> "OutputMetadata":
+        """Use version file to grab yaml from GCS."""
+        version = cls.version_file.read_text()
+        metadata_file = cls.output_bucket / version / "etl-run-metadata.yaml"
+        return cls(**yaml.safe_load(stream=metadata_file.read_text()))
 
 
 @click.command()
@@ -218,6 +235,34 @@ class OutputMetadata(BaseModel):
     default=None,
     help="The run id of the github action that built the outputs",
 )
+def upload_outputs(
+    build_ref: str,
+    target: str,
+    code_git_sha: str,
+    github_action_run_id: str,
+):
+    """Upload outputs to GCS as parquet files."""
+    metadata = OutputMetadata(
+        git_ref=build_ref,
+        target=target,
+        code_git_sha=code_git_sha,
+        github_action_run_id=github_action_run_id,
+    )
+
+    # write metadata file to GCS
+    metadata.to_yaml()
+    logger.info(f"Uploaded metadata to {metadata.output_directory}")
+    for schema in SchemaName:
+        logger.info(f"Uploading outputs for schema {schema.value}")
+        upload_parquet_directory_to_gcs(
+            schema=schema, output_directory=metadata.output_directory
+        )
+
+    # Write version uuid to file so it can be saved as an artifact
+    metadata.write_version()
+
+
+@click.command()
 @click.option(
     "-bq",
     "--upload-to-big-query",
@@ -231,54 +276,28 @@ class OutputMetadata(BaseModel):
     is_flag=True,
     help="Upload the data mart tables to production Postgres",
 )
-@click.option(
-    "--schemas",
-    type=click.Choice([option.value for option in SchemaName]),
-    multiple=True,
-    default=[option.value for option in SchemaName],
-    help="The schema to publish to GCS and BigQuery",
-)
 def publish_outputs(
-    build_ref: str,
-    target: str,
-    code_git_sha: str,
-    github_action_run_id: str,
-    schemas: list[str],
     upload_to_big_query: bool,
     upload_to_postgres: bool,
 ):
     """Publish outputs to Google Cloud Storage and Big Query."""
-    output_bucket = UPath("gs://dgm-outputs")
-
-    metadata = OutputMetadata(
-        git_ref=build_ref,
-        target=target,
-        code_git_sha=code_git_sha,
-        github_action_run_id=github_action_run_id,
-    )
+    metadata = OutputMetadata.from_version_file()
 
     # write metadata file to GCS
-    output_directory = output_bucket / metadata.version
-    (output_directory / "etl-run-metadata.yaml").write_text(metadata.to_yaml())
-    logger.info(f"Uploaded metadata to {output_directory}")
-
-    for schema in schemas:
+    for schema in SchemaName:
         logger.info(f"Distributing {schema} tables.")
-        upload_parquet_directory_to_gcs(
-            schema=SchemaName(schema), output_directory=output_directory
-        )
         if upload_to_big_query:
             load_tables_to_bigquery(
-                output_directory=output_directory,
+                output_directory=metadata.output_directory,
                 schema=SchemaName(schema),
                 version=metadata.version,
-                target=target,
+                target=metadata.target,
             )
         if upload_to_postgres:
             load_tables_to_postgres(
-                output_directory=output_directory,
+                output_directory=metadata.output_directory,
                 schema=SchemaName(schema),
-                target=target,
+                target=metadata.target,
             )
 
 
