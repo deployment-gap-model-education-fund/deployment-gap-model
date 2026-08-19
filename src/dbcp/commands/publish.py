@@ -57,7 +57,9 @@ def upload_parquet_directory_to_gcs(
     for table in get_schema_sql_alchemy_metadata(schema).sorted_tables:
         table_name = table.name
         db.table(f"{schema.value}.{table_name}").to_parquet(
-            str(output_directory / schema.value / f"{table_name}.parquet")
+            str(output_directory / schema.value / f"{table_name}.parquet").replace(
+                "gs", "gcs"
+            )
         )
 
 
