@@ -77,10 +77,15 @@ def load_tables_to_postgres(
     """
     publish_engine = get_postgres_engine(production=target == "prod")
     for table in get_schema_sql_alchemy_metadata(schema).sorted_tables:
+        table_name = table.name
+        # TODO: Figure out if county_wide + intermediate tables should be published to postgres
+        if "__" not in table_name:
+            continue
+
         logger.info(f"Publishing table {table} to production postgres DB.")
         write_to_sql(
-            pd.read_parquet(path=str(output_directory / schema.value / table.name)),
-            table_name=table.name,
+            pd.read_parquet(path=str(output_directory / schema.value / table_name)),
+            table_name=table_name,
             engine=publish_engine,
             schema_name=schema,
             if_exists="replace",

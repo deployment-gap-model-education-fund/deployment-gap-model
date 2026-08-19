@@ -192,10 +192,17 @@ class CountyOpposition:
         df = pd.read_sql(query, self._engine)
         return df
 
+    def _get_manual_ordinances(self) -> pd.DataFrame:
+        df = pd.read_sql_table(
+            "airtable__manual_ordinances", self._engine, schema="data_warehouse"
+        )
+        return df
+
     def agg_to_counties(
         self,
         include_state_policies=True,
-        # include_nrel_bans=False,
+        include_nrel_bans=False,
+        include_manual_ordinances=True,
     ) -> pd.DataFrame:
         """Aggregate local policies, and optionally state policies, to the county level.
 
@@ -212,6 +219,13 @@ class CountyOpposition:
             opposition = pd.concat([opposition, states_as_counties], axis=0)
         aggregated = self._agg_local_ordinances_to_counties(opposition)
         aggregated["ordinance_via_reldi"] = True
+        if include_nrel_bans:
+            nrel = self._get_nrel_bans()
+            aggregated = aggregated.merge(nrel, on="county_id_fips", how="outer")
+
+        if include_manual_ordinances:
+            manual = self._get_manual_ordinances()
+            aggregated = aggregated.merge(manual, on="county_id_fips", how="outer")
 
         return aggregated
 
@@ -294,7 +308,9 @@ def _estimate_proposed_power_co2e(
     )
 
     iso_projects["estimated_capacity_factor"] = gt_small_cap_factor
-    iso_projects = iso_projects.loc[:, "estimated_capacity_factor"].where(
+    iso_projects.loc[:, "estimated_capacity_factor"] = iso_projects.loc[
+        :, "estimated_capacity_factor"
+    ].where(
         ~is_cc & iso_projects.loc[:, "capacity_mw"].le(gt_sub_split),
         other=gt_large_cap_factor,
     )

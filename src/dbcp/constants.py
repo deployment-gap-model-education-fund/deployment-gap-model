@@ -193,7 +193,7 @@ FYI_RESOURCE_DICT = {
     "Coal": {"codes": ["Coal + Gas", "Coal + Oil"], "type": "Fossil"},
     "Fuel Cell": {"codes": [], "type": "Fossil"},
     "Geothermal": {
-        "codes": ["Geothermal + Solar"],
+        "codes": ["Geothermal + Solar", "Battery + Geothermal + Solar"],
         "type": "Renewable",
     },
     "Hydro": {"codes": ["Battery + Hydro", "Wave"], "type": "Renewable"},
@@ -209,6 +209,7 @@ FYI_RESOURCE_DICT = {
             "Compressed Air + Gas",
             "Methane",
             "Battery + Fuel Cell + Gas",
+            "Fuel Cell + Gas",
         ],
         "type": "Fossil",
     },

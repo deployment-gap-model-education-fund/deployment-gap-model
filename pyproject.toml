@@ -13,25 +13,25 @@ license = { text = "MIT" }
 dependencies = [
   "addfips>=0.4",
   "beautifulsoup4~=4.14",
-  "click>=8.1.7",
+  "click>=8.4.2",
   "coloredlogs~=15.0.1",
   "duckdb>=1.3.0",
   "duckdb-sqlalchemy",
   "fiona~=1.10.1",
   "gcsfs~=2026.1.0",
-  "geocodio-library-python>=0.7.0",
-  "geopandas~=1.0.1",
+  "geocodio-library-python>=1.0.0",
+  "geopandas~=1.1.2",
   "google-cloud-storage~=3.8.0",
   "googlemaps~=4.10.0",
-  "gridstatus~=0.29.1",
-  "joblib~=1.2.0",
-  "jupyterlab~=4.5.5",
+  "gridstatus~=0.34.0",
+  "joblib~=1.5.3",
+  "jupyterlab~=4.6.2",
   "matplotlib~=3.10.8",
   "numpy<3",
   "pandas~=2.3.3",
-  "pandas-gbq~=0.34.0",
+  "pandas-gbq~=0.35.0",
   "pandera[io]~=0.26.1",
-  "plotly~=5.15.0",
+  "plotly~=6.9.0",
   "psycopg2-binary~=2.9.11",
   "pyairtable>=2.3.3",
   "pydantic>=2.9,<2.13",
@@ -58,7 +58,7 @@ packages = ["src/dbcp", "src/scripts"]
 
 [tool.typos.default]
 # Ignore spellchecking all lines with # spellchecker:ignore
-extend-ignore-re = ["(?Rm)^.*(#|//)\\s*spellchecker:ignore$"]
+extend-ignore-re = ["(?Rm)^.*(#|//)\\s*spellchecker:ignore$", "emiss"]
 
 [tool.typos.default.extend-words]
 # Add words that should be excepted from spell-checking
