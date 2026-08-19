@@ -1,5 +1,6 @@
 """The ETL module create the data warehouse tables."""
 
+import importlib.resources
 import logging
 from collections.abc import Callable
 
@@ -229,7 +230,9 @@ def etl_offshore_wind() -> dict[str, pd.DataFrame]:
     projects_uri = "airtable/Offshore Wind Locations DBCP Version/Projects.json"
     locations_uri = "airtable/Offshore Wind Locations DBCP Version/Locations.json"
 
-    es = ExtractionSettings.from_yaml("/app/dbcp/settings.yaml")
+    es = ExtractionSettings.from_yaml(
+        importlib.resources.files("dbcp").joinpath("settings.yaml")
+    )
     es.update_archive_generation_numbers()
 
     projects_uri = es.get_full_archive_uri(projects_uri)

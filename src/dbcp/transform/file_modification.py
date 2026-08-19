@@ -1,6 +1,7 @@
 """Transform YAML file tracking dataset inputs to deployment gap ETL pipeline.."""
 
 import datetime
+import importlib.resources
 import os
 import subprocess
 from pathlib import Path
@@ -90,7 +91,9 @@ def get_last_modified_time_from_path(filepath: str):
         # embedded within it, meaning that running git log is not an option.
         time = _github_latest_commit_date(repo_rel_path)
     elif filepath.startswith("airtable"):
-        es = ExtractionSettings.from_yaml("/app/dbcp/settings.yaml")
+        es = ExtractionSettings.from_yaml(
+            importlib.resources.files("dbcp").joinpath("settings.yaml")
+        )
         es.update_archive_generation_numbers()
 
         # Airtable tables all get archived on GCS so we can reuse our existing functionality here
