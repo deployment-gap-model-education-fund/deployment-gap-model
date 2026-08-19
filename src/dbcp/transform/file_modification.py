@@ -2,24 +2,12 @@
 
 import datetime
 import os
-import urllib
+import subprocess
 from pathlib import Path
 
 import fsspec
 import pandas as pd
-import requests
 from google.cloud import storage
-
-
-def _parse_iso_z(dt_str: str) -> datetime.datetime:
-    """Parse an ISO 8601 timestamp.
-
-    Parse the timestamp returned by GitHub (e.g., "2021-01-01T12:00:00Z" or with offset)
-    and return a timezone-aware datetime.
-    """
-    if dt_str.endswith("Z"):
-        dt_str = dt_str[:-1] + "+00:00"
-    return datetime.datetime.fromisoformat(dt_str)
 
 
 def _github_latest_commit_date(repo_rel_path: str) -> datetime.datetime:
@@ -27,19 +15,25 @@ def _github_latest_commit_date(repo_rel_path: str) -> datetime.datetime:
 
     Returns a timezone-aware datetime.
     """
-    quoted_path = urllib.parse.quote(repo_rel_path, safe="")
-    url = f"https://api.github.com/repos/deployment-gap-model-education-fund/deployment-gap-model/commits?path={quoted_path}&per_page=1"
-    headers = {
-        "Accept": "application/vnd.github.v3+json",
-        "User-Agent": "get-last-mod-time/1.0",
-    }
+    result = subprocess.run(  # noqa: S603
+        [  # noqa: S607
+            "git",
+            "log",
+            "-1",
+            "--format=%cI",
+            "--",
+            repo_rel_path,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
-    resp = requests.get(url, headers=headers, timeout=200)
-    commits = resp.json()
-    commit = commits[0]
-    # Prefer committer date since it reflects repository commit time
-    date_str = commit["commit"]["committer"]["date"]
-    return _parse_iso_z(date_str)
+    date = result.stdout.strip()
+    if not date:
+        raise ValueError(f"No Git history found for {repo_rel_path!r}")
+
+    return datetime.datetime.fromisoformat(date)
 
 
 def get_last_modified_time_from_path(filepath: str):
@@ -59,7 +53,8 @@ def get_last_modified_time_from_path(filepath: str):
         bucket = storage_client.bucket("dgm-archive")
         if filepath.endswith("/"):  # If path is a folder:
             time = max(
-                blob.updated for blob in storage_client.list_blobs(
+                blob.updated
+                for blob in storage_client.list_blobs(
                     bucket, prefix=filepath.split("dgm-archive/")[-1]
                 )
             )
