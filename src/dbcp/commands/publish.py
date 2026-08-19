@@ -11,6 +11,7 @@ import duckdb
 import google.auth
 import pandas as pd
 import yaml
+from fsspec import filesystem
 from google.cloud import bigquery
 from pydantic import BaseModel, field_validator
 from upath import UPath
@@ -49,6 +50,7 @@ def upload_parquet_directory_to_gcs(
 
     """
     # Get connection to dev duckdb
+    duckdb.register_filesystem(filesystem("gcs"))
     db = duckdb.connect(DUCKDB_PATH, read_only=True)
 
     # Upload each table as a Parquet file to GCS
