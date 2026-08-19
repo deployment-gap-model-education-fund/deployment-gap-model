@@ -50,8 +50,8 @@ def upload_parquet_directory_to_gcs(
 
     """
     # Get connection to dev duckdb
-    duckdb.register_filesystem(filesystem("gcs"))
     db = duckdb.connect(DUCKDB_PATH, read_only=True)
+    db.register_filesystem(filesystem("gcs"))
 
     # Upload each table as a Parquet file to GCS
     for table in get_schema_sql_alchemy_metadata(schema).sorted_tables:
