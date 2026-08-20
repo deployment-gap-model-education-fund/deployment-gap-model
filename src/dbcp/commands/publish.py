@@ -216,9 +216,8 @@ class OutputMetadata(BaseModel):
         self.version_file.write_text(self.version)
 
     @classmethod
-    def from_version_file(cls) -> "OutputMetadata":
-        """Use version file to grab yaml from GCS."""
-        version = cls.version_file.read_text()
+    def from_version(cls, version: str) -> "OutputMetadata":
+        """Get OutputMetadata from versioned yaml file."""
         metadata_file = cls.output_bucket / version / "etl-run-metadata.yaml"
         return cls(**yaml.safe_load(stream=metadata_file.read_text()))
 
@@ -285,12 +284,17 @@ def upload_outputs(
     is_flag=True,
     help="Upload the data mart tables to production Postgres",
 )
+@click.argument(
+    "version",
+    type=str,
+)
 def publish_outputs(
+    version: str,
     upload_to_big_query: bool,
     upload_to_postgres: bool,
 ):
     """Publish outputs to Google Cloud Storage and Big Query."""
-    metadata = OutputMetadata.from_version_file()
+    metadata = OutputMetadata.from_version(version)
 
     # write metadata file to GCS
     for schema in SchemaName:

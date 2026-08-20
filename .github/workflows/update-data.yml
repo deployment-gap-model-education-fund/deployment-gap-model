@@ -61,7 +61,7 @@ jobs:
         run: |
           make test
 
-      # Set necessary environment variables for publish step
+      # Set necessary environment variables for upload step
       - name: Set upload outputs environment variables
         run: |
           {

@@ -2,11 +2,52 @@
 name: publish-data
 
 on:
+  workflow_run:
+    workflows: ["update-data"]
+    types:
+      - completed
   workflow_dispatch:
+    inputs:
+      run_id:
+        description: Github action run ID, which is the number at the end of the URL when looking at a run
+        required: true
+        type: string
 
 jobs:
   publish:
+    # Only run when manually triggered or fsspec archiver failed
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    env:
+      RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.run_id || github.event.workflow_run.id }}
     steps:
-      - name: no-op
-        run: echo "no-op stub"
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+
+      - uses: "google-github-actions/auth@v2"
+        with:
+          credentials_json: "${{ secrets.DGM_GITHUB_ACTION_CREDENTIALS }}"
+
+      - name: Download version file
+        uses: actions/download-artifact@v8
+        with:
+          run-id: ${{ env.RUN_ID }}
+          path: version.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Set necessary environment variables for upload step
+      - name: Set upload outputs environment variables
+        run: |
+          {
+            echo "VERSION_ID=$(< version.txt)";
+          } >> "$GITHUB_ENV"
+
+      - name: Publish versioned outputs
+        run: |
+          make publish_outputs
