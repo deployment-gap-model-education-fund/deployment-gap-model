@@ -1,0 +1,12 @@
+---
+name: publish-data
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: no-op
+        run: echo "no-op stub"
