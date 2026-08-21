@@ -23,7 +23,18 @@ jobs:
     env:
       RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.run_id || github.event.workflow_run.id }}
     steps:
+      - name: Get upstream workflow run
+        id: upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id || github.event.workflow_run.id }}
+        run: |
+          run=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID")
+          echo "head_sha=$(jq -r '.head_sha' <<< "$run")" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.upstream.outputs.head_sha }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0

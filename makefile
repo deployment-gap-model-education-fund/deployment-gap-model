@@ -17,6 +17,9 @@ upload_outputs:
         --github-action-run-id $(GITHUB_ACTION_RUN_ID) \
         --target $(TARGET)
 
+publish_outputs:
+	uv run python -m dbcp.cli publish-outputs $(VERSION_ID)
+
 duckdb:
 	uv run duckdb -c 'INSTALL ui;'
 	uv run duckdb ./data/dbcp.duckdb \
