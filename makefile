@@ -20,6 +20,9 @@ upload_outputs:
 publish_outputs:
 	uv run python -m dbcp.cli publish-outputs $(VERSION_ID)
 
+inspect_version:
+	uv run python -m dbcp.cli inspect-outputs $(VERSION_ID)
+
 duckdb:
 	uv run duckdb -c 'INSTALL ui;'
 	uv run duckdb ./data/dbcp.duckdb \

@@ -52,13 +52,6 @@ jobs:
           path: version.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # Set necessary environment variables for upload step
-      - name: Set upload outputs environment variables
-        run: |
-          {
-            echo "VERSION_ID=$(< version.txt)";
-          } >> "$GITHUB_ENV"
-
       - name: Publish versioned outputs
         run: |
-          make publish_outputs
+          make publish_outputs VERSION_ID=$(< version.txt)

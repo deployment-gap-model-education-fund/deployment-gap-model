@@ -2,6 +2,7 @@
 
 import logging
 import re
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -25,6 +26,7 @@ from dbcp.helpers import (
 from dbcp.metadata import SchemaName
 
 logger = logging.getLogger(__name__)
+OUTPUT_BUCKET: UPath = UPath("gs://dgm-outputs")
 
 
 def _get_published_schema_id(schema_name: SchemaName, target: str) -> str:
@@ -36,6 +38,13 @@ def _get_published_schema_id(schema_name: SchemaName, target: str) -> str:
     destination_suffix = "" if target == "prod" else f"_{target}"
 
     return f"{schema_name.value}{destination_suffix}"
+
+
+def _get_duckdb_connection(read_only: bool = True) -> duckdb.DuckDBPyConnection:
+    """Connect to duckdb db through python API and register GCS filesystem."""
+    db = duckdb.connect(DUCKDB_PATH, read_only=read_only)
+    db.register_filesystem(filesystem("gcs"))
+    return db
 
 
 def upload_parquet_directory_to_gcs(
@@ -50,8 +59,7 @@ def upload_parquet_directory_to_gcs(
 
     """
     # Get connection to dev duckdb
-    db = duckdb.connect(DUCKDB_PATH, read_only=True)
-    db.register_filesystem(filesystem("gcs"))
+    db = _get_duckdb_connection()
 
     # Upload each table as a Parquet file to GCS
     for table in get_schema_sql_alchemy_metadata(schema).sorted_tables:
@@ -166,7 +174,6 @@ class OutputMetadata(BaseModel):
     github_action_run_id: str | None = None
     date_created: datetime = datetime.now()
     version_file: Path = Path("./version.txt")
-    output_bucket: UPath = UPath("gs://dgm-outputs")
 
     @field_validator("git_ref")
     def git_ref_must_be_branch_or_tag(cls, git_ref: str | None) -> str | None:  # noqa: N805
@@ -196,11 +203,11 @@ class OutputMetadata(BaseModel):
     @property
     def output_directory(self) -> UPath:
         """Return directory within output bucket corresponding to current version."""
-        return self.output_bucket / self.version
+        return OUTPUT_BUCKET / self.version
 
     def to_yaml(self):
         """Convert the metadata to a YAML string."""
-        settings_dict = self.model_dump(exclude={"version_file", "output_bucket"})
+        settings_dict = self.model_dump(exclude={"version_file"})
         repo_base_url = "https://github.com/deployment-gap-model-education-fund/deployment-gap-model"
         settings_dict["code_git_sha_url"] = f"{repo_base_url}/tree/{self.git_ref}"
         settings_dict["github_action_run_url"] = (
@@ -218,7 +225,7 @@ class OutputMetadata(BaseModel):
     @classmethod
     def from_version(cls, version: str) -> "OutputMetadata":
         """Get OutputMetadata from versioned yaml file."""
-        metadata_file = cls.output_bucket / version / "etl-run-metadata.yaml"
+        metadata_file = OUTPUT_BUCKET / version / "etl-run-metadata.yaml"
         return cls(**yaml.safe_load(stream=metadata_file.read_text()))
 
 
@@ -268,6 +275,41 @@ def upload_outputs(
 
     # Write version uuid to file so it can be saved as an artifact
     metadata.write_version()
+
+
+@click.command()
+@click.argument("version", type=str)
+def inspect_outputs(version: str):
+    """Return SQL that will generate views to all tables in specified versioned output."""
+    db = _get_duckdb_connection(read_only=False)
+
+    output_metadata = OutputMetadata.from_version(version)
+    views = []
+    for schema in SchemaName:
+        duckdb_schema = f"versioned_{schema.value}"
+        db.execute(f"CREATE SCHEMA IF NOT EXISTS {duckdb_schema}")
+        db.execute(f"USE {duckdb_schema}")
+        for table in (output_metadata.output_directory / schema.value).iterdir():
+            table_path = table.stem
+            db.read_parquet(str(table).replace("gs", "gcs")).to_view(
+                table_path, replace=True
+            )
+            views.append(f"{duckdb_schema}.{table_path}")
+
+    db.execute("USE main")
+    db.execute("CALL start_ui()")
+    logger.info("DuckDB UI running — press Ctrl+C to exit.")
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        [db.execute(f"DROP VIEW {view}") for view in views]
+        [db.execute(f"DROP SCHEMA versioned_{schema.value}") for schema in SchemaName]
+        db.close()
+        logger.info("Stopped.")
 
 
 @click.command()
