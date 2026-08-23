@@ -22,6 +22,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.run_id || github.event.workflow_run.id }}
+      PROD_POSTGRES_USER: ${{ secrets.PROD_POSTGRES_USER }}
+      PROD_POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD }}
+      PROD_POSTGRES_HOST: ${{ secrets.PROD_POSTGRES_HOST }}
+      DATA_DIR: "./data"
     steps:
       - name: Get upstream workflow run
         id: upstream
@@ -33,8 +37,8 @@ jobs:
           echo "head_sha=$(jq -r '.head_sha' <<< "$run")" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v7
-        with:
-          ref: ${{ steps.upstream.outputs.head_sha }}
+      #  with:
+      #    ref: ${{ steps.upstream.outputs.head_sha }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
