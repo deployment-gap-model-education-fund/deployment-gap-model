@@ -149,18 +149,16 @@ def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: SchemaName):
 def get_postgres_engine(production: bool = False) -> sa.engine.Engine:
     """Create a sql alchemy engine from environment vars."""
     if not production:
-        user = os.environ["DEV_POSTGRES_USER"]
-        password = os.environ["DEV_POSTGRES_PASSWORD"]
-        db = os.environ["DEV_POSTGRES_DB"]
-        engine = sa.create_engine(f"postgresql://{user}:{password}@{db}:6543")
+        user = os.environ["STAGING_POSTGRES_USER"]
+        password = os.environ["STAGING_POSTGRES_PASSWORD"]
+        host = os.environ["STAGING_POSTGRES_HOST"]
+        port = 6543
     else:
         user = os.environ["PROD_POSTGRES_USER"]
         password = os.environ["PROD_POSTGRES_PASSWORD"]
         host = os.environ["PROD_POSTGRES_HOST"]
-        engine = sa.create_engine(
-            f"postgresql://{user}:{password}@{host}:5432/postgres"
-        )
-    return engine
+        port = 5432
+    return sa.create_engine(f"postgresql://{user}:{password}@{host}:{port}/postgres")
 
 
 def get_duckdb_engine() -> sa.engine.Engine:

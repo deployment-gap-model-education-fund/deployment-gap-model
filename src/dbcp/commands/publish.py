@@ -92,7 +92,9 @@ def load_tables_to_postgres(
 
         logger.info(f"Publishing table {table} to production postgres DB.")
         write_to_sql(
-            pd.read_parquet(path=str(output_directory / schema.value / table_name)),
+            pd.read_parquet(
+                path=str(output_directory / schema.value / f"{table_name}.parquet")
+            ),
             table_name=table_name,
             engine=publish_engine,
             schema_name=schema,
