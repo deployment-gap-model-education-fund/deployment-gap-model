@@ -14,10 +14,6 @@ on:
         default: "dev"
         type: choice
         options: [dev, prod]
-  schedule:
-    - cron: 0 0 * * 0
-  release:
-    types: [published] # immediately deploy prod when a release is published
 
 jobs:
   etl:
@@ -32,6 +28,7 @@ jobs:
       PROD_POSTGRES_HOST: ${{ secrets.PROD_POSTGRES_HOST }}
       DATA_DIR: "./data"
       PUDL_VERSION: stable
+      TARGET: ${{ inputs.target || (github.ref_type == 'tag' && 'prod' || 'dev') }}
     steps:
       - name: Checkout Repository
         id: checkout
@@ -68,7 +65,6 @@ jobs:
             echo "BUILD_REF=${{ github.ref_name }}";
             echo "CODE_GIT_SHA=${{ steps.checkout.outputs.commit }}";
             echo "GITHUB_ACTION_RUN_ID=${{ github.run_id }}";
-            echo "TARGET=${{ inputs.target }}";
           } >> "$GITHUB_ENV"
 
       # Publish the outputs, grab the git SHA of the commit step

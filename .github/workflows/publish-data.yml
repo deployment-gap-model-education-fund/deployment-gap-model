@@ -6,6 +6,8 @@ on:
     workflows: ["update-data"]
     types:
       - completed
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       run_id:
