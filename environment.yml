@@ -1,9 +1,0 @@
-name: dbcp-dev
-channels:
-  - conda-forge
-  - defaults
-dependencies:
-  - pip~=23.0
-  - python~=3.13.0
-  - pre-commit>=4,<5
-  - black>=24,<26
