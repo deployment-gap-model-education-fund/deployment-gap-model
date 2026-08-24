@@ -58,4 +58,6 @@ jobs:
 
       - name: Publish versioned outputs
         run: |
-          make publish_outputs VERSION_ID=$(cat version.txt)
+          VERSION_ID=$(cat version.txt)
+          echo "VERSION_ID=$VERSION_ID"
+          make publish_outputs VERSION_ID=$VERSION_ID
