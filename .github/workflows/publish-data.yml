@@ -22,9 +22,12 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.run_id || github.event.workflow_run.id }}
-      PROD_POSTGRES_USER: ${{ secrets.PROD_POSTGRES_USER }}
+      PROD_POSTGRES_USER: catalyst_user
       PROD_POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD }}
       PROD_POSTGRES_HOST: ${{ secrets.PROD_POSTGRES_HOST }}
+      STAGING_POSTGRES_USER: catalyst_user
+      STAGING_POSTGRES_PASSWORD: ${{ secrets.STAGING_POSTGRES_PASSWORD }}
+      STAGING_POSTGRES_HOST: ${{ secrets.STAGING_POSTGRES_HOST }}
       DATA_DIR: "./data"
     steps:
       - name: Get upstream workflow run
