@@ -4,7 +4,7 @@ name: update-data
 on:
   push:
     branches:
-      - "main"
+      - "**"
     tags: ["v*"]
   workflow_dispatch:
     inputs:
@@ -29,6 +29,9 @@ jobs:
       DATA_DIR: "./data"
       PUDL_VERSION: stable
       TARGET: ${{ inputs.target || (github.ref_type == 'tag' && 'prod' || 'dev') }}
+      # Only upload outputs on tag push, push to main, or manual trigger
+      # Pushes to other branches will still run the ETL and tests for CI purposes
+      UPLOAD: ${{ github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref_type == 'tag' }}
     steps:
       - name: Checkout Repository
         id: checkout
@@ -69,10 +72,12 @@ jobs:
 
       # Publish the outputs, grab the git SHA of the commit step
       - name: Upload outputs
+        if: ${{ env.UPLOAD }}
         run: |
           make upload_outputs
 
       - name: Save version number associated with completed build
+        if: ${{ env.UPLOAD }}
         uses: actions/upload-artifact@v7
         with:
           name: version-file
