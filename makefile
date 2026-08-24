@@ -18,7 +18,7 @@ upload_outputs:
         --target $(TARGET)
 
 publish_outputs:
-	uv run python -m dbcp.cli publish-outputs $(VERSION_ID)
+	uv run python -m dbcp.cli publish-outputs $(VERSION_ID) --upload-to-postgres -bq
 
 inspect_version:
 	uv run python -m dbcp.cli inspect-outputs $(VERSION_ID)
