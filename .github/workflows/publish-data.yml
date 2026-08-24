@@ -32,15 +32,6 @@ jobs:
       STAGING_POSTGRES_HOST: ${{ secrets.STAGING_POSTGRES_HOST }}
       DATA_DIR: "./data"
     steps:
-      - name: Get upstream workflow run
-        id: upstream
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ inputs.run_id || github.event.workflow_run.id }}
-        run: |
-          run=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID")
-          echo "head_sha=$(jq -r '.head_sha' <<< "$run")" >> "$GITHUB_OUTPUT"
-
       - uses: actions/checkout@v7
 
       - name: Install uv
