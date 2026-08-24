@@ -72,12 +72,12 @@ jobs:
 
       # Publish the outputs, grab the git SHA of the commit step
       - name: Upload outputs
-        if: ${{ env.UPLOAD }}
+        if: ${{ env.UPLOAD == 'true' }}
         run: |
           make upload_outputs
 
       - name: Save version number associated with completed build
-        if: ${{ env.UPLOAD }}
+        if: ${{ env.UPLOAD == 'true' }}
         uses: actions/upload-artifact@v7
         with:
           name: version-file
