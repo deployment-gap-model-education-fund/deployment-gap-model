@@ -79,7 +79,7 @@ class DeploymentMetadata(pa.DataFrameModel):
 
     table_name: str = pa.Field(unique=True)
     last_modified_deployment_id: str
-    last_modified: pd.Timestamp
+    last_modified: pd.Timestamp = pa.Field(coerce=True)
 
 
 @pa.check_types
@@ -158,21 +158,6 @@ def load_tables_to_bigquery(
             # Construct the destination table
             table_ref = dataset_ref.table(table_name)
 
-            # delete table if it exists
-            client.delete_table(table_ref, not_found_ok=True)
-
-            # Load the Parquet file to BigQuery
-            job_config = bigquery.LoadJobConfig(
-                source_format=bigquery.SourceFormat.PARQUET,
-                write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
-            )
-            load_job = client.load_table_from_uri(
-                str(file), table_ref, job_config=job_config
-            )
-
-            logger.info(f"Loading {file.name} to {dataset_id}.{table_name}")
-            load_job.result()
-
             # Get the current deployed version of the table
             table = client.get_table(table_ref)
             current_version = table.labels.get("version")
@@ -184,8 +169,22 @@ def load_tables_to_bigquery(
             # Only update table if it's changed from previous deployment
             old_metadata = OutputMetadata.from_version(current_version)
             if not table_versions_equivalent(
-                old_metadata.output_directory / file.name, file
+                old_metadata.output_directory / schema.value / file.name, file
             ):
+                # Load the Parquet file to BigQuery
+                job_config = bigquery.LoadJobConfig(
+                    source_format=bigquery.SourceFormat.PARQUET,
+                    write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+                )
+                load_job = client.load_table_from_uri(
+                    str(file), table_ref, job_config=job_config
+                )
+
+                logger.info(f"Loading {file.name} to {dataset_id}.{table_name}")
+                load_job.result()
+
+                # Reload table
+                table = client.get_table(table_ref)
                 labels = dict(table.labels or {})
                 labels["version"] = version
                 table.labels = labels
@@ -195,11 +194,15 @@ def load_tables_to_bigquery(
 
                 current_version = version
                 deployment_time = datetime.now()
+            else:
+                logger.info(
+                    f"{file.name} hasn't changed since previous deployment. Skipping upload."
+                )
 
             deployment_metadata.loc[len(deployment_metadata)] = {
                 "table_name": table_name,
                 "last_modified_deployment_id": current_version,
-                "last_modified": deployment_time,
+                "last_modified": pd.Timestamp(deployment_time),
             }
     return deployment_metadata
 
