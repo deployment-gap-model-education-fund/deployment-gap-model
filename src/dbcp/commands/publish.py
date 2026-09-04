@@ -21,9 +21,9 @@ from upath import UPath
 
 from dbcp.constants import DUCKDB_PATH
 from dbcp.helpers import (
+    check_table_versions_equivalent,
     get_postgres_engine,
     get_schema_sql_alchemy_metadata,
-    table_versions_equivalent,
     write_to_sql,
 )
 from dbcp.metadata import SchemaName
@@ -168,7 +168,7 @@ def load_tables_to_bigquery(
 
             # Only update table if it's changed from previous deployment
             old_metadata = OutputMetadata.from_version(current_version)
-            if not table_versions_equivalent(
+            if not check_table_versions_equivalent(
                 old_metadata.output_directory / schema.value / file.name, file
             ):
                 # Load the Parquet file to BigQuery
