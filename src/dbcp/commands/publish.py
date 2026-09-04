@@ -15,7 +15,7 @@ import pandera as pa
 import yaml
 from fsspec import filesystem
 from google.cloud import bigquery
-from pandera.typing import DataFrame, Series
+from pandera.typing import DataFrame
 from pydantic import BaseModel, field_validator
 from upath import UPath
 
@@ -77,9 +77,9 @@ def upload_parquet_directory_to_gcs(
 class DeploymentMetadata(pa.DataFrameModel):
     """Schema for table tracking when tables are updated."""
 
-    table_name: Series[str] = pa.Field(unique=True)
-    last_modified_deployment_id: Series[str]
-    last_modified: Series[pd.Timestamp]
+    table_name: str = pa.Field(unique=True)
+    last_modified_deployment_id: str
+    last_modified: pd.Timestamp
 
 
 @pa.check_types
