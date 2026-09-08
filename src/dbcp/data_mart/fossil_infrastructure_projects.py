@@ -4,7 +4,7 @@ import pandas as pd
 import sqlalchemy as sa
 
 from dbcp.data_mart.helpers import get_query
-from dbcp.helpers import get_sql_engine
+from dbcp.helpers import get_duckdb_engine
 
 
 def _get_proposed_infra_projects(engine: sa.engine.Engine) -> pd.DataFrame:
@@ -26,6 +26,6 @@ def create_data_mart(
 
     """
     if engine is None:
-        engine = get_sql_engine()
+        engine = get_duckdb_engine()
     df = _get_proposed_infra_projects(engine=engine)
     return df

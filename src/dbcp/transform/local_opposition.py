@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from dbcp.constants import FIPS_CODE_VINTAGE
+from dbcp.constants import DATA_DIR, FIPS_CODE_VINTAGE
 from dbcp.helpers import add_fips_ids
 from dbcp.transform.helpers import add_county_fips_with_backup_geocoding
 
@@ -193,12 +193,11 @@ def _validate_ordinances(ordn: pd.DataFrame) -> None:
 
 if __name__ == "__main__":
     # debugging entry point
-    from pathlib import Path
-
     from dbcp.extract.local_opposition import ColumbiaDocxParser
 
-    source_path = Path(
-        "/app/data/raw/2023.05.30 Opposition to Renewable Energy Facilities - FINAL.docx"
+    source_path = (
+        DATA_DIR
+        / "data/raw/2023.05.30 Opposition to Renewable Energy Facilities - FINAL.docx"
     )
     extractor = ColumbiaDocxParser()
     extractor.load_docx(source_path)

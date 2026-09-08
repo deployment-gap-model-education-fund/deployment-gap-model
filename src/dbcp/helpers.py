@@ -6,6 +6,7 @@ import os
 from datetime import UTC
 from io import StringIO
 from pathlib import Path
+from typing import Literal
 
 import addfips
 import fsspec
@@ -15,7 +16,7 @@ import sqlalchemy as sa
 from tqdm import tqdm
 
 import dbcp
-from dbcp.constants import DATA_DIR
+from dbcp.constants import DATA_DIR, DUCKDB_PATH
 from dbcp.metadata import SchemaName
 
 logger = logging.getLogger(__name__)
@@ -145,29 +146,33 @@ def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: SchemaName):
     return df
 
 
-def get_sql_engine(production: bool = False) -> sa.engine.Engine:
+def get_postgres_engine(production: bool = False) -> sa.engine.Engine:
     """Create a sql alchemy engine from environment vars."""
     if not production:
-        user = os.environ["POSTGRES_USER"]
-        password = os.environ["POSTGRES_PASSWORD"]
-        db = os.environ["POSTGRES_DB"]
-        engine = sa.create_engine(f"postgresql://{user}:{password}@{db}:5432")
+        user = os.environ["STAGING_POSTGRES_USER"]
+        password = os.environ["STAGING_POSTGRES_PASSWORD"]
+        host = os.environ["STAGING_POSTGRES_HOST"]
+        port = 6543
     else:
         user = os.environ["PROD_POSTGRES_USER"]
         password = os.environ["PROD_POSTGRES_PASSWORD"]
         host = os.environ["PROD_POSTGRES_HOST"]
-        engine = sa.create_engine(
-            f"postgresql://{user}:{password}@{host}:6543/postgres"
-        )
-    return engine
+        port = 5432
+    return sa.create_engine(f"postgresql://{user}:{password}@{host}:{port}/postgres")
 
 
-def write_to_postgres(
+def get_duckdb_engine() -> sa.engine.Engine:
+    """Return duckdb engine used for local storage when ETL runs."""
+    DATA_DIR.mkdir(exist_ok=True)
+    return sa.create_engine(f"duckdb:///{DUCKDB_PATH}")
+
+
+def write_to_sql(
     df: pd.DataFrame,
     table_name: str,
     engine: sa.engine.Engine,
     schema_name: SchemaName,
-    if_exists: str = "append",
+    if_exists: Literal["fail", "replace", "append"] = "append",
     remote: bool = False,
 ):
     """Create data from a DataFrame to a postgres table.
@@ -191,12 +196,8 @@ def write_to_postgres(
         if_exists=if_exists,
         index=False,
         schema="catalyst" if remote else schema_name.value,
-        method=psql_insert_copy,
         chunksize=5000,  # adjust based on memory capacity
     )
-
-    # Return DataFrame with enforced dtypes
-    return df
 
 
 def get_pudl_resource(

@@ -66,7 +66,7 @@ class ColumbiaDocxParser:
         """Read the .docx file with python-docx.
 
         Args:
-            source_path (Path, optional): path to .docx file. Defaults to Path('/app/data/raw/RELDI report updated 9.10.21 (1).docx').
+            source_path (Path, optional): path to .docx file. Defaults to Path('data/raw/RELDI report updated 9.10.21 (1).docx').
 
         """
         self.doc = docx.Document(source_path)
@@ -165,7 +165,7 @@ class ColumbiaDocxParser:
             if paragraph.style.name == "Heading 1":  # states
                 self.current_state = paragraph.text.strip()
                 assert self.current_state in ColumbiaDocxParser.POSSIBLE_STATES, (
-                    f"Unexepected state: {self.current_state}"
+                    f"Unexpected state: {self.current_state}"
                 )
                 self.current_header = (
                     ""  # a new state marks a new hierarchy, so reset cache

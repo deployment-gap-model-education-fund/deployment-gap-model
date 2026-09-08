@@ -1,19 +1,18 @@
 """The ETL module create the data warehouse tables."""
 
+import importlib.resources
 import logging
 from collections.abc import Callable
 
 import pandas as pd
-import pyarrow as pa
-import pyarrow.parquet as pq
 import sqlalchemy as sa
 
 import dbcp
 from dbcp.archivers.utils import ExtractionSettings
-from dbcp.constants import DATA_DIR, OUTPUT_DIR
+from dbcp.constants import DATA_DIR
 from dbcp.extract.civis import extract as extract_civis
 from dbcp.extract.helpers import load_yml_file
-from dbcp.helpers import write_to_postgres
+from dbcp.helpers import get_duckdb_engine, write_to_sql
 from dbcp.metadata import SchemaName
 from dbcp.transform.fips_tables import SPATIAL_CACHE
 from dbcp.transform.helpers import GEOCODER_CACHES
@@ -185,11 +184,10 @@ def etl_manual_ordinances() -> dict[str, pd.DataFrame]:
     return transformed
 
 
-def write_to_postgres_and_parquet(
-    dfs: dict[str, pd.DataFrame], engine: sa.engine.Engine, schema_name: SchemaName
-):
-    """Write data mart tables from a schema to postgres and parquet."""
+def write_to_duckdb(dfs: dict[str, pd.DataFrame], schema_name: SchemaName):
+    """Write data mart tables from a schema to duckdb."""
     # Ensure schema exists in a committed transaction
+    engine = get_duckdb_engine()
     with engine.begin() as con:
         con.execute(sa.text(f"CREATE SCHEMA IF NOT EXISTS {schema_name.value}"))
 
@@ -201,39 +199,27 @@ def write_to_postgres_and_parquet(
     metadata.drop_all(engine)
     metadata.create_all(engine, tables=tables)
 
-    parquet_dir = OUTPUT_DIR / f"{schema_name.value}"
-    parquet_dir.mkdir(exist_ok=True)
-
-    # Load table into postgres and parquet
+    # Load table into duckdb
     for table in metadata.sorted_tables:
         if table in tables:
-            logger.info(f"Load {table.name} to postgres.")
-            df = write_to_postgres(
+            logger.info(f"Load {table.name} to duckdb.")
+            write_to_sql(
                 df=dfs[table.name],
                 table_name=table.name,
                 engine=engine,
                 schema_name=schema_name,
                 if_exists="append",
             )
-            schema = dbcp.helpers.get_pyarrow_schema_from_metadata(
-                table.name, schema_name
-            )
-            pa_table = pa.Table.from_pandas(df, schema=schema)
-            pq.write_table(pa_table, parquet_dir / f"{table.name}.parquet")
 
 
 def run_etl(funcs: dict[str, Callable], schema_name: SchemaName):
     """Execute etl functions and save outputs to parquet and postgres."""
-    engine = dbcp.helpers.get_sql_engine()
-
     transformed_dfs = {}
     for dataset, etl_func in funcs.items():
         logger.info(f"Processing: {dataset}")
         transformed_dfs.update(etl_func())
 
-    write_to_postgres_and_parquet(
-        dfs=transformed_dfs, engine=engine, schema_name=schema_name
-    )
+    write_to_duckdb(dfs=transformed_dfs, schema_name=schema_name)
 
     logger.info(f"Successfully finished {schema_name.value} ETL.")
 
@@ -244,7 +230,9 @@ def etl_offshore_wind() -> dict[str, pd.DataFrame]:
     projects_uri = "airtable/Offshore Wind Locations DBCP Version/Projects.json"
     locations_uri = "airtable/Offshore Wind Locations DBCP Version/Locations.json"
 
-    es = ExtractionSettings.from_yaml("/app/dbcp/settings.yaml")
+    es = ExtractionSettings.from_yaml(
+        importlib.resources.files("dbcp").joinpath("settings.yaml")
+    )
     es.update_archive_generation_numbers()
 
     projects_uri = es.get_full_archive_uri(projects_uri)
@@ -303,9 +291,7 @@ def create_data_mart(engine):  # noqa: C901
                 f"Expecting pd.DataFrame or dict of dataframes. Got {type(data)}"
             )
 
-    write_to_postgres_and_parquet(
-        dfs=data_mart_tables, engine=engine, schema_name=SchemaName.DATA_MART
-    )
+    write_to_duckdb(dfs=data_mart_tables, schema_name=SchemaName.DATA_MART)
 
 
 def etl(schema: SchemaName | None = None):
@@ -313,7 +299,7 @@ def etl(schema: SchemaName | None = None):
     # Reduce size of caches if necessary
     GEOCODER_CACHES.reduce_cache_sizes()
     SPATIAL_CACHE.reduce_size()
-    engine = dbcp.helpers.get_sql_engine()
+    engine = dbcp.helpers.get_duckdb_engine()
 
     # Run public ETL functions
     if (schema == SchemaName.DATA_WAREHOUSE) or (schema is None):

@@ -40,16 +40,8 @@ uv sync --only-dev
 ## GCP Authentication
 
 The ETL requires access to some data stored in Google Cloud Platform (GCP).
-To authenticate the docker container with GCP install the [gcloud utilities](https://cloud.google.com/sdk/docs/install) on your
-computer. There are several ways to do this. We recommend using ``conda`` or its faster
-sibling ``mamba``. If you're not using ``conda`` environments, there are other
-ways to install the Google Cloud SDK explained in the link above.
-
-```
-conda install -c conda-forge google-cloud-sdk
-```
-
-Finally, use ``gcloud`` to establish application default credentials
+To authenticate with GCP install the [gcloud utilities](https://docs.cloud.google.com/sdk/docs/install-sdk#latest-version) on your
+computer. Once complete, use ``gcloud auth application-default login`` to establish application default credentials
 
 ```
 gcloud auth application-default login
@@ -62,32 +54,11 @@ authenticated, the command should print out a message:
 Credentials saved to file: <path/to/your_credentials.json>
 ```
 
-Set this path to a local environment variable called `GOOGLE_GHA_CREDS_PATH`
-
-```
-export GOOGLE_GHA_CREDS_PATH=<path/to/your_credentials.json>
-```
-
-`GOOGLE_GHA_CREDS_PATH` will be mounted into the container so
-the GCP APIs in the container can access the data stored in GCP.
-
 You'll also need to set an environment variable for the Geocodio API Key. This api key is stored
 GCP project Secret Manager as `geocodio-api-key`.
 
 ```
 export GEOCODIO_API_KEY={geocodio api key}
-```
-
-To set the environment variables each time the environment is activated,
-run the following with the environment activated:
-
-```bash
-mkdir -p $CONDA_PREFIX/etc/conda/activate.d
-```
-
-then set environment variables:
-```bash
-echo 'export GOOGLE_GHA_CREDS_PATH="value"' > $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh
 ```
 
 ## Postgres Authentication
@@ -102,19 +73,12 @@ variables:
 - `PROD_POSTGRES_HOST`
 - `PROD_POSTGRES_USER`
 - `PROD_POSTGRES_PASSWORD`
+- `STAGING_POSTGRES_HOST`
+- `STAGING_POSTGRES_USER`
+- `STAGING_POSTGRES_PASSWORD`
 
 See the secret `DBCP Postgres Credentials` in Bitwarden to access the
 corresponding values for each of these variables.
-
-Once you have set these variables, there are various ways to access data
-from the postgres instance. For example, you could run `make jupyter_lab`
-then from a notebook:
-
-```py
-from dbcp.helpers import get_sql_engine
-
-engine = get_sql_engine(production=True)
-```
 
 To explore the data using SQL you can use the `make duckdb` target (see
 details below).
@@ -131,26 +95,6 @@ uv run pre-commit install
 
 The scripts that run are configured in the .pre-commit-config.yaml file.
 
-## Docker
-
-[Install docker](https://docs.docker.com/get-docker/). Once you have docker installed, make sure it is running.
-
-Now we can build the docker images by running:
-
-```
-make build
-```
-
-This command create a docker image and installs all the packages in `pyproject.toml` so it will take a couple minutes to complete.
-
-If you get this error:
-
-```
-Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?
-```
-
-during this step it means docker is not running.
-
 ## Run the ETL
 
 Now that we’ve built the image and set the environment variables run:
@@ -159,131 +103,73 @@ Now that we’ve built the image and set the environment variables run:
 make all
 ```
 
-to create and load the data warehouse and data mart tables into postgres.
-
-# Makefile
-
-Here are additional make commands you can run.
-
-```
-make build
-```
-
-Builds the dbcp docker images.
+to create and load the data warehouse and data mart tables into duckdb. You can also
+selectively run only the `data_warehouse` or `data_mart` using:
 
 ```
 make data_warehouse
 ```
 
-Runs the etl and loads the data warehouse table to postgres.
+or,
 
 ```
 make data_mart
 ```
 
-Loads the data mart tables into postgres.
+# Development Tools
+
+We also include `Makefile` targets to provide useful tools during development.
+
+### make duckdb
+
+This target will open a `duckdb` shell instance and the [duckdb ui](https://duckdb.org/2025/03/12/duckdb-ui),
+which can be used to access local and remote data. This will attach to the `duckdb`
+file created by local ETL runs as well as BigQuery and the dev/prod postgres instances.
+Data is organized into distinct schemas for each source, allowing for organized access
+to each of these sources. Remote tables can be accessed with queries like:
 
 ```
-make all
+SELECT * FROM {bq|pg_prod|pg_dev}.{schema_name}.{table_name}
 ```
 
-Creates and loads the data warehouse and data mart tables into postgres.
+While local tables don't require the `bq`/`pg` prefix schema.
 
-```
-make sql_shell
-```
-
-starts a PostgreSQL interactive terminal. This is helpful for inspecting the loaded data.
-
-```
-make shell
-```
-
-starts a bash interactive terminal. This is helpful for debugging.
-
-```
-make jupyter_lab
-```
-
-starts a jupyter lab instance at `http://127.0.0.1:8888/`. If you have another jupyter service running at `8888` you can change the port by setting an environment variable in your shell before running this command:
-
-```
-export JUPYTER_PORT=8890
-```
-
-```
-make duckdb
-```
-
-Will open a `duckdb` shell instance which can be used access data from
-BigQuery and the dev/prod postgres instances in one unified interface. Tables
-can then be referenced in queries like `{bq|pg_prod|pg_dev}.{schema_name}.{table_name}`.
-Note that we currently only have one schema in the production Postgres
-instance, so no schema name is required for this database.
+Note that we currently publish all data to a single schema in the postgres instances,
+so the `schema_name` can be dropped for these cases.
 
 
-# Development Process
+### make inspect_version
+`make inspect_version VERSION_ID=$VERSION_ID` will open a `duckdb` interface to inspect
+outputs corresponding to a specific version. The `VERSION_ID` is a `uuid` that is
+generated by the `update-data` workflow. `update-data` saves a text file with the
+`uuid` as an artifact during each successful run. This file can be downloaded to
+get the `VERSION_ID` associated with the run and inspect its outputs. The `make`
+target will generate a SQL view for each parquet file output by `update-data`.
 
-## Git Branches
-We have the following branch setup for updating the production and development tables:
-- development schema (`data_warehouse_dev`, `data_mart_dev`): updated using the HEAD of the `main` branch
-- production schema (`data_warehouse`, `data_mart`): updated using the most recent tagged version release of the `main` branch
 
-Developing new features or adding new data is done by making a new branch off of `main`, and merging into main allows us to see the results of these changes in the `_dev` schema tables.
+# Data Builds / Deployment
+## Builds
+Data builds are performed by the `update-data` Github workflow. This workflow will
+run the full ETL, all tests, then upload data as parquet files to the GCS bucket,
+`gs://dgm-outputs/{VERSION_ID}/`. Within this GCS directory, there will be a file
+called `etl-run-metadata.yaml`, and subdirectories for the `data_mart` and `data_warehouse`
+schemas, which will each contain a set of parquet files (one per table).
 
-### Deploying a new version to production
-We use Git tags to deploy versioned releases to production. The format of these tags is `vYYYY.MM.DD`, where:
+Builds can be manually triggered, and they will run on new pushes to `main`, or when
+tags are pushed with the pattern `v*`. Builds have an associated `target`, which can
+be either `prod` or `dev`. This doesn't actually impact the build process, but will
+be saved in the output metadata and used when we publish the outputs.
 
-- `YYYY` = year
-- `MM` = month
-- `DD` = day
 
-Only tagged releases are used to update the production schema (`data_warehouse`, `data_mart`). Follow the steps below to create and deploy a new version:
+## Deployment
+The `publish-data` workflow will deploy data output by `update-data` to BigQuery and
+postgres. The `target` associated with the build will determine which BigQuery schema,
+or Postgres instance we deploy to.
 
-1. Make sure your main branch is up to date:
-```bash
-git checkout main
-git pull origin main
-```
-2. Verify that everything is ready for release
-Ensure that the code in main is what you want deployed to production, and tests have passed.
+The `publish-data` workflow will run automatically when a tagged build, or build on
+`main` is complete. It can also be manually triggered and just needs the `run_id` from
+the associated `update-data` run that you want to publish.
 
-3. Create a new version tag
-Replace the tag value with the appropriate version:
-```bash
-git tag v2025.08.01  # Example for the first release on August 1, 2025
-```
-4. Push the tag to the remote repository:
-```bash
-git push origin v2025.08.01
-```
-
-This will trigger creating a new release using the tag and kick off the deployment process
-to update the production schemas with the state of the code at the tagged commit.
-
-## Comparing Branches During Development
-
-In addition to inspecting the data warehouse and data mart tables that are loaded into postgres,
-you may want to compare the data outputs between git branches. The `branch_compare_helper.py`
-script automates parts of this process in order to make it easier to compare the data
-in a target branch to a base branch (`dev` by default).
-
-It checks out the target branch, and then the base branch, and for each branch:
-* Runs `make all` to generate the data output files
-* Copies the parquet files that are generated during the run to compare
-to a newly created temporary data folder with the branch name as the subfolder
-
-With these Parquet files, one can create a notebook that reads the data in these
-folders and makes comparisons between branches.
-
-With the comparison branch checked out, run the following to generate and compare
-data outputs between two branches:
-
-```bash
-branch-compare [<target_branch>] [<base_branch>]
-```
-- `target_branch` – the feature or target branch to compare (defaults to the currently checked-out branch)
-- `base_branch` – the base branch to compare against (defaults to `dev`)
 
 ## Architecture
 

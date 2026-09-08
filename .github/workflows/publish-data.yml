@@ -2,11 +2,59 @@
 name: publish-data
 
 on:
+  workflow_run:
+    workflows: ["update-data"]
+    types:
+      - completed
+    branches:
+      - main
   workflow_dispatch:
+    inputs:
+      run_id:
+        description: |
+          Github action run ID from update-data run you want to publish. Run ID is the
+          number at the end of the URL when looking at a run
+        required: true
+        type: string
 
 jobs:
   publish:
+    # Only run when manually triggered or when update-data succeeded
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    env:
+      RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.run_id || github.event.workflow_run.id }}
+      PROD_POSTGRES_USER: catalyst_user
+      PROD_POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD }}
+      PROD_POSTGRES_HOST: ${{ secrets.PROD_POSTGRES_HOST }}
+      STAGING_POSTGRES_USER: catalyst_user
+      STAGING_POSTGRES_PASSWORD: ${{ secrets.STAGING_POSTGRES_PASSWORD }}
+      STAGING_POSTGRES_HOST: ${{ secrets.STAGING_POSTGRES_HOST }}
+      DATA_DIR: "./data"
     steps:
-      - name: no-op
-        run: echo "no-op stub"
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+
+      - uses: "google-github-actions/auth@v2"
+        with:
+          credentials_json: "${{ secrets.DGM_GITHUB_ACTION_CREDENTIALS }}"
+
+      - name: Download version file
+        uses: actions/download-artifact@v8
+        with:
+          run-id: ${{ env.RUN_ID }}
+          name: version-file
+          path: .
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish versioned outputs
+        run: |
+          VERSION_ID=$(cat version.txt)
+          echo "VERSION_ID=$VERSION_ID"
+          make publish_outputs VERSION_ID=$VERSION_ID

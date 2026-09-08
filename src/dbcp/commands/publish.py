@@ -2,22 +2,31 @@
 
 import logging
 import re
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
 
 import click
+import duckdb
 import google.auth
 import pandas as pd
 import yaml
-from google.cloud import bigquery, storage
-from pydantic import BaseModel, validator
+from fsspec import filesystem
+from google.cloud import bigquery
+from pydantic import BaseModel, field_validator
+from upath import UPath
 
-from dbcp.constants import OUTPUT_DIR
-from dbcp.helpers import get_sql_engine, write_to_postgres
+from dbcp.constants import DUCKDB_PATH
+from dbcp.helpers import (
+    get_postgres_engine,
+    get_schema_sql_alchemy_metadata,
+    write_to_sql,
+)
 from dbcp.metadata import SchemaName
 
 logger = logging.getLogger(__name__)
+OUTPUT_BUCKET: UPath = UPath("gs://dgm-outputs")
 
 
 def _get_published_schema_id(schema_name: SchemaName, target: str) -> str:
@@ -31,91 +40,80 @@ def _get_published_schema_id(schema_name: SchemaName, target: str) -> str:
     return f"{schema_name.value}{destination_suffix}"
 
 
+def _get_duckdb_connection(read_only: bool = True) -> duckdb.DuckDBPyConnection:
+    """Connect to duckdb db through python API and register GCS filesystem."""
+    db = duckdb.connect(DUCKDB_PATH, read_only=read_only)
+    db.register_filesystem(filesystem("gcs"))
+    return db
+
+
 def upload_parquet_directory_to_gcs(
-    directory_path: str,
-    output_bucket: storage.Bucket,
     schema: SchemaName,
-    version: str,
+    output_directory: UPath,
 ):
     """Uploads a directory of Parquet files to Google Cloud Storage.
 
     Args:
         directory_path: Path to the directory containing Parquet files.
-        output_bucket: The GCS output bucket
-        schema: Name of schema to prepend to destination blob names.
-        version: The version of the data to upload.
+        output_directory: GCS directory corresponding to new published version of data.
 
     """
-    # List all Parquet files in the directory
-    parquet_files = list(Path(directory_path).glob("*.parquet"))
+    # Get connection to dev duckdb
+    db = _get_duckdb_connection()
 
-    # Upload each Parquet file to GCS
-    for file in parquet_files:
-        # Construct the destination blob name
-        destination_blob_name = f"{version}/{schema.value}/{file.name}"
-
-        # Create a blob object in the bucket
-        blob = output_bucket.blob(destination_blob_name)
-
-        # Upload the file to GCS
-        blob.upload_from_filename(str(file))
-
-        logger.info(
-            f"Uploaded {file} to gs://{output_bucket.id}/{destination_blob_name}"
+    # Upload each table as a Parquet file to GCS
+    for table in get_schema_sql_alchemy_metadata(schema).sorted_tables:
+        table_name = table.name
+        db.table(f"{schema.value}.{table_name}").to_parquet(
+            str(output_directory / schema.value / f"{table_name}.parquet").replace(
+                "gs", "gcs"
+            )
         )
 
 
-def load_parquet_files_to_postgres(
-    output_bucket: storage.Bucket,
+def load_tables_to_postgres(
+    output_directory: UPath,
     schema: SchemaName,
-    version: str,
     target: str,
 ):
     """Load Parquet files from GCS to production postgres db.
 
     Args:
-        output_bucket: the GCS bucket containing the output Parquet files.
+        output_directory: GCS directory corresponding to new published version of data.
         schema: The schema of the GCS blobs to load.
-        version: the version of the data to load.
 
     """
-    engine = get_sql_engine(production=True)
-    for blob in output_bucket.list_blobs(prefix=f"{version}/{schema.value}"):
-        if not blob.name.endswith(".parquet"):
-            continue
-        # get the blob filename without the extension
-        table_name = blob.name.split("/")[-1].split(".")[0]
+    publish_engine = get_postgres_engine(production=target == "prod")
+    for table in get_schema_sql_alchemy_metadata(schema).sorted_tables:
+        table_name = table.name
+        # TODO: Figure out if county_wide + intermediate tables should be published to postgres
         if "__" not in table_name:
             continue
 
-        # Read parquet then write to postgres
-        df = pd.read_parquet(f"gs://{output_bucket.id}/{blob.name}")
-
-        logger.info(f"Publishing table {table_name} to production postgres DB.")
-        write_to_postgres(
-            df,
+        logger.info(f"Publishing table {table} to production postgres DB.")
+        write_to_sql(
+            pd.read_parquet(
+                path=str(output_directory / schema.value / f"{table_name}.parquet")
+            ),
             table_name=table_name,
-            engine=engine,
+            engine=publish_engine,
             schema_name=schema,
             if_exists="replace",
             remote=True,
         )
-        logger.info(f"Successfully wrote table {table_name} to production postgres DB.")
+        logger.info(f"Successfully wrote table {table} to {target} postgres DB.")
 
 
-def load_parquet_files_to_bigquery(
-    output_bucket: storage.Bucket,
-    schema: SchemaName,
-    version: str,
-    target: str,
+def load_tables_to_bigquery(
+    output_directory: UPath, schema: SchemaName, target: str, version: str
 ):
     """Load Parquet files from GCS to BigQuery.
 
     Args:
-        output_bucket: the GCS bucket containing the output Parquet files.
+        output_directory: GCS directory corresponding to new published version of data.
         schema: The schema of the GCS blobs to load.
-        version: the version of the data to load.
         target: the target schema, one of "prod" or "dev".
+        version: the version of the data to load.
 
     """
     # Create a BigQuery client
@@ -126,14 +124,11 @@ def load_parquet_files_to_bigquery(
     dataset_id = _get_published_schema_id(schema, target)
     dataset_ref = client.dataset(dataset_id)
 
-    # get all parquet files in the bucket/{version} directory
-    blobs = output_bucket.list_blobs(prefix=f"{version}/{schema.value}")
-
     # Load each Parquet file to BigQuery
-    for blob in blobs:
-        if blob.name.endswith(".parquet"):
+    for file in (output_directory / schema.value).iterdir():
+        if file.suffix == ".parquet":
             # get the blob filename without the extension
-            table_name = blob.name.split("/")[-1].split(".")[0]
+            table_name = file.stem
 
             # Construct the destination table
             table_ref = dataset_ref.table(table_name)
@@ -147,10 +142,10 @@ def load_parquet_files_to_bigquery(
                 write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
             )
             load_job = client.load_table_from_uri(
-                f"gs://{output_bucket.id}/{blob.name}", table_ref, job_config=job_config
+                str(file), table_ref, job_config=job_config
             )
 
-            logger.info(f"Loading {blob.name} to {dataset_id}.{table_name}")
+            logger.info(f"Loading {file.name} to {dataset_id}.{table_name}")
             load_job.result()
 
             # add a label to the table
@@ -159,7 +154,7 @@ def load_parquet_files_to_bigquery(
             table.labels = labels
             client.update_table(table, ["labels"])
 
-            logger.info(f"Loaded {blob.name} to {dataset_id}.{table_name}")
+            logger.info(f"Loaded {file.name} to {dataset_id}.{table_name}")
 
 
 class OutputMetadata(BaseModel):
@@ -176,12 +171,13 @@ class OutputMetadata(BaseModel):
 
     version: str = str(uuid.uuid4())
     git_ref: str | None = None
-    target: str | None = None
+    target: str
     code_git_sha: str | None = None
     github_action_run_id: str | None = None
     date_created: datetime = datetime.now()
+    version_file: Path = Path("./version.txt")
 
-    @validator("git_ref")
+    @field_validator("git_ref")
     def git_ref_must_be_branch_or_tag(cls, git_ref: str | None) -> str | None:  # noqa: N805
         """Validate that the git ref is 'main', a tag like vX.Y.Z, or a valid branch name."""
         if not git_ref:
@@ -199,27 +195,40 @@ class OutputMetadata(BaseModel):
             f"{git_ref} is not a valid Git ref. Must be 'main', a git tag starting with 'v', or a valid branch name."
         )
 
-    @validator("target")
-    def target_must_be_dev_or_prod(cls, target: str | None) -> str | None:  # noqa: N805
+    @field_validator("target")
+    def target_must_be_dev_or_prod(cls, target: str) -> str | None:  # noqa: N805
         """Validate that the target is either "dev" or "prod"."""
-        if target:
-            if target in ("dev", "prod"):
-                return target
-            raise ValueError(
-                f'{target} is not a valid target. Must be "dev" or "prod".'
-            )
-        return target
+        if target in ("dev", "prod"):
+            return target
+        raise ValueError(f'{target} is not a valid target. Must be "dev" or "prod".')
 
-    def to_yaml(self) -> str:
+    @property
+    def output_directory(self) -> UPath:
+        """Return directory within output bucket corresponding to current version."""
+        return OUTPUT_BUCKET / self.version
+
+    def to_yaml(self):
         """Convert the metadata to a YAML string."""
-        settings_dict = self.dict()
+        settings_dict = self.model_dump(exclude={"version_file"})
         repo_base_url = "https://github.com/deployment-gap-model-education-fund/deployment-gap-model"
         settings_dict["code_git_sha_url"] = f"{repo_base_url}/tree/{self.git_ref}"
         settings_dict["github_action_run_url"] = (
             f"{repo_base_url}/actions/runs/{self.github_action_run_id}"
         )
 
-        return yaml.dump(settings_dict)
+        (self.output_directory / "etl-run-metadata.yaml").write_text(
+            yaml.dump(settings_dict)
+        )
+
+    def write_version(self):
+        """Write version to disk so it can be saved as an artifact to pass to distribute workflow."""
+        self.version_file.write_text(self.version)
+
+    @classmethod
+    def from_version(cls, version: str) -> "OutputMetadata":
+        """Get OutputMetadata from versioned yaml file."""
+        metadata_file = OUTPUT_BUCKET / version / "etl-run-metadata.yaml"
+        return cls(**yaml.safe_load(stream=metadata_file.read_text()))
 
 
 @click.command()
@@ -243,6 +252,69 @@ class OutputMetadata(BaseModel):
     default=None,
     help="The run id of the github action that built the outputs",
 )
+def upload_outputs(
+    build_ref: str,
+    target: str,
+    code_git_sha: str,
+    github_action_run_id: str,
+):
+    """Upload outputs to GCS as parquet files."""
+    metadata = OutputMetadata(
+        git_ref=build_ref,
+        target=target,
+        code_git_sha=code_git_sha,
+        github_action_run_id=github_action_run_id,
+    )
+
+    # write metadata file to GCS
+    metadata.to_yaml()
+    logger.info(f"Uploaded metadata to {metadata.output_directory}")
+    for schema in SchemaName:
+        logger.info(f"Uploading outputs for schema {schema.value}")
+        upload_parquet_directory_to_gcs(
+            schema=schema, output_directory=metadata.output_directory
+        )
+
+    # Write version uuid to file so it can be saved as an artifact
+    metadata.write_version()
+
+
+@click.command()
+@click.argument("version", type=str)
+def inspect_outputs(version: str):
+    """Return SQL that will generate views to all tables in specified versioned output."""
+    db = _get_duckdb_connection(read_only=False)
+
+    output_metadata = OutputMetadata.from_version(version)
+    views = []
+    for schema in SchemaName:
+        duckdb_schema = f"versioned_{schema.value}"
+        db.execute(f"CREATE SCHEMA IF NOT EXISTS {duckdb_schema}")
+        db.execute(f"USE {duckdb_schema}")
+        for table in (output_metadata.output_directory / schema.value).iterdir():
+            table_path = table.stem
+            db.read_parquet(str(table).replace("gs", "gcs")).to_view(
+                table_path, replace=True
+            )
+            views.append(f"{duckdb_schema}.{table_path}")
+
+    db.execute("USE main")
+    db.execute("CALL start_ui()")
+    logger.info("DuckDB UI running — press Ctrl+C to exit.")
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        [db.execute(f"DROP VIEW {view}") for view in views]
+        [db.execute(f"DROP SCHEMA versioned_{schema.value}") for schema in SchemaName]
+        db.close()
+        logger.info("Stopped.")
+
+
+@click.command()
 @click.option(
     "-bq",
     "--upload-to-big-query",
@@ -256,56 +328,34 @@ class OutputMetadata(BaseModel):
     is_flag=True,
     help="Upload the data mart tables to production Postgres",
 )
-@click.option(
-    "--schemas",
-    type=click.Choice([option.value for option in SchemaName]),
-    multiple=True,
-    default=[option.value for option in SchemaName],
-    help="The schema to publish to GCS and BigQuery",
+@click.argument(
+    "version",
+    type=str,
 )
 def publish_outputs(
-    build_ref: str,
-    target: str,
-    code_git_sha: str,
-    github_action_run_id: str,
-    schemas: list[str],
+    version: str,
     upload_to_big_query: bool,
     upload_to_postgres: bool,
 ):
     """Publish outputs to Google Cloud Storage and Big Query."""
-    bucket_name = "dgm-outputs"
-    output_bucket = storage.Client().get_bucket(bucket_name)
+    metadata = OutputMetadata.from_version(version)
 
-    metadata = OutputMetadata(
-        git_ref=build_ref,
-        target=target,
-        code_git_sha=code_git_sha,
-        github_action_run_id=github_action_run_id,
-    )
-
-    for schema in schemas:
-        upload_parquet_directory_to_gcs(
-            OUTPUT_DIR / schema, output_bucket, SchemaName(schema), metadata.version
-        )
     # write metadata file to GCS
-    destination_blob_name = f"{metadata.version}/etl-run-metadata.yaml"
-    blob = output_bucket.blob(destination_blob_name)
-    blob.upload_from_string(metadata.to_yaml())
-    logger.info(f"Uploaded metadata to gs://{bucket_name}/{destination_blob_name}")
-
-    if target is not None:
-        for schema in schemas:
-            if upload_to_big_query:
-                load_parquet_files_to_bigquery(
-                    output_bucket, SchemaName(schema), metadata.version, target
-                )
-            # At this point postgres is only used for production data mart and private data mart tables
-            if upload_to_postgres:
-                load_parquet_files_to_postgres(
-                    output_bucket, SchemaName(schema), metadata.version, target
-                )
-    else:
-        logger.warning("No target schema provided. Skipping BigQuery/Postgres upload.")
+    for schema in SchemaName:
+        logger.info(f"Distributing {schema} tables.")
+        if upload_to_big_query:
+            load_tables_to_bigquery(
+                output_directory=metadata.output_directory,
+                schema=SchemaName(schema),
+                version=metadata.version,
+                target=metadata.target,
+            )
+        if upload_to_postgres:
+            load_tables_to_postgres(
+                output_directory=metadata.output_directory,
+                schema=SchemaName(schema),
+                target=metadata.target,
+            )
 
 
 if __name__ == "__main__":

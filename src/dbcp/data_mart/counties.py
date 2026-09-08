@@ -45,7 +45,7 @@ from dbcp.data_mart.helpers import (
     _subset_db_columns,
     get_query,
 )
-from dbcp.helpers import get_sql_engine
+from dbcp.helpers import get_duckdb_engine
 
 JUSTICE40_AGGREGATES = pd.read_csv(
     # This variable exists because of Postgres character limits on column names.
@@ -894,7 +894,7 @@ def create_wide_format(
 ) -> pd.DataFrame:
     """Create wide format county aggregates."""
     if postgres_engine is None:
-        postgres_engine = get_sql_engine()
+        postgres_engine = get_duckdb_engine()
     if long_format is None:
         long_format = create_long_format(postgres_engine=postgres_engine)
     wide_format = _convert_long_to_wide(long_format)
@@ -985,7 +985,7 @@ def create_data_mart(
     """
     postgres_engine = engine
     if postgres_engine is None:
-        postgres_engine = get_sql_engine()
+        postgres_engine = get_duckdb_engine()
 
     long_format = create_long_format(postgres_engine=postgres_engine)
     wide_format = create_wide_format(
@@ -1008,7 +1008,7 @@ def create_data_mart(
 
 if __name__ == "__main__":
     # debugging entry point
-    engine = get_sql_engine()
+    engine = get_duckdb_engine()
     marts = create_data_mart(engine=engine)
 
     print("hooray")
