@@ -19,7 +19,7 @@ on:
 
 jobs:
   publish:
-    # Only run when manually triggered or fsspec archiver failed
+    # Only run when manually triggered or when update-data succeeded
     if: |
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
