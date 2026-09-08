@@ -13,7 +13,7 @@ from google.cloud import storage
 from dbcp.archivers.utils import ExtractionSettings
 
 
-def _github_latest_commit_date(repo_rel_path: str) -> datetime.datetime:
+def _git_latest_commit_date(repo_rel_path: str) -> datetime.datetime:
     """Query GitHub REST API to get the latest commit touching repo_rel_path.
 
     Returns a timezone-aware datetime.
@@ -86,10 +86,8 @@ def get_last_modified_time_from_path(filepath: str):
     elif filepath.startswith("data/raw/"):
         # Convert to a repo-relative POSIX string with no leading slash
         repo_rel_path = Path(filepath).as_posix().lstrip("/")
-        # Query GitHub API for the most recent commit touching this path
-        # We do this because the Docker build does not have the .git project
-        # embedded within it, meaning that running git log is not an option.
-        time = _github_latest_commit_date(repo_rel_path)
+        # Find the last time a file within the repo was modified
+        time = _git_latest_commit_date(repo_rel_path)
     elif filepath.startswith("airtable"):
         es = ExtractionSettings.from_yaml(
             importlib.resources.files("dbcp").joinpath("settings.yaml")
