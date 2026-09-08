@@ -40,8 +40,8 @@ uv sync --only-dev
 ## GCP Authentication
 
 The ETL requires access to some data stored in Google Cloud Platform (GCP).
-To authenticate the docker container with GCP install the [gcloud utilities](https://docs.cloud.google.com/sdk/docs/install-sdk#latest-version) on your
-computer. Once complete, use ``gcloud`` to establish application default credentials
+To authenticate with GCP install the [gcloud utilities](https://docs.cloud.google.com/sdk/docs/install-sdk#latest-version) on your
+computer. Once complete, use ``gcloud auth application-default login`` to establish application default credentials
 
 ```
 gcloud auth application-default login
