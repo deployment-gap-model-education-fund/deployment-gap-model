@@ -101,8 +101,8 @@ repos:
     rev: v3.94.3
     hooks:
       - id: trufflehog
+        entry: trufflehog git file://. --since-commit HEAD --fail --exclude-paths trufflehog-exclude.txt
         name: TruffleHog
-        entry: trufflehog git file://. --since-commit HEAD --fail
         language: golang
         pass_filenames: false
 
