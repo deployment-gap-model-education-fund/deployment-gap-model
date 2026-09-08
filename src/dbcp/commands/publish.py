@@ -11,14 +11,17 @@ import click
 import duckdb
 import google.auth
 import pandas as pd
+import pandera as pa
 import yaml
 from fsspec import filesystem
 from google.cloud import bigquery
+from pandera.typing import DataFrame
 from pydantic import BaseModel, field_validator
 from upath import UPath
 
 from dbcp.constants import DUCKDB_PATH
 from dbcp.helpers import (
+    check_table_versions_equivalent,
     get_postgres_engine,
     get_schema_sql_alchemy_metadata,
     write_to_sql,
@@ -71,42 +74,58 @@ def upload_parquet_directory_to_gcs(
         )
 
 
+class DeploymentMetadata(pa.DataFrameModel):
+    """Schema for table tracking when tables are updated."""
+
+    table_name: str = pa.Field(unique=True)
+    last_modified_deployment_id: str
+    last_modified: pd.Timestamp = pa.Field(coerce=True)
+
+
+@pa.check_types
 def load_tables_to_postgres(
     output_directory: UPath,
-    schema: SchemaName,
     target: str,
+    deployment_metadata: DataFrame[DeploymentMetadata],
 ):
     """Load Parquet files from GCS to production postgres db.
 
     Args:
         output_directory: GCS directory corresponding to new published version of data.
-        schema: The schema of the GCS blobs to load.
 
     """
     publish_engine = get_postgres_engine(production=target == "prod")
-    for table in get_schema_sql_alchemy_metadata(schema).sorted_tables:
-        table_name = table.name
-        # TODO: Figure out if county_wide + intermediate tables should be published to postgres
-        if "__" not in table_name:
-            continue
+    for schema in SchemaName:
+        for table in get_schema_sql_alchemy_metadata(schema).sorted_tables:
+            table_name = table.name
+            # TODO: Figure out if county_wide + intermediate tables should be published to postgres
+            if "__" not in table_name:
+                continue
 
-        logger.info(f"Publishing table {table} to production postgres DB.")
-        write_to_sql(
-            pd.read_parquet(
-                path=str(output_directory / schema.value / f"{table_name}.parquet")
-            ),
-            table_name=table_name,
-            engine=publish_engine,
-            schema_name=schema,
-            if_exists="replace",
-            remote=True,
-        )
-        logger.info(f"Successfully wrote table {table} to {target} postgres DB.")
+            logger.info(f"Publishing table {table} to production postgres DB.")
+            write_to_sql(
+                pd.read_parquet(
+                    path=str(output_directory / schema.value / f"{table_name}.parquet")
+                ),
+                table_name=table_name,
+                engine=publish_engine,
+                schema_name=schema,
+                if_exists="replace",
+                remote=True,
+            )
+            logger.info(f"Successfully wrote table {table} to {target} postgres DB.")
+    deployment_metadata.to_sql(
+        name="madrone__deployment_metadata",
+        con=publish_engine,
+        if_exists="replace",
+        schema="catalyst",
+    )
 
 
+@pa.check_types
 def load_tables_to_bigquery(
-    output_directory: UPath, schema: SchemaName, target: str, version: str
-):
+    output_directory: UPath, target: str, version: str
+) -> DataFrame[DeploymentMetadata]:
     """Load Parquet files from GCS to BigQuery.
 
     Args:
@@ -120,41 +139,72 @@ def load_tables_to_bigquery(
     credentials, project_id = google.auth.default()
     client = bigquery.Client(credentials=credentials, project=project_id)
 
-    # Get the BigQuery dataset
-    dataset_id = _get_published_schema_id(schema, target)
-    dataset_ref = client.dataset(dataset_id)
+    # Initialize deployment metadata
+    deployment_metadata = DeploymentMetadata.empty()
 
-    # Load each Parquet file to BigQuery
-    for file in (output_directory / schema.value).iterdir():
-        if file.suffix == ".parquet":
+    for schema in SchemaName:
+        # Get the BigQuery dataset
+        dataset_id = _get_published_schema_id(schema, target)
+        dataset_ref = client.dataset(dataset_id)
+
+        # Load each Parquet file to BigQuery
+        for file in (output_directory / schema.value).iterdir():
+            if file.suffix != ".parquet":
+                continue
+
             # get the blob filename without the extension
             table_name = file.stem
 
             # Construct the destination table
             table_ref = dataset_ref.table(table_name)
 
-            # delete table if it exists
-            client.delete_table(table_ref, not_found_ok=True)
-
-            # Load the Parquet file to BigQuery
-            job_config = bigquery.LoadJobConfig(
-                source_format=bigquery.SourceFormat.PARQUET,
-                write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
-            )
-            load_job = client.load_table_from_uri(
-                str(file), table_ref, job_config=job_config
-            )
-
-            logger.info(f"Loading {file.name} to {dataset_id}.{table_name}")
-            load_job.result()
-
-            # add a label to the table
-            labels = {"version": version}
+            # Get the current deployed version of the table
             table = client.get_table(table_ref)
-            table.labels = labels
-            client.update_table(table, ["labels"])
+            current_version = table.labels.get("version")
+            deployment_time = table.modified
 
-            logger.info(f"Loaded {file.name} to {dataset_id}.{table_name}")
+            assert isinstance(current_version, str)
+            assert isinstance(deployment_time, datetime)
+
+            # Only update table if it's changed from previous deployment
+            old_metadata = OutputMetadata.from_version(current_version)
+            if not check_table_versions_equivalent(
+                old_metadata.output_directory / schema.value / file.name, file
+            ):
+                # Load the Parquet file to BigQuery
+                job_config = bigquery.LoadJobConfig(
+                    source_format=bigquery.SourceFormat.PARQUET,
+                    write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+                )
+                load_job = client.load_table_from_uri(
+                    str(file), table_ref, job_config=job_config
+                )
+
+                logger.info(f"Loading {file.name} to {dataset_id}.{table_name}")
+                load_job.result()
+
+                # Reload table
+                table = client.get_table(table_ref)
+                labels = dict(table.labels or {})
+                labels["version"] = version
+                table.labels = labels
+                client.update_table(table, ["labels"])
+
+                logger.info(f"Loaded {file.name} to {dataset_id}.{table_name}")
+
+                current_version = version
+                deployment_time = datetime.now()
+            else:
+                logger.info(
+                    f"{file.name} hasn't changed since previous deployment. Skipping upload."
+                )
+
+            deployment_metadata.loc[len(deployment_metadata)] = {
+                "table_name": table_name,
+                "last_modified_deployment_id": current_version,
+                "last_modified": pd.Timestamp(deployment_time),
+            }
+    return deployment_metadata
 
 
 class OutputMetadata(BaseModel):
@@ -315,47 +365,27 @@ def inspect_outputs(version: str):
 
 
 @click.command()
-@click.option(
-    "-bq",
-    "--upload-to-big-query",
-    default=False,
-    is_flag=True,
-    help="Upload the outputs to BigQuery",
-)
-@click.option(
-    "--upload-to-postgres",
-    default=False,
-    is_flag=True,
-    help="Upload the data mart tables to production Postgres",
-)
 @click.argument(
     "version",
     type=str,
 )
 def publish_outputs(
     version: str,
-    upload_to_big_query: bool,
-    upload_to_postgres: bool,
 ):
     """Publish outputs to Google Cloud Storage and Big Query."""
     metadata = OutputMetadata.from_version(version)
 
     # write metadata file to GCS
-    for schema in SchemaName:
-        logger.info(f"Distributing {schema} tables.")
-        if upload_to_big_query:
-            load_tables_to_bigquery(
-                output_directory=metadata.output_directory,
-                schema=SchemaName(schema),
-                version=metadata.version,
-                target=metadata.target,
-            )
-        if upload_to_postgres:
-            load_tables_to_postgres(
-                output_directory=metadata.output_directory,
-                schema=SchemaName(schema),
-                target=metadata.target,
-            )
+    deployment_metadata = load_tables_to_bigquery(
+        output_directory=metadata.output_directory,
+        version=metadata.version,
+        target=metadata.target,
+    )
+    load_tables_to_postgres(
+        output_directory=metadata.output_directory,
+        target=metadata.target,
+        deployment_metadata=deployment_metadata,
+    )
 
 
 if __name__ == "__main__":

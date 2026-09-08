@@ -14,6 +14,7 @@ import pandas as pd
 import pyarrow as pa
 import sqlalchemy as sa
 from tqdm import tqdm
+from upath import UPath
 
 import dbcp
 from dbcp.constants import DATA_DIR, DUCKDB_PATH
@@ -66,7 +67,7 @@ def get_schema_sql_alchemy_metadata(schema: SchemaName) -> sa.MetaData:
 
 
 def get_bq_schema_from_metadata(
-    table_name: str, schema: SchemaName, dev: bool = True
+    table_name: str, schema: SchemaName
 ) -> list[dict[str, str]]:
     """Create a BigQuery schema from SQL Alchemy metadata.
 
@@ -88,6 +89,30 @@ def get_bq_schema_from_metadata(
         col_schema["mode"] = SA_TO_BQ_MODES[column.nullable]
         bq_schema.append(col_schema)
     return bq_schema
+
+
+def check_table_versions_equivalent(old_version: UPath, new_version: UPath) -> bool:
+    """Takes path to two parquet files of the same table and return a bool indicating if there are differences.
+
+    This function is meant to detect changes between deployments. It checks for major changes like
+    new, missing, or changed rows. For float columns it compares within a reasonable tolerance.
+    """
+    old_df = pd.read_parquet(str(old_version))
+    new_df = pd.read_parquet(str(new_version))
+
+    try:
+        pd.testing.assert_frame_equal(
+            old_df,
+            new_df,
+            check_dtype=True,
+            check_like=True,
+            check_exact=False,
+            rtol=1e-5,
+            atol=1e-8,
+        )
+        return True
+    except AssertionError:
+        return False
 
 
 def get_pyarrow_schema_from_metadata(table_name: str, schema: SchemaName) -> pa.Schema:
