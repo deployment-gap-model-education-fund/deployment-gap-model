@@ -141,4 +141,4 @@ ignore = [
 extend-select = ["NPY201"] # preview rule to easy migration to Numpy 2.0
 
 [dependency-groups]
-dev = ["pre-commit>=4.6.0"]
+dev = ["pre-commit>=4.6.0", "zensical>=0.0.60"]
