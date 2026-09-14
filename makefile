@@ -46,7 +46,7 @@ archive_all:
 
 build_docs:
 	uv run python -m dbcp.cli render-table-docs ./docs/generated_table_docs
-	uv run zensical build
+	uv run zensical build --clean
 
 save_settings:
 	uv run python -m dbcp.cli save-settings
