@@ -144,6 +144,12 @@ def enforce_dtypes(df: pd.DataFrame, table_name: str, schema: SchemaName):
     except KeyError as e:
         raise KeyError(f"{table_name} does not exist in metadata.") from e
 
+    # Add an `id` column for tables without a primary key
+    pk_cols = [col.name for col in table.primary_key.columns]
+    if pk_cols == ["id"] and "id" not in df.columns:
+        # Generate a simple 1-based sequence for surrogate PK rows.
+        df["id"] = range(1, len(df) + 1)
+
     for col in table.columns:
         # Add the column if it doesn't exist
         if col.name not in df.columns:

@@ -1,0 +1,33 @@
+{% set table = model.__table__ %}
+{% set table_args = model.__table_args__ %}
+{% set sources = sources if sources is defined else table_args.get("info", {}).get("sources", []) %}
+
+# {{ table.name }}
+
+- **Schema:** `{{ table.schema or "default" }}`
+
+## Description
+
+{{ model.__doc__ | trim }}
+
+## Primary key columns
+
+{% for column in table.primary_key.columns %}
+- `{{ column.name }}`
+{% endfor %}
+
+
+{% if sources|length > 0 %}
+## Sources
+{% for source in sources %}
+- `{{ source }}`
+{% endfor %}
+{% endif %}
+
+## Columns
+
+| Column | Type | Primary key | Nullable | Description |
+| --- | --- | --- | --- | --- |
+{% for column in table.columns -%}
+| `{{ column.name }}` | `{{ column.type }}` | {{ "Yes" if column.primary_key else "No" }} | {{ "Yes" if column.nullable else "No" }} | {{ column.doc }} |
+{% endfor -%}
