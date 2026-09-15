@@ -214,7 +214,7 @@ FYI_RESOURCE_DICT = {
         "type": "Fossil",
     },
     "Nuclear": {
-        "codes": [],
+        "codes": ["Fuel Cell + Gas + Nuclear", "Gas + Nuclear"],
         "type": "Renewable",
     },
     "Oil": {
