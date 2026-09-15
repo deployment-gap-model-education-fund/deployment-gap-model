@@ -18,7 +18,7 @@ upload_outputs:
         --target $(TARGET)
 
 publish_outputs:
-	uv run python -m dbcp.cli publish-outputs $(VERSION_ID) --upload-to-postgres -bq
+	uv run python -m dbcp.cli publish-outputs $(VERSION_ID)
 
 inspect_version:
 	uv run python -m dbcp.cli inspect-outputs $(VERSION_ID)
@@ -43,6 +43,10 @@ jupyter_lab:
 
 archive_all:
 	uv run python -m dbcp.cli run-archivers
+
+build_docs:
+	uv run python -m dbcp.cli render-table-docs ./docs/generated_table_docs
+	uv run zensical build --clean
 
 save_settings:
 	uv run python -m dbcp.cli save-settings

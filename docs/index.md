@@ -1,8 +1,7 @@
 # Deployment Gap Model
 
-This documentation covers the public BigQuery tables in the `data_mart` dataset of the `dbcp-dev-350818` project.
-
-The Data Mart section contains documentation for each table and each column, as well as modeling decisions that may impact downstream analysis.
+This documentation pertains to the ETL backing the Deployment Gap Model project. It describes the
+data sources used in the ETL and the tables produced by it.
 
 ## Table Naming Schema
 
