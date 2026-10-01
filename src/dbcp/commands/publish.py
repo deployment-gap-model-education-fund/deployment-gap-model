@@ -75,7 +75,15 @@ def upload_parquet_directory_to_gcs(
 
 
 class DeploymentMetadata(pa.DataFrameModel):
-    """Schema for table tracking when tables are updated."""
+    """Schema for table tracking when tables are updated.
+
+    This table does not conform to the typical patterns
+    for metadata and deployment. This is because it is
+    produced during the publication process and only gets
+    published to postgres. It is only published to postgres
+    because it is only used for Madrone's postgres backed
+    dashboards.
+    """
 
     table_name: str = pa.Field(unique=True)
     last_modified_deployment_id: str
@@ -88,7 +96,7 @@ def load_tables_to_postgres(
     target: str,
     deployment_metadata: DataFrame[DeploymentMetadata],
 ):
-    """Load Parquet files from GCS to production postgres db.
+    """Load Parquet files from GCS to 'prod' or 'dev' postgres db.
 
     Args:
         output_directory: GCS directory corresponding to new published version of data.
@@ -99,6 +107,8 @@ def load_tables_to_postgres(
         for table in get_schema_sql_alchemy_metadata(schema).sorted_tables:
             table_name = table.name
             # TODO: Figure out if county_wide + intermediate tables should be published to postgres
+            # These are legacy tables that are still used in bigquery, but don't conform to naming conventions
+            # To avoid cluttering the postgres schema we avoid publishing these in postgres for now
             if "__" not in table_name:
                 continue
 
