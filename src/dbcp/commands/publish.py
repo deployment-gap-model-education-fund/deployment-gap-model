@@ -139,8 +139,8 @@ def load_tables_to_bigquery(
     credentials, project_id = google.auth.default()
     client = bigquery.Client(credentials=credentials, project=project_id)
 
-    # Initialize deployment metadata
-    deployment_metadata = DeploymentMetadata.empty()
+    # Initialize deployment metadata (converted to dataframe on return)
+    deployment_metadata_records = []
 
     for schema in SchemaName:
         # Get the BigQuery dataset
@@ -199,12 +199,15 @@ def load_tables_to_bigquery(
                     f"{file.name} hasn't changed since previous deployment. Skipping upload."
                 )
 
-            deployment_metadata.loc[len(deployment_metadata)] = {
-                "table_name": table_name,
-                "last_modified_deployment_id": current_version,
-                "last_modified": pd.Timestamp(deployment_time),
-            }
-    return deployment_metadata
+            deployment_metadata_records.append(
+                {
+                    "table_name": table_name,
+                    "last_modified_deployment_id": current_version,
+                    "last_modified": pd.Timestamp(deployment_time),
+                }
+            )
+
+    return DataFrame[DeploymentMetadata](deployment_metadata_records)
 
 
 class OutputMetadata(BaseModel):
