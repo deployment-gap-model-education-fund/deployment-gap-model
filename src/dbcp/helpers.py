@@ -91,12 +91,18 @@ def get_bq_schema_from_metadata(
     return bq_schema
 
 
-def check_table_versions_equivalent(old_version: UPath, new_version: UPath) -> bool:
+def check_table_versions_equivalent(
+    old_version: UPath | None, new_version: UPath
+) -> bool:
     """Takes path to two parquet files of the same table and return a bool indicating if there are differences.
 
     This function is meant to detect changes between deployments. It checks for major changes like
-    new, missing, or changed rows. For float columns it compares within a reasonable tolerance.
+    new, missing, or changed rows. For float columns it compares within a reasonable tolerance. If
+    `old_version` is `None`, this function will assume the table has changed.
     """
+    if old_version is None:
+        return False
+
     old_df = pd.read_parquet(str(old_version))
     new_df = pd.read_parquet(str(new_version))
 
