@@ -18,13 +18,14 @@ upload_outputs:
         --target $(TARGET)
 
 publish_outputs:
-	uv run python -m dbcp.cli publish-outputs $(VERSION_ID) --upload-to-postgres -bq
+	uv run python -m dbcp.cli publish-outputs $(VERSION_ID)
 
 inspect_version:
 	uv run python -m dbcp.cli inspect-outputs $(VERSION_ID)
 
 duckdb:
 	uv run duckdb -c 'INSTALL ui;'
+	uv run duckdb -c 'INSTALL postgres;'
 	uv run duckdb ./data/dbcp.duckdb \
 		-cmd 'LOAD UI; CALL start_ui();' \
 		-cmd 'INSTALL bigquery FROM community; LOAD bigquery;' \
