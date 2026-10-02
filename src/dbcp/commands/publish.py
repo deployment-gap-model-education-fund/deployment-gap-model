@@ -94,7 +94,13 @@ def load_tables_to_postgres(
     target: str,
     version: str,
 ):
-    """Load Parquet files from GCS to 'prod' or 'dev' postgres db."""
+    """Load Parquet files from GCS to 'prod' or 'dev' postgres db.
+
+    This method will also check which tables have changed from the previous deployment.
+    It then publishes the `madrone__deployment_metadata` table with this information
+    alongside the other tables. This metadata is only used from postgres, which is why
+    it is generated here and only deployed to postgres.
+    """
     publish_engine = get_postgres_engine(production=target == "prod")
 
     # Load metadata about currently deployed tables
