@@ -103,6 +103,9 @@ def load_tables_to_postgres(
     """
     publish_engine = get_postgres_engine(production=target == "prod")
 
+    # Generate a timestamp for the current deployment to use for metadata
+    deployment_timestamp = pd.Timestamp.now()
+
     # Load metadata about currently deployed tables
     try:
         current_metadata = pd.read_sql(
@@ -144,7 +147,7 @@ def load_tables_to_postgres(
             # Update deployment metadata if table has changed
             if changed:
                 last_modified_deployment_id = version
-                last_modified = pd.Timestamp.now()
+                last_modified = deployment_timestamp
             else:
                 last_modified_deployment_id = current_metadata.loc[
                     table_name, "last_modified_deployment_id"
