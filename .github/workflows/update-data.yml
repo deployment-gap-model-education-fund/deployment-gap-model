@@ -43,6 +43,7 @@ jobs:
           enable-cache: true
 
       - uses: "google-github-actions/auth@v2"
+        if: ${{ env.UPLOAD == 'true' }}
         with:
           credentials_json: "${{ secrets.DGM_GITHUB_ACTION_CREDENTIALS }}"
 
