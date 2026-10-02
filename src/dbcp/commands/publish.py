@@ -97,6 +97,7 @@ def load_tables_to_postgres(
     """Load Parquet files from GCS to 'prod' or 'dev' postgres db."""
     publish_engine = get_postgres_engine(production=target == "prod")
 
+    # Load metadata about currently deployed tables
     try:
         current_metadata = pd.read_sql(
             "SELECT * FROM catalyst.madrone__deployment_metadata",
@@ -112,6 +113,9 @@ def load_tables_to_postgres(
     for schema in SchemaName:
         for table in get_schema_sql_alchemy_metadata(schema).sorted_tables:
             table_name = table.name
+            # This check stops us from publishing the county_wide and its upstream tables to postgres
+            # These tables don't conform to our current naming standards and are only used in bigquery
+            # This stops us from cluttering the postgres schema while we decide what to do with these tables longterm
             if "__" not in table_name:
                 continue
 
