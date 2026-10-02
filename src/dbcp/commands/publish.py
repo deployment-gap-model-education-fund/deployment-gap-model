@@ -187,9 +187,7 @@ def load_tables_to_postgres(
     )
 
 
-def load_tables_to_bigquery(
-    output_directory: UPath, schema: SchemaName, target: str, version: str
-):
+def load_tables_to_bigquery(output_directory: UPath, target: str, version: str):
     """Load Parquet files from GCS to BigQuery.
 
     Args:
@@ -203,41 +201,42 @@ def load_tables_to_bigquery(
     credentials, project_id = google.auth.default()
     client = bigquery.Client(credentials=credentials, project=project_id)
 
-    # Get the BigQuery dataset
-    dataset_id = _get_published_schema_id(schema, target)
-    dataset_ref = client.dataset(dataset_id)
+    for schema in SchemaName:
+        # Get the BigQuery dataset
+        dataset_id = _get_published_schema_id(schema, target)
+        dataset_ref = client.dataset(dataset_id)
 
-    # Load each Parquet file to BigQuery
-    for file in (output_directory / schema.value).iterdir():
-        if file.suffix == ".parquet":
-            # get the blob filename without the extension
-            table_name = file.stem
+        # Load each Parquet file to BigQuery
+        for file in (output_directory / schema.value).iterdir():
+            if file.suffix == ".parquet":
+                # get the blob filename without the extension
+                table_name = file.stem
 
-            # Construct the destination table
-            table_ref = dataset_ref.table(table_name)
+                # Construct the destination table
+                table_ref = dataset_ref.table(table_name)
 
-            # delete table if it exists
-            client.delete_table(table_ref, not_found_ok=True)
+                # delete table if it exists
+                client.delete_table(table_ref, not_found_ok=True)
 
-            # Load the Parquet file to BigQuery
-            job_config = bigquery.LoadJobConfig(
-                source_format=bigquery.SourceFormat.PARQUET,
-                write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
-            )
-            load_job = client.load_table_from_uri(
-                str(file), table_ref, job_config=job_config
-            )
+                # Load the Parquet file to BigQuery
+                job_config = bigquery.LoadJobConfig(
+                    source_format=bigquery.SourceFormat.PARQUET,
+                    write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+                )
+                load_job = client.load_table_from_uri(
+                    str(file), table_ref, job_config=job_config
+                )
 
-            logger.info(f"Loading {file.name} to {dataset_id}.{table_name}")
-            load_job.result()
+                logger.info(f"Loading {file.name} to {dataset_id}.{table_name}")
+                load_job.result()
 
-            # add a label to the table
-            labels = {"version": version}
-            table = client.get_table(table_ref)
-            table.labels = labels
-            client.update_table(table, ["labels"])
+                # add a label to the table
+                labels = {"version": version}
+                table = client.get_table(table_ref)
+                table.labels = labels
+                client.update_table(table, ["labels"])
 
-            logger.info(f"Loaded {file.name} to {dataset_id}.{table_name}")
+                logger.info(f"Loaded {file.name} to {dataset_id}.{table_name}")
 
 
 class OutputMetadata(BaseModel):
@@ -408,16 +407,16 @@ def publish_outputs(
     """Publish outputs to Google Cloud Storage and Big Query."""
     metadata = OutputMetadata.from_version(version)
 
-    # write metadata file to GCS
-    deployment_metadata = load_tables_to_bigquery(
+    # Publish data to bigquery / postgres
+    load_tables_to_bigquery(
         output_directory=metadata.output_directory,
         version=metadata.version,
         target=metadata.target,
     )
     load_tables_to_postgres(
         output_directory=metadata.output_directory,
+        version=metadata.version,
         target=metadata.target,
-        deployment_metadata=deployment_metadata,
     )
 
 
