@@ -247,6 +247,8 @@ FYI_RESOURCE_DICT = {
             "Methane + Solar",
             "Diesel + Solar",
             "Geothermal + Waste Heat",
+            # in 2026-10 we saw 3890 rows with empty generation type, nearly
+            # all of which were marked as "Other" in previous months:
             "Unknown",
         ],
         "type": "Unknown Resource",
