@@ -247,12 +247,14 @@ FYI_RESOURCE_DICT = {
             "Methane + Solar",
             "Diesel + Solar",
             "Geothermal + Waste Heat",
+            "Unknown",
         ],
         "type": "Unknown Resource",
     },
     "Other Storage": {
         "codes": [
             "Battery + Compressed Air",
+            "Battery + Flywheel",
             "Compressed Air",
             "Flywheel",
             "Hydrogen",
