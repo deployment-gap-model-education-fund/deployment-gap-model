@@ -1508,6 +1508,6 @@ madrone_data_last_updated = Table(
     metadata,
     Column("dataset_name", String, primary_key=True),
     Column("dataset_link", String),
-    Column("last_modified", String),
+    Column("last_modified", DateTime),
     schema=schema,
 )

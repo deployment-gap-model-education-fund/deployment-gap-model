@@ -1,5 +1,7 @@
 """Test DBCP helper functions."""
 
+import pandas as pd
+import pytest
 import sqlalchemy as sa
 
 import dbcp
@@ -37,3 +39,39 @@ class TestBQSchemaHelpers:
             "census__county_fips", SchemaName.DATA_WAREHOUSE
         )
         assert bq_schema == expected_bq_schema
+
+
+@pytest.mark.parametrize(
+    "old_df,new_df,expected",
+    [
+        (
+            pd.DataFrame({"a": [1, 2], "b": [1.0, 2.0]}),
+            pd.DataFrame({"a": [1, 2], "b": [1.0, 2.0]}),
+            True,
+        ),
+        (
+            pd.DataFrame({"a": [1, 2], "b": [3, 4]}),
+            pd.DataFrame({"b": [3, 4], "a": [1, 2]}),
+            True,
+        ),
+        (
+            pd.DataFrame({"a": [1.0, 2.0]}),
+            pd.DataFrame({"a": [1.0 + 1e-6, 2.0 - 1e-6]}),
+            True,
+        ),
+        (pd.DataFrame({"a": [1, 2]}), pd.DataFrame({"a": [1, 3]}), False),
+        (pd.DataFrame({"a": [1, 2]}), pd.DataFrame({"a": [1]}), False),
+        (pd.DataFrame({"a": [1, 2]}), pd.DataFrame({"a": [1.0, 2.0]}), False),
+    ],
+)
+def test_check_table_versions_equivalent(tmpdir, old_df, new_df, expected):
+    """Test that `check_table_versions_equivalent` works as expected with test inputs."""
+    old_path = tmpdir.join("old.parquet")
+    new_path = tmpdir.join("new.parquet")
+    old_df.to_parquet(str(old_path))
+    new_df.to_parquet(str(new_path))
+
+    assert (
+        dbcp.helpers.check_table_versions_equivalent(str(old_path), str(new_path))
+        is expected
+    )
