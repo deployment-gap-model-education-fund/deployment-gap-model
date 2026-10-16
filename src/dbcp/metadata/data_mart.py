@@ -236,7 +236,7 @@ fyi__private__counties__active_clean_projects_capacity = Table(
 counties_long_format = Table(
     "counties_long_format",
     metadata,
-    Column("state_id_fips", String, nullable=False),
+    Column("state_id_fips", String, nullable=True),
     Column("county_id_fips", String, primary_key=True),
     Column("state", String, nullable=False),
     Column("county", String, nullable=False),
