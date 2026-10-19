@@ -1,6 +1,7 @@
 """Small helper functions for dbcp etl."""
 
 import csv
+import hashlib
 import logging
 import os
 from datetime import UTC
@@ -262,24 +263,57 @@ def get_pudl_resource(
     remote_pudl_resource_path = f"{bucket}{pudl_version}/{pudl_resource}"
     local_pudl_resource_path = pudl_version_cache / pudl_resource
 
-    if not local_pudl_resource_path.exists():
-        fs = fsspec.filesystem("s3", anon=True)
-        file_size = fs.size(remote_pudl_resource_path)
+    fs = fsspec.filesystem("s3", anon=True)
 
-        # open the remote_pudl_resource_path and track progress with tqdm
-        with (
-            fs.open(remote_pudl_resource_path) as file,
-            Path(local_pudl_resource_path).open("wb") as local_file,
-            tqdm(total=file_size, unit="B", unit_scale=True, unit_divisor=1024) as pbar,
+    if local_pudl_resource_path.exists():
+        if _local_file_matches_remote(
+            local_pudl_resource_path, remote_pudl_resource_path, fs
         ):
-            while True:
-                buf = file.read(8192)
-                if not buf:
-                    break
-                local_file.write(buf)
-                pbar.update(len(buf))
+            logger.info(f"Using cached copy of {pudl_resource}.")
+            return local_pudl_resource_path
+        logger.info(f"Cached copy of {pudl_resource} is stale. Re-downloading.")
+        local_pudl_resource_path.unlink()
+
+    logger.info(f"Downloading {remote_pudl_resource_path}.")
+    fs.get(
+        remote_pudl_resource_path,
+        str(local_pudl_resource_path),
+    )
 
     return local_pudl_resource_path
+
+
+def _local_file_matches_remote(
+    local_path: Path, remote_path: str, fs: fsspec.AbstractFileSystem
+) -> bool:
+    """Compare a local file to a remote object using checksums.
+
+    S3 ETags are MD5 hashes for objects uploaded in a single part. Multipart
+    uploads have an ETag of the form ``<hash>-<n_parts>``, which can't be
+    compared to a plain MD5, so we fall back to comparing file sizes.
+
+    Args:
+        local_path: path to the cached file.
+        remote_path: path to the remote object.
+        fs: the filesystem used to access ``remote_path``.
+
+    Returns:
+        True if the local file appears to match the remote object.
+
+    """
+    remote_info = fs.info(remote_path)
+    if local_path.stat().st_size != remote_info["size"]:
+        return False
+
+    etag = remote_info.get("ETag", "").strip('"')
+    if not etag or "-" in etag:
+        raise RuntimeError(f"Can't get checksum from {remote_info}")
+
+    md5 = hashlib.md5()  # noqa: S324
+    with local_path.open("rb") as local_file:
+        for chunk in iter(lambda: local_file.read(1024 * 1024), b""):
+            md5.update(chunk)
+    return md5.hexdigest() == etag
 
 
 def track_tar_progress(members):
