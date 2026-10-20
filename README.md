@@ -197,5 +197,5 @@ We use [github pages](https://docs.github.com/en/pages) for hosting docs. The `d
 will build and deploy docs off of `main`. The URL for the docs is:
 
 ```
-deployment-gap-model.github.io
+deployment-gap-model.github.io/deployment-gap-model
 ```
