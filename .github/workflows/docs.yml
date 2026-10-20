@@ -22,7 +22,7 @@ jobs:
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           enable-cache: true
-      - run: make docs
+      - run: make build_docs
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site
