@@ -76,7 +76,7 @@ def clean_resource_type(
     resource_df["resource_clean"] = resource_df["resource_clean"].map(long_dict)
     unmapped = resource_df["resource_clean"].isna()
     if unmapped.sum() != 0:
-        debug = resource_df.loc[unmapped, "resource"].value_counts()
+        debug = resource_df.loc[unmapped, "resource"].value_counts(dropna=False)
         raise AssertionError(f"Unmapped resource types: {debug}")
     return resource_df
 

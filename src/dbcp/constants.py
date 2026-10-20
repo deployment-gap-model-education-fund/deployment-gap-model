@@ -214,7 +214,7 @@ FYI_RESOURCE_DICT = {
         "type": "Fossil",
     },
     "Nuclear": {
-        "codes": [],
+        "codes": ["Fuel Cell + Gas + Nuclear", "Gas + Nuclear"],
         "type": "Renewable",
     },
     "Oil": {
@@ -248,16 +248,22 @@ FYI_RESOURCE_DICT = {
             "Diesel + Solar",
             "Geothermal + Waste Heat",
         ],
-        "type": "Unknown Resource",
+        "type": "Other Resource",
     },
     "Other Storage": {
         "codes": [
             "Battery + Compressed Air",
+            "Battery + Flywheel",
             "Compressed Air",
             "Flywheel",
             "Hydrogen",
         ],
         "type": "Renewable",
+    },
+    "Unknown": {
+        "codes": [
+        ],
+        "type": "Unknown Resource - not reported",
     },
     "Pumped Storage": {
         "codes": [],
