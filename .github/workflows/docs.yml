@@ -2,7 +2,9 @@ name: Build and deploy docs
 on:
   push:
     branches:
-      - main
+      # TODO: uncomment `main` branch and remove docs-update once docs PR is merged
+      - docs-update
+      # - main
 permissions:
   contents: read
   pages: write
