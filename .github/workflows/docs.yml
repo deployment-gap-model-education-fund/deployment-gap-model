@@ -11,6 +11,15 @@ permissions:
   id-token: write
 jobs:
   deploy:
+    env:
+      GEOCODIO_API_KEY: ${{ secrets.GEOCODIO_API_KEY }}
+      API_KEY_GOOGLE_MAPS: ${{ secrets.API_KEY_GOOGLE_MAPS }}
+      GITHUB_REF: ${{ github.ref_name }}
+      PROD_POSTGRES_USER: ${{ secrets.PROD_POSTGRES_USER }}
+      PROD_POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD }}
+      PROD_POSTGRES_HOST: ${{ secrets.PROD_POSTGRES_HOST }}
+      DATA_DIR: "./data"
+      PUDL_VERSION: stable
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
