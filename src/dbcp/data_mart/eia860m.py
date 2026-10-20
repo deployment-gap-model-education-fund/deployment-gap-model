@@ -24,7 +24,7 @@ from dbcp.data_mart.helpers import (
 )
 from dbcp.extract.pudl_data import _extract_eia860m_yearly_generators
 from dbcp.helpers import add_fips_ids, get_duckdb_engine
-from dbcp.transform.helpers import bedford_addfips_fix
+from dbcp.transform.helpers import fix_retired_county_fips
 
 logger = logging.getLogger(__name__)
 
@@ -856,7 +856,7 @@ def _add_eia860m_generator_fips(generators: pd.DataFrame) -> pd.DataFrame:
     """Add county and state FIPS IDs to yearly generator history."""
     generators = generators.copy()
     # workaround for addfips Bedford, VA problem
-    bedford_addfips_fix(generators)
+    generators = fix_retired_county_fips(generators)
 
     # Correct geocoding of some plants
     generators.loc[generators.plant_id_eia.eq(65756), "state"] = "MD"

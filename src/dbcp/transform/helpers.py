@@ -22,6 +22,43 @@ UNIX_EPOCH_ORIGIN = pd.Timestamp("01/01/1970")
 EXCEL_EPOCH_ORIGIN = pd.Timestamp("12/30/1899")
 
 
+@dataclass(frozen=True)
+class _RetiredCounty:
+    """A county name addfips knows but the Census TIGER vintage has retired.
+
+    Attributes:
+        state_names: lowercase state names/abbreviations to match on.
+        old_name_prefix: lowercase prefix of the retired county name. A prefix
+            is used because the suffix varies ("Bedford city" vs "Bedford City",
+            "Shannon" vs "Shannon County").
+        new_name: modern county name to substitute.
+
+    """
+
+    state_names: frozenset[str]
+    old_name_prefix: str
+    new_name: str
+
+
+# addfips retains counties that have since been dissolved, split, or renamed, so
+# it can return FIPS codes that do not exist in the Census TIGER vintage used by
+# dbcp.extract.fips_tables.extract_fips(). Rename them to their modern
+# equivalents *before* the FIPS lookup.
+RETIRED_COUNTIES: tuple[_RetiredCounty, ...] = (
+    # Valdez-Cordova was split in 2019 into Chugach (Prince William Sound) and
+    # Copper River (the Copper River basin). All observed localities fall in Chugach.
+    _RetiredCounty(frozenset({"ak", "alaska"}), "valdez-cordova", "Chugach"),
+    # Wade Hampton -> Kusilvak, 2015
+    _RetiredCounty(frozenset({"ak", "alaska"}), "wade hampton", "Kusilvak"),
+    # Shannon -> Oglala Lakota, 2015
+    _RetiredCounty(
+        frozenset({"sd", "south dakota"}), "shannon", "Oglala Lakota County"
+    ),
+    # Bedford city was absorbed by Bedford County, 2013
+    _RetiredCounty(frozenset({"va", "virginia"}), "bedford", "Bedford County"),
+)
+
+
 @dataclass
 class MemoryCaches:
     """Container for multiple Memory caches.
@@ -377,7 +414,7 @@ def add_county_fips_with_backup_geocoding(
 ) -> pd.DataFrame:
     """Add state and county FIPS codes to a DataFrame with state and locality columns.
 
-    This function is tolerant of mis-spellings and heterogeneous town/city/county types
+    This function is tolerant of misspellings and heterogeneous town/city/county types
     because it uses the Google Maps Platform API to re-process initial matching failures.
 
     Args:
@@ -426,7 +463,7 @@ def add_county_fips_with_backup_geocoding(
     if len(has_fips_code) == len(state_locality_df):
         return pd.concat([state_locality_df, has_fips_code[cols_to_keep]], axis=1)
 
-    # geocode the lookup failures - they are often city/town names (instead of counties) or simply mis-spelled
+    # geocode the lookup failures - they are often city/town names (instead of counties) or simply misspelled
     nan_fips = add_fips_results.loc[fips_code_is_nan, :].copy()
 
     # Compare google and geocodio results
@@ -503,17 +540,48 @@ def replace_value_with_count_validation(
     return
 
 
-def bedford_addfips_fix(df, state_col="state", county_col="county") -> None:
-    """Workaround to fix addfips data problem.
+def fix_retired_county_fips(
+    df: pd.DataFrame, state_col: str = "state", county_col: str = "county"
+) -> pd.DataFrame:
+    """Rename counties that addfips knows but the Census vintage has retired.
 
-    addfips includes Bedford City, VA in its county database even though it was
-    absorbed by Bedford County, VA in 2013. Its FIPS code no longer exists.
+    Call this *before* add_fips_ids() so the lookup returns a FIPS code that
+    exists in the Census TIGER vintage used by
+    dbcp.extract.fips_tables.extract_fips().
+
+    Args:
+        df: dataframe with state and county name columns. Not modified.
+        state_col: name of the state name column.
+        county_col: name of the county name column.
+
+    Returns:
+        A copy of ``df`` with retired county names replaced by modern equivalents.
+
     """
-    # workaround for addfips Bedford, VA problem
-    is_va = df[state_col].str.lower().isin({"va", "virginia"})
-    is_bedford = df[county_col].str.lower().str.startswith("bedford")
-    df.loc[is_va & is_bedford, county_col] = "Bedford County"
-    return
+    out = df.copy()
+    states = out[state_col].astype("string").str.strip().str.lower()
+    counties = (
+        out[county_col]
+        .astype("string")
+        .str.strip()
+        .str.lower()
+        # normalize unicode dashes to ASCII, eg "Valdez\u2013Cordova Census Area"
+        .str.replace(r"[\u2010-\u2015]", "-", regex=True)
+    )
+    for retired in RETIRED_COUNTIES:
+        matches = (
+            states.isin(retired.state_names)
+            & counties.str.startswith(retired.old_name_prefix, na=False)
+            # don't rewrite (or log) names that are already correct
+            & counties.ne(retired.new_name.lower())
+        ).fillna(False)
+        if n_matched := matches.sum():
+            logger.info(
+                f"Renaming {n_matched} instances of retired county "
+                f"'{retired.old_name_prefix}' to '{retired.new_name}' in {county_col}."
+            )
+            out.loc[matches, county_col] = retired.new_name
+    return out
 
 
 def normalize_point_of_interconnection(ser: pd.Series) -> pd.Series:

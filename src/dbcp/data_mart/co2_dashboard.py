@@ -12,7 +12,7 @@ from dbcp.data_mart.helpers import _get_county_fips_df, _get_state_fips_df, get_
 from dbcp.helpers import get_duckdb_engine, get_pudl_resource
 from dbcp.transform.helpers import (
     add_county_fips_with_backup_geocoding,
-    bedford_addfips_fix,
+    fix_retired_county_fips,
 )
 
 
@@ -175,7 +175,7 @@ def _get_plant_location_data() -> pd.DataFrame:
 def _transform_plant_location_data(
     plant_locations: pd.DataFrame, state_table: pd.DataFrame, county_table: pd.DataFrame
 ) -> pd.DataFrame:
-    bedford_addfips_fix(plant_locations)
+    plant_locations = fix_retired_county_fips(plant_locations)
     plant_locations = add_county_fips_with_backup_geocoding(
         plant_locations, state_col="state", locality_col="county"
     )

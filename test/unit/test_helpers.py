@@ -1,5 +1,8 @@
 """Test DBCP helper functions."""
 
+import hashlib
+from pathlib import Path
+
 import pandas as pd
 import pytest
 import sqlalchemy as sa
@@ -75,3 +78,74 @@ def test_check_table_versions_equivalent(tmpdir, old_df, new_df, expected):
         dbcp.helpers.check_table_versions_equivalent(str(old_path), str(new_path))
         is expected
     )
+
+
+class FakeFilesystem:
+    """Minimal stand-in for an fsspec filesystem that only implements ``info``."""
+
+    def __init__(self, info: dict):
+        """Store the object metadata returned by ``info``."""
+        self._info = info
+
+    def info(self, path: str) -> dict:
+        """Return canned object metadata, ignoring ``path``."""
+        return self._info
+
+
+@pytest.fixture
+def local_file(tmp_path: Path) -> Path:
+    """Write a small local file used to compare against fake remote metadata."""
+    path = tmp_path / "resource.parquet"
+    path.write_bytes(b"pudl resource contents")
+    return path
+
+
+def test_local_file_matches_remote_when_checksums_match(local_file: Path):
+    """Matching size and ETag means the cached file is up to date."""
+    etag = hashlib.md5(local_file.read_bytes()).hexdigest()  # noqa: S324
+    fs = FakeFilesystem(
+        {"size": local_file.stat().st_size, "ETag": f'"{etag}"'},
+    )
+
+    assert (
+        dbcp.helpers._local_file_matches_remote(local_file, "s3://bucket/key", fs)
+        is True
+    )
+
+
+def test_local_file_matches_remote_false_on_size_mismatch(local_file: Path):
+    """A different size short circuits before the checksum is computed."""
+    fs = FakeFilesystem({"size": local_file.stat().st_size + 1})
+
+    assert (
+        dbcp.helpers._local_file_matches_remote(local_file, "s3://bucket/key", fs)
+        is False
+    )
+
+
+def test_local_file_matches_remote_false_on_checksum_mismatch(local_file: Path):
+    """Same size but a different ETag means the cached file is stale."""
+    stale_etag = hashlib.md5(b"different contents!!!!").hexdigest()  # noqa: S324
+    fs = FakeFilesystem({"size": local_file.stat().st_size, "ETag": f'"{stale_etag}"'})
+
+    assert (
+        dbcp.helpers._local_file_matches_remote(local_file, "s3://bucket/key", fs)
+        is False
+    )
+
+
+@pytest.mark.parametrize(
+    "etag",
+    [
+        "",
+        '"d41d8cd98f00b204e9800998ecf8427e-3"',  # multipart upload ETag
+    ],
+)
+def test_local_file_matches_remote_raises_without_usable_checksum(
+    local_file: Path, etag: str
+):
+    """Missing or multipart ETags can't be compared to a plain MD5."""
+    fs = FakeFilesystem({"size": local_file.stat().st_size, "ETag": etag})
+
+    with pytest.raises(RuntimeError, match="Can't get checksum"):
+        dbcp.helpers._local_file_matches_remote(local_file, "s3://bucket/key", fs)
