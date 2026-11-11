@@ -7,9 +7,8 @@ import click
 import coloredlogs
 from jinja2 import Environment, PackageLoader, select_autoescape
 
-import dbcp
 from dbcp.commands.publish import inspect_outputs, publish_outputs, upload_outputs
-from dbcp.metadata import SchemaName
+from dbcp.definitions import defs
 from dbcp.metadata.data_mart import Base as DataMartBase
 from dbcp.metadata.data_warehouse import Base as DataWarehouseBase
 from dbcp.transform.fips_tables import SPATIAL_CACHE
@@ -60,9 +59,9 @@ def etl(data_mart: bool, data_warehouse: bool, clear_cache: bool):
         SPATIAL_CACHE.clear()
 
     if data_warehouse:
-        dbcp.etl.etl(schema=SchemaName("data_warehouse"))
+        defs.resolve_job_def("data_warehouse_job").execute_in_process()
     if data_mart:
-        dbcp.etl.etl(schema=SchemaName("data_mart"))
+        defs.resolve_job_def("data_mart_job").execute_in_process()
     if (not data_warehouse) and (not data_mart):
         raise ValueError(
             "Please specify a target for the ETL process: --data-warehouse and/or --data-mart."

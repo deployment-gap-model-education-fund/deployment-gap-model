@@ -173,7 +173,7 @@ the associated `update-data` run that you want to publish.
 
 ## Architecture
 
-DBCP roughly follows an ETL(T) architecture. `dbcp.etl.etl()` extracts the raw data, cleans it then loads it into a data warehouse, a local postgres database in ourcase. The tables in the data warehouse are normalized to a certain degree (we need to define a clear data model).
+DBCP roughly follows an ETL(T) architecture. The Dagster assets in `dbcp.assets` (run via `dbcp etl` or `dg dev`) extract the raw data, cleans it then loads it into a data warehouse, a local postgres database in ourcase. The tables in the data warehouse are normalized to a certain degree (we need to define a clear data model).
 
 We then create denomalized tables for specific dashboards we call "data marts". To create a new data mart, create a new python file in the `dbcp.data_mart` module and implement a `create_data_mart()` function that returns the data_mart as a pandas data frame.
 

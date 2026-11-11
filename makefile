@@ -1,3 +1,6 @@
+dagster:
+	uv run dg dev
+
 data_warehouse:
 	uv run python -m dbcp.cli etl --data-warehouse
 

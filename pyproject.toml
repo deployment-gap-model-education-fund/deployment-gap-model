@@ -14,7 +14,8 @@ dependencies = [
   "addfips>=0.4",
   "beautifulsoup4~=4.14",
   "click>=8.4.2",
-  "coloredlogs~=15.0.1",
+  "coloredlogs>=14,<=14.0",
+  "dagster>=1.12",
   "duckdb>=1.3.0",
   "duckdb-sqlalchemy>=1.5.0",
   "fiona~=1.10.1",
@@ -53,6 +54,13 @@ branch-compare = "scripts.branch_compare_helper:main"
 
 [project.urls]
 Homepage = "https://github.com/catalyst-cooperative/down_ballot_climate"
+
+[tool.dg]
+directory_type = "project"
+
+[tool.dg.project]
+root_module = "dbcp"
+code_location_target_module = "dbcp.definitions"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dbcp", "src/scripts"]
@@ -142,4 +150,9 @@ ignore = [
 extend-select = ["NPY201"] # preview rule to easy migration to Numpy 2.0
 
 [dependency-groups]
-dev = ["pre-commit>=4.6.0", "zensical>=0.0.60"]
+dev = [
+  "dagster-dg-cli",
+  "dagster-webserver",
+  "pre-commit>=4.6.0",
+  "zensical>=0.0.60",
+]

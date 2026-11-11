@@ -1,19 +1,19 @@
-"""The ETL module create the data warehouse tables."""
+"""Dagster assets that ETL each data source into the duckdb warehouse and marts."""
 
 import importlib.resources
 import logging
-from collections.abc import Callable
 
+import dagster as dg
 import pandas as pd
-import sqlalchemy as sa
 
 import dbcp
 from dbcp.archivers.utils import ExtractionSettings
 from dbcp.constants import DATA_DIR
+from dbcp.data_mart import get_data_mart_modules
 from dbcp.extract.civis import extract as extract_civis
 from dbcp.extract.helpers import load_yml_file
-from dbcp.helpers import get_duckdb_engine, write_to_sql
 from dbcp.metadata import SchemaName
+from dbcp.resources import DuckDBResource
 from dbcp.transform.fips_tables import SPATIAL_CACHE
 from dbcp.transform.helpers import GEOCODER_CACHES
 from dbcp.validation.tests import validate_warehouse
@@ -21,7 +21,16 @@ from dbcp.validation.tests import validate_warehouse
 logger = logging.getLogger(__name__)
 
 
-def etl_eip_infrastructure() -> dict[str, pd.DataFrame]:
+@dg.asset(group_name="data_warehouse")
+def empty_data_warehouse(duckdb: DuckDBResource) -> None:
+    """Shrink the geocoder/spatial caches and drop all existing warehouse tables."""
+    GEOCODER_CACHES.reduce_cache_sizes()
+    SPATIAL_CACHE.reduce_size()
+    duckdb.drop_all_tables(SchemaName.DATA_WAREHOUSE)
+
+
+@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse", "fips_tables"])
+def eip_infrastructure(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """EIP Infrastructure ETL."""
     # Extract
     eip_raw_dfs = dbcp.extract.eip_infrastructure.extract()
@@ -29,25 +38,28 @@ def etl_eip_infrastructure() -> dict[str, pd.DataFrame]:
     # Transform
     eip_transformed_dfs = dbcp.transform.eip_infrastructure.transform(eip_raw_dfs)
 
-    return eip_transformed_dfs
+    return duckdb.write_tables(eip_transformed_dfs, SchemaName.DATA_WAREHOUSE)
 
 
-def etl_file_modification_dates() -> dict[str, pd.DataFrame]:
+@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse"])
+def file_modification_dates(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """Return a DF with last modified dates for all raw data inputs."""
     file_paths = load_yml_file(DATA_DIR / "file_paths.yml")
     file_df = dbcp.transform.file_modification.transform(file_paths)
-    return file_df
+    return duckdb.write_tables(file_df, SchemaName.DATA_WAREHOUSE)
 
 
-def etl_fyi_queue() -> dict[str, pd.DataFrame]:
+@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse", "fips_tables"])
+def fyi_queue(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """Interconnection.fyi ISO Queues ETL."""
     file_paths = load_yml_file(DATA_DIR / "file_paths.yml")
     fyi_raw_dfs = dbcp.extract.fyi_queue.extract(file_paths["fyi_queue"].item())
     fyi_transformed_dfs = dbcp.transform.fyi_queue.transform(fyi_raw_dfs)
-    return fyi_transformed_dfs
+    return duckdb.write_tables(fyi_transformed_dfs, SchemaName.DATA_WAREHOUSE)
 
 
-def etl_columbia_local_opp() -> dict[str, pd.DataFrame]:
+@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse", "fips_tables"])
+def columbia_local_opp(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """Columbia Local Opposition ETL."""
     # Extract
     file_paths = load_yml_file(DATA_DIR / "file_paths.yml")
@@ -58,16 +70,20 @@ def etl_columbia_local_opp() -> dict[str, pd.DataFrame]:
     # Transform
     transformed_dfs = dbcp.transform.local_opposition.transform(docx_dfs)
 
-    return transformed_dfs
+    return duckdb.write_tables(transformed_dfs, SchemaName.DATA_WAREHOUSE)
 
 
-def etl_pudl_tables() -> dict[str, pd.DataFrame]:
+@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse", "fips_tables"])
+def pudl_tables(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """Pull tables from pudl sqlite database."""
     raw_pudl_tables = dbcp.extract.pudl_data.extract()
-    return dbcp.transform.pudl_data.transform(raw_pudl_tables)
+    return duckdb.write_tables(
+        dbcp.transform.pudl_data.transform(raw_pudl_tables), SchemaName.DATA_WAREHOUSE
+    )
 
 
-def etl_ncsl_state_permitting() -> dict[str, pd.DataFrame]:
+@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse", "fips_tables"])
+def ncsl_state_permitting(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """NCSL State Permitting for Wind ETL."""
     file_paths = load_yml_file(DATA_DIR / "file_paths.yml")
     raw_df = dbcp.extract.ncsl_state_permitting.extract(
@@ -76,10 +92,11 @@ def etl_ncsl_state_permitting() -> dict[str, pd.DataFrame]:
 
     out = dbcp.transform.ncsl_state_permitting.transform(raw_df)
 
-    return out
+    return duckdb.write_tables(out, SchemaName.DATA_WAREHOUSE)
 
 
-def etl_fips_tables() -> dict[str, pd.DataFrame]:
+@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse"])
+def fips_tables(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """Master state and county FIPS table ETL."""
     fips = dbcp.extract.fips_tables.extract_fips()
 
@@ -90,18 +107,20 @@ def etl_fips_tables() -> dict[str, pd.DataFrame]:
 
     out = dbcp.transform.fips_tables.transform(fips)
 
-    return out
+    return duckdb.write_tables(out, SchemaName.DATA_WAREHOUSE)
 
 
-def etl_justice40() -> dict[str, pd.DataFrame]:
+@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse"])
+def justice40(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """ETL white house environmental justice dataset."""
     source_path = load_yml_file(DATA_DIR / "file_paths.yml")["justice40"].item()
     raw = dbcp.extract.justice40.extract(source_path)
     out = dbcp.transform.justice40.transform(raw)
-    return out
+    return duckdb.write_tables(out, SchemaName.DATA_WAREHOUSE)
 
 
-def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
+@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse", "fips_tables"])
+def nrel_ordinances(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """ETL NREL state and local ordinances for wind and solar."""
     wind_source_path = load_yml_file(DATA_DIR / "file_paths.yml")[
         "nrel_wind_ordinances"
@@ -121,30 +140,33 @@ def etl_nrel_ordinances() -> dict[str, pd.DataFrame]:
         nrel_raw_dfs
     )
 
-    return nrel_transformed_dfs
+    return duckdb.write_tables(nrel_transformed_dfs, SchemaName.DATA_WAREHOUSE)
 
 
-def etl_protected_area_by_county() -> dict[str, pd.DataFrame]:
+@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse"])
+def protected_area_by_county(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """ETL the PAD-US intersection with TIGER county geometries."""
     source_path = load_yml_file(DATA_DIR / "file_paths.yml")[
         "padus_intersect_counties"
     ].item()
     raw_df = dbcp.extract.protected_area_by_county.extract(source_path)
     transformed = dbcp.transform.protected_area_by_county.transform(raw_df)
-    return transformed
+    return duckdb.write_tables(transformed, SchemaName.DATA_WAREHOUSE)
 
 
-def etl_energy_communities_by_county() -> dict[str, pd.DataFrame]:
+@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse"])
+def energy_communities_by_county(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """ETL RMI's energy communities analysis."""
     source_path = load_yml_file(DATA_DIR / "file_paths.yml")[
         "rmi_energy_communities_counties"
     ].item()
     raw_df = dbcp.extract.rmi_energy_communities.extract(source_path)
     transformed = dbcp.transform.rmi_energy_communities.transform(raw_df)
-    return transformed
+    return duckdb.write_tables(transformed, SchemaName.DATA_WAREHOUSE)
 
 
-def etl_epa_avert() -> dict[str, pd.DataFrame]:
+@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse"])
+def epa_avert(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """ETL EPA AVERT avoided emissions data."""
     # https://github.com/USEPA/AVERT/blob/v4.1.0/utilities/data/county-fips.txt
     path_county_region_xwalk = load_yml_file(DATA_DIR / "file_paths.yml")[
@@ -159,72 +181,38 @@ def etl_epa_avert() -> dict[str, pd.DataFrame]:
         emission_rates_path=path_emission_rates,
     )
     transformed = dbcp.transform.epa_avert.transform(raw_dfs)
-    return transformed
+    return duckdb.write_tables(transformed, SchemaName.DATA_WAREHOUSE)
 
 
-def etl_civis() -> dict[str, pd.DataFrame]:
+@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse", "fips_tables"])
+def civis(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """ETL archived Civis county demographics and election results."""
     raw_dfs = extract_civis()
-    county_fips = etl_fips_tables()["census__county_fips"]
+    county_fips = pd.read_sql(
+        "SELECT * FROM data_warehouse.census__county_fips", duckdb.get_engine()
+    )
     transformed = dbcp.transform.civis.transform(raw_dfs, county_fips=county_fips)
-    return transformed
+    return duckdb.write_tables(transformed, SchemaName.DATA_WAREHOUSE)
 
 
-def etl_acp_projects() -> dict[str, pd.DataFrame]:
+@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse"])
+def acp_projects(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """ETL ACP projects."""
     raw_dfs = dbcp.extract.acp_projects.extract()
     transformed = dbcp.transform.acp_projects.transform(raw_dfs)
-    return transformed
+    return duckdb.write_tables(transformed, SchemaName.DATA_WAREHOUSE)
 
 
-def etl_manual_ordinances() -> dict[str, pd.DataFrame]:
+@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse"])
+def manual_ordinances(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """ETL manually maintained ordinances."""
     raw_dfs = dbcp.extract.manual_ordinances.extract()
     transformed = dbcp.transform.manual_ordinances.transform(raw_dfs)
-    return transformed
+    return duckdb.write_tables(transformed, SchemaName.DATA_WAREHOUSE)
 
 
-def write_to_duckdb(dfs: dict[str, pd.DataFrame], schema_name: SchemaName):
-    """Write data mart tables from a schema to duckdb."""
-    # Ensure schema exists in a committed transaction
-    engine = get_duckdb_engine()
-    with engine.begin() as con:
-        con.execute(sa.text(f"CREATE SCHEMA IF NOT EXISTS {schema_name.value}"))
-
-    # Delete any existing tables, and create them anew
-    metadata = dbcp.helpers.get_schema_sql_alchemy_metadata(schema_name)
-    table_names = dfs.keys()
-    tables = [metadata.tables[schema_name.value + "." + name] for name in table_names]
-    # Drop tables
-    metadata.drop_all(engine)
-    metadata.create_all(engine, tables=tables)
-
-    # Load table into duckdb
-    for table in metadata.sorted_tables:
-        if table in tables:
-            logger.info(f"Load {table.name} to duckdb.")
-            write_to_sql(
-                df=dfs[table.name],
-                table_name=table.name,
-                engine=engine,
-                schema_name=schema_name,
-                if_exists="append",
-            )
-
-
-def run_etl(funcs: dict[str, Callable], schema_name: SchemaName):
-    """Execute etl functions and save outputs to parquet and postgres."""
-    transformed_dfs = {}
-    for dataset, etl_func in funcs.items():
-        logger.info(f"Processing: {dataset}")
-        transformed_dfs.update(etl_func())
-
-    write_to_duckdb(dfs=transformed_dfs, schema_name=schema_name)
-
-    logger.info(f"Successfully finished {schema_name.value} ETL.")
-
-
-def etl_offshore_wind() -> dict[str, pd.DataFrame]:
+@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse", "fips_tables"])
+def offshore_wind(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """ETL manually curated offshore wind data."""
     # get the latest version of the offshore wind data from the candidate yaml file
     projects_uri = "airtable/Offshore Wind Locations DBCP Version/Projects.json"
@@ -243,78 +231,60 @@ def etl_offshore_wind() -> dict[str, pd.DataFrame]:
     )
     offshore_transformed_dfs = dbcp.transform.offshore_wind.transform(raw_offshore_dfs)
 
-    return offshore_transformed_dfs
+    return duckdb.write_tables(offshore_transformed_dfs, SchemaName.DATA_WAREHOUSE)
 
 
-def create_data_warehouse():
-    """Create data warehouse tables by ETL-ing each data source."""
-    etl_funcs = {
-        "offshore_wind": etl_offshore_wind,
-        "last_modified": etl_file_modification_dates,
-        "columbia_local_opp": etl_columbia_local_opp,
-        "fips_tables": etl_fips_tables,
-        "manual_ordinances": etl_manual_ordinances,
-        "protected_area_by_county": etl_protected_area_by_county,
-        "energy_communities_by_county": etl_energy_communities_by_county,
-        "eip_infrastructure": etl_eip_infrastructure,
-        "epa_avert": etl_epa_avert,
-        "pudl": etl_pudl_tables,
-        "ncsl_state_permitting": etl_ncsl_state_permitting,
-        "acp_projects": etl_acp_projects,
-        "justice40_tracts": etl_justice40,
-        "nrel_wind_solar_ordinances": etl_nrel_ordinances,
-        "fyi_queue": etl_fyi_queue,
-        "civis_election_data": etl_civis,
-    }
-    run_etl(etl_funcs, SchemaName.DATA_WAREHOUSE)
+WAREHOUSE_DATASETS = [
+    "eip_infrastructure",
+    "file_modification_dates",
+    "fyi_queue",
+    "columbia_local_opp",
+    "pudl_tables",
+    "ncsl_state_permitting",
+    "fips_tables",
+    "justice40",
+    "nrel_ordinances",
+    "protected_area_by_county",
+    "energy_communities_by_county",
+    "epa_avert",
+    "civis",
+    "acp_projects",
+    "manual_ordinances",
+    "offshore_wind",
+]
 
 
-def create_data_mart(engine):  # noqa: C901
-    """Create data mart tables by calling create_data_mart in each data mart module."""
-    modules = [
-        (module, module_info)
-        for module, module_info in dbcp.data_mart.get_data_mart_modules()
-    ]
-    data_mart_tables: dict[str, pd.DataFrame] = {}
-    for module, module_info in modules:
-        data = module.create_data_mart(engine=engine)
+@dg.asset(group_name="data_warehouse", deps=WAREHOUSE_DATASETS)
+def validated_data_warehouse(duckdb: DuckDBResource) -> None:
+    """Run data warehouse validation tests."""
+    validate_warehouse(engine=duckdb.get_engine())
+
+
+def _data_mart_asset(module, name: str) -> dg.AssetsDefinition:
+    @dg.asset(
+        name=name,
+        key_prefix="data_mart",
+        group_name="data_mart",
+        deps=[validated_data_warehouse],
+    )
+    def _asset(duckdb: DuckDBResource) -> dg.MaterializeResult:
+        data = module.create_data_mart(engine=duckdb.get_engine())
         if isinstance(data, pd.DataFrame):
-            name = module_info.name
-            assert name not in data_mart_tables, (
-                f"Key {name} already exists in data mart"
-            )
-            data_mart_tables[name] = data
-        elif isinstance(data, dict):
-            data_mart_tables.update(data)
-        else:
+            data = {name: data}
+        elif not isinstance(data, dict):
             raise TypeError(
                 f"Expecting pd.DataFrame or dict of dataframes. Got {type(data)}"
             )
+        return duckdb.write_tables(data, SchemaName.DATA_MART)
 
-    write_to_duckdb(dfs=data_mart_tables, schema_name=SchemaName.DATA_MART)
-
-
-def etl(schema: SchemaName | None = None):
-    """Run ETL."""
-    # Reduce size of caches if necessary
-    GEOCODER_CACHES.reduce_cache_sizes()
-    SPATIAL_CACHE.reduce_size()
-    engine = dbcp.helpers.get_duckdb_engine()
-
-    # Run public ETL functions
-    if (schema == SchemaName.DATA_WAREHOUSE) or (schema is None):
-        create_data_warehouse()
-        validate_warehouse(engine=engine)
-    if (schema == SchemaName.DATA_MART) or (schema is None):
-        create_data_mart(engine=engine)
-
-    logger.info("Successfully finished ETL.")
+    return _asset
 
 
-if __name__ == "__main__":
-    # debugging entry point
-    etl()
-    print("yay")
+# One asset per data mart module.
+data_mart_assets = [
+    _data_mart_asset(module, module_info.name)
+    for module, module_info in get_data_mart_modules()
+]
 
 
 ##########################################
