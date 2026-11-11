@@ -266,8 +266,8 @@ def test_iso_projects_data_mart(engine: Engine):
 def test_county_commission_election_info(engine: Engine):
     """Check total_n_seats is >= total_n_races."""
     with engine.connect() as con:
-        df = pd.read_sql_table(
-            "county_commission_election_info", con, schema="data_mart"
+        df = pd.read_sql(
+            "SELECT * FROM data_mart.county_commission_election_info", con
         ).convert_dtypes()
     assert (df.next_primary_total_n_seats >= df.next_primary_total_n_races).all(), (
         "Found more races than seats in county_commission_election_info!"
@@ -388,8 +388,8 @@ def test_manual_ordinance_fips_coverage(engine: Engine):
 
 def test_civis_county_election_results(engine: Engine):
     """Check LJEDF county politics table keys and percentage ranges."""
-    df = pd.read_sql_table(
-        "civis__counties__election_results", engine, schema="data_warehouse"
+    df = pd.read_sql(
+        "SELECT * FROM data_warehouse.civis__counties__election_results", engine
     )
     assert df["county_id_fips"].is_unique, "Found duplicate county FIPS in LJEDF table."
     expected_n_counties = pd.read_sql(

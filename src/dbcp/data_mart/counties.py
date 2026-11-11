@@ -137,7 +137,7 @@ def _create_dbcp_ej_index(j40_df: pd.DataFrame) -> pd.Series:
 
 def _get_env_justice_df(engine: sa.engine.Engine) -> pd.DataFrame:
     """Create county-level aggregates of Justice40 tracts."""
-    df = pd.read_sql_table("justice40_tracts", engine, schema="data_warehouse")
+    df = pd.read_sql("SELECT * FROM data_warehouse.justice40_tracts", engine)
     df["county_id_fips"] = df["tract_id_fips"].str.slice(0, 5)
     df = df.groupby("county_id_fips").agg(
         total_tracts=("tract_id_fips", "count"),
@@ -858,8 +858,8 @@ def _add_avoided_co2e(iso: pd.DataFrame, engine: sa.engine.Engine) -> pd.DataFra
 
 
 def _get_avoided_emissions_by_county_resource(engine: sa.engine.Engine) -> pd.DataFrame:
-    emiss_fac = pd.read_sql_table(
-        "avert_avoided_emissions_factors", engine, schema="data_warehouse"
+    emiss_fac = pd.read_sql(
+        "SELECT * FROM data_warehouse.avert_avoided_emissions_factors", engine
     )
     emiss_fac = emiss_fac[
         emiss_fac.resource_type.isin(["onshore_wind", "offshore_wind", "utility_pv"])
@@ -867,8 +867,8 @@ def _get_avoided_emissions_by_county_resource(engine: sa.engine.Engine) -> pd.Da
     emiss_fac = emiss_fac[
         ["avert_region", "resource_type", "co2e_tonnes_per_year_per_mw"]
     ]
-    crosswalk = pd.read_sql_table(
-        "avert_county_region_assoc", engine, schema="data_warehouse"
+    crosswalk = pd.read_sql(
+        "SELECT * FROM data_warehouse.avert_county_region_assoc", engine
     )
     emiss_fac_by_county = crosswalk.merge(emiss_fac, on="avert_region", how="left")
 
