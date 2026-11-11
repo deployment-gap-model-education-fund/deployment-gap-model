@@ -14,9 +14,9 @@ from ISOs/RTOS and non-ISO utilities. This is a non-public data source.
 ### Tables
 #### Data Warehouse
 There are three normalized data warehouse tables produced from FYI data:
-- [fyi__private__projects](./data-warehouse/fyi__private__projects.md)
-- [fyi__private__resource_capacity](./data-warehouse/fyi__private__resource_capacity.md)
-- [fyi__private__locations](./data-warehouse/fyi__private__locations)
+- [fyi__private__projects](./generated_table_docs/data_warehouse/fyi__private__projects.md)
+- [fyi__private__resource_capacity](./generated_table_docs/data_warehouse/fyi__private__resource_capacity.md)
+- [fyi__private__locations](./generated_table_docs/data_warehouse/fyi__private__locations)
 
 #### Data Mart
 The three data warehouse tables feed into the following data mart table:
