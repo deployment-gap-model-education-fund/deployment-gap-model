@@ -14,22 +14,12 @@ from dbcp.extract.civis import extract as extract_civis
 from dbcp.extract.helpers import load_yml_file
 from dbcp.metadata import SchemaName
 from dbcp.resources import DuckDBResource
-from dbcp.transform.fips_tables import SPATIAL_CACHE
-from dbcp.transform.helpers import GEOCODER_CACHES
 from dbcp.validation.tests import validate_warehouse
 
 logger = logging.getLogger(__name__)
 
 
-@dg.asset(group_name="data_warehouse")
-def empty_data_warehouse(duckdb: DuckDBResource) -> None:
-    """Shrink the geocoder/spatial caches and drop all existing warehouse tables."""
-    GEOCODER_CACHES.reduce_cache_sizes()
-    SPATIAL_CACHE.reduce_size()
-    duckdb.drop_all_tables(SchemaName.DATA_WAREHOUSE)
-
-
-@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse", "fips_tables"])
+@dg.asset(group_name="data_warehouse", deps=["fips_tables"])
 def eip_infrastructure(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """EIP Infrastructure ETL."""
     # Extract
@@ -41,7 +31,7 @@ def eip_infrastructure(duckdb: DuckDBResource) -> dg.MaterializeResult:
     return duckdb.write_tables(eip_transformed_dfs, SchemaName.DATA_WAREHOUSE)
 
 
-@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse"])
+@dg.asset(group_name="data_warehouse")
 def file_modification_dates(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """Return a DF with last modified dates for all raw data inputs."""
     file_paths = load_yml_file(DATA_DIR / "file_paths.yml")
@@ -49,7 +39,7 @@ def file_modification_dates(duckdb: DuckDBResource) -> dg.MaterializeResult:
     return duckdb.write_tables(file_df, SchemaName.DATA_WAREHOUSE)
 
 
-@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse", "fips_tables"])
+@dg.asset(group_name="data_warehouse", deps=["fips_tables"])
 def fyi_queue(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """Interconnection.fyi ISO Queues ETL."""
     file_paths = load_yml_file(DATA_DIR / "file_paths.yml")
@@ -58,7 +48,7 @@ def fyi_queue(duckdb: DuckDBResource) -> dg.MaterializeResult:
     return duckdb.write_tables(fyi_transformed_dfs, SchemaName.DATA_WAREHOUSE)
 
 
-@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse", "fips_tables"])
+@dg.asset(group_name="data_warehouse", deps=["fips_tables"])
 def columbia_local_opp(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """Columbia Local Opposition ETL."""
     # Extract
@@ -73,7 +63,7 @@ def columbia_local_opp(duckdb: DuckDBResource) -> dg.MaterializeResult:
     return duckdb.write_tables(transformed_dfs, SchemaName.DATA_WAREHOUSE)
 
 
-@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse", "fips_tables"])
+@dg.asset(group_name="data_warehouse", deps=["fips_tables"])
 def pudl_tables(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """Pull tables from pudl sqlite database."""
     raw_pudl_tables = dbcp.extract.pudl_data.extract()
@@ -82,7 +72,7 @@ def pudl_tables(duckdb: DuckDBResource) -> dg.MaterializeResult:
     )
 
 
-@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse", "fips_tables"])
+@dg.asset(group_name="data_warehouse", deps=["fips_tables"])
 def ncsl_state_permitting(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """NCSL State Permitting for Wind ETL."""
     file_paths = load_yml_file(DATA_DIR / "file_paths.yml")
@@ -95,7 +85,7 @@ def ncsl_state_permitting(duckdb: DuckDBResource) -> dg.MaterializeResult:
     return duckdb.write_tables(out, SchemaName.DATA_WAREHOUSE)
 
 
-@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse"])
+@dg.asset(group_name="data_warehouse")
 def fips_tables(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """Master state and county FIPS table ETL."""
     fips = dbcp.extract.fips_tables.extract_fips()
@@ -110,7 +100,7 @@ def fips_tables(duckdb: DuckDBResource) -> dg.MaterializeResult:
     return duckdb.write_tables(out, SchemaName.DATA_WAREHOUSE)
 
 
-@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse"])
+@dg.asset(group_name="data_warehouse")
 def justice40(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """ETL white house environmental justice dataset."""
     source_path = load_yml_file(DATA_DIR / "file_paths.yml")["justice40"].item()
@@ -119,7 +109,7 @@ def justice40(duckdb: DuckDBResource) -> dg.MaterializeResult:
     return duckdb.write_tables(out, SchemaName.DATA_WAREHOUSE)
 
 
-@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse", "fips_tables"])
+@dg.asset(group_name="data_warehouse", deps=["fips_tables"])
 def nrel_ordinances(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """ETL NREL state and local ordinances for wind and solar."""
     wind_source_path = load_yml_file(DATA_DIR / "file_paths.yml")[
@@ -143,7 +133,7 @@ def nrel_ordinances(duckdb: DuckDBResource) -> dg.MaterializeResult:
     return duckdb.write_tables(nrel_transformed_dfs, SchemaName.DATA_WAREHOUSE)
 
 
-@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse"])
+@dg.asset(group_name="data_warehouse")
 def protected_area_by_county(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """ETL the PAD-US intersection with TIGER county geometries."""
     source_path = load_yml_file(DATA_DIR / "file_paths.yml")[
@@ -154,7 +144,7 @@ def protected_area_by_county(duckdb: DuckDBResource) -> dg.MaterializeResult:
     return duckdb.write_tables(transformed, SchemaName.DATA_WAREHOUSE)
 
 
-@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse"])
+@dg.asset(group_name="data_warehouse")
 def energy_communities_by_county(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """ETL RMI's energy communities analysis."""
     source_path = load_yml_file(DATA_DIR / "file_paths.yml")[
@@ -165,7 +155,7 @@ def energy_communities_by_county(duckdb: DuckDBResource) -> dg.MaterializeResult
     return duckdb.write_tables(transformed, SchemaName.DATA_WAREHOUSE)
 
 
-@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse"])
+@dg.asset(group_name="data_warehouse")
 def epa_avert(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """ETL EPA AVERT avoided emissions data."""
     # https://github.com/USEPA/AVERT/blob/v4.1.0/utilities/data/county-fips.txt
@@ -184,7 +174,7 @@ def epa_avert(duckdb: DuckDBResource) -> dg.MaterializeResult:
     return duckdb.write_tables(transformed, SchemaName.DATA_WAREHOUSE)
 
 
-@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse", "fips_tables"])
+@dg.asset(group_name="data_warehouse", deps=["fips_tables"])
 def civis(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """ETL archived Civis county demographics and election results."""
     raw_dfs = extract_civis()
@@ -195,7 +185,7 @@ def civis(duckdb: DuckDBResource) -> dg.MaterializeResult:
     return duckdb.write_tables(transformed, SchemaName.DATA_WAREHOUSE)
 
 
-@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse"])
+@dg.asset(group_name="data_warehouse")
 def acp_projects(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """ETL ACP projects."""
     raw_dfs = dbcp.extract.acp_projects.extract()
@@ -203,7 +193,7 @@ def acp_projects(duckdb: DuckDBResource) -> dg.MaterializeResult:
     return duckdb.write_tables(transformed, SchemaName.DATA_WAREHOUSE)
 
 
-@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse"])
+@dg.asset(group_name="data_warehouse")
 def manual_ordinances(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """ETL manually maintained ordinances."""
     raw_dfs = dbcp.extract.manual_ordinances.extract()
@@ -211,7 +201,7 @@ def manual_ordinances(duckdb: DuckDBResource) -> dg.MaterializeResult:
     return duckdb.write_tables(transformed, SchemaName.DATA_WAREHOUSE)
 
 
-@dg.asset(group_name="data_warehouse", deps=["empty_data_warehouse", "fips_tables"])
+@dg.asset(group_name="data_warehouse", deps=["fips_tables"])
 def offshore_wind(duckdb: DuckDBResource) -> dg.MaterializeResult:
     """ETL manually curated offshore wind data."""
     # get the latest version of the offshore wind data from the candidate yaml file

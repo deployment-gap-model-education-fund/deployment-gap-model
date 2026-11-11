@@ -58,6 +58,10 @@ def etl(data_mart: bool, data_warehouse: bool, clear_cache: bool):
         GEOCODER_CACHES.clear_caches()
         SPATIAL_CACHE.clear()
 
+    # Reduce size of caches if necessary
+    GEOCODER_CACHES.reduce_cache_sizes()
+    SPATIAL_CACHE.reduce_size()
+
     if data_warehouse:
         defs.resolve_job_def("data_warehouse_job").execute_in_process()
     if data_mart:

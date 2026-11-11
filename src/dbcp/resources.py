@@ -23,13 +23,6 @@ class DuckDBResource(dg.ConfigurableResource):
         """Return a SQLAlchemy engine for the duckdb database."""
         return get_duckdb_engine()
 
-    def drop_all_tables(self, schema_name: SchemaName):
-        """Drop every table defined in a schema's metadata (if it exists)."""
-        engine = self.get_engine()
-        with engine.begin() as con:
-            con.execute(sa.text(f"CREATE SCHEMA IF NOT EXISTS {schema_name.value}"))
-        get_schema_sql_alchemy_metadata(schema_name).drop_all(engine)
-
     def write_tables(
         self, dfs: dict[str, pd.DataFrame], schema_name: SchemaName
     ) -> dg.MaterializeResult:
