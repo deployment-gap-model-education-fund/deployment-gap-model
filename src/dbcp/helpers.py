@@ -190,7 +190,7 @@ def get_postgres_engine(production: bool = False) -> sa.engine.Engine:
         password = os.environ["PROD_POSTGRES_PASSWORD"]
         host = os.environ["PROD_POSTGRES_HOST"]
         port = 5432
-    return sa.create_engine(f"postgresql://{user}:{password}@{host}:{port}/postgres")
+    return sa.create_engine(f"postgresql+psycopg2://{user}:{password}@{host}:{port}/postgres")
 
 
 def get_duckdb_engine() -> sa.engine.Engine:
