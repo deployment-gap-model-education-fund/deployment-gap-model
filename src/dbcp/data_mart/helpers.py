@@ -193,8 +193,8 @@ class CountyOpposition:
         return df
 
     def _get_manual_ordinances(self) -> pd.DataFrame:
-        df = pd.read_sql_table(
-            "airtable__manual_ordinances", self._engine, schema="data_warehouse"
+        df = pd.read_sql(
+            "SELECT * FROM data_warehouse.airtable__manual_ordinances", self._engine
         )
         return df
 
