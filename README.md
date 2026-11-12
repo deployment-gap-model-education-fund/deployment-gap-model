@@ -183,7 +183,9 @@ exist in the docs directory, but there are also auto-generated table level docs,
 keep the table level documentation in sync with schemas. The auto-generated portions use jinja
 templating to create markdown files for each table and the `zensical.toml` config file. The templates
 can be found in `src/dbcp/metadata/templates`, and the actual rendering is done with a CLI command
-`render-table-docs`. The auto-generated markdown files will be created in `docs/generated_table_docs`, and these are not checked in to
+`render-table-docs`. The auto-generated markdown files will be created in `docs/generated_table_docs`,
+and these are not checked in to the repo. There is a `makefile` target to which wraps this CLI command
+and should be used for building docs. See the [Local Builds](#local-builds) section below.
 
 ## Local Builds
 To build the docs and serve them to locally use:
