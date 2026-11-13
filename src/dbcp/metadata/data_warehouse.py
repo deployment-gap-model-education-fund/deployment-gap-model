@@ -1,5 +1,7 @@
 """SQL Alchemy metadata for the datawarehouse tables."""
 
+import inspect
+
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -24,31 +26,38 @@ class Base(DeclarativeBase):
 
 
 class AvertCapacityFactors(Base):
-    """EPA AVERT capacity factors and CO2 emission rates by AVERT region and resource type.
-
-    This table is used to estimate the CO2e emissions avoided by proposed renewable and storage projects. In the AVERT model, a new zero-emission generator is assumed to displace the output of the marginal fossil generator in its region, so avoided emissions depend on how much the new resource generates (its capacity factor) and how emissions-intensive the displaced generation is (the emissions factor).
-
-    ### Table Details
-
-    **Source:** EPA AVERT (AVoided Emissions and geneRation Tool) emission rates workbook
-
-    **Grain:** One row per AVERT region and resource type
-
-    **Purpose:** Convert proposed capacity (MW) into avoided CO2e emissions (tonnes per year) in the data mart.
-
-    ### Transformations
-
-    The ETL reads the capacity factor and CO2 emission rate tables from the AVERT workbook, drops the energy efficiency columns, and reshapes both tables to one row per region and resource type. Emission rates are converted from pounds to metric tonnes of CO2 per MWh.
-
-    `co2e_tonnes_per_year_per_mw` is derived as `tonnes_co2_per_mwh * capacity_factor * 8766` (average hours per year). AVERT does not cover Alaska or Hawaii, so they have no rows here.
-
-    ### Related Tables
-
-    - [`avert_county_region_assoc`](avert_county_region_assoc.md)
-    """
-
     __tablename__ = "avert_avoided_emissions_factors"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                EPA AVERT capacity factors and CO2 emission rates by AVERT region and resource type.
+
+                This table is used to estimate the CO2e emissions avoided by proposed renewable and storage projects. In the AVERT model, a new zero-emission generator is assumed to displace the output of the marginal fossil generator in its region, so avoided emissions depend on how much the new resource generates (its capacity factor) and how emissions-intensive the displaced generation is (the emissions factor).
+
+                ### Table Details
+
+                **Source:** EPA AVERT (AVoided Emissions and geneRation Tool) emission rates workbook
+
+                **Grain:** One row per AVERT region and resource type
+
+                **Purpose:** Convert proposed capacity (MW) into avoided CO2e emissions (tonnes per year) in the data mart.
+
+                ### Related Tables
+
+                - [`avert_county_region_assoc`](avert_county_region_assoc.md)
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The ETL reads the capacity factor and CO2 emission rate tables from the AVERT workbook, drops the energy efficiency columns, and reshapes both tables to one row per region and resource type. Emission rates are converted from pounds to metric tonnes of CO2 per MWh.
+
+                `co2e_tonnes_per_year_per_mw` is derived as `tonnes_co2_per_mwh * capacity_factor * 8766` (average hours per year). AVERT does not cover Alaska or Hawaii, so they have no rows here.
+                """
+            ),
+        },
+    }
 
     avert_region: Mapped[str] = mapped_column(
         String, primary_key=True, doc="Name of the EPA AVERT region."
@@ -73,26 +82,33 @@ class AvertCapacityFactors(Base):
 
 
 class AvertCountyRegionAssoc(Base):
-    """Crosswalk assigning each county to an EPA AVERT region.
-
-    AVERT region boundaries do not follow county or state lines, so this lookup table is used to attach the regional avoided-emissions factors from `avert_avoided_emissions_factors` to county-level data.
-
-    ### Table Details
-
-    **Source:** EPA AVERT county-to-region crosswalk
-
-    **Grain:** One row per county (each county belongs to a single AVERT region)
-
-    **Purpose:** Join county-level project capacity to regional AVERT emissions factors.
-
-    ### Related Tables
-
-    - [`avert_avoided_emissions_factors`](avert_avoided_emissions_factors.md)
-    - [`census__county_fips`](census__county_fips.md)
-    """
-
     __tablename__ = "avert_county_region_assoc"
-    __table_args__ = {"schema": schema, "info": {"sources": ["avert"]}}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Crosswalk assigning each county to an EPA AVERT region.
+
+                AVERT region boundaries do not follow county or state lines, so this lookup table is used to attach the regional avoided-emissions factors from `avert_avoided_emissions_factors` to county-level data.
+
+                ### Table Details
+
+                **Source:** EPA AVERT county-to-region crosswalk
+
+                **Grain:** One row per county (each county belongs to a single AVERT region)
+
+                **Purpose:** Join county-level project capacity to regional AVERT emissions factors.
+
+                ### Related Tables
+
+                - [`avert_avoided_emissions_factors`](avert_avoided_emissions_factors.md)
+                - [`census__county_fips`](census__county_fips.md)
+                """
+            ),
+            "sources": ["avert"],
+        },
+    }
 
     avert_region: Mapped[str] = mapped_column(
         String,
@@ -105,29 +121,36 @@ class AvertCountyRegionAssoc(Base):
 
 
 class CensusCountyFips(Base):
-    """Reference table provides county-equivalent FIPS records used throughout the warehouse and data mart. It is sourced from Census data. County FIPS codes are five digits and can have leading zeroes.
-
-    ### Table Details
-
-    **Source:** Census FIPS reference tables
-
-    **Grain:** One row per county-equivalent geography
-
-    **Purpose:** Canonical county FIPS, names, centroid fields, land/water area, and tribal land share.
-
-    ### Transformations
-
-    The ETL renames Census shapefile fields into warehouse-friendly names, converts land and water area from square meters to square kilometers, and casts centroid coordinates into numeric columns.
-
-    It also calculates `raw_tribal_land_frac` and `tribal_land_frac` by spatially intersecting county geometries with Census tribal land geometries. `tribal_land_frac` is capped at 1.0 and rounded to two decimal places.
-
-    ### Related Tables
-
-    - [`census__state_fips`](census__state_fips.md)
-    """
-
     __tablename__ = "census__county_fips"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Reference table provides county-equivalent FIPS records used throughout the warehouse and data mart. It is sourced from Census data. County FIPS codes are five digits and can have leading zeroes.
+
+                ### Table Details
+
+                **Source:** Census FIPS reference tables
+
+                **Grain:** One row per county-equivalent geography
+
+                **Purpose:** Canonical county FIPS, names, centroid fields, land/water area, and tribal land share.
+
+                ### Related Tables
+
+                - [`census__state_fips`](census__state_fips.md)
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The ETL renames Census shapefile fields into warehouse-friendly names, converts land and water area from square meters to square kilometers, and casts centroid coordinates into numeric columns.
+
+                It also calculates `raw_tribal_land_frac` and `tribal_land_frac` by spatially intersecting county geometries with Census tribal land geometries. `tribal_land_frac` is capped at 1.0 and rounded to two decimal places.
+                """
+            ),
+        },
+    }
 
     county_id_fips: Mapped[str] = mapped_column(
         String,
@@ -184,27 +207,34 @@ class CensusCountyFips(Base):
 
 
 class CensusStateFips(Base):
-    """Reference table provides state and territory FIPS records used throughout the warehouse and data mart. State FIPS codes are two digits and can have leading zeroes.
-
-    ### Table Details
-
-    **Source:** Census FIPS reference tables
-
-    **Grain:** One row per state or territory
-
-    **Purpose:** Canonical state FIPS, names, and abbreviations.
-
-    ### Transformations
-
-    The ETL deduplicates state records by FIPS code, keeping the shortest available state name when multiple names exist for the same code. It then renames the source fields to `state_id_fips`, `state_name`, and `state_abbrev`.
-
-    ### Related Tables
-
-    - [`census__county_fips`](census__county_fips.md)
-    """
-
     __tablename__ = "census__state_fips"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Reference table provides state and territory FIPS records used throughout the warehouse and data mart. State FIPS codes are two digits and can have leading zeroes.
+
+                ### Table Details
+
+                **Source:** Census FIPS reference tables
+
+                **Grain:** One row per state or territory
+
+                **Purpose:** Canonical state FIPS, names, and abbreviations.
+
+                ### Related Tables
+
+                - [`census__county_fips`](census__county_fips.md)
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The ETL deduplicates state records by FIPS code, keeping the shortest available state name when multiple names exist for the same code. It then renames the source fields to `state_id_fips`, `state_name`, and `state_abbrev`.
+                """
+            ),
+        },
+    }
 
     state_id_fips: Mapped[str] = mapped_column(
         String,
@@ -223,29 +253,36 @@ class CensusStateFips(Base):
 
 
 class CivisCountiesElectionResults(Base):
-    """County-level election results and demographic composition from Civis Analytics data (distributed through LJEDF).
-
-    Each row is a county or county-equivalent in the 50 states and DC (territories are excluded). The table combines archived Civis demographic and 2020 Biden vote share estimates with 2024 presidential results from which the Harris vote share is calculated.
-
-    ### Table Details
-
-    **Source:** Civis county demographics and 2024 presidential results (archived in GCS)
-
-    **Grain:** One row per county
-
-    **Purpose:** County-level political and demographic context for prioritizing and analyzing counties.
-
-    ### Transformations
-
-    The ETL standardizes the Civis column names, zero-pads county FIPS codes to five digits, and left-joins the demographics and 2024 results onto the `census__county_fips` county list (excluding territories). `harris_2024_pct` is the Harris vote total divided by the total vote, rounded to two decimals. A single out-of-range `projected_dems_pct` value (172.8) in the source is set to null. All percentage columns are validated to be between 0 and 100.
-
-    ### Related Tables
-
-    - [`census__county_fips`](census__county_fips.md)
-    """
-
     __tablename__ = "civis__counties__election_results"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                County-level election results and demographic composition from Civis Analytics data (distributed through LJEDF).
+
+                Each row is a county or county-equivalent in the 50 states and DC (territories are excluded). The table combines archived Civis demographic and 2020 Biden vote share estimates with 2024 presidential results from which the Harris vote share is calculated.
+
+                ### Table Details
+
+                **Source:** Civis county demographics and 2024 presidential results (archived in GCS)
+
+                **Grain:** One row per county
+
+                **Purpose:** County-level political and demographic context for prioritizing and analyzing counties.
+
+                ### Related Tables
+
+                - [`census__county_fips`](census__county_fips.md)
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The ETL standardizes the Civis column names, zero-pads county FIPS codes to five digits, and left-joins the demographics and 2024 results onto the `census__county_fips` county list (excluding territories). `harris_2024_pct` is the Harris vote total divided by the total vote, rounded to two decimals. A single out-of-range `projected_dems_pct` value (172.8) in the source is set to null. All percentage columns are validated to be between 0 and 100.
+                """
+            ),
+        },
+    }
 
     county_id_fips: Mapped[str] = mapped_column(
         String,
@@ -321,33 +358,40 @@ class CivisCountiesElectionResults(Base):
 
 
 class EipProjects(Base):
-    """Fossil infrastructure projects from the Environmental Integrity Project (EIP) Oil & Gas Watch inventory.
-
-    A project is a proposed or recent construction, expansion, conversion, or restart of oil, gas, LNG, fertilizer, petrochemical, or plastics infrastructure at a facility. The Environmental Integrity Project (EIP) tracks proposed and existing oil, gas, and petrochemical infrastructure through its public Oil & Gas Watch inventory (oilandgaswatch.org). EIP data is retrieved from their API as separate files for facilities, projects, and air construction permits, plus two files that link them together. This is the most complete version of the EIP project data: it includes projects that are already operating, under construction, or cancelled. The `fossil_infrastructure_projects` data mart table is built from this table but keeps only forward-looking projects.
-
-    ### Table Details
-
-    **Source:** Environmental Integrity Project (EIP), Oil & Gas Watch
-
-    **Grain:** One row per EIP project
-
-    **Purpose:** Project description, status, cost, potential emissions, wetlands impacts, and editorial metadata.
-
-    ### Transformations
-
-    Column names are converted to snake_case and the JSON `xata` metadata column is expanded. Columns that require further cleaning keep a `raw_` prefix. Emission columns are in tons per year (`tpy`) and are potential-to-emit estimates reported to regulators, which assume 100% facility utilization. `is_ccs` is derived from the industry sector (true for carbon capture, utilization and storage sectors). One project cost that was off by a factor of ten (listed as $92 billion rather than $9.2 billion) is manually corrected. `operating_status` and `industry_sector` are cleaned versions of their `raw_` counterparts.
-
-    ### Related Tables
-
-    - [`eip_facilities`](eip_facilities.md)
-    - [`eip_facility_project_association`](eip_facility_project_association.md)
-    - [`eip_air_constr_permits`](eip_air_constr_permits.md)
-    - [`eip_project_permit_association`](eip_project_permit_association.md)
-    - [`fossil_infrastructure_projects`](../data_mart/fossil_infrastructure_projects.md)
-    """
-
     __tablename__ = "eip_projects"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Fossil infrastructure projects from the Environmental Integrity Project (EIP) Oil & Gas Watch inventory.
+
+                A project is a proposed or recent construction, expansion, conversion, or restart of oil, gas, LNG, fertilizer, petrochemical, or plastics infrastructure at a facility. The Environmental Integrity Project (EIP) tracks proposed and existing oil, gas, and petrochemical infrastructure through its public Oil & Gas Watch inventory (oilandgaswatch.org). EIP data is retrieved from their API as separate files for facilities, projects, and air construction permits, plus two files that link them together. This is the most complete version of the EIP project data: it includes projects that are already operating, under construction, or cancelled. The `fossil_infrastructure_projects` data mart table is built from this table but keeps only forward-looking projects.
+
+                ### Table Details
+
+                **Source:** Environmental Integrity Project (EIP), Oil & Gas Watch
+
+                **Grain:** One row per EIP project
+
+                **Purpose:** Project description, status, cost, potential emissions, wetlands impacts, and editorial metadata.
+
+                ### Related Tables
+
+                - [`eip_facilities`](eip_facilities.md)
+                - [`eip_facility_project_association`](eip_facility_project_association.md)
+                - [`eip_air_constr_permits`](eip_air_constr_permits.md)
+                - [`eip_project_permit_association`](eip_project_permit_association.md)
+                - [`fossil_infrastructure_projects`](../data_mart/fossil_infrastructure_projects.md)
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                Column names are converted to snake_case and the JSON `xata` metadata column is expanded. Columns that require further cleaning keep a `raw_` prefix. Emission columns are in tons per year (`tpy`) and are potential-to-emit estimates reported to regulators, which assume 100% facility utilization. `is_ccs` is derived from the industry sector (true for carbon capture, utilization and storage sectors). One project cost that was off by a factor of ten (listed as $92 billion rather than $9.2 billion) is manually corrected. `operating_status` and `industry_sector` are cleaned versions of their `raw_` counterparts.
+                """
+            ),
+        },
+    }
 
     project_id: Mapped[str] = mapped_column(
         String, primary_key=True, doc="Unique project identifier."
@@ -531,32 +575,39 @@ class EipProjects(Base):
 
 
 class EipFacilities(Base):
-    """Facilities (sites) tracked by the Environmental Integrity Project (EIP) Oil & Gas Watch inventory.
-
-    A facility is a physical site such as a refinery, gas processing plant, or compressor station, which can be associated with one or more projects. The Environmental Integrity Project (EIP) tracks proposed and existing oil, gas, and petrochemical infrastructure through its public Oil & Gas Watch inventory (oilandgaswatch.org). EIP data is retrieved from their API as separate files for facilities, projects, and air construction permits, plus two files that link them together. Each facility record includes location data, nearby demographics and health risk screening metrics from EPA's EJScreen, and identifiers for linking to EPA datasets.
-
-    ### Table Details
-
-    **Source:** Environmental Integrity Project (EIP), Oil & Gas Watch
-
-    **Grain:** One row per published EIP facility
-
-    **Purpose:** Facility identity, location, EJScreen demographic and risk context, and geocoded county/state FIPS.
-
-    ### Transformations
-
-    Column names are converted to snake_case and the JSON `xata` metadata column is expanded. Columns that require further cleaning keep a `raw_` prefix. Facilities that EIP has not published (a small number added in error) are removed. County and state FIPS codes are added by geocoding the raw state, city and county fields (with backup geocoding), so `state_id_fips`, `county_id_fips` and the `geocoded_*` columns are not from EIP.
-
-    ### Related Tables
-
-    - [`eip_projects`](eip_projects.md)
-    - [`eip_facility_project_association`](eip_facility_project_association.md)
-    - [`census__county_fips`](census__county_fips.md)
-    - [`census__state_fips`](census__state_fips.md)
-    """
-
     __tablename__ = "eip_facilities"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Facilities (sites) tracked by the Environmental Integrity Project (EIP) Oil & Gas Watch inventory.
+
+                A facility is a physical site such as a refinery, gas processing plant, or compressor station, which can be associated with one or more projects. The Environmental Integrity Project (EIP) tracks proposed and existing oil, gas, and petrochemical infrastructure through its public Oil & Gas Watch inventory (oilandgaswatch.org). EIP data is retrieved from their API as separate files for facilities, projects, and air construction permits, plus two files that link them together. Each facility record includes location data, nearby demographics and health risk screening metrics from EPA's EJScreen, and identifiers for linking to EPA datasets.
+
+                ### Table Details
+
+                **Source:** Environmental Integrity Project (EIP), Oil & Gas Watch
+
+                **Grain:** One row per published EIP facility
+
+                **Purpose:** Facility identity, location, EJScreen demographic and risk context, and geocoded county/state FIPS.
+
+                ### Related Tables
+
+                - [`eip_projects`](eip_projects.md)
+                - [`eip_facility_project_association`](eip_facility_project_association.md)
+                - [`census__county_fips`](census__county_fips.md)
+                - [`census__state_fips`](census__state_fips.md)
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                Column names are converted to snake_case and the JSON `xata` metadata column is expanded. Columns that require further cleaning keep a `raw_` prefix. Facilities that EIP has not published (a small number added in error) are removed. County and state FIPS codes are added by geocoding the raw state, city and county fields (with backup geocoding), so `state_id_fips`, `county_id_fips` and the `geocoded_*` columns are not from EIP.
+                """
+            ),
+        },
+    }
 
     facility_id: Mapped[str] = mapped_column(
         String, primary_key=True, doc="Unique facility identifier."
@@ -804,26 +855,32 @@ class EipFacilities(Base):
 
 
 class EipFacilityProjectAssociation(Base):
-    """Association table linking Environmental Integrity Project (EIP) facilities to EIP projects.
-
-    The relationship is many-to-many in principle: a project can affect several facilities and a facility can have several projects (though about 99% of projects involve a single facility).
-
-    ### Table Details
-
-    **Source:** Environmental Integrity Project (EIP), Oil & Gas Watch
-
-    **Grain:** One row per facility-project link
-
-    **Purpose:** Many-to-many bridge between `eip_facilities` and `eip_projects`.
-
-    ### Related Tables
-
-    - [`eip_facilities`](eip_facilities.md)
-    - [`eip_projects`](eip_projects.md)
-    """
-
     __tablename__ = "eip_facility_project_association"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Association table linking Environmental Integrity Project (EIP) facilities to EIP projects.
+
+                The relationship is many-to-many in principle: a project can affect several facilities and a facility can have several projects (though about 99% of projects involve a single facility).
+
+                ### Table Details
+
+                **Source:** Environmental Integrity Project (EIP), Oil & Gas Watch
+
+                **Grain:** One row per facility-project link
+
+                **Purpose:** Many-to-many bridge between `eip_facilities` and `eip_projects`.
+
+                ### Related Tables
+
+                - [`eip_facilities`](eip_facilities.md)
+                - [`eip_projects`](eip_projects.md)
+                """
+            ),
+        },
+    }
 
     facility_id: Mapped[str | None] = mapped_column(
         String,
@@ -866,30 +923,37 @@ class EipFacilityProjectAssociation(Base):
 
 
 class EipAirConstrPermits(Base):
-    """Clean Air Act air construction permits tracked by the Environmental Integrity Project (EIP) for fossil infrastructure projects.
-
-    The Environmental Integrity Project (EIP) tracks proposed and existing oil, gas, and petrochemical infrastructure through its public Oil & Gas Watch inventory (oilandgaswatch.org). EIP data is retrieved from their API as separate files for facilities, projects, and air construction permits, plus two files that link them together. Each row is one air construction permit, with its application, issuance and comment dates, status, description, and links to permit documents.
-
-    ### Table Details
-
-    **Source:** Environmental Integrity Project (EIP), Oil & Gas Watch
-
-    **Grain:** One row per air construction permit
-
-    **Purpose:** Permit status, key dates, and descriptive text for permits related to EIP projects.
-
-    ### Transformations
-
-    Column names are converted to snake_case and the JSON `xata` metadata column is expanded. Columns that require further cleaning keep a `raw_` prefix.
-
-    ### Related Tables
-
-    - [`eip_projects`](eip_projects.md)
-    - [`eip_project_permit_association`](eip_project_permit_association.md)
-    """
-
     __tablename__ = "eip_air_constr_permits"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Clean Air Act air construction permits tracked by the Environmental Integrity Project (EIP) for fossil infrastructure projects.
+
+                The Environmental Integrity Project (EIP) tracks proposed and existing oil, gas, and petrochemical infrastructure through its public Oil & Gas Watch inventory (oilandgaswatch.org). EIP data is retrieved from their API as separate files for facilities, projects, and air construction permits, plus two files that link them together. Each row is one air construction permit, with its application, issuance and comment dates, status, description, and links to permit documents.
+
+                ### Table Details
+
+                **Source:** Environmental Integrity Project (EIP), Oil & Gas Watch
+
+                **Grain:** One row per air construction permit
+
+                **Purpose:** Permit status, key dates, and descriptive text for permits related to EIP projects.
+
+                ### Related Tables
+
+                - [`eip_projects`](eip_projects.md)
+                - [`eip_project_permit_association`](eip_project_permit_association.md)
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                Column names are converted to snake_case and the JSON `xata` metadata column is expanded. Columns that require further cleaning keep a `raw_` prefix.
+                """
+            ),
+        },
+    }
 
     air_construction_id: Mapped[str] = mapped_column(
         String,
@@ -988,26 +1052,37 @@ class EipAirConstrPermits(Base):
 
 
 class EipProjectPermitAssociation(Base):
-    """Association table linking Environmental Integrity Project (EIP) projects to their air construction permits.
-
-    The relationship is many-to-many: a project can have multiple permits and a permit can cover multiple projects. The `fossil_infrastructure_projects` data mart table simplifies this by keeping only one permit per project; use this table for the full relationships.
-
-    ### Table Details
-
-    **Source:** Environmental Integrity Project (EIP), Oil & Gas Watch
-
-    **Grain:** One row per project-permit link
-
-    **Purpose:** Many-to-many bridge between `eip_projects` and `eip_air_constr_permits`.
-
-    ### Related Tables
-
-    - [`eip_projects`](eip_projects.md)
-    - [`eip_air_constr_permits`](eip_air_constr_permits.md)
-    """
-
     __tablename__ = "eip_project_permit_association"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Association table linking Environmental Integrity Project (EIP) projects to their air construction permits.
+
+                The relationship is many-to-many: a project can have multiple permits and a permit can cover multiple projects.
+
+                ### Table Details
+
+                **Source:** Environmental Integrity Project (EIP), Oil & Gas Watch
+
+                **Grain:** One row per project-permit link
+
+                **Purpose:** Many-to-many bridge between `eip_projects` and `eip_air_constr_permits`.
+
+                ### Related Tables
+
+                - [`eip_projects`](eip_projects.md)
+                - [`eip_air_constr_permits`](eip_air_constr_permits.md)
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The project-permit relationship is many-to-many, but the `fossil_infrastructure_projects` data mart table simplifies it by keeping only one permit per project. Use this table for the full relationships.
+                """
+            ),
+        },
+    }
 
     air_construction_id: Mapped[str | None] = mapped_column(
         String,
@@ -1050,31 +1125,38 @@ class EipProjectPermitAssociation(Base):
 
 
 class ColumbiaReldiLocalOppositionLocalOrdinance(Base):
-    """Table contains local ordinance records from Columbia's Renewable Energy Legal Defense Initiative (RELDI) opposition-to-renewables source.
-
-    ### Table Details
-
-    **Source:** Columbia RELDI local opposition
-
-    **Grain:** One row per local ordinance entry
-
-    **Purpose:** Local ordinance text, energy type, year fields, and county/state enrichment.
-
-    ### Transformations
-
-    The ETL strips whitespace from text fields, applies a small set of manual locality name corrections, removes locality prefixes that make geocoding less reliable, and adds county/state FIPS codes with backup geocoding.
-
-    It also extracts year-like values from the ordinance text and summarizes them into `earliest_year_mentioned`, `latest_year_mentioned`, and `n_years_mentioned`. These fields are helpful context, but they should not always be interpreted as enacted-year fields.
-
-    ### Related Tables
-
-    - [`columbia_reldi_local_opposition__state_policy`](columbia_reldi_local_opposition__state_policy.md)
-    - [`census__county_fips`](census__county_fips.md)
-    - [`census__state_fips`](census__state_fips.md)
-    """
-
     __tablename__ = "columbia_reldi_local_opposition__local_ordinance"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Table contains local ordinance records from Columbia's Renewable Energy Legal Defense Initiative (RELDI) opposition-to-renewables source.
+
+                ### Table Details
+
+                **Source:** Columbia RELDI local opposition
+
+                **Grain:** One row per local ordinance entry
+
+                **Purpose:** Local ordinance text, energy type, year fields, and county/state enrichment.
+
+                ### Related Tables
+
+                - [`columbia_reldi_local_opposition__state_policy`](columbia_reldi_local_opposition__state_policy.md)
+                - [`census__county_fips`](census__county_fips.md)
+                - [`census__state_fips`](census__state_fips.md)
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The ETL strips whitespace from text fields, applies a small set of manual locality name corrections, removes locality prefixes that make geocoding less reliable, and adds county/state FIPS codes with backup geocoding.
+
+                It also extracts year-like values from the ordinance text and summarizes them into `earliest_year_mentioned`, `latest_year_mentioned`, and `n_years_mentioned`. These fields are helpful context, but they should not always be interpreted as enacted-year fields.
+                """
+            ),
+        },
+    }
 
     id: Mapped[int] = mapped_column(
         Integer, primary_key=True, doc="Auto-generated surrogate row identifier."
@@ -1137,30 +1219,37 @@ class ColumbiaReldiLocalOppositionLocalOrdinance(Base):
 
 
 class ColumbiaReldiLocalOppositionStatePolicy(Base):
-    """Table contains state-level policy records from Columbia's Renewable Energy Legal Defense Initiative (RELDI) opposition-to-renewables source.
-
-    ### Table Details
-
-    **Source:** Columbia RELDI local opposition
-
-    **Grain:** One row per state policy entry
-
-    **Purpose:** State-level policy text with state FIPS and extracted year-summary fields.
-
-    ### Transformations
-
-    The ETL adds state FIPS codes to the raw state policy records and renames the source state column to `raw_state_name`.
-
-    It also extracts year-like values from the policy text and summarizes them into `earliest_year_mentioned`, `latest_year_mentioned`, and `n_years_mentioned`. These fields are intended to summarize the source text, not to guarantee a formal enacted year.
-
-    ### Related Tables
-
-    - [`columbia_reldi_local_opposition__local_ordinance`](columbia_reldi_local_opposition__local_ordinance.md)
-    - [`census__state_fips`](census__state_fips.md)
-    """
-
     __tablename__ = "columbia_reldi_local_opposition__state_policy"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Table contains state-level policy records from Columbia's Renewable Energy Legal Defense Initiative (RELDI) opposition-to-renewables source.
+
+                ### Table Details
+
+                **Source:** Columbia RELDI local opposition
+
+                **Grain:** One row per state policy entry
+
+                **Purpose:** State-level policy text with state FIPS and extracted year-summary fields.
+
+                ### Related Tables
+
+                - [`columbia_reldi_local_opposition__local_ordinance`](columbia_reldi_local_opposition__local_ordinance.md)
+                - [`census__state_fips`](census__state_fips.md)
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The ETL adds state FIPS codes to the raw state policy records and renames the source state column to `raw_state_name`.
+
+                It also extracts year-like values from the policy text and summarizes them into `earliest_year_mentioned`, `latest_year_mentioned`, and `n_years_mentioned`. These fields are intended to summarize the source text, not to guarantee a formal enacted year.
+                """
+            ),
+        },
+    }
 
     id: Mapped[int] = mapped_column(
         Integer, primary_key=True, doc="Auto-generated surrogate row identifier."
@@ -1200,29 +1289,36 @@ class ColumbiaReldiLocalOppositionStatePolicy(Base):
 
 
 class NcslStatePermitting(Base):
-    """Table summarizes whether wind siting and permitting authority is primarily state, local, or hybrid.
-
-    ### Table Details
-
-    **Source:** NCSL state permitting
-
-    **Grain:** One row per state
-
-    **Purpose:** State-level permitting authority classification and supporting description/link.
-
-    ### Transformations
-
-    The ETL standardizes null-like permitting values, normalizes the District of Columbia state name, applies a manual correction for Mississippi's permitting classification, casts fields to consistent string/categorical dtypes, and adds `state_id_fips`.
-
-    The transform validates that state names and permitting-type categories are within expected sets.
-
-    ### Related Tables
-
-    - [`census__state_fips`](census__state_fips.md)
-    """
-
     __tablename__ = "ncsl__state_permitting"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Table summarizes whether wind siting and permitting authority is primarily state, local, or hybrid.
+
+                ### Table Details
+
+                **Source:** NCSL state permitting
+
+                **Grain:** One row per state
+
+                **Purpose:** State-level permitting authority classification and supporting description/link.
+
+                ### Related Tables
+
+                - [`census__state_fips`](census__state_fips.md)
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The ETL standardizes null-like permitting values, normalizes the District of Columbia state name, applies a manual correction for Mississippi's permitting classification, casts fields to consistent string/categorical dtypes, and adds `state_id_fips`.
+
+                The transform validates that state names and permitting-type categories are within expected sets.
+                """
+            ),
+        },
+    }
 
     state_id_fips: Mapped[str] = mapped_column(
         String,
@@ -1251,32 +1347,39 @@ class NcslStatePermitting(Base):
 
 
 class Eia860mChangelogGenerators(Base):
-    """Table contains change-log style EIA 860M generator data sourced from Catalyst Cooperative's PUDL resources. This table is not intended for analysis and is largely just a building block for other EIA data warehouse tables (indicated by the leading underscore in the name.) Derived from [this PUDL table](https://docs.catalyst.coop/pudl/en/latest/data_dictionaries/pudl_db.html#core-eia860m-changelog-generators), this table is a changelog of monthly reported generator data. There is a record corresponding to the first instance of a generator and associated characteristics with a report_date column and a valid_until_date column. Whenever any of the reported EIA-860M data was changed for a record, there will be a new changelog record with a new report_date.
-
-    ### Table Details
-
-    **Source:** PUDL / EIA 860M
-
-    **Grain:** One row per generator snapshot change
-
-    **Purpose:** Historical generator changes across report dates, with validity dates and standardized status fields.
-
-    **Additional Details:** EIA-860M includes generator tables with the most up-to-date catalog of EIA generators and their operational status and other generator characteristics. EIA-860M is reported monthly, although for the vast majority of the generators nothing changes month-to-month.
-
-    ### Transformations
-
-    The ETL converts date-like columns to datetimes, renames selected raw fields, and adds state/county FIPS IDs from the raw state and county values.
-
-    It preserves the original EIA operational status code in `raw_operational_status_code`, maps the status code to Madrone's numeric status scale in `operational_status_code`, and imputes missing ISO/balancing-authority values for some records when the latest county-level data has exactly one non-null balancing authority code.
-
-    ### Related Tables
-
-    - `eia860m__annual__generators`
-    - [`eia860m__operational_status_codes`](eia860m__operational_status_codes.md)
-    """
-
     __tablename__ = "_eia860m__changelog__generators"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Table contains change-log style EIA 860M generator data sourced from Catalyst Cooperative's PUDL resources. This table is not intended for analysis and is largely just a building block for other EIA data warehouse tables (indicated by the leading underscore in the name.) Derived from [this PUDL table](https://docs.catalyst.coop/pudl/en/latest/data_dictionaries/pudl_db.html#core-eia860m-changelog-generators), this table is a changelog of monthly reported generator data. There is a record corresponding to the first instance of a generator and associated characteristics with a report_date column and a valid_until_date column. Whenever any of the reported EIA-860M data was changed for a record, there will be a new changelog record with a new report_date.
+
+                ### Table Details
+
+                **Source:** PUDL / EIA 860M
+
+                **Grain:** One row per generator snapshot change
+
+                **Purpose:** Historical generator changes across report dates, with validity dates and standardized status fields.
+
+                **Additional Details:** EIA-860M includes generator tables with the most up-to-date catalog of EIA generators and their operational status and other generator characteristics. EIA-860M is reported monthly, although for the vast majority of the generators nothing changes month-to-month.
+
+                ### Related Tables
+
+                - `eia860m__annual__generators`
+                - [`eia860m__operational_status_codes`](eia860m__operational_status_codes.md)
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The ETL converts date-like columns to datetimes, renames selected raw fields, and adds state/county FIPS IDs from the raw state and county values.
+
+                It preserves the original EIA operational status code in `raw_operational_status_code`, maps the status code to Madrone's numeric status scale in `operational_status_code`, and imputes missing ISO/balancing-authority values for some records when the latest county-level data has exactly one non-null balancing authority code.
+                """
+            ),
+        },
+    }
 
     report_date: Mapped["DateTime"] = mapped_column(
         DateTime,
@@ -1416,47 +1519,54 @@ class Eia860mChangelogGenerators(Base):
 
 
 class Eia860mOperationalStatusCodes(Base):
-    """Table maps raw EIA 860M operational status codes to Madrone's internal numeric status scale and status descriptions.
-
-    ### Table Details
-
-    **Source:** PUDL / EIA 860M
-
-    **Grain:** One row per operational status code
-
-    **Purpose:** Lookup table for raw EIA operational status codes, Madrone status values, and descriptions used in downstream EIA 860M warehouse and data mart tables.
-
-    ### Transformations
-
-    The ETL starts with PUDL's operational status code descriptions and joins them to Madrone's numeric status scale. The resulting `status` value orders proposed, under-construction, operating, retired, canceled, and other statuses for downstream status comparisons.
-
-    The transform also adds `summarized_status_description`, which groups raw EIA code descriptions by the internal Madrone status value.
-
-    ### Madrone Status Scale
-
-    |Status|Meaning|
-    |----|----|
-    |`1`|Planned for installation, regulatory approvals not initiated, and not under construction|
-    |`2`|Regulatory approvals pending; not under construction but site preparation could be underway|
-    |`3`|Regulatory approvals received; not under construction but site preparation could be underway|
-    |`4`|Under construction, less than or equal to 50 percent complete|
-    |`5`|Under construction, more than 50 percent complete|
-    |`6`|Construction complete, but not yet in commercial operation|
-    |`7`|Operational|
-    |`8`|Retired|
-    |`98`|Canceled, indefinitely postponed, or no longer in a resource plan|
-    |`99`|Other or unknown|
-
-    ### Related Tables
-
-    - [`_eia860m__changelog__generators`](_eia860m__changelog__generators.md)
-    - [`eia860m__latest__generators`](../data_mart/eia860m__latest__generators.md)
-    - [`eia860m__monthly__generators`](../data_mart/eia860m__monthly__generators.md)
-    - [`eia860m__generators_operational_status_transition_dates`](../data_mart/eia860m__generators_operational_status_transition_dates.md)
-    """
-
     __tablename__ = "eia860m__operational_status_codes"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Table maps raw EIA 860M operational status codes to Madrone's internal numeric status scale and status descriptions.
+
+                ### Table Details
+
+                **Source:** PUDL / EIA 860M
+
+                **Grain:** One row per operational status code
+
+                **Purpose:** Lookup table for raw EIA operational status codes, Madrone status values, and descriptions used in downstream EIA 860M warehouse and data mart tables.
+
+                ### Madrone Status Scale
+
+                |Status|Meaning|
+                |----|----|
+                |`1`|Planned for installation, regulatory approvals not initiated, and not under construction|
+                |`2`|Regulatory approvals pending; not under construction but site preparation could be underway|
+                |`3`|Regulatory approvals received; not under construction but site preparation could be underway|
+                |`4`|Under construction, less than or equal to 50 percent complete|
+                |`5`|Under construction, more than 50 percent complete|
+                |`6`|Construction complete, but not yet in commercial operation|
+                |`7`|Operational|
+                |`8`|Retired|
+                |`98`|Canceled, indefinitely postponed, or no longer in a resource plan|
+                |`99`|Other or unknown|
+
+                ### Related Tables
+
+                - [`_eia860m__changelog__generators`](_eia860m__changelog__generators.md)
+                - [`eia860m__latest__generators`](../data_mart/eia860m__latest__generators.md)
+                - [`eia860m__monthly__generators`](../data_mart/eia860m__monthly__generators.md)
+                - [`eia860m__generators_operational_status_transition_dates`](../data_mart/eia860m__generators_operational_status_transition_dates.md)
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The ETL starts with PUDL's operational status code descriptions and joins them to Madrone's numeric status scale. The resulting `status` value orders proposed, under-construction, operating, retired, canceled, and other statuses for downstream status comparisons.
+
+                The transform also adds `summarized_status_description`, which groups raw EIA code descriptions by the internal Madrone status value.
+                """
+            ),
+        },
+    }
 
     code: Mapped[str] = mapped_column(
         String,
@@ -1477,26 +1587,32 @@ class Eia860mOperationalStatusCodes(Base):
 
 
 class Justice40Tracts(Base):
-    """Census tract indicators from the Climate and Economic Justice Screening Tool (CEJST), which derives from the Justice40 initiative of the Biden Administration.
-
-    For every census tract the CEJST reports demographics, socioeconomic indicators, environmental and climate burdens, and whether the tract is designated "disadvantaged". A tract is considered disadvantaged if it meets the threshold for at least one category of burden (the indicator exceeds the 90th percentile AND the tract also meets the low income criterion, i.e. exceeds the 65th percentile for households at or below 200% of the federal poverty level), or if it is on land within the boundaries of a Federally Recognized Tribe. Many columns come in triplets: an indicator value, its national percentile, and a flag for whether the tract exceeds the threshold while also being low income (`*_is_low_income`).
-
-    ### Table Details
-
-    **Source:** Climate and Economic Justice Screening Tool (CEJST) / Justice40
-
-    **Grain:** One row per census tract
-
-    **Purpose:** Tract-level environmental justice screening data. This table is aggregated to the county level in the data mart (the `n_tracts_*`, `total_tracts`, `n_distinct_qualifying_tracts`, and `justice40_dbcp_index` columns of `counties_wide_format` and `counties_long_format`).
-
-    ### Related Tables
-
-    - [`counties_wide_format`](../data_mart/counties_wide_format.md)
-    - [`counties_long_format`](../data_mart/counties_long_format.md)
-    """
-
     __tablename__ = "justice40_tracts"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Census tract indicators from the Climate and Economic Justice Screening Tool (CEJST), which derives from the Justice40 initiative of the Biden Administration.
+
+                For every census tract the CEJST reports demographics, socioeconomic indicators, environmental and climate burdens, and whether the tract is designated "disadvantaged". A tract is considered disadvantaged if it meets the threshold for at least one category of burden (the indicator exceeds the 90th percentile AND the tract also meets the low income criterion, i.e. exceeds the 65th percentile for households at or below 200% of the federal poverty level), or if it is on land within the boundaries of a Federally Recognized Tribe. Many columns come in triplets: an indicator value, its national percentile, and a flag for whether the tract exceeds the threshold while also being low income (`*_is_low_income`).
+
+                ### Table Details
+
+                **Source:** Climate and Economic Justice Screening Tool (CEJST) / Justice40
+
+                **Grain:** One row per census tract
+
+                **Purpose:** Tract-level environmental justice screening data. This table is aggregated to the county level in the data mart (the `n_tracts_*`, `total_tracts`, `n_distinct_qualifying_tracts`, and `justice40_dbcp_index` columns of `counties_wide_format` and `counties_long_format`).
+
+                ### Related Tables
+
+                - [`counties_wide_format`](../data_mart/counties_wide_format.md)
+                - [`counties_long_format`](../data_mart/counties_long_format.md)
+                """
+            ),
+        },
+    }
 
     tract_id_fips: Mapped[str] = mapped_column(
         String,
@@ -2144,33 +2260,40 @@ class Justice40Tracts(Base):
 
 
 class NrelLocalOrdinances(Base):
-    """Local wind and solar siting ordinances from NREL's ordinance database, with standardized values and derived ban flags.
-
-    NREL has compiled nearly 2700 wind and solar siting ordinances from over 700 localities. The restrictiveness of ordinances ranges from outright bans to insignificant tweaks, so this table standardizes values to distances where possible and flags ordinances that are bans. See [When is a Wind/Solar Ordinance an Effective Ban?](../../NREL_ordinance_bans.md) for the full methodology.
-
-    ### Table Details
-
-    **Source:** NREL wind and solar ordinance databases
-
-    **Grain:** One row per ordinance (a locality can have several)
-
-    **Purpose:** Locate local ordinances restricting wind and solar development, and identify those that act as bans, for aggregation to the county level.
-
-    ### Transformations
-
-    Wind and solar ordinances are cleaned separately and then combined. Ordinance types and units are simplified and standardized, and multi-valued ordinances are replaced with their worst-case value. Localities are geocoded to add county and state FIPS codes.
-
-    Setbacks defined as multipliers (of hub height, tip height, rotor diameter, etc.) are converted to meters using a reference turbine (89 m hub height, 127 m rotor diameter), and sound limits (dBA) are converted to approximate distances. These are stored in `standardized_value` and `standardized_units`.
-
-    `is_ban` is true if an ordinance is an outright ban (`ordinance_type` is "banned") or meets a threshold that makes development impractical, such as wind setbacks of one mile or more, solar setbacks of 750 feet or more, sound limits of 35 dBA or less, or very low height limits. `is_de_facto_ban` is true for bans that are based on these thresholds rather than an outright ban.
-
-    ### Related Tables
-
-    - [`census__county_fips`](census__county_fips.md)
-    """
-
     __tablename__ = "nrel_local_ordinances"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Local wind and solar siting ordinances from NREL's ordinance database, with standardized values and derived ban flags.
+
+                NREL has compiled nearly 2700 wind and solar siting ordinances from over 700 localities. The restrictiveness of ordinances ranges from outright bans to insignificant tweaks, so this table standardizes values to distances where possible and flags ordinances that are bans. See [When is a Wind/Solar Ordinance an Effective Ban?](../../NREL_ordinance_bans.md) for the full methodology.
+
+                ### Table Details
+
+                **Source:** NREL wind and solar ordinance databases
+
+                **Grain:** One row per ordinance (a locality can have several)
+
+                **Purpose:** Locate local ordinances restricting wind and solar development, and identify those that act as bans, for aggregation to the county level.
+
+                ### Related Tables
+
+                - [`census__county_fips`](census__county_fips.md)
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                Wind and solar ordinances are cleaned separately and then combined. Ordinance types and units are simplified and standardized, and multi-valued ordinances are replaced with their worst-case value. Localities are geocoded to add county and state FIPS codes.
+
+                Setbacks defined as multipliers (of hub height, tip height, rotor diameter, etc.) are converted to meters using a reference turbine (89 m hub height, 127 m rotor diameter), and sound limits (dBA) are converted to approximate distances. These are stored in `standardized_value` and `standardized_units`.
+
+                `is_ban` is true if an ordinance is an outright ban (`ordinance_type` is "banned") or meets a threshold that makes development impractical, such as wind setbacks of one mile or more, solar setbacks of 750 feet or more, sound limits of 35 dBA or less, or very low height limits. `is_de_facto_ban` is true for bans that are based on these thresholds rather than an outright ban.
+                """
+            ),
+        },
+    }
 
     id: Mapped[int] = mapped_column(
         Integer, primary_key=True, doc="Auto-generated surrogate row identifier."
@@ -2274,32 +2397,39 @@ class NrelLocalOrdinances(Base):
 
 
 class AirtableOffshoreWindProjects(Base):
-    """Table describes manually curated offshore wind projects from Madrone's Airtable offshore wind base.
-
-    ### Table Details
-
-    **Source:** Madrone Airtable offshore wind
-
-    **Grain:** One row per offshore wind project
-
-    **Purpose:** Core project attributes including developer, capacity, status, and DBCP actionability flags.
-
-    ### Transformations
-
-    The ETL renames Airtable fields into snake_case warehouse columns, casts key fields like project IDs, capacity, and proposed completion year into typed columns, and validates that project IDs and project names are unique.
-
-    The transform also maps construction statuses into a queue-style `queue_status` field (`active`, `completed`, or `withdrawn`) so offshore wind projects can be compared more easily with queue-based project sources. It derives `is_actionable` and `is_nearly_certain` flags from construction status.
-
-    ### Related Tables
-
-    - [`airtable__offshore_wind_locations`](airtable__offshore_wind_locations.md)
-    - [`airtable__association__offshore_wind_cable_landing`](airtable__association__offshore_wind_cable_landing.md)
-    - [`airtable__offshore_wind_port_association`](airtable__offshore_wind_port_association.md)
-    - [`airtable__offshore_wind_staging_association`](airtable__offshore_wind_staging_association.md)
-    """
-
     __tablename__ = "airtable__offshore_wind_projects"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Table describes manually curated offshore wind projects from Madrone's Airtable offshore wind base.
+
+                ### Table Details
+
+                **Source:** Madrone Airtable offshore wind
+
+                **Grain:** One row per offshore wind project
+
+                **Purpose:** Core project attributes including developer, capacity, status, and DBCP actionability flags.
+
+                ### Related Tables
+
+                - [`airtable__offshore_wind_locations`](airtable__offshore_wind_locations.md)
+                - [`airtable__association__offshore_wind_cable_landing`](airtable__association__offshore_wind_cable_landing.md)
+                - [`airtable__offshore_wind_port_association`](airtable__offshore_wind_port_association.md)
+                - [`airtable__offshore_wind_staging_association`](airtable__offshore_wind_staging_association.md)
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The ETL renames Airtable fields into snake_case warehouse columns, casts key fields like project IDs, capacity, and proposed completion year into typed columns, and validates that project IDs and project names are unique.
+
+                The transform also maps construction statuses into a queue-style `queue_status` field (`active`, `completed`, or `withdrawn`) so offshore wind projects can be compared more easily with queue-based project sources. It derives `is_actionable` and `is_nearly_certain` flags from construction status.
+                """
+            ),
+        },
+    }
 
     project_id: Mapped[int] = mapped_column(
         Integer, primary_key=True, doc="Unique project identifier."
@@ -2382,32 +2512,39 @@ class AirtableOffshoreWindProjects(Base):
 
 
 class AirtableOffshoreWindLocations(Base):
-    """Table describes onshore locations associated with manually curated offshore wind projects.
-
-    ### Table Details
-
-    **Source:** Madrone Airtable offshore wind
-
-    **Grain:** One row per offshore wind location
-
-    **Purpose:** Location records used for ports, cable landing points, and staging areas, with county/state enrichment.
-
-    ### Transformations
-
-    The ETL renames Airtable location fields into warehouse column names, validates that each `location_id` is unique, and geocodes the raw city/county/state values to add county FIPS and locality metadata.
-
-    Locations use a two-pass geocoding strategy. The first pass geocodes a combined city-county string to reduce ambiguity, and the second pass retries remaining missing locations using only the raw city and state values.
-
-    ### Related Tables
-
-    - [`airtable__offshore_wind_projects`](airtable__offshore_wind_projects.md)
-    - [`airtable__association__offshore_wind_cable_landing`](airtable__association__offshore_wind_cable_landing.md)
-    - [`airtable__offshore_wind_port_association`](airtable__offshore_wind_port_association.md)
-    - [`airtable__offshore_wind_staging_association`](airtable__offshore_wind_staging_association.md)
-    """
-
     __tablename__ = "airtable__offshore_wind_locations"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Table describes onshore locations associated with manually curated offshore wind projects.
+
+                ### Table Details
+
+                **Source:** Madrone Airtable offshore wind
+
+                **Grain:** One row per offshore wind location
+
+                **Purpose:** Location records used for ports, cable landing points, and staging areas, with county/state enrichment.
+
+                ### Related Tables
+
+                - [`airtable__offshore_wind_projects`](airtable__offshore_wind_projects.md)
+                - [`airtable__association__offshore_wind_cable_landing`](airtable__association__offshore_wind_cable_landing.md)
+                - [`airtable__offshore_wind_port_association`](airtable__offshore_wind_port_association.md)
+                - [`airtable__offshore_wind_staging_association`](airtable__offshore_wind_staging_association.md)
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The ETL renames Airtable location fields into warehouse column names, validates that each `location_id` is unique, and geocodes the raw city/county/state values to add county FIPS and locality metadata.
+
+                Locations use a two-pass geocoding strategy. The first pass geocodes a combined city-county string to reduce ambiguity, and the second pass retries remaining missing locations using only the raw city and state values.
+                """
+            ),
+        },
+    }
 
     location_id: Mapped[int] = mapped_column(
         Integer, primary_key=True, doc="Unique location identifier."
@@ -2454,28 +2591,35 @@ class AirtableOffshoreWindLocations(Base):
 
 
 class AirtableAssociationOffshoreWindCableLanding(Base):
-    """Association table links offshore wind projects to cable landing locations.
-
-    ### Table Details
-
-    **Source:** Madrone Airtable offshore wind
-
-    **Grain:** One row per project-location link
-
-    **Purpose:** Many-to-many bridge between projects and cable landing locations.
-
-    ### Transformations
-
-    The ETL creates this association table by splitting the comma-separated cable landing location IDs stored on the offshore wind project records, exploding them into one row per project-location pair, and casting `location_id` to an integer.
-
-    ### Related Tables
-
-    - [`airtable__offshore_wind_projects`](airtable__offshore_wind_projects.md)
-    - [`airtable__offshore_wind_locations`](airtable__offshore_wind_locations.md)
-    """
-
     __tablename__ = "airtable__association__offshore_wind_cable_landing"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Association table links offshore wind projects to cable landing locations.
+
+                ### Table Details
+
+                **Source:** Madrone Airtable offshore wind
+
+                **Grain:** One row per project-location link
+
+                **Purpose:** Many-to-many bridge between projects and cable landing locations.
+
+                ### Related Tables
+
+                - [`airtable__offshore_wind_projects`](airtable__offshore_wind_projects.md)
+                - [`airtable__offshore_wind_locations`](airtable__offshore_wind_locations.md)
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The ETL creates this association table by splitting the comma-separated cable landing location IDs stored on the offshore wind project records, exploding them into one row per project-location pair, and casting `location_id` to an integer.
+                """
+            ),
+        },
+    }
 
     location_id: Mapped[int] = mapped_column(
         Integer,
@@ -2492,28 +2636,35 @@ class AirtableAssociationOffshoreWindCableLanding(Base):
 
 
 class AirtableOffshoreWindPortAssociation(Base):
-    """Association table links offshore wind projects to port locations.
-
-    ### Table Details
-
-    **Source:** Madrone Airtable offshore wind
-
-    **Grain:** One row per project-location link
-
-    **Purpose:** Many-to-many bridge between projects and port locations.
-
-    ### Transformations
-
-    The ETL creates this association table by splitting the comma-separated port location IDs stored on the offshore wind project records, exploding them into one row per project-location pair, and casting `location_id` to an integer.
-
-    ### Related Tables
-
-    - [`airtable__offshore_wind_projects`](airtable__offshore_wind_projects.md)
-    - [`airtable__offshore_wind_locations`](airtable__offshore_wind_locations.md)
-    """
-
     __tablename__ = "airtable__offshore_wind_port_association"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Association table links offshore wind projects to port locations.
+
+                ### Table Details
+
+                **Source:** Madrone Airtable offshore wind
+
+                **Grain:** One row per project-location link
+
+                **Purpose:** Many-to-many bridge between projects and port locations.
+
+                ### Related Tables
+
+                - [`airtable__offshore_wind_projects`](airtable__offshore_wind_projects.md)
+                - [`airtable__offshore_wind_locations`](airtable__offshore_wind_locations.md)
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The ETL creates this association table by splitting the comma-separated port location IDs stored on the offshore wind project records, exploding them into one row per project-location pair, and casting `location_id` to an integer.
+                """
+            ),
+        },
+    }
 
     location_id: Mapped[int] = mapped_column(
         Integer,
@@ -2530,28 +2681,35 @@ class AirtableOffshoreWindPortAssociation(Base):
 
 
 class AirtableOffshoreWindStagingAssociation(Base):
-    """Association table links offshore wind projects to staging locations.
-
-    ### Table Details
-
-    **Source:** Madrone Airtable offshore wind
-
-    **Grain:** One row per project-location link
-
-    **Purpose:** Many-to-many bridge between projects and staging locations.
-
-    ### Transformations
-
-    The ETL creates this association table by splitting the comma-separated staging location IDs stored on the offshore wind project records, exploding them into one row per project-location pair, and casting `location_id` to an integer.
-
-    ### Related Tables
-
-    - [`airtable__offshore_wind_projects`](airtable__offshore_wind_projects.md)
-    - [`airtable__offshore_wind_locations`](airtable__offshore_wind_locations.md)
-    """
-
     __tablename__ = "airtable__offshore_wind_staging_association"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Association table links offshore wind projects to staging locations.
+
+                ### Table Details
+
+                **Source:** Madrone Airtable offshore wind
+
+                **Grain:** One row per project-location link
+
+                **Purpose:** Many-to-many bridge between projects and staging locations.
+
+                ### Related Tables
+
+                - [`airtable__offshore_wind_projects`](airtable__offshore_wind_projects.md)
+                - [`airtable__offshore_wind_locations`](airtable__offshore_wind_locations.md)
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The ETL creates this association table by splitting the comma-separated staging location IDs stored on the offshore wind project records, exploding them into one row per project-location pair, and casting `location_id` to an integer.
+                """
+            ),
+        },
+    }
 
     location_id: Mapped[int] = mapped_column(
         Integer,
@@ -2568,29 +2726,36 @@ class AirtableOffshoreWindStagingAssociation(Base):
 
 
 class AirtableManualOrdinances(Base):
-    """Table captures manually maintained county-level ordinance flags that supplement external ordinances datasets.
-
-    ### Table Details
-
-    **Source:** Madrone Airtable manual ordinances
-
-    **Grain:** One row per county
-
-    **Purpose:** Indicates whether the self-maintained ordinance workflow marks a county as having an ordinance or moratorium.
-
-    ### Transformations
-
-    The ETL queries the Airtable-derived BigQuery table and reduces the raw ordinance status field to a county-level boolean column, `ordinance_via_self_maintained`.
-
-    `ordinance_via_self_maintained` is set to `true` when the raw status indicates either an ordinance or moratorium change in process or a prohibitive ordinance/moratorium. It is set to `false` for other non-null statuses and left null when the source status is null.
-
-    ### Notes
-
-    This ordinance data has since been de-prioritized and is used as a reference.
-    """
-
     __tablename__ = "airtable__manual_ordinances"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Table captures manually maintained county-level ordinance flags that supplement external ordinances datasets.
+
+                ### Table Details
+
+                **Source:** Madrone Airtable manual ordinances
+
+                **Grain:** One row per county
+
+                **Purpose:** Indicates whether the self-maintained ordinance workflow marks a county as having an ordinance or moratorium.
+
+                ### Notes
+
+                This ordinance data has since been de-prioritized and is used as a reference.
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The ETL queries the Airtable-derived BigQuery table and reduces the raw ordinance status field to a county-level boolean column, `ordinance_via_self_maintained`.
+
+                `ordinance_via_self_maintained` is set to `true` when the raw status indicates either an ordinance or moratorium change in process or a prohibitive ordinance/moratorium. It is set to `false` for other non-null statuses and left null when the source status is null.
+                """
+            ),
+        },
+    }
 
     county_id_fips: Mapped[str] = mapped_column(
         String, primary_key=True, nullable=False, doc="County FIPS ID."
@@ -2602,31 +2767,38 @@ class AirtableManualOrdinances(Base):
 
 
 class ProtectedAreaByCounty(Base):
-    """Protected and federally managed land area by county, from the USGS Protected Areas Database of the United States (PAD-US) intersected with Census TIGER county boundaries.
-
-    Federally managed land may be beyond the jurisdiction of local ordinances, so it can present renewable development opportunities despite local bans. Each row is the area of one county that falls under a particular combination of owner, manager, designation, and GAP status. See [Federal Land Ownership](../../protected-land-area.md) for the methodology.
-
-    ### Table Details
-
-    **Source:** USGS PAD-US 3.0 and Census TIGER county shapefiles
-
-    **Grain:** One row per county, protected area owner/manager/designation, and GAP status combination
-
-    **Purpose:** Aggregate to the county level to calculate unprotected land area and the fraction of it managed by federal agencies (`unprotected_land_area_km2` and `federal_fraction_unprotected_land` in the data mart county tables).
-
-    ### Transformations
-
-    Marine areas and major inland bodies of water are removed, and both PAD-US and county geometries are clipped to coastlines using low resolution 1:500k shapefiles. As a result, areas for a few particularly coastal counties (such as the Florida Keys) are inaccurate. Columns that are already in `census__county_fips` (land area, water area, and centroid) are dropped.
-
-    The GAP (Gap Analysis Project) status code describes the degree of restriction on development: GAP 1 and 2 are national parks and similar areas, GAP 3 areas are partially protected, and GAP 4 land is unrestricted.
-
-    ### Related Tables
-
-    - [`census__county_fips`](census__county_fips.md)
-    """
-
     __tablename__ = "protected_area_by_county"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Protected and federally managed land area by county, from the USGS Protected Areas Database of the United States (PAD-US) intersected with Census TIGER county boundaries.
+
+                Federally managed land may be beyond the jurisdiction of local ordinances, so it can present renewable development opportunities despite local bans. Each row is the area of one county that falls under a particular combination of owner, manager, designation, and GAP status. See [Federal Land Ownership](../../protected-land-area.md) for the methodology.
+
+                ### Table Details
+
+                **Source:** USGS PAD-US 3.0 and Census TIGER county shapefiles
+
+                **Grain:** One row per county, protected area owner/manager/designation, and GAP status combination
+
+                **Purpose:** Aggregate to the county level to calculate unprotected land area and the fraction of it managed by federal agencies (`unprotected_land_area_km2` and `federal_fraction_unprotected_land` in the data mart county tables).
+
+                ### Related Tables
+
+                - [`census__county_fips`](census__county_fips.md)
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                Marine areas and major inland bodies of water are removed, and both PAD-US and county geometries are clipped to coastlines using low resolution 1:500k shapefiles. As a result, areas for a few particularly coastal counties (such as the Florida Keys) are inaccurate. Columns that are already in `census__county_fips` (land area, water area, and centroid) are dropped.
+
+                The GAP (Gap Analysis Project) status code describes the degree of restriction on development: GAP 1 and 2 are national parks and similar areas, GAP 3 areas are partially protected, and GAP 4 land is unrestricted.
+                """
+            ),
+        },
+    }
 
     id: Mapped[int] = mapped_column(
         Integer, primary_key=True, doc="Auto-generated surrogate row identifier."
@@ -2679,30 +2851,37 @@ class ProtectedAreaByCounty(Base):
 
 
 class EnergyCommunitiesByCounty(Base):
-    """County-level inputs for determining whether a county qualifies as an "energy community" under the Inflation Reduction Act (IRA) tax credit bonus, from RMI's energy communities analysis.
-
-    The IRA qualifications are defined at three different spatial resolutions, only one of which directly maps to counties: fossil employment is defined on Metropolitan Statistical Areas (sets of counties), coal closures on Census tracts, and brownfields on individual sites. This table holds the county-level information needed to reconcile them.
-
-    ### Table Details
-
-    **Source:** RMI energy communities analysis
-
-    **Grain:** One row per county
-
-    **Purpose:** Brownfield counts and acreage, coal closure area, and employment-based qualification by county. The data mart county tables use `qualifies_by_employment_criteria` and `coal_qualifying_area_fraction` to derive `energy_community_qualifies` (qualifies via employment OR at least 50% of county area qualifies due to coal closures). Brownfield data is not currently used in the qualification rubric.
-
-    ### Transformations
-
-    Columns are renamed, state names appended to county names are removed, and county FIPS codes are added by geocoding the county and state names (with backup geocoding) to correct counties whose FIPS codes changed between 2010 and 2015. Where geocoding fails, the original FIPS code is used.
-
-    ### Related Tables
-
-    - [`census__county_fips`](census__county_fips.md)
-    - [`counties_wide_format`](../data_mart/counties_wide_format.md)
-    """
-
     __tablename__ = "energy_communities_by_county"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                County-level inputs for determining whether a county qualifies as an "energy community" under the Inflation Reduction Act (IRA) tax credit bonus, from RMI's energy communities analysis.
+
+                The IRA qualifications are defined at three different spatial resolutions, only one of which directly maps to counties: fossil employment is defined on Metropolitan Statistical Areas (sets of counties), coal closures on Census tracts, and brownfields on individual sites. This table holds the county-level information needed to reconcile them.
+
+                ### Table Details
+
+                **Source:** RMI energy communities analysis
+
+                **Grain:** One row per county
+
+                **Purpose:** Brownfield counts and acreage, coal closure area, and employment-based qualification by county. The data mart county tables use `qualifies_by_employment_criteria` and `coal_qualifying_area_fraction` to derive `energy_community_qualifies` (qualifies via employment OR at least 50% of county area qualifies due to coal closures). Brownfield data is not currently used in the qualification rubric.
+
+                ### Related Tables
+
+                - [`census__county_fips`](census__county_fips.md)
+                - [`counties_wide_format`](../data_mart/counties_wide_format.md)
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                Columns are renamed, state names appended to county names are removed, and county FIPS codes are added by geocoding the county and state names (with backup geocoding) to correct counties whose FIPS codes changed between 2010 and 2015. Where geocoding fails, the original FIPS code is used.
+                """
+            ),
+        },
+    }
 
     county_id_fips: Mapped[str] = mapped_column(
         String,
@@ -2754,33 +2933,40 @@ class EnergyCommunitiesByCounty(Base):
 
 
 class AcpPrivateChangelogProjects(Base):
-    """Private warehouse table contains a change log tracking changes in ACP projects across all snapshots of data (including quarterly snapshots going back to Q2 2024). A new row is present in the change log anytime an ACP project is updated.
-
-    ### Table Details
-
-    **Source:** American Clean Power projects
-
-    **Grain:** One row per changed project version per report date
-
-    **Purpose:** Historical change log showing how ACP project records evolve over time.
-
-    ### Transformations
-
-    The ETL applies the same cleaning and location enrichment as `acp__private__projects` across all available ACP snapshots. It then hashes the non-raw comparison columns within each `proj_id` and emits a new row only when a cleaned project record changes relative to its previous snapshot.
-
-    The transform adds `valid_until_date` by shifting the next report date within each `proj_id`, which makes the table usable as a project-version history.
-
-    ### Related Tables
-
-    - [`acp__private__projects`](acp__private__projects.md)
-
-    ### Notes
-
-    This table is intended for non-public use.
-    """
-
     __tablename__ = "acp__private__changelog__projects"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Private warehouse table contains a change log tracking changes in ACP projects across all snapshots of data (including quarterly snapshots going back to Q2 2024). A new row is present in the change log anytime an ACP project is updated.
+
+                ### Table Details
+
+                **Source:** American Clean Power projects
+
+                **Grain:** One row per changed project version per report date
+
+                **Purpose:** Historical change log showing how ACP project records evolve over time.
+
+                ### Related Tables
+
+                - [`acp__private__projects`](acp__private__projects.md)
+
+                ### Notes
+
+                This table is intended for non-public use.
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The ETL applies the same cleaning and location enrichment as `acp__private__projects` across all available ACP snapshots. It then hashes the non-raw comparison columns within each `proj_id` and emits a new row only when a cleaned project record changes relative to its previous snapshot.
+
+                The transform adds `valid_until_date` by shifting the next report date within each `proj_id`, which makes the table usable as a project-version history.
+                """
+            ),
+        },
+    }
 
     proj_id: Mapped[int] = mapped_column(
         BigInteger,
@@ -2967,33 +3153,40 @@ class AcpPrivateChangelogProjects(Base):
 
 
 class AcpPrivateProjects(Base):
-    """Private warehouse table contains the most recent ACP project snapshot and operational characteristics about those projects. It is updated irregularly in an ad-hoc manner and is used to augment the EIA data to provide a view of projects that are planned or existing. Data is cleaned and transformed into a uniform schema including adding a unique identifier for each project.
-
-    ### Table Details
-
-    **Source:** American Clean Power projects
-
-    **Grain:** One row per current ACP project phase
-
-    **Purpose:** Most recent snapshot of ACP project records with cleaned fields and geospatial enrichment.
-
-    ### Transformations
-
-    The ETL selects the most recent ACP snapshot, converts raw column names to snake_case, and creates a stable surrogate `proj_id` from project name, phase name, resource type, capacity, states, and counties.
-
-    It standardizes key fields such as project status, resource type, owner type, ISO/RTO name, EIA plant ID, and capacity. Location fields are enriched using both latitude/longitude spatial joins and state/county geocoding, with special handling for multi-valued counties and offshore projects where coordinates may fall outside county boundaries.
-
-    ### Related Tables
-
-    - [`acp__private__changelog__projects`](acp__private__changelog__projects.md)
-
-    ### Notes
-
-    This table is intended for non-public use.
-    """
-
     __tablename__ = "acp__private__projects"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Private warehouse table contains the most recent ACP project snapshot and operational characteristics about those projects. It is updated irregularly in an ad-hoc manner and is used to augment the EIA data to provide a view of projects that are planned or existing. Data is cleaned and transformed into a uniform schema including adding a unique identifier for each project.
+
+                ### Table Details
+
+                **Source:** American Clean Power projects
+
+                **Grain:** One row per current ACP project phase
+
+                **Purpose:** Most recent snapshot of ACP project records with cleaned fields and geospatial enrichment.
+
+                ### Related Tables
+
+                - [`acp__private__changelog__projects`](acp__private__changelog__projects.md)
+
+                ### Notes
+
+                This table is intended for non-public use.
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The ETL selects the most recent ACP snapshot, converts raw column names to snake_case, and creates a stable surrogate `proj_id` from project name, phase name, resource type, capacity, states, and counties.
+
+                It standardizes key fields such as project status, resource type, owner type, ISO/RTO name, EIA plant ID, and capacity. Location fields are enriched using both latitude/longitude spatial joins and state/county geocoding, with special handling for multi-valued counties and offshore projects where coordinates may fall outside county boundaries.
+                """
+            ),
+        },
+    }
 
     proj_id: Mapped[int] = mapped_column(
         BigInteger,
@@ -3199,34 +3392,41 @@ class AcpPrivateProjects(Base):
 
 
 class FyiPrivateProjects(Base):
-    """Private warehouse table contains attributes about projects in the interconnection.fyi queue. Transformations include mapping project status to categorized values.
-
-    ### Table Details
-
-    **Source:** interconnection.fyi queues
-
-    **Grain:** One row per queue project
-
-    **Purpose:** Core interconnection queue attributes, status fields, and Madrone actionability flags.
-
-    ### Transformations
-
-    The ETL renames source fields, validates interconnection.fyi status values, parses date columns, strips whitespace, standardizes queue status to lowercase, and normalizes ISO naming in selected fields.
-
-    It deduplicates likely duplicate physical projects using point of interconnection, capacity, location, utility, resource, and queue status, with tiebreakers based on completion date, status rank, and queue date. It also derives `queue_year`, `is_actionable`, and `is_nearly_certain`, and fills a small expected set of missing queue statuses as withdrawn.
-
-    ### Related Tables
-
-    - [`fyi__private__locations`](fyi__private__locations.md)
-    - [`fyi__private__resource_capacity`](fyi__private__resource_capacity.md)
-
-    ### Notes
-
-    This table is intended for non-public use.
-    """
-
     __tablename__ = "fyi__private__projects"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Private warehouse table contains attributes about projects in the interconnection.fyi queue. Transformations include mapping project status to categorized values.
+
+                ### Table Details
+
+                **Source:** interconnection.fyi queues
+
+                **Grain:** One row per queue project
+
+                **Purpose:** Core interconnection queue attributes, status fields, and Madrone actionability flags.
+
+                ### Related Tables
+
+                - [`fyi__private__locations`](fyi__private__locations.md)
+                - [`fyi__private__resource_capacity`](fyi__private__resource_capacity.md)
+
+                ### Notes
+
+                This table is intended for non-public use.
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The ETL renames source fields, validates interconnection.fyi status values, parses date columns, strips whitespace, standardizes queue status to lowercase, and normalizes ISO naming in selected fields.
+
+                It deduplicates likely duplicate physical projects using point of interconnection, capacity, location, utility, resource, and queue status, with tiebreakers based on completion date, status rank, and queue date. It also derives `queue_year`, `is_actionable`, and `is_nearly_certain`, and fills a small expected set of missing queue statuses as withdrawn.
+                """
+            ),
+        },
+    }
 
     project_id: Mapped[str] = mapped_column(
         String,
@@ -3395,37 +3595,44 @@ class FyiPrivateProjects(Base):
 
 
 class FyiPrivateLocations(Base):
-    """Private warehouse table contains normalized location data for interconnection.fyi queue projects. We use a geocoder to validate county locational information and FIPS codes, then join it onto the Census county FIPS backbone.
-
-    ### Table Details
-
-    **Source:** interconnection.fyi queues
-
-    **Grain:** One row per project-location record
-
-    **Purpose:** County/state/location details for projects with location data.
-
-    ### Transformations
-
-    The ETL splits raw project location fields out of `fyi__private__projects` into a normalized locations table and drops records where both raw state and county are missing.
-
-    Before geocoding, the transform applies manual county/state fill-ins for known source-data gaps. It then adds `state_id_fips`, `county_id_fips`, `geocoded_locality_name`, `geocoded_locality_type`, and `geocoded_containing_county`, while preserving the original raw county/state names in the final output.
-
-    We're currently dropping the FYI provided `fips_codes` column in favor of the geocded value, but as a future improvement it could potentially be useful to us for filling in FIPS codes that the geocoder misses, or validating the geocoded FIPS codes.
-
-    ### Related Tables
-
-    - [`fyi__private__projects`](fyi__private__projects.md)
-    - [`census__county_fips`](census__county_fips.md)
-    - [`census__state_fips`](census__state_fips.md)
-
-    ### Notes
-
-    This table is intended for non-public use.
-    """
-
     __tablename__ = "fyi__private__locations"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Private warehouse table contains normalized location data for interconnection.fyi queue projects. We use a geocoder to validate county locational information and FIPS codes, then join it onto the Census county FIPS backbone.
+
+                ### Table Details
+
+                **Source:** interconnection.fyi queues
+
+                **Grain:** One row per project-location record
+
+                **Purpose:** County/state/location details for projects with location data.
+
+                ### Related Tables
+
+                - [`fyi__private__projects`](fyi__private__projects.md)
+                - [`census__county_fips`](census__county_fips.md)
+                - [`census__state_fips`](census__state_fips.md)
+
+                ### Notes
+
+                This table is intended for non-public use.
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The ETL splits raw project location fields out of `fyi__private__projects` into a normalized locations table and drops records where both raw state and county are missing.
+
+                Before geocoding, the transform applies manual county/state fill-ins for known source-data gaps. It then adds `state_id_fips`, `county_id_fips`, `geocoded_locality_name`, `geocoded_locality_type`, and `geocoded_containing_county`, while preserving the original raw county/state names in the final output.
+
+                We're currently dropping the FYI provided `fips_codes` column in favor of the geocded value, but as a future improvement it could potentially be useful to us for filling in FIPS codes that the geocoder misses, or validating the geocoded FIPS codes.
+                """
+            ),
+        },
+    }
 
     id: Mapped[int] = mapped_column(
         Integer, primary_key=True, doc="Auto-generated surrogate row identifier."
@@ -3484,33 +3691,40 @@ class FyiPrivateLocations(Base):
 
 
 class FyiPrivateResourceCapacity(Base):
-    """Private warehouse table contains normalized data on the potential capacity of the generator resource components of projects in the interconnection queue. Transformations include mapping project resources types to clean, categorized values.
-
-    ### Table Details
-
-    **Source:** interconnection.fyi queues
-
-    **Grain:** One row per project-resource pair
-
-    **Purpose:** Resource-level capacity breakout for projects with one or more generation types.
-
-    ### Transformations
-
-    The ETL parses interconnection.fyi's capacity-by-generation-type breakout where available, explodes multi-resource projects into one row per project-resource pair, and sums duplicate resource rows for the same project when appropriate.
-
-    For projects without a parsed resource-capacity breakout, the transform falls back to the project-level capacity and canonical generation type. It then maps raw resource values into the cleaned `resource_clean` categories used downstream.
-
-    ### Related Tables
-
-    - [`fyi__private__projects`](fyi__private__projects.md)
-
-    ### Notes
-
-    This table is intended for non-public use.
-    """
-
     __tablename__ = "fyi__private__resource_capacity"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Private warehouse table contains normalized data on the potential capacity of the generator resource components of projects in the interconnection queue. Transformations include mapping project resources types to clean, categorized values.
+
+                ### Table Details
+
+                **Source:** interconnection.fyi queues
+
+                **Grain:** One row per project-resource pair
+
+                **Purpose:** Resource-level capacity breakout for projects with one or more generation types.
+
+                ### Related Tables
+
+                - [`fyi__private__projects`](fyi__private__projects.md)
+
+                ### Notes
+
+                This table is intended for non-public use.
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The ETL parses interconnection.fyi's capacity-by-generation-type breakout where available, explodes multi-resource projects into one row per project-resource pair, and sums duplicate resource rows for the same project when appropriate.
+
+                For projects without a parsed resource-capacity breakout, the transform falls back to the project-level capacity and canonical generation type. It then maps raw resource values into the cleaned `resource_clean` categories used downstream.
+                """
+            ),
+        },
+    }
 
     id: Mapped[int] = mapped_column(
         Integer, primary_key=True, doc="Auto-generated surrogate row identifier."
@@ -3534,32 +3748,39 @@ class FyiPrivateResourceCapacity(Base):
 
 
 class MadroneDataLastUpdated(Base):
-    """Table documents the last modification date of all input files to the Deployment Gap Model database.
-
-    ### Table Details
-
-    **Source:** All input data
-
-    **Grain:** One row per dataset
-
-    **Purpose:** Identify the source path and last file modification date of each data source used in the pipeline.
-
-    ### Transformations
-
-    The ETL checks each path and captures the most recent file modification date.
-    For directories, this is the most recent file modification date of any file in the folder.
-    For files stored on GitHub, this is the last modification date on the GitHub repository.
-
-    Note that this reflects the last date that the file was updated within the data
-    pipeline, rather than the original date of file creation - i.e., if a file was created
-    on June 1st and added to the ETL on June 5th, it will appear here with a modification
-    date of June 5th. This will be the case for sources that are stored in the data folder of the Github repository,
-    or manually added to the dgm-archive GCS bucket. For datasets that are pulled directly from the source (e.g., PUDL),
-    the date of creation and modification will be identical.
-    """
-
     __tablename__ = "madrone__data_last_updated"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Table documents the last modification date of all input files to the Deployment Gap Model database.
+
+                ### Table Details
+
+                **Source:** All input data
+
+                **Grain:** One row per dataset
+
+                **Purpose:** Identify the source path and last file modification date of each data source used in the pipeline.
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                The ETL checks each path and captures the most recent file modification date.
+                For directories, this is the most recent file modification date of any file in the folder.
+                For files stored on GitHub, this is the last modification date on the GitHub repository.
+
+                Note that this reflects the last date that the file was updated within the data
+                pipeline, rather than the original date of file creation - i.e., if a file was created
+                on June 1st and added to the ETL on June 5th, it will appear here with a modification
+                date of June 5th. This will be the case for sources that are stored in the data folder of the Github repository,
+                or manually added to the dgm-archive GCS bucket. For datasets that are pulled directly from the source (e.g., PUDL),
+                the date of creation and modification will be identical.
+                """
+            ),
+        },
+    }
 
     dataset_name: Mapped[str] = mapped_column(
         String, primary_key=True, doc="Name of the input dataset."

@@ -1,6 +1,6 @@
 {% set table = model.__table__ %}
-{% set table_args = model.__table_args__ %}
-{% set sources = sources if sources is defined else table_args.get("info", {}).get("sources", []) %}
+{% set info = table.info %}
+{% set sources = sources if sources is defined else info.get("sources", []) %}
 
 # {{ table.name }}
 
@@ -8,7 +8,7 @@
 
 ## Description
 
-{{ model.__doc__ | trim }}
+{{ info.get("description", "") | trim }}
 
 ## Primary key columns
 
@@ -31,3 +31,9 @@
 {% for column in table.columns -%}
 | `{{ column.name }}` | `{{ column.type }}` | {{ "Yes" if column.primary_key else "No" }} | {{ "Yes" if column.nullable else "No" }} | {{ column.doc }} |
 {% endfor -%}
+
+{% if info.get("modelling_decisions") %}
+## Modelling Decisions
+
+{{ info["modelling_decisions"] | trim }}
+{% endif %}

@@ -141,5 +141,10 @@ ignore = [
 ]
 extend-select = ["NPY201"] # preview rule to easy migration to Numpy 2.0
 
+[tool.ruff.lint.per-file-ignores]
+"src/dbcp/metadata/*.py" = [
+  "D101",
+] # SQLAlchemy table docs live in __table_args__["info"]
+
 [dependency-groups]
 dev = ["pre-commit>=4.6.0", "zensical>=0.0.60"]

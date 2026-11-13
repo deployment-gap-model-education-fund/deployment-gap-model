@@ -1,5 +1,7 @@
 """SQL Alchemy metadata for the data mart tables."""
 
+import inspect
+
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
@@ -22,143 +24,150 @@ class Base(DeclarativeBase):
 
 
 class CountiesWideFormat(Base):
-    """Table is structured so that each row contains aggregates for a whole county.
-
-    ### Column Conventions
-
-    Aggregates of fossil infrastructure projects only include pre-construction projects (as of the data release date, see the EIP data source page for details). This provides a forward-looking lens to the data.
-
-    See [Data Sources](../../data_sources.md).
-
-    Fossil generation aggregates include coal, oil, and gas power plants.
-
-    "renewable_and_battery" aggregates include solar and wind power plants **and** battery storage facilities.
-
-    ### Modeling Decisions
-
-    Almost all the decisions from the interconnection queue and fossil infrastructure project level tables are inherited by these aggregates. The following are in addition to, not instead of, those decisions.
-
-    #### Local Ordinance Resolution Mismatch
-
-    Queue projects are only geolocated by state/county. Local ordinances can be either at the county level (60 out of 103, 58% as of the 2020 data) or some smaller jurisdiction like a town (43/103, 42%). Without more precise project locations, we don't know if the ordinance directly affects the project. So far we have taken the conservative approach and assumed that if a project and ordinance share the same county, they are related.
-
-    Furthermore, there are 6 state-level laws affecting RE siting in some capacity, but these laws are not included in the scope of local ordinances. The law in NY is pro-RE and the law in ME was repealed. The law in OH simply adds a level of veto power to county jurisdictions. Laws in KS, OR, and CT restrict development on certain types of land; their severity can only be assessed by an expert.
-
-    When aggregating to the county level, 8 out of 92 (9%) counties (as of January 2022) have multiple associated ordinances. In those cases, the ordinance descriptions have been concatenated together.
-
-    #### NREL Ordinance Interpretation
-
-    See the description in the NREL_ordinance section for details.
-
-    See [NREL_ordinance_bans.md](../../NREL_ordinance_bans.md).
-
-    Additionally, as with the RELDI local ordinance dataset above, some ordinances belong to sub-county level jurisdictions such as townships. In those cases, the ban is propagated up to the entire county when represented in this county-level table.
-
-    #### EIP Emissions Aggregates
-
-    EIP tracks 7 different types of emissions: CO2e, PM2.5, NOx, VOC, SO2, CO, HAPs. For the sake of simplicity, this table contains only:
-
-    * CO2e, because of its direct climate relevance and for comparison with power plants
-    * PM2.5, because of its outsize impact on public health and the EPA’s damage assessments
-    * NOx, another well-known combustion byproduct
-
-    #### EIP Project Filtering
-
-    EIP’s project database also contains older projects that are already completed or under construction. To keep this table forward looking, those older projects have been removed from these aggregates. This leaves only 136/439 (31%) of the projects as of January 2022 data.
-
-    #### Justice40 Environmental Justice Metrics
-
-    The Climate and Economic Justice Screening Tool (CEJST) derives from the Justice40 Biden Administration Initiative. The CEJST dataset measures socio-economic and environmental measures for each Census tract and identifies overburdened and underserved census tracts within counties in the U.S. Communities are considered disadvantaged: 1) if they are in census tracts that meet the thresholds for at least one of the tool’s categories of burden, or 2) if they are on land within the boundaries of Federally Recognized Tribes.
-
-    The data derives many indicators from these measures, such as "high diabetes rates, low income, and low college student population". To qualify, a tract must (1) exceed the 90th percentile of the environmental or climate indicator (i.e., particulate matter exposure), AND 2) meet the socioeconomic indicators designed to identify low income communities (i.e., exceed the 65th percentile for households living at or below 200% of the Federal poverty level)." See [their documentation](https://static-data-screeningtool.geoplatform.gov/data-pipeline/data/score/downloadable/cejst_technical_support_document.pdf) for details.
-
-    ##### Proprietary Justice40 Index
-
-    We derive an index in order to condense all the environmental justice information into a single summary number. The index is calculated as follows:
-
-    1. Aggregate by category: for each tract, sum the indicators within each category. If the sum is >= 1, assign 1, else 0.
-    2. Aggregate by county: take a weighted sum of the new indicators and the category weights below. This produces an index value for each county.
-    3. Counties with a score of ≥4 points are considered an EJ priority.
-
-    The category weights are:
-
-    | Category  | Weight |
-    | --------- | ------ |
-    | Climate   | 1.0    |
-    | Energy    | 1.0    |
-    | Transit   | 1.0    |
-    | Pollution | 0.75   |
-    | Water     | 0.75   |
-    | Housing   | 0.5    |
-    | Health    | 0.5    |
-    | Workforce | 0.5    |
-
-    #### Offshore Wind
-
-    ##### Capacity is Split Between Project Locations
-
-    Some prospective offshore wind power plants are listed with multiple locations (for example, several cable landing counties). For these projects, as for all multi-location queue projects, the total project capacity is split equally between locations and assigned to their respective counties.
-
-    ##### Proposed Offshore Wind Comes from interconnection.fyi
-
-    Proposed offshore wind capacity, counts, and the actionable and nearly certain aggregates come from the interconnection.fyi queue data, like all other proposed power projects. Madrone's manually curated offshore wind dataset (the `airtable__offshore_wind_*` warehouse tables) previously replaced the offshore wind projects in the queue data, but it is no longer used for that purpose. It is only used for the `offshore_wind_capacity_mw_via_ports` and `offshore_wind_interest_type` columns.
-
-    #### Protected Land Area
-
-    See here for details:
-
-    See [Protected Land Area](../../protected-land-area.md).
-
-    #### Energy Community Qualification
-
-    The Inflation Reduction Act tax credit qualifications are defined at three different spatial resolutions, only one of which directly maps to county boundaries. We reconcile that spatial mismatch as follows:
-
-    Fossil employment qualification is defined on Metropolitan Statistical Areas, which are sets of counties. There is a direct mapping from MSAs to counties, so there is no modeling ambiguity here.
-
-    Coal closure qualification is defined on the Census tract level. Counties are combinations of Census tracts, so many counties will contain qualifying area but may not completely qualify. We reconcile this by arbitrarily defining a threshold at 50% of county area.
-
-    Finally, individual brownfield sites are eligible for tax credits. In the future, we plan to aggregate the total area of qualifying sites, but have not yet implemented this. Brownfield qualification does not yet play any role in our current qualification rubric.
-
-    #### "Actionable" and "Nearly Certain" Projects
-
-    These values are based on where a project is in the interconnection process. An "actionable" project is one that meets the following criteria:
-
-    * is active in the queue (`queue_status` is `active` in `fyi__private__projects`)
-    * is in one of the following stages of interconnection, as standardized by interconnection.fyi (`interconnection_status_fyi`):
-      * Facility Study
-      * System Impact Study
-      * Phase 4 Study
-      * "IA Pending"
-
-
-    A "nearly certain" project is one that meets the "actionable" criteria but with the following additional allowable interconnection stages:
-
-    * Construction
-    * IA Executed
-    * Operational
-
-    Both classifications are calculated in the interconnection.fyi warehouse tables and apply to offshore wind projects in the same way as other resources.
-
-    #### Definition of "Renewables" includes Battery Storage
-
-    The columns prefixed with `renewable_and_battery_` contain aggregates of both generation and storage assets. The generation sources are solar photovoltaic, onshore wind, and offshore wind technologies. The only included storage type is battery storage. Batteries are included here because
-
-    * batteries increase capacity factors of wind & solar plants
-    * batteries allow arbitrage against tariffs, enabling higher project values
-    * batteries are also additional local economic development (more tax base)
-
-    #### Avoided CO2e Emissions
-
-    Avoided emissions estimates are based on the EPA's AVERT model. In this model, the avoided emissions are calculated as the difference between the emissions of the proposed generator (zero for renewables) and the emissions of the existing generator that would be displaced by the proposed generator. This gives an estimate of the short term emissions impact of the proposed generator.
-
-    The marginal generator is determined by the proposed generator's location and the time of day/year. Avoided emissions are scaled by the capacity of the proposed generator times an average capacity factor for the proposed generator's resource type and location.
-
-    The equation for avoided emissions is:
-    (Capacity of proposed generator [MW]) × (Average capacity factor of proposed generator [MWh/hour/MW]) × (8766 [average hours/year]) * (Emissions factor of marginal generator [tonnes/MWh])
-    """
-
     __tablename__ = "counties_wide_format"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Table is structured so that each row contains aggregates for a whole county.
+
+                ### Column Conventions
+
+                Aggregates of fossil infrastructure projects only include pre-construction projects (as of the data release date, see the EIP data source page for details). This provides a forward-looking lens to the data.
+
+                See [Data Sources](../../data_sources.md).
+
+                Fossil generation aggregates include coal, oil, and gas power plants.
+
+                "renewable_and_battery" aggregates include solar and wind power plants **and** battery storage facilities.
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                Almost all the decisions from the interconnection queue and fossil infrastructure project level tables are inherited by these aggregates. The following are in addition to, not instead of, those decisions.
+
+                ### Local Ordinance Resolution Mismatch
+
+                Queue projects are only geolocated by state/county. Local ordinances can be either at the county level (60 out of 103, 58% as of the 2020 data) or some smaller jurisdiction like a town (43/103, 42%). Without more precise project locations, we don't know if the ordinance directly affects the project. So far we have taken the conservative approach and assumed that if a project and ordinance share the same county, they are related.
+
+                Furthermore, there are 6 state-level laws affecting RE siting in some capacity, but these laws are not included in the scope of local ordinances. The law in NY is pro-RE and the law in ME was repealed. The law in OH simply adds a level of veto power to county jurisdictions. Laws in KS, OR, and CT restrict development on certain types of land; their severity can only be assessed by an expert.
+
+                When aggregating to the county level, 8 out of 92 (9%) counties (as of January 2022) have multiple associated ordinances. In those cases, the ordinance descriptions have been concatenated together.
+
+                ### NREL Ordinance Interpretation
+
+                See the description in the NREL_ordinance section for details.
+
+                See [NREL_ordinance_bans.md](../../NREL_ordinance_bans.md).
+
+                Additionally, as with the RELDI local ordinance dataset above, some ordinances belong to sub-county level jurisdictions such as townships. In those cases, the ban is propagated up to the entire county when represented in this county-level table.
+
+                ### EIP Emissions Aggregates
+
+                EIP tracks 7 different types of emissions: CO2e, PM2.5, NOx, VOC, SO2, CO, HAPs. For the sake of simplicity, this table contains only:
+
+                * CO2e, because of its direct climate relevance and for comparison with power plants
+                * PM2.5, because of its outsize impact on public health and the EPA’s damage assessments
+                * NOx, another well-known combustion byproduct
+
+                ### EIP Project Filtering
+
+                EIP’s project database also contains older projects that are already completed or under construction. To keep this table forward looking, those older projects have been removed from these aggregates. This leaves only 136/439 (31%) of the projects as of January 2022 data.
+
+                ### Justice40 Environmental Justice Metrics
+
+                The Climate and Economic Justice Screening Tool (CEJST) derives from the Justice40 Biden Administration Initiative. The CEJST dataset measures socio-economic and environmental measures for each Census tract and identifies overburdened and underserved census tracts within counties in the U.S. Communities are considered disadvantaged: 1) if they are in census tracts that meet the thresholds for at least one of the tool’s categories of burden, or 2) if they are on land within the boundaries of Federally Recognized Tribes.
+
+                The data derives many indicators from these measures, such as "high diabetes rates, low income, and low college student population". To qualify, a tract must (1) exceed the 90th percentile of the environmental or climate indicator (i.e., particulate matter exposure), AND 2) meet the socioeconomic indicators designed to identify low income communities (i.e., exceed the 65th percentile for households living at or below 200% of the Federal poverty level)." See [their documentation](https://static-data-screeningtool.geoplatform.gov/data-pipeline/data/score/downloadable/cejst_technical_support_document.pdf) for details.
+
+                #### Proprietary Justice40 Index
+
+                We derive an index in order to condense all the environmental justice information into a single summary number. The index is calculated as follows:
+
+                1. Aggregate by category: for each tract, sum the indicators within each category. If the sum is >= 1, assign 1, else 0.
+                2. Aggregate by county: take a weighted sum of the new indicators and the category weights below. This produces an index value for each county.
+                3. Counties with a score of ≥4 points are considered an EJ priority.
+
+                The category weights are:
+
+                | Category  | Weight |
+                | --------- | ------ |
+                | Climate   | 1.0    |
+                | Energy    | 1.0    |
+                | Transit   | 1.0    |
+                | Pollution | 0.75   |
+                | Water     | 0.75   |
+                | Housing   | 0.5    |
+                | Health    | 0.5    |
+                | Workforce | 0.5    |
+
+                ### Offshore Wind
+
+                #### Capacity is Split Between Project Locations
+
+                Some prospective offshore wind power plants are listed with multiple locations (for example, several cable landing counties). For these projects, as for all multi-location queue projects, the total project capacity is split equally between locations and assigned to their respective counties.
+
+                #### Proposed Offshore Wind Comes from interconnection.fyi
+
+                Proposed offshore wind capacity, counts, and the actionable and nearly certain aggregates come from the interconnection.fyi queue data, like all other proposed power projects. Madrone's manually curated offshore wind dataset (the `airtable__offshore_wind_*` warehouse tables) previously replaced the offshore wind projects in the queue data, but it is no longer used for that purpose. It is only used for the `offshore_wind_capacity_mw_via_ports` and `offshore_wind_interest_type` columns.
+
+                ### Protected Land Area
+
+                See here for details:
+
+                See [Protected Land Area](../../protected-land-area.md).
+
+                ### Energy Community Qualification
+
+                The Inflation Reduction Act tax credit qualifications are defined at three different spatial resolutions, only one of which directly maps to county boundaries. We reconcile that spatial mismatch as follows:
+
+                Fossil employment qualification is defined on Metropolitan Statistical Areas, which are sets of counties. There is a direct mapping from MSAs to counties, so there is no modeling ambiguity here.
+
+                Coal closure qualification is defined on the Census tract level. Counties are combinations of Census tracts, so many counties will contain qualifying area but may not completely qualify. We reconcile this by arbitrarily defining a threshold at 50% of county area.
+
+                Finally, individual brownfield sites are eligible for tax credits. In the future, we plan to aggregate the total area of qualifying sites, but have not yet implemented this. Brownfield qualification does not yet play any role in our current qualification rubric.
+
+                ### "Actionable" and "Nearly Certain" Projects
+
+                These values are based on where a project is in the interconnection process. An "actionable" project is one that meets the following criteria:
+
+                * is active in the queue (`queue_status` is `active` in `fyi__private__projects`)
+                * is in one of the following stages of interconnection, as standardized by interconnection.fyi (`interconnection_status_fyi`):
+                  * Facility Study
+                  * System Impact Study
+                  * Phase 4 Study
+                  * "IA Pending"
+
+
+                A "nearly certain" project is one that meets the "actionable" criteria but with the following additional allowable interconnection stages:
+
+                * Construction
+                * IA Executed
+                * Operational
+
+                Both classifications are calculated in the interconnection.fyi warehouse tables and apply to offshore wind projects in the same way as other resources.
+
+                ### Definition of "Renewables" includes Battery Storage
+
+                The columns prefixed with `renewable_and_battery_` contain aggregates of both generation and storage assets. The generation sources are solar photovoltaic, onshore wind, and offshore wind technologies. The only included storage type is battery storage. Batteries are included here because
+
+                * batteries increase capacity factors of wind & solar plants
+                * batteries allow arbitrage against tariffs, enabling higher project values
+                * batteries are also additional local economic development (more tax base)
+
+                ### Avoided CO2e Emissions
+
+                Avoided emissions estimates are based on the EPA's AVERT model. In this model, the avoided emissions are calculated as the difference between the emissions of the proposed generator (zero for renewables) and the emissions of the existing generator that would be displaced by the proposed generator. This gives an estimate of the short term emissions impact of the proposed generator.
+
+                The marginal generator is determined by the proposed generator's location and the time of day/year. Avoided emissions are scaled by the capacity of the proposed generator times an average capacity factor for the proposed generator's resource type and location.
+
+                The equation for avoided emissions is:
+                (Capacity of proposed generator [MW]) × (Average capacity factor of proposed generator [MWh/hour/MW]) × (8766 [average hours/year]) * (Emissions factor of marginal generator [tonnes/MWh])
+                """
+            ),
+        },
+    }
 
     state_id_fips: Mapped[str] = mapped_column(
         String, nullable=False, doc="State FIPS ID. Source: Census."
@@ -827,17 +836,24 @@ class CountiesWideFormat(Base):
 
 
 class Eia860mLatestPlants(Base):
-    """Table describes existing power plants from the PUDL database (mostly EIA data). Each row represents one plant.
-
-    ### Modeling Decisions
-
-    #### Multiple Fuel Types
-
-    Many power plants have multiple generators and about 11% of plants have generators that run on different fuels (such as a co-located coal plant and natural gas turbine). To simplify this table, plants are classified by only one fuel type: the fuel type responsible for the largest share of electrical generation. Where generation data is not available, the fuel type with the largest capacity is used.
-    """
-
     __tablename__ = "eia860m__latest__plants"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Table describes existing power plants from the PUDL database (mostly EIA data). Each row represents one plant.
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                ### Multiple Fuel Types
+
+                Many power plants have multiple generators and about 11% of plants have generators that run on different fuels (such as a co-located coal plant and natural gas turbine). To simplify this table, plants are classified by only one fuel type: the fuel type responsible for the largest share of electrical generation. Where generation data is not available, the fuel type with the largest capacity is used.
+                """
+            ),
+        },
+    }
 
     plant_id_eia: Mapped[int] = mapped_column(
         Integer,
@@ -871,31 +887,38 @@ class Eia860mLatestPlants(Base):
 
 
 class FyiPrivateCountiesActiveCleanProjectsCapacity(Base):
-    """Private table contains per-county information about the capacity of clean resources which are active in the interconnection queue. Projects from the interconnection.fyi data are filtered for renewable and battery resources, aggregated up to the county level, and broken out by resource. Each row represents one county.
-
-    ### Transformations
-
-    #### Active Clean Projects
-
-    This table uses data from the three FYI data warehouse tables. It first filters to active queue projects,
-    then keeps only projects with clean resources (battery, solar, and wind).
-
-    #### County Level Aggregation
-
-    After filtering to only active projects, resource capacity is aggregated to the county level. Projects
-    are deduplicated when creating the `fyi__private__projects` table so we don't need to worry about
-    double counting project capacity at this point.
-
-    Some projects have multiple candidate locations. In this case a project will show up multiple times
-    in the `fyi__private__locations` table. The capacity for these projects will be allocated equally across
-    each county it appears in (note that 99% of projects are in only one county).
-
-    Finally, the capacity for each individual resource type is summed to create the `total_active_clean_projects_capacity_mw`
-    column.
-    """
-
     __tablename__ = "fyi__private__counties__active_clean_projects_capacity"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Private table contains per-county information about the capacity of clean resources which are active in the interconnection queue. Projects from the interconnection.fyi data are filtered for renewable and battery resources, aggregated up to the county level, and broken out by resource. Each row represents one county.
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                ### Active Clean Projects
+
+                This table uses data from the three FYI data warehouse tables. It first filters to active queue projects,
+                then keeps only projects with clean resources (battery, solar, and wind).
+
+                ### County Level Aggregation
+
+                After filtering to only active projects, resource capacity is aggregated to the county level. Projects
+                are deduplicated when creating the `fyi__private__projects` table so we don't need to worry about
+                double counting project capacity at this point.
+
+                Some projects have multiple candidate locations. In this case a project will show up multiple times
+                in the `fyi__private__locations` table. The capacity for these projects will be allocated equally across
+                each county it appears in (note that 99% of projects are in only one county).
+
+                Finally, the capacity for each individual resource type is summed to create the `total_active_clean_projects_capacity_mw`
+                column.
+                """
+            ),
+        },
+    }
 
     county_id_fips: Mapped[str] = mapped_column(
         String, primary_key=True, doc="County FIPS ID. Source: Census."
@@ -930,17 +953,24 @@ class FyiPrivateCountiesActiveCleanProjectsCapacity(Base):
 
 
 class CountiesLongFormat(Base):
-    """Table is mostly a restructured version of counties_wide_format. It provides county-level aggregates by facility type: existing power, proposed power, or proposed fossil infrastructure. Each row represents a unique combination of county, facility_type, status, and resource_or_sector. Local ordinance and state wind permitting information has been joined on for convenience. The data sources are the interconnection.fyi queue data, EIP fossil infrastructure, PUDL power plant data, plus Columbia local opposition and NCSL state wind permitting types. The only other difference is the removal of two columns `offshore_wind_capacity_mw_via_ports` and `offshore_wind_interest_type`. See below for details.
-
-    ### Modeling Decisions
-
-    With the exception of the two columns mentioned above, this is a restructured version of counties_wide_format. See the entry for that table for description of methodology:
-
-    See [`counties_wide_format`](counties_wide_format.md).
-    """
-
     __tablename__ = "counties_long_format"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Table is mostly a restructured version of counties_wide_format. It provides county-level aggregates by facility type: existing power, proposed power, or proposed fossil infrastructure. Each row represents a unique combination of county, facility_type, status, and resource_or_sector. Local ordinance and state wind permitting information has been joined on for convenience. The data sources are the interconnection.fyi queue data, EIP fossil infrastructure, PUDL power plant data, plus Columbia local opposition and NCSL state wind permitting types. The only other difference is the removal of two columns `offshore_wind_capacity_mw_via_ports` and `offshore_wind_interest_type`. See below for details.
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                With the exception of the two columns mentioned above, this is a restructured version of counties_wide_format. See the entry for that table for description of methodology:
+
+                See [`counties_wide_format`](counties_wide_format.md).
+                """
+            ),
+        },
+    }
 
     state_id_fips: Mapped[str] = mapped_column(
         String,
@@ -1194,15 +1224,21 @@ class CountiesLongFormat(Base):
 
 
 class Eia860mLatestGenerators(Base):
-    """Table contains the most recent information from EIA 860M for each generator. Each row represents one generator in the latest snapshot.
-
-    ### Operational Status Codes
-
-    See the documentation for [`eia860m__operational_status_codes`](../data_warehouse/eia860m__operational_status_codes.md) for a description of the operational status codes.
-    """
-
     __tablename__ = "eia860m__latest__generators"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Table contains the most recent information from EIA 860M for each generator. Each row represents one generator in the latest snapshot.
+
+                ### Operational Status Codes
+
+                See the documentation for [`eia860m__operational_status_codes`](../data_warehouse/eia860m__operational_status_codes.md) for a description of the operational status codes.
+                """
+            ),
+        },
+    }
 
     report_date: Mapped["DateTime | None"] = mapped_column(
         DateTime,
@@ -1319,15 +1355,21 @@ class Eia860mLatestGenerators(Base):
 
 
 class Eia860mMonthlyGenerators(Base):
-    """Table contains three years of monthly status history for each generator in EIA 860M. Each row is a generator-month pair.
-
-    ### Operational Status Codes
-
-    See the documentation for [`eia860m__operational_status_codes`](../data_warehouse/eia860m__operational_status_codes.md) for a description of the operational status codes.
-    """
-
     __tablename__ = "eia860m__monthly__generators"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Table contains three years of monthly status history for each generator in EIA 860M. Each row is a generator-month pair.
+
+                ### Operational Status Codes
+
+                See the documentation for [`eia860m__operational_status_codes`](../data_warehouse/eia860m__operational_status_codes.md) for a description of the operational status codes.
+                """
+            ),
+        },
+    }
 
     plant_name_eia: Mapped[str | None] = mapped_column(
         String,
@@ -1364,15 +1406,21 @@ class Eia860mMonthlyGenerators(Base):
 
 
 class Eia860mGeneratorsOperationalStatusTransitionDates(Base):
-    """Table contains the dates of each status transition for each generator in EIA 860m. Each row is one generator.
-
-    ### Operational Status Codes
-
-    See the documentation for [`eia860m__operational_status_codes`](../data_warehouse/eia860m__operational_status_codes.md) for a description of the operational status codes.
-    """
-
     __tablename__ = "eia860m__generators_operational_status_transition_dates"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                Table contains the dates of each status transition for each generator in EIA 860m. Each row is one generator.
+
+                ### Operational Status Codes
+
+                See the documentation for [`eia860m__operational_status_codes`](../data_warehouse/eia860m__operational_status_codes.md) for a description of the operational status codes.
+                """
+            ),
+        },
+    }
 
     plant_name_eia: Mapped[str | None] = mapped_column(
         String, doc="The name of the plant. Source: EIA."
@@ -1434,33 +1482,40 @@ class Eia860mGeneratorsOperationalStatusTransitionDates(Base):
 
 
 class FossilInfrastructureProjects(Base):
-    """The purpose of this table is to give information on individual fossil infrastructure projects. Each row corresponds to one fossil facility such as a refinery or gas pipeline compressor station. The data source is the Environmental integrity Project (EIP) plus standard state/county names from the Census.
-
-    Note: facilities that are already operating, under construction, or cancelled have been excluded from this table. See the `operating_status` column for more details. To see the excluded projects, refer to the data warehouse table `eip_projects`.
-
-    ### Modeling Decisions
-
-    #### Negative Emissions Values
-
-    A few (21/439, 4.8% as of March 2022) emissions potentials have negative values. In all such cases, the proposed facility is a modification of an existing one. We confirmed with EIP staff that negative numbers indicate an emissions reduction compared to existing levels.
-
-    #### Utilization Adjustment on Emissions
-
-    The emissions estimates reported to regulators (and collected by EIP) assume 100% facility utilization. This is  certainly an overestimation of utilization, but in terms of emissions, it is possible that lax enforcement or overly conservative reporting offset this error. We applied a blanket 15% reduction to account for more realistic utilization based on typical refinery and petrochemical utilization figures. See the CO2 Estimation page for more details:
-
-    See [co2-estimation.md](../../co2-estimation.md).
-
-    #### Project - Facility Relationships
-
-    In reality these relationships are many-to-many: a single project can effect multiple facilities and a single facility can have multiple projects. But the overwhelming majority (675/681, 99%) are simpler single facility cases (one-to-many). For the sake of simplicity, only the first facility per project appears in this table.
-
-    #### Project- Permit Relationships
-
-    Project-permit relationships are many-to-many. Due to our limited interest in permit information to date, these relationships have been simplified by taking only a single permit. This drops a third (276 / 831, 33%) of permits. We suggest you use the data warehouse (specifically the eip_project_permit_association table) if you are interested in the full project - permit relationships.
-    """
-
     __tablename__ = "fossil_infrastructure_projects"
-    __table_args__ = {"schema": schema}
+    __table_args__ = {
+        "schema": schema,
+        "info": {
+            "description": inspect.cleandoc(
+                """
+                The purpose of this table is to give information on individual fossil infrastructure projects. Each row corresponds to one fossil facility such as a refinery or gas pipeline compressor station. The data source is the Environmental integrity Project (EIP) plus standard state/county names from the Census.
+
+                Note: facilities that are already operating, under construction, or cancelled have been excluded from this table. See the `operating_status` column for more details. To see the excluded projects, refer to the data warehouse table `eip_projects`.
+                """
+            ),
+            "modelling_decisions": inspect.cleandoc(
+                """
+                ### Negative Emissions Values
+
+                A few (21/439, 4.8% as of March 2022) emissions potentials have negative values. In all such cases, the proposed facility is a modification of an existing one. We confirmed with EIP staff that negative numbers indicate an emissions reduction compared to existing levels.
+
+                ### Utilization Adjustment on Emissions
+
+                The emissions estimates reported to regulators (and collected by EIP) assume 100% facility utilization. This is  certainly an overestimation of utilization, but in terms of emissions, it is possible that lax enforcement or overly conservative reporting offset this error. We applied a blanket 15% reduction to account for more realistic utilization based on typical refinery and petrochemical utilization figures. See the CO2 Estimation page for more details:
+
+                See [co2-estimation.md](../../co2-estimation.md).
+
+                ### Project - Facility Relationships
+
+                In reality these relationships are many-to-many: a single project can effect multiple facilities and a single facility can have multiple projects. But the overwhelming majority (675/681, 99%) are simpler single facility cases (one-to-many). For the sake of simplicity, only the first facility per project appears in this table.
+
+                ### Project- Permit Relationships
+
+                Project-permit relationships are many-to-many. Due to our limited interest in permit information to date, these relationships have been simplified by taking only a single permit. This drops a third (276 / 831, 33%) of permits. We suggest you use the data warehouse (specifically the eip_project_permit_association table) if you are interested in the full project - permit relationships.
+                """
+            ),
+        },
+    }
 
     project_id: Mapped[str] = mapped_column(
         String, primary_key=True, doc="Unique project identifier. Source: EIP."
