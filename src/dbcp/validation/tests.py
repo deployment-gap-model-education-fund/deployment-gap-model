@@ -7,7 +7,7 @@ import pandas as pd
 from sqlalchemy.engine import Engine
 
 from dbcp.helpers import get_duckdb_engine
-from dbcp.metadata.data_mart import counties_wide_format
+from dbcp.metadata.data_mart import CountiesWideFormat
 
 logger = logging.getLogger(__name__)
 
@@ -440,7 +440,7 @@ def test_civis_county_election_results(engine: Engine):
 @lru_cache(maxsize=1)
 def _get_non_county_cols_from_wide_format(engine: Engine) -> pd.Index:
     """Get the columns from counties_wide_format that are not derived from county-level data."""
-    wide_cols = pd.Index([col.name for col in counties_wide_format.columns])
+    wide_cols = pd.Index([col.name for col in CountiesWideFormat.__table__.columns])
     cols_to_fetch = wide_cols.difference(COUNTY_LEVEL_WIDE_FORMAT_COLS)
     return cols_to_fetch
 

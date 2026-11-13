@@ -4,7 +4,7 @@ Comparing power plants to petrochemical facilities requires a common metric. EIP
 
 ## De-rate EIP's CO2e Estimates by 15%
 
-EIP's CO2e emissions estimates come from Clean Air Act permitting documents. These estimates are defined as the emissions a facility would produce at 100% utilization. Such high utilization is rarely acheived in practice, so we de-rate the estimates accordingly. National average capacity utilization for refineries is about 85% ([per EIA](https://www.eia.gov/dnav/pet/pet_pnp_unc_dcu_nus_m.htm)), and for the chemical industry as a whole is about 75% ([per FRED](https://fred.stlouisfed.org/series/CAPUTLG325S)). We apply a coarse adjustment of -15% to CO2e estimates from EIP.
+EIP's CO2e emissions estimates come from Clean Air Act permitting documents. These estimates are defined as the emissions a facility would produce at 100% utilization. Such high utilization is rarely achieved in practice, so we de-rate the estimates accordingly. National average capacity utilization for refineries is about 85% ([per EIA](https://www.eia.gov/dnav/pet/pet_pnp_unc_dcu_nus_m.htm)), and for the chemical industry as a whole is about 75% ([per FRED](https://fred.stlouisfed.org/series/CAPUTLG325S)). We apply a coarse adjustment of -15% to CO2e estimates from EIP.
 
 There are several possible sources of bias in these estimates:
 
@@ -27,10 +27,10 @@ Proposed plants lack information about hypothetical fuel consumption, so we have
 The chain of estimation is as follows:
 
 1. Classify the plant technology based on capacity and fuel type (combustion turbine or combined cycle)
-1. Estimate capacity factor based on recent (2015+) existing plants of similar capacity and technology type (data from the EIA via [Catalyst Cooperative's PUDL database](https://catalyst.coop/pudl/)).
-1. Estimate electrical production by multiplying reported capacity with this estimated capacity factor
-1. Estimate input fuel consumption by combining electrical production estimates with technology-specific combustion efficiency [(“heat rates”) from the EIA](https://www.eia.gov/electricity/annual/html/epa_08_02.html).
-1. Estimate CO2e emissions by multiplying fuel consumption by the EPA emissions factor.
+2. Estimate capacity factor based on recent (2015+) existing plants of similar capacity and technology type (data from the EIA via [Catalyst Cooperative's PUDL database](https://catalyst.coop/pudl/)).
+3. Estimate electrical production by multiplying reported capacity with this estimated capacity factor
+4. Estimate input fuel consumption by combining electrical production estimates with technology-specific combustion efficiency [(“heat rates”) from the EIA](https://www.eia.gov/electricity/annual/html/epa_08_02.html).
+5. Estimate CO2e emissions by multiplying fuel consumption by the EPA emissions factor.
 
 #### Uncertainty
 
