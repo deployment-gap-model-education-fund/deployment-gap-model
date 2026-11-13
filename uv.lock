@@ -622,7 +622,7 @@ requires-dist = [
     { name = "matplotlib", specifier = "~=3.10.8" },
     { name = "numpy", specifier = "<3" },
     { name = "pandas", specifier = "~=2.3.3" },
-    { name = "pandas-gbq", specifier = "~=0.35.0" },
+    { name = "pandas-gbq", specifier = "~=0.35.3" },
     { name = "pandera", extras = ["io"], specifier = "~=0.26.1" },
     { name = "plotly", specifier = ">=7.0" },
     { name = "psycopg2-binary", specifier = "~=2.9.11" },
@@ -2038,7 +2038,7 @@ wheels = [
 
 [[package]]
 name = "pandas-gbq"
-version = "0.35.1"
+version = "0.35.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "db-dtypes" },
@@ -2054,9 +2054,9 @@ dependencies = [
     { name = "pydata-google-auth" },
     { name = "setuptools" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5b/23/9f321a360d4814c4890a9cc711fe53b3d8a0d66e29c20bd6e4e8553ca841/pandas_gbq-0.35.1.tar.gz", hash = "sha256:83045209ec006c1bd98f6f56e88982beddfd29bdfbf58fef1de39309bde5be99", size = 81121, upload-time = "2026-08-06T19:33:22.124Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a2/8c/9ab1945eed2c033f56ffb5898f0655dc1bcf43305c4b9447c4ddfb8f3314/pandas_gbq-0.35.3.tar.gz", hash = "sha256:adea5edd0ecae197f99850f35098a069782e08e99746cc7c917eea65889b957c", size = 81806, upload-time = "2026-10-23T00:56:27.549Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/41/86/802e0a4979c85d83d884eba4f77f5c2a57d9e986b56e3f7b7eba8b49fc06/pandas_gbq-0.35.1-py3-none-any.whl", hash = "sha256:d197bf5172bc89f50bec52fa0a3e18e3c6c095f10bb5be677c1998c48b50ea4a", size = 51720, upload-time = "2026-08-06T19:33:20.758Z" },
+    { url = "https://files.pythonhosted.org/packages/05/6a/9e6033639176f0b7318a694eec17e2578d384dfa400a73f67b15ad714b5e/pandas_gbq-0.35.3-py3-none-any.whl", hash = "sha256:a528f99d7bd5973bcc29f721b2d2e55aff0162f7788b855b1bae16f82eec6318", size = 51934, upload-time = "2026-10-23T00:56:25.872Z" },
 ]
 
 [[package]]
