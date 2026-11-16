@@ -36,3 +36,14 @@ Examples for each part:
 - `eia860m__annual__generators`
 
 This convention is meant to make table names legible at a glance: where the data came from, whether it is public, the time shape, the row grain, and what the table actually contains.
+
+## Schemas
+Tables are split between a "Data Warehouse" and "Data Mart". In `postgres`, tables are published into one schema, but this split still exists
+in the code and is a logical distinction between these tables.
+
+Data warehouse tables are normalized, source-specific tables which can be
+joined together to create wider tables ready for analysis. They are created
+by extracting the raw data from cloud storage archives, and doing transformations
+to the data to make them clean and well-normalized. Data mart tables
+are built from these data warehouse tables and denormalized to be immediately
+analysis ready without requiring joins.
