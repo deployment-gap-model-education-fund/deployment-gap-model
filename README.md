@@ -176,3 +176,28 @@ the associated `update-data` run that you want to publish.
 DBCP roughly follows an ETL(T) architecture. `dbcp.etl.etl()` extracts the raw data, cleans it then loads it into a data warehouse, a local postgres database in ourcase. The tables in the data warehouse are normalized to a certain degree (we need to define a clear data model).
 
 We then create denomalized tables for specific dashboards we call "data marts". To create a new data mart, create a new python file in the `dbcp.data_mart` module and implement a `create_data_mart()` function that returns the data_mart as a pandas data frame.
+
+# Documentation
+The docs are built with [zensical](https://zensical.org/docs/get-started/). Several static pages
+exist in the docs directory, but there are also auto-generated table level docs, which allow us to
+keep the table level documentation in sync with schemas. The auto-generated portions use jinja
+templating to create markdown files for each table and the `zensical.toml` config file. The templates
+can be found in `src/dbcp/metadata/templates`, and the actual rendering is done with a CLI command
+`render-table-docs`. The auto-generated markdown files will be created in `docs/generated_table_docs`,
+and these are not checked in to the repo. There is a `makefile` target to which wraps this CLI command
+and should be used for building docs. See the [Local Builds](#local-builds) section below.
+
+## Local Builds
+To build the docs and serve them to locally use:
+
+```
+make build_docs && uv run zensical serve
+```
+
+## Remote Deployments
+We use [github pages](https://docs.github.com/en/pages) for hosting docs. The `docs.yml` workflow
+will build and deploy docs off of `main`. The URL for the docs is:
+
+```
+deployment-gap-model.github.io/deployment-gap-model
+```

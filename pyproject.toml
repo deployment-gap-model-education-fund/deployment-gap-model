@@ -24,6 +24,7 @@ dependencies = [
   "google-cloud-storage~=3.8.0",
   "googlemaps~=4.10.0",
   "gridstatus~=0.34.0",
+  "jinja2>=3.1.6",
   "joblib~=1.6.0",
   "jupyterlab~=4.6.2",
   "matplotlib~=3.10.8",
@@ -140,5 +141,10 @@ ignore = [
 ]
 extend-select = ["NPY201"] # preview rule to easy migration to Numpy 2.0
 
+[tool.ruff.lint.per-file-ignores]
+"src/dbcp/metadata/*.py" = [
+  "D101",
+] # SQLAlchemy table docs live in __table_args__["info"]
+
 [dependency-groups]
-dev = ["pre-commit>=4.6.0"]
+dev = ["pre-commit>=4.6.0", "zensical>=0.0.60"]
