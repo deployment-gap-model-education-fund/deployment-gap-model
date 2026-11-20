@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = "==3.13.*"
 
 [[package]]
@@ -631,7 +631,7 @@ requires-dist = [
     { name = "matplotlib", specifier = "~=3.10.8" },
     { name = "numpy", specifier = "<3" },
     { name = "pandas", specifier = "~=2.3.3" },
-    { name = "pandas-gbq", specifier = "~=0.35.0" },
+    { name = "pandas-gbq", specifier = "~=0.35.4" },
     { name = "pandera", extras = ["io"], specifier = "~=0.26.1" },
     { name = "plotly", specifier = ">=7.0" },
     { name = "psycopg2-binary", specifier = "~=2.9.11" },
@@ -2048,7 +2048,7 @@ wheels = [
 
 [[package]]
 name = "pandas-gbq"
-version = "0.35.3"
+version = "0.35.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "db-dtypes" },
@@ -2064,9 +2064,9 @@ dependencies = [
     { name = "pydata-google-auth" },
     { name = "setuptools" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a2/8c/9ab1945eed2c033f56ffb5898f0655dc1bcf43305c4b9447c4ddfb8f3314/pandas_gbq-0.35.3.tar.gz", hash = "sha256:adea5edd0ecae197f99850f35098a069782e08e99746cc7c917eea65889b957c", size = 81806, upload-time = "2026-10-23T00:56:27.549Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c9/be/e6d59dca8e3bf4b0bf51866e6107161ca5f760a69ca8c9a79cd8d5b0ab97/pandas_gbq-0.35.4.tar.gz", hash = "sha256:a9bad2d16d100ee683294caff09b0d5c6e53aad393a262fd317e83a94642826d", size = 81548, upload-time = "2026-11-12T14:35:00.454Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/05/6a/9e6033639176f0b7318a694eec17e2578d384dfa400a73f67b15ad714b5e/pandas_gbq-0.35.3-py3-none-any.whl", hash = "sha256:a528f99d7bd5973bcc29f721b2d2e55aff0162f7788b855b1bae16f82eec6318", size = 51934, upload-time = "2026-10-23T00:56:25.872Z" },
+    { url = "https://files.pythonhosted.org/packages/72/41/fc796527a9cab6dbae9660118ccbffd0d8b02abc75f90bcef5ce92d625a6/pandas_gbq-0.35.4-py3-none-any.whl", hash = "sha256:165a72539673d9902e68d0c4e52a57e6936fb40ef4389f24dcc7f0ce9617bb6f", size = 51715, upload-time = "2026-11-12T14:34:59.03Z" },
 ]
 
 [[package]]
