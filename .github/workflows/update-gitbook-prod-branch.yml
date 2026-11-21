@@ -1,0 +1,68 @@
+---
+name: update-gitbook-prod-branch
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to publish to the production GitBook. Leave blank to use latest published release."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  update-prod-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release tag
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          INPUT_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            TAG="${{ github.event.release.tag_name }}"
+          elif [[ -n "${INPUT_TAG:-}" ]]; then
+            TAG="$INPUT_TAG"
+          else
+            TAG="$(gh release list \
+              --repo "$REPO" \
+              --exclude-drafts \
+              --exclude-pre-releases \
+              --json tagName \
+              --jq '.[0].tagName')"
+          fi
+
+          if [[ -z "${TAG:-}" ]]; then
+            echo "No published release tag found."
+            exit 1
+          fi
+
+          gh release view "$TAG" --repo "$REPO" >/dev/null
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Resolved production GitBook tag: $TAG"
+
+      - name: Move gitbook-prod branch to release tag
+        run: |
+          set -euo pipefail
+
+          git fetch --tags origin
+          git checkout --detach "${{ steps.release.outputs.tag }}"
+
+          if git ls-remote --exit-code --heads origin gitbook-prod >/dev/null 2>&1; then
+            git push --force-with-lease origin HEAD:gitbook-prod
+          else
+            git push origin HEAD:gitbook-prod
+          fi
